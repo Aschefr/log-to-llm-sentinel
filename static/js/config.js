@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     setupForm();
     setupTests();
+    setupOllamaModelSelect();
 });
 
 async function loadConfig() {
@@ -13,12 +14,67 @@ async function loadConfig() {
         document.getElementById('smtp-password').value = '';
         document.getElementById('smtp-tls').checked = config.smtp_tls !== false;
         document.getElementById('ollama-url').value = config.ollama_url || 'http://host.docker.internal:11434';
-        document.getElementById('ollama-model').value = config.ollama_model || 'llama3';
+        // Model select is populated async; keep desired value to apply later.
+        window.__desiredOllamaModel = config.ollama_model || 'llama3';
         document.getElementById('system-prompt').value = config.system_prompt || '';
         document.getElementById('notification-method').value = config.notification_method || 'smtp';
         document.getElementById('apprise-url').value = config.apprise_url || '';
     } catch (error) {
         console.error('Erreur chargement config:', error);
+    }
+}
+
+async function setupOllamaModelSelect() {
+    const select = document.getElementById('ollama-model');
+    const customGroup = document.getElementById('ollama-model-custom-group');
+    const customInput = document.getElementById('ollama-model-custom');
+    if (!select || !customGroup || !customInput) return;
+
+    function setCustomVisible(on) {
+        customGroup.classList.toggle('hidden', !on);
+    }
+
+    select.addEventListener('change', () => {
+        const v = select.value;
+        if (v === '__custom__') {
+            setCustomVisible(true);
+            customInput.focus();
+        } else {
+            setCustomVisible(false);
+        }
+    });
+
+    // Populate list
+    try {
+        const res = await apiFetch('/api/config/ollama/models');
+        const models = (res && res.models) ? res.models : [];
+
+        const desired = window.__desiredOllamaModel || 'llama3';
+        const hasDesired = models.includes(desired);
+
+        const options = [];
+        if (models.length === 0) {
+            options.push(`<option value="__custom__">Autre…</option>`);
+        } else {
+            options.push(...models.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`));
+            options.push(`<option value="__custom__">Autre…</option>`);
+        }
+        select.innerHTML = options.join('');
+
+        if (hasDesired) {
+            select.value = desired;
+            setCustomVisible(false);
+        } else {
+            select.value = '__custom__';
+            customInput.value = desired;
+            setCustomVisible(true);
+        }
+    } catch (e) {
+        // Fallback: allow manual
+        select.innerHTML = `<option value="__custom__">Autre…</option>`;
+        select.value = '__custom__';
+        customInput.value = window.__desiredOllamaModel || 'llama3';
+        setCustomVisible(true);
     }
 }
 
@@ -76,6 +132,12 @@ async function runTest(url, messageEl, buttonEl) {
 }
 
 async function saveConfig(messageEl) {
+    const modelSelect = document.getElementById('ollama-model');
+    const modelCustom = document.getElementById('ollama-model-custom');
+    const chosenModel = (modelSelect && modelSelect.value === '__custom__')
+        ? (modelCustom ? modelCustom.value : '')
+        : (modelSelect ? modelSelect.value : '');
+
     const data = {
         smtp_host: document.getElementById('smtp-host').value,
         smtp_port: parseInt(document.getElementById('smtp-port').value) || 587,
@@ -83,7 +145,7 @@ async function saveConfig(messageEl) {
         smtp_password: document.getElementById('smtp-password').value,
         smtp_tls: document.getElementById('smtp-tls').checked,
         ollama_url: document.getElementById('ollama-url').value,
-        ollama_model: document.getElementById('ollama-model').value,
+        ollama_model: chosenModel,
         system_prompt: document.getElementById('system-prompt').value,
         notification_method: document.getElementById('notification-method').value,
         apprise_url: document.getElementById('apprise-url').value,

@@ -200,6 +200,8 @@ def test_rule(rule_id: int):
             prompt=prompt,
             url=config_dict.get("ollama_url"),
             model=config_dict.get("ollama_model"),
+            timeout=90,
+            retries=2,
         )
         severity = orchestrator._detect_severity(response)
 

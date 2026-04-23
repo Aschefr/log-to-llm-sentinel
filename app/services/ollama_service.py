@@ -1,6 +1,7 @@
 import json
 import urllib.request
 import urllib.error
+import time
 from typing import Optional
 
 
@@ -15,6 +16,8 @@ class OllamaService:
         url: str = "http://host.docker.internal:11434",
         model: str = "llama3",
         timeout: int = 30,
+        retries: int = 2,
+        retry_delay_s: float = 2.0,
     ) -> str:
         """
         Envoie un prompt à Ollama et retourne la réponse.
@@ -35,42 +38,68 @@ class OllamaService:
             "stream": False,
         }
 
-        try:
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(
-                api_url,
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
+        attempts = max(1, int(retries) + 1)
+        last_err: Optional[str] = None
 
-            with urllib.request.urlopen(req, timeout=timeout) as response:
-                result = json.loads(response.read().decode("utf-8"))
-                return result.get("response", "Aucune réponse d'Ollama")
-
-        except urllib.error.HTTPError as e:
-            # HTTPError is also a file-like object that may contain a JSON body.
+        for attempt in range(1, attempts + 1):
             try:
-                body = e.read().decode("utf-8", errors="ignore")
-            except Exception:
-                body = ""
+                data = json.dumps(payload).encode("utf-8")
+                req = urllib.request.Request(
+                    api_url,
+                    data=data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
 
-            try:
-                parsed = json.loads(body) if body else {}
-            except Exception:
-                parsed = {}
+                with urllib.request.urlopen(req, timeout=timeout) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                    return result.get("response", "Aucune réponse d'Ollama")
 
-            detail = (
-                parsed.get("error")
-                or parsed.get("detail")
-                or body.strip()
-                or e.reason
-                or "Erreur HTTP"
-            )
-            return f"[Erreur Ollama] HTTP {getattr(e, 'code', '?')}: {detail}"
-        except urllib.error.URLError as e:
-            return f"[Erreur Ollama] Impossible de joindre Ollama: {str(e)}"
-        except json.JSONDecodeError:
-            return "[Erreur Ollama] Réponse JSON invalide"
-        except Exception as e:
-            return f"[Erreur Ollama] {str(e)}"
+            except urllib.error.HTTPError as e:
+                # HTTPError is also a file-like object that may contain a JSON body.
+                try:
+                    body = e.read().decode("utf-8", errors="ignore")
+                except Exception:
+                    body = ""
+
+                try:
+                    parsed = json.loads(body) if body else {}
+                except Exception:
+                    parsed = {}
+
+                detail = (
+                    parsed.get("error")
+                    or parsed.get("detail")
+                    or body.strip()
+                    or e.reason
+                    or "Erreur HTTP"
+                )
+
+                # Ollama can return 500 while loading a model; retry helps.
+                retryable = (
+                    getattr(e, "code", None) in (500, 503)
+                    and "loading model" in str(detail).lower()
+                )
+                last_err = f"[Erreur Ollama] HTTP {getattr(e, 'code', '?')}: {detail}"
+                if retryable and attempt < attempts:
+                    time.sleep(retry_delay_s * attempt)
+                    continue
+                return last_err
+
+            except urllib.error.URLError as e:
+                msg = str(e)
+                last_err = f"[Erreur Ollama] Impossible de joindre Ollama: {msg}"
+                retryable = "timed out" in msg.lower() or "timeout" in msg.lower()
+                if retryable and attempt < attempts:
+                    time.sleep(retry_delay_s * attempt)
+                    continue
+                return last_err
+
+            except json.JSONDecodeError:
+                last_err = "[Erreur Ollama] Réponse JSON invalide"
+                return last_err
+            except Exception as e:
+                last_err = f"[Erreur Ollama] {str(e)}"
+                return last_err
+
+        return last_err or "[Erreur Ollama] Erreur inconnue"

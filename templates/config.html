@@ -45,7 +45,12 @@
             </div>
             <div class="form-group">
                 <label for="ollama-model">Modèle</label>
-                <input type="text" id="ollama-model" placeholder="llama3">
+                <select id="ollama-model"></select>
+                <div class="form-hint">La liste est récupérée depuis Ollama. Choisis “Autre…” pour saisir manuellement.</div>
+            </div>
+            <div class="form-group hidden" id="ollama-model-custom-group">
+                <label for="ollama-model-custom">Modèle (manuel)</label>
+                <input type="text" id="ollama-model-custom" placeholder="ex: llama3:latest">
             </div>
             <div class="form-group">
                 <label for="system-prompt">Prompt système</label>

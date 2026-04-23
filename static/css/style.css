@@ -531,6 +531,10 @@ body {
     display: none;
 }
 
+.hidden {
+    display: none;
+}
+
 /* Loading */
 .loading {
     text-align: center;
