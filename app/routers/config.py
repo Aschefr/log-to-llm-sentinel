@@ -125,11 +125,33 @@ def test_ollama():
         try:
             req = urllib.request.Request(f"{base}/api/tags", method="GET")
             with urllib.request.urlopen(req, timeout=8) as r:
-                _ = r.read()  # consume
+                tags_raw = r.read().decode("utf-8", errors="ignore")
         except urllib.error.HTTPError as e:
             raise HTTPException(status_code=502, detail=f"[Erreur Ollama] /api/tags a répondu HTTP {e.code}")
         except urllib.error.URLError as e:
             raise HTTPException(status_code=502, detail=f"[Erreur Ollama] Impossible de joindre Ollama: {str(e)}")
+
+        try:
+            tags = json.loads(tags_raw) if tags_raw else {}
+        except Exception:
+            tags = {}
+
+        available_models = []
+        try:
+            for m in tags.get("models", []) or []:
+                name = m.get("name")
+                if name:
+                    available_models.append(name)
+        except Exception:
+            available_models = []
+
+        if available_models and model not in available_models:
+            preview = ", ".join(available_models[:12])
+            suffix = "…" if len(available_models) > 12 else ""
+            raise HTTPException(
+                status_code=400,
+                detail=f"Modèle Ollama introuvable: '{model}'. Modèles disponibles: {preview}{suffix}",
+            )
 
         # 2) generation (courte)
         prompt = "Réponds uniquement par 'OK'."
@@ -138,7 +160,12 @@ def test_ollama():
         if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
             raise HTTPException(status_code=502, detail=resp)
 
-        return {"ok": True, "detail": "Connexion Ollama OK", "sample": resp}
+        return {
+            "ok": True,
+            "detail": "Connexion Ollama OK",
+            "sample": resp,
+            "available_models": available_models,
+        }
     finally:
         db.close()
 

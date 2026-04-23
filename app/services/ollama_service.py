@@ -48,6 +48,26 @@ class OllamaService:
                 result = json.loads(response.read().decode("utf-8"))
                 return result.get("response", "Aucune réponse d'Ollama")
 
+        except urllib.error.HTTPError as e:
+            # HTTPError is also a file-like object that may contain a JSON body.
+            try:
+                body = e.read().decode("utf-8", errors="ignore")
+            except Exception:
+                body = ""
+
+            try:
+                parsed = json.loads(body) if body else {}
+            except Exception:
+                parsed = {}
+
+            detail = (
+                parsed.get("error")
+                or parsed.get("detail")
+                or body.strip()
+                or e.reason
+                or "Erreur HTTP"
+            )
+            return f"[Erreur Ollama] HTTP {getattr(e, 'code', '?')}: {detail}"
         except urllib.error.URLError as e:
             return f"[Erreur Ollama] Impossible de joindre Ollama: {str(e)}"
         except json.JSONDecodeError:
