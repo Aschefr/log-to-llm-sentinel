@@ -1,7 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import os
@@ -62,15 +62,15 @@ app.include_router(dashboard.router)
 
 # ── Pages ──
 @app.get("/")
-def dashboard_page(request):
+def dashboard_page(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request})
 
 
 @app.get("/rules")
-def rules_page(request):
+def rules_page(request: Request):
     return templates.TemplateResponse("rules.html", {"request": request})
 
 
 @app.get("/config")
-def config_page(request):
+def config_page(request: Request):
     return templates.TemplateResponse("config.html", {"request": request})
