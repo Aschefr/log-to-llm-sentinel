@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadRules();
     setupModal();
     setupKeywordSuggestions();
+    loadAnalyses();
 });
 
 const TYPICAL_KEYWORDS = [
@@ -86,9 +87,11 @@ async function loadRules() {
                     <h3>${escapeHtml(rule.name)}</h3>
                     <p>📁 ${escapeHtml(rule.log_file_path)}</p>
                     <p>🔑 ${rule.keywords.join(', ')}</p>
+                    ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}
                     <p>${rule.enabled ? '✅ Activée' : '❌ Désactivée'} | 🔔 ${rule.notify_on_match ? 'Notifications activées' : 'Notifications désactivées'}</p>
                 </div>
                 <div class="rule-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
                     <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
                 </div>
@@ -96,6 +99,59 @@ async function loadRules() {
         `).join('');
     } catch (error) {
         console.error('Erreur chargement règles:', error);
+    }
+}
+
+let _analysesRuleFilter = null;
+
+async function loadAnalyses() {
+    const container = document.getElementById('rules-analyses');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">Chargement...</div>';
+
+    try {
+        const url = _analysesRuleFilter
+            ? `/api/dashboard/recent?limit=20&rule_id=${encodeURIComponent(_analysesRuleFilter)}`
+            : '/api/dashboard/recent?limit=20';
+        const analyses = await apiFetch(url);
+
+        if (!analyses || analyses.length === 0) {
+            container.innerHTML = '<div class="loading">Aucune analyse pour le moment</div>';
+            return;
+        }
+
+        container.innerHTML = analyses.map(a => `
+            <div class="analysis-card">
+                <div class="analysis-header">
+                    <div>
+                        <strong>Règle #${a.rule_id}</strong>
+                        <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
+                    </div>
+                    <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                </div>
+                <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
+                <div class="analysis-response">${escapeHtml(a.ollama_response || '')}</div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Erreur analyses:', e);
+        container.innerHTML = `<div class="loading">Erreur: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
+    }
+}
+
+async function testRule(id) {
+    try {
+        // UI feedback: filter history on this rule after test
+        _analysesRuleFilter = id;
+        const res = await apiFetch(`/api/rules/${id}/test`, { method: 'POST' });
+        await loadAnalyses();
+
+        // Quick inline info for the user
+        const sev = res.severity ? res.severity.toUpperCase() : 'INFO';
+        alert(`Test OK (${sev}). Réponse ajoutée à l’historique.`);
+    } catch (e) {
+        console.error('Erreur test règle:', e);
+        alert('Erreur test: ' + (e.message || 'inconnue'));
     }
 }
 

@@ -36,15 +36,14 @@ def get_stats():
 
 
 @router.get("/recent")
-def get_recent_analyses(limit: int = 10):
+def get_recent_analyses(limit: int = 10, rule_id: int | None = None):
     db = SessionLocal()
     try:
-        analyses = (
-            db.query(Analysis)
-            .order_by(Analysis.analyzed_at.desc())
-            .limit(limit)
-            .all()
-        )
+        q = db.query(Analysis)
+        if rule_id is not None:
+            q = q.filter(Analysis.rule_id == rule_id)
+
+        analyses = q.order_by(Analysis.analyzed_at.desc()).limit(limit).all()
         return [
             {
                 "id": a.id,

@@ -2,11 +2,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+import os
 
 from app.database import SessionLocal
-from app.models import Rule
+from app.models import Rule, Analysis, GlobalConfig
+from app.services.orchestrator import Orchestrator
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
+orchestrator = Orchestrator()
 
 
 class RuleCreate(BaseModel):
@@ -126,5 +129,100 @@ def delete_rule(rule_id: int):
         db.delete(rule)
         db.commit()
         return {"message": "Règle supprimée"}
+    finally:
+        db.close()
+
+
+def _read_last_non_empty_line(path: str, max_bytes: int = 65536) -> Optional[str]:
+    """
+    Lit la dernière ligne non vide d'un fichier sans charger tout le fichier en mémoire.
+    Retourne None si aucune ligne utile.
+    """
+    if not os.path.exists(path):
+        return None
+
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            end = f.tell()
+            if end == 0:
+                return None
+
+            to_read = min(max_bytes, end)
+            f.seek(end - to_read)
+            chunk = f.read(to_read)
+
+        # Decode permissive
+        text = chunk.decode("utf-8", errors="ignore")
+        lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
+        if not lines:
+            return None
+        return lines[-1]
+    except Exception:
+        return None
+
+
+@router.post("/{rule_id}/test")
+def test_rule(rule_id: int):
+    """
+    Envoie la dernière ligne du fichier log de la règle pour analyse,
+    sauvegarde l'analyse en BDD, et renvoie le résultat.
+    """
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="Règle non trouvée")
+
+        last_line = _read_last_non_empty_line(rule.log_file_path)
+        if not last_line:
+            raise HTTPException(
+                status_code=400,
+                detail="Impossible de lire une dernière ligne (fichier introuvable, vide, ou illisible).",
+            )
+
+        config = db.query(GlobalConfig).first()
+        config_dict = {
+            "smtp_host": config.smtp_host if config else "",
+            "smtp_port": config.smtp_port if config else 587,
+            "smtp_user": config.smtp_user if config else "",
+            "smtp_password": config.smtp_password if config else "",
+            "smtp_tls": config.smtp_tls if config else True,
+            "ollama_url": config.ollama_url if config else "http://host.docker.internal:11434",
+            "ollama_model": config.ollama_model if config else "llama3",
+            "system_prompt": config.system_prompt if config else "",
+            "notification_method": config.notification_method if config else "smtp",
+            "apprise_url": config.apprise_url if config else "",
+        }
+
+        prompt = orchestrator._build_prompt(rule, last_line, config_dict.get("system_prompt", ""))
+        response = orchestrator.ollama.analyze(
+            prompt=prompt,
+            url=config_dict.get("ollama_url"),
+            model=config_dict.get("ollama_model"),
+        )
+        severity = orchestrator._detect_severity(response)
+
+        analysis = Analysis(
+            rule_id=rule.id,
+            triggered_line=last_line,
+            context_before_json="[]",
+            context_after_json="[]",
+            ollama_response=response,
+            severity=severity,
+            notified=False,
+        )
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
+
+        return {
+            "id": analysis.id,
+            "rule_id": analysis.rule_id,
+            "triggered_line": analysis.triggered_line,
+            "ollama_response": analysis.ollama_response,
+            "severity": analysis.severity,
+            "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
+        }
     finally:
         db.close()
