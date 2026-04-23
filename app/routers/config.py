@@ -117,9 +117,23 @@ def test_ollama():
         if not model:
             raise HTTPException(status_code=400, detail="Modèle Ollama manquant")
 
-        # Test minimal: génération très courte
+        # Test minimal en 2 étapes:
+        # 1) reachability via /api/tags (plus parlant qu'un 404 sur generate)
+        base = url.strip().rstrip("/")
+        if base.endswith("/api"):
+            base = base[: -len("/api")]
+        try:
+            req = urllib.request.Request(f"{base}/api/tags", method="GET")
+            with urllib.request.urlopen(req, timeout=8) as r:
+                _ = r.read()  # consume
+        except urllib.error.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"[Erreur Ollama] /api/tags a répondu HTTP {e.code}")
+        except urllib.error.URLError as e:
+            raise HTTPException(status_code=502, detail=f"[Erreur Ollama] Impossible de joindre Ollama: {str(e)}")
+
+        # 2) generation (courte)
         prompt = "Réponds uniquement par 'OK'."
-        resp = OllamaService().analyze(prompt=prompt, url=url, model=model, timeout=10)
+        resp = OllamaService().analyze(prompt=prompt, url=base, model=model, timeout=10)
 
         if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
             raise HTTPException(status_code=502, detail=resp)

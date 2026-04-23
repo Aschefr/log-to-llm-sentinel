@@ -19,7 +19,16 @@ class OllamaService:
         """
         Envoie un prompt à Ollama et retourne la réponse.
         """
-        api_url = f"{url}/api/generate"
+        base = (url or "").strip()
+        # Users often paste "...:11434/api" in the UI. Normalize to the base.
+        base = base.rstrip("/")
+        if base.endswith("/api"):
+            base = base[: -len("/api")]
+        # Allow passing the full endpoint too.
+        if base.endswith("/api/generate"):
+            api_url = base
+        else:
+            api_url = f"{base}/api/generate"
         payload = {
             "model": model,
             "prompt": prompt,
