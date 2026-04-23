@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     loadConfig();
     setupForm();
+    setupTests();
 });
 
 async function loadConfig() {
@@ -29,6 +30,49 @@ function setupForm() {
         e.preventDefault();
         await saveConfig(messageEl);
     });
+}
+
+function setupTests() {
+    const btnOllama = document.getElementById('test-ollama-btn');
+    const btnSmtp = document.getElementById('test-smtp-btn');
+    const btnApprise = document.getElementById('test-apprise-btn');
+
+    const msgOllama = document.getElementById('ollama-test-message');
+    const msgSmtp = document.getElementById('smtp-test-message');
+    const msgApprise = document.getElementById('apprise-test-message');
+
+    if (btnOllama && msgOllama) {
+        btnOllama.addEventListener('click', async () => {
+            await runTest('/api/config/test/ollama', msgOllama, btnOllama);
+        });
+    }
+    if (btnSmtp && msgSmtp) {
+        btnSmtp.addEventListener('click', async () => {
+            await runTest('/api/config/test/smtp', msgSmtp, btnSmtp);
+        });
+    }
+    if (btnApprise && msgApprise) {
+        btnApprise.addEventListener('click', async () => {
+            await runTest('/api/config/test/apprise', msgApprise, btnApprise);
+        });
+    }
+}
+
+async function runTest(url, messageEl, buttonEl) {
+    const oldText = buttonEl.textContent;
+    buttonEl.disabled = true;
+    buttonEl.textContent = 'Test en cours...';
+    try {
+        const res = await apiFetch(url, { method: 'POST' });
+        const detail = (res && res.detail) ? res.detail : 'OK';
+        showMessage(messageEl, detail, 'success');
+    } catch (error) {
+        console.error('Erreur test:', error);
+        showMessage(messageEl, 'Erreur: ' + (error.message || 'inconnue'), 'error');
+    } finally {
+        buttonEl.disabled = false;
+        buttonEl.textContent = oldText;
+    }
 }
 
 async function saveConfig(messageEl) {

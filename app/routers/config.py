@@ -4,6 +4,12 @@ from typing import Optional
 
 from app.database import SessionLocal
 from app.models import GlobalConfig
+from app.services.notification_service import NotificationService
+from app.services.ollama_service import OllamaService
+
+import json
+import urllib.request
+import urllib.error
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -78,5 +84,94 @@ def update_config(config_data: ConfigUpdate):
 
         db.commit()
         return {"message": "Configuration mise à jour"}
+    finally:
+        db.close()
+
+
+def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
+    return {
+        "smtp_host": config.smtp_host if config else "",
+        "smtp_port": config.smtp_port if config else 587,
+        "smtp_user": config.smtp_user if config else "",
+        "smtp_password": config.smtp_password if config else "",
+        "smtp_tls": config.smtp_tls if config else True,
+        "ollama_url": config.ollama_url if config else "http://host.docker.internal:11434",
+        "ollama_model": config.ollama_model if config else "llama3",
+        "system_prompt": config.system_prompt if config else "",
+        "notification_method": config.notification_method if config else "smtp",
+        "apprise_url": config.apprise_url if config else "",
+    }
+
+
+@router.post("/test/ollama")
+def test_ollama():
+    db = SessionLocal()
+    try:
+        config = db.query(GlobalConfig).first()
+        cfg = _get_config_dict(config)
+
+        url = (cfg.get("ollama_url") or "").strip()
+        model = (cfg.get("ollama_model") or "").strip()
+        if not url:
+            raise HTTPException(status_code=400, detail="URL Ollama manquante")
+        if not model:
+            raise HTTPException(status_code=400, detail="Modèle Ollama manquant")
+
+        # Test minimal: génération très courte
+        prompt = "Réponds uniquement par 'OK'."
+        resp = OllamaService().analyze(prompt=prompt, url=url, model=model, timeout=10)
+
+        if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
+            raise HTTPException(status_code=502, detail=resp)
+
+        return {"ok": True, "detail": "Connexion Ollama OK", "sample": resp}
+    finally:
+        db.close()
+
+
+@router.post("/test/smtp")
+def test_smtp():
+    db = SessionLocal()
+    try:
+        config = db.query(GlobalConfig).first()
+        cfg = _get_config_dict(config)
+
+        # Envoie un email de test vers smtp_user (comportement existant)
+        notifier = NotificationService()
+        subject = "[Sentinel] Test SMTP"
+        body = "<p>Ceci est un email de test envoyé par Log-to-LLM-Sentinel.</p>"
+        ok = notifier._send_smtp(subject, body, cfg, to_email=cfg.get("smtp_user") or None)
+
+        if not ok:
+            raise HTTPException(status_code=502, detail="Échec de l'envoi SMTP (vérifie hôte/port/user/mdp/TLS)")
+
+        return {"ok": True, "detail": "Email SMTP envoyé (si configuration correcte)"}
+    finally:
+        db.close()
+
+
+@router.post("/test/apprise")
+def test_apprise():
+    """
+    Test “connexion” Apprise : vérifie que l'URL est joignable.
+    (La livraison d'une notification dépend de ta config Apprise.)
+    """
+    db = SessionLocal()
+    try:
+        config = db.query(GlobalConfig).first()
+        cfg = _get_config_dict(config)
+
+        apprise_url = (cfg.get("apprise_url") or "").strip()
+        if not apprise_url:
+            raise HTTPException(status_code=400, detail="URL Apprise manquante")
+
+        # Test simple de reachability HTTP
+        try:
+            req = urllib.request.Request(apprise_url, method="GET")
+            with urllib.request.urlopen(req, timeout=8) as r:
+                status = getattr(r, "status", 200)
+                return {"ok": True, "detail": f"Apprise joignable (HTTP {status})"}
+        except urllib.error.URLError as e:
+            raise HTTPException(status_code=502, detail=f"Apprise injoignable: {str(e)}")
     finally:
         db.close()

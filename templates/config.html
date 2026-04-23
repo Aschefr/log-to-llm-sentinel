@@ -31,6 +31,10 @@
                     Utiliser TLS
                 </label>
             </div>
+            <div class="form-actions" style="margin-top: 0.5rem;">
+                <button type="button" id="test-smtp-btn" class="btn btn-secondary">Tester SMTP</button>
+            </div>
+            <div id="smtp-test-message" class="message hidden"></div>
         </section>
 
         <section class="config-section">
@@ -47,6 +51,10 @@
                 <label for="system-prompt">Prompt système</label>
                 <textarea id="system-prompt" rows="5" placeholder="Instructions système pour l'analyse..."></textarea>
             </div>
+            <div class="form-actions" style="margin-top: 0.5rem;">
+                <button type="button" id="test-ollama-btn" class="btn btn-secondary">Tester Ollama</button>
+            </div>
+            <div id="ollama-test-message" class="message hidden"></div>
         </section>
 
         <section class="config-section">
@@ -62,6 +70,10 @@
                 <label for="apprise-url">URL Apprise (si applicable)</label>
                 <input type="text" id="apprise-url" placeholder="http://localhost:8000">
             </div>
+            <div class="form-actions" style="margin-top: 0.5rem;">
+                <button type="button" id="test-apprise-btn" class="btn btn-secondary">Tester Apprise</button>
+            </div>
+            <div id="apprise-test-message" class="message hidden"></div>
         </section>
 
         <div class="form-actions">
