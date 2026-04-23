@@ -1,7 +1,74 @@
 document.addEventListener('DOMContentLoaded', () => {
     loadRules();
     setupModal();
+    setupKeywordSuggestions();
 });
+
+const TYPICAL_KEYWORDS = [
+    'error',
+    'exception',
+    'fatal',
+    'critical',
+    'warning',
+    'warn',
+    'timeout',
+    'timed out',
+    'connection refused',
+    'refused',
+    'unhandled',
+    'panic',
+    'traceback',
+    'stacktrace',
+    'failed',
+    'failure',
+    'permission denied',
+    'unauthorized',
+    'forbidden',
+    'rate limit',
+    'oom',
+    'out of memory',
+    'disk full',
+    'no space left',
+    'segfault',
+    '502',
+    '503',
+    '504',
+];
+
+function setupKeywordSuggestions() {
+    const datalist = document.getElementById('keywords-suggestions');
+    const chips = document.getElementById('keyword-chips');
+    if (!datalist || !chips) return;
+
+    datalist.innerHTML = TYPICAL_KEYWORDS.map(k => `<option value="${escapeHtml(k)}"></option>`).join('');
+
+    // Chips: show a short curated list (avoid overwhelming)
+    const chipList = ['error', 'exception', 'timeout', 'permission denied', 'unauthorized', 'disk full', 'out of memory', 'panic', '502', '503'];
+    chips.innerHTML = chipList.map(k => `<span class="chip" data-keyword="${escapeHtml(k)}">${escapeHtml(k)} +</span>`).join('');
+
+    chips.addEventListener('click', (e) => {
+        const el = e.target.closest('.chip');
+        if (!el) return;
+        const kw = el.getAttribute('data-keyword');
+        if (!kw) return;
+        addKeywordToInput(kw);
+    });
+}
+
+function addKeywordToInput(keyword) {
+    const input = document.getElementById('rule-keywords');
+    if (!input) return;
+    const current = input.value
+        .split(',')
+        .map(k => k.trim())
+        .filter(Boolean);
+
+    if (!current.includes(keyword)) {
+        current.push(keyword);
+        input.value = current.join(', ');
+    }
+    input.focus();
+}
 
 async function loadRules() {
     try {
@@ -39,6 +106,8 @@ function setupModal() {
     const cancelBtn = document.getElementById('cancel-rule');
     const form = document.getElementById('rule-form');
 
+    setupFileBrowser();
+
     addBtn.addEventListener('click', () => {
         resetForm();
         modal.classList.remove('hidden');
@@ -67,6 +136,144 @@ function resetForm() {
     document.getElementById('rule-enabled').checked = true;
     document.getElementById('rule-notify').checked = true;
     document.getElementById('modal-title').textContent = 'Nouvelle règle';
+    closeFileBrowser();
+}
+
+let _fileRootsCache = null;
+let _fileBrowserCurrentPath = null;
+
+function setupFileBrowser() {
+    const browseBtn = document.getElementById('browse-logs-btn');
+    const browser = document.getElementById('file-browser');
+    const closeBtn = document.getElementById('file-browser-close');
+    const list = document.getElementById('file-browser-list');
+    const breadcrumb = document.getElementById('file-browser-breadcrumb');
+    const showHidden = document.getElementById('file-browser-show-hidden');
+
+    if (!browseBtn || !browser || !closeBtn || !list || !breadcrumb || !showHidden) return;
+
+    browseBtn.addEventListener('click', async () => {
+        browser.classList.toggle('hidden');
+        if (browser.classList.contains('hidden')) return;
+
+        await ensureFileRoots();
+        const desired = getSuggestedBrowsePath();
+        const startPath = desired || (_fileRootsCache && _fileRootsCache[0]) || '/logs';
+        await browsePath(startPath);
+    });
+
+    closeBtn.addEventListener('click', () => closeFileBrowser());
+
+    showHidden.addEventListener('change', async () => {
+        if (!_fileBrowserCurrentPath) return;
+        await browsePath(_fileBrowserCurrentPath);
+    });
+
+    list.addEventListener('click', async (e) => {
+        const row = e.target.closest('[data-path]');
+        if (!row) return;
+        const path = row.getAttribute('data-path');
+        const isDir = row.getAttribute('data-is-dir') === 'true';
+        if (!path) return;
+
+        if (isDir) {
+            await browsePath(path);
+        } else {
+            document.getElementById('rule-path').value = path;
+            closeFileBrowser();
+        }
+    });
+
+    breadcrumb.addEventListener('click', async (e) => {
+        const el = e.target.closest('[data-root]');
+        if (!el) return;
+        const root = el.getAttribute('data-root');
+        if (!root) return;
+        await browsePath(root);
+    });
+}
+
+function closeFileBrowser() {
+    const browser = document.getElementById('file-browser');
+    if (!browser) return;
+    browser.classList.add('hidden');
+}
+
+async function ensureFileRoots() {
+    if (_fileRootsCache) return _fileRootsCache;
+    try {
+        const res = await apiFetch('/api/files/roots');
+        _fileRootsCache = (res && res.roots) || [];
+    } catch (e) {
+        _fileRootsCache = [];
+    }
+    return _fileRootsCache;
+}
+
+function getSuggestedBrowsePath() {
+    const input = document.getElementById('rule-path');
+    if (!input) return null;
+    const v = (input.value || '').trim();
+    if (!v) return null;
+    // If user entered a file path, start from its parent folder.
+    const slash = Math.max(v.lastIndexOf('/'), v.lastIndexOf('\\'));
+    if (slash <= 0) return v;
+    return v.slice(0, slash);
+}
+
+async function browsePath(path) {
+    const list = document.getElementById('file-browser-list');
+    const breadcrumb = document.getElementById('file-browser-breadcrumb');
+    const showHidden = document.getElementById('file-browser-show-hidden');
+    if (!list || !breadcrumb || !showHidden) return;
+
+    list.innerHTML = '<div class="loading">Chargement...</div>';
+
+    try {
+        const res = await apiFetch(`/api/files/browse?path=${encodeURIComponent(path)}&show_hidden=${showHidden.checked ? 'true' : 'false'}`);
+        _fileBrowserCurrentPath = res.path;
+
+        const roots = await ensureFileRoots();
+        const rootsLinks = (roots || [])
+            .slice(0, 3)
+            .map(r => `<span class="chip" data-root="${escapeHtml(r)}">📌 ${escapeHtml(r)}</span>`)
+            .join(' ');
+
+        breadcrumb.innerHTML = `
+            <div><strong>${escapeHtml(res.path)}</strong></div>
+            ${rootsLinks ? `<div class="form-hint">Racines: ${rootsLinks}</div>` : ''}
+        `;
+
+        const rows = [];
+        if (res.parent) {
+            rows.push(renderBrowserRow({ name: '.. (parent)', path: res.parent, is_dir: true, readable: true }, true));
+        }
+
+        for (const e of res.entries) {
+            rows.push(renderBrowserRow(e, false));
+        }
+
+        list.innerHTML = rows.join('') || '<div class="loading">Dossier vide</div>';
+    } catch (error) {
+        console.error('Erreur browse:', error);
+        list.innerHTML = `<div class="loading">Erreur: ${escapeHtml(error.message || 'Impossible de lister ce dossier')}</div>`;
+    }
+}
+
+function renderBrowserRow(entry, isParent) {
+    const icon = entry.is_dir ? '📁' : '📄';
+    const meta = entry.is_dir ? 'Dossier' : 'Fichier';
+    const disabled = entry.readable === false ? 'opacity:0.6; pointer-events:none;' : '';
+    const name = isParent ? entry.name : entry.name;
+    return `
+        <div class="file-browser-item" style="${disabled}" data-path="${escapeHtml(entry.path)}" data-is-dir="${entry.is_dir ? 'true' : 'false'}">
+            <div class="left">
+                <span>${icon}</span>
+                <span class="name">${escapeHtml(name)}</span>
+            </div>
+            <div class="meta">${meta}${entry.readable === false ? ' • illisible' : ''}</div>
+        </div>
+    `;
 }
 
 async function saveRule() {
@@ -113,6 +320,7 @@ async function editRule(id) {
         document.getElementById('rule-notify').checked = rule.notify_on_match;
         document.getElementById('modal-title').textContent = 'Éditer la règle';
         document.getElementById('rule-modal').classList.remove('hidden');
+        closeFileBrowser();
     } catch (error) {
         console.error('Erreur chargement règle:', error);
     }

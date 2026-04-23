@@ -28,14 +28,38 @@
                 </div>
                 <div class="form-group">
                     <label for="rule-path">Chemin du fichier log</label>
-                    <input type="text" id="rule-path" required placeholder="/logs/app.log">
+                    <div class="input-row">
+                        <input type="text" id="rule-path" required placeholder="/logs/app.log">
+                        <button type="button" id="browse-logs-btn" class="btn btn-secondary btn-sm">Parcourir</button>
+                    </div>
+                    <div id="file-browser" class="file-browser hidden">
+                        <div class="file-browser-header">
+                            <div class="file-browser-breadcrumb" id="file-browser-breadcrumb"></div>
+                            <div class="file-browser-actions">
+                                <label class="inline-checkbox">
+                                    <input type="checkbox" id="file-browser-show-hidden">
+                                    Afficher fichiers cachés
+                                </label>
+                                <button type="button" id="file-browser-close" class="btn btn-secondary btn-sm">Fermer</button>
+                            </div>
+                        </div>
+                        <div id="file-browser-list" class="file-browser-list">
+                            <div class="loading">Chargement...</div>
+                        </div>
+                        <div class="file-browser-hint">
+                            Astuce : monte tes logs dans Docker (ex: volume vers <code>/logs</code>) puis sélectionne le fichier ici.
+                        </div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="rule-keywords">Mots-clés (séparés par des virgules)</label>
-                    <input type="text" id="rule-keywords" placeholder="error, exception, fatal">
+                    <input type="text" id="rule-keywords" list="keywords-suggestions" placeholder="error, exception, fatal">
+                    <datalist id="keywords-suggestions"></datalist>
+                    <div class="keyword-chips" id="keyword-chips"></div>
+                    <div class="form-hint">Clique sur une suggestion pour l’ajouter, ou écris librement.</div>
                 </div>
                 <div class="form-group">
-                    <label for="rule-context">Contexte application</label>
+                    <label for="rule-context">Contexte applicatif (optionnel)</label>
                     <textarea id="rule-context" rows="3" placeholder="Description du contexte..."></textarea>
                 </div>
                 <div class="form-group checkbox-group">

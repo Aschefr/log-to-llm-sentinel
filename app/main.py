@@ -8,6 +8,7 @@ import os
 
 from app.database import init_db
 from app.routers import rules, config, dashboard
+from app.routers import files as files_router
 from app.services.log_watcher import LogWatcher
 from app.services.orchestrator import Orchestrator
 
@@ -58,6 +59,7 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 app.include_router(rules.router)
 app.include_router(config.router)
 app.include_router(dashboard.router)
+app.include_router(files_router.router)
 
 
 # ── Pages ──

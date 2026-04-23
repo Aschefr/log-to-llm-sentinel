@@ -8,6 +8,32 @@ services:
     volumes:
       - ./data:/app/data
       - ./logs:/logs
+      # -----------------------------
+      # Exemples (à dé-commenter)
+      # Monte un dossier de logs local dans le conteneur en lecture seule :
+      # - "C:/chemin/vers/tes/logs:/host-logs:ro"
+      #
+      # Monte des logs système Linux (si tu es sur Linux) :
+      # - "/var/log:/host-var-log:ro"
+      #
+      # Exemple de dossier de logs applicatifs :
+      # - "/opt/myapp/logs:/host-myapp-logs:ro"
+      # -----------------------------
     environment:
       - PYTHONUNBUFFERED=1
+      # Racines autorisées pour le “browser” de fichiers dans l’UI.
+      # Mets ici les chemins côté conteneur (ceux à droite dans volumes:).
+      - SENTINEL_BROWSE_ROOTS=/logs,/app/data,/host-logs,/host-var-log,/host-myapp-logs
     restart: unless-stopped
+
+  # (Optionnel) Ollama à côté du sentinel, si tu veux un setup “tout en docker”.
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama:/root/.ollama
+  #   restart: unless-stopped
+
+# volumes:
+#   ollama:

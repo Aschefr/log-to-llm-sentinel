@@ -361,6 +361,139 @@ body {
     margin-top: 1.5rem;
 }
 
+.form-hint {
+    margin-top: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+.input-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.input-row input {
+    flex: 1;
+}
+
+.inline-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+/* File browser */
+.file-browser {
+    margin-top: 0.75rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 0.75rem;
+}
+
+.file-browser.hidden {
+    display: none;
+}
+
+.file-browser-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.file-browser-breadcrumb {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    word-break: break-all;
+}
+
+.file-browser-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.file-browser-list {
+    max-height: 260px;
+    overflow: auto;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.file-browser-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0.5rem;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(51, 65, 85, 0.35);
+}
+
+.file-browser-item:hover {
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.file-browser-item .left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.file-browser-item .name {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-browser-item .meta {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    flex: 0 0 auto;
+}
+
+.file-browser-hint {
+    margin-top: 0.75rem;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.4;
+}
+
+/* Keyword chips */
+.keyword-chips {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.35);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.chip:hover {
+    background: rgba(59, 130, 246, 0.22);
+}
+
 /* Config Page */
 .config-section {
     background: var(--bg-card);
