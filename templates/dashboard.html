@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Log Sentinel{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <h1>Dashboard</h1>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="total-rules">0</div>
+            <div class="stat-label">Règles totales</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="active-rules">0</div>
+            <div class="stat-label">Règles actives</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="total-analyses">0</div>
+            <div class="stat-label">Analyses totales</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="today-analyses">0</div>
+            <div class="stat-label">Analyses aujourd'hui</div>
+        </div>
+    </div>
+
+    <div class="severity-grid">
+        <div class="severity-card critical">
+            <div class="severity-value" id="critical-count">0</div>
+            <div class="severity-label">Critiques</div>
+        </div>
+        <div class="severity-card warning">
+            <div class="severity-value" id="warning-count">0</div>
+            <div class="severity-label">Avertissements</div>
+        </div>
+        <div class="severity-card info">
+            <div class="severity-value" id="info-count">0</div>
+            <div class="severity-label">Infos</div>
+        </div>
+    </div>
+
+    <section class="recent-section">
+        <h2>Analyses récentes</h2>
+        <div id="recent-analyses" class="analyses-list">
+            <div class="loading">Chargement...</div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/dashboard.js"></script>
+{% endblock %}

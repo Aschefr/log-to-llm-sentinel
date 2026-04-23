@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  sentinel:
+    build: .
+    ports:
+      - "10911:10911"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

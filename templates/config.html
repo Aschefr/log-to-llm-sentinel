@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Configuration - Log Sentinel{% endblock %}
+
+{% block content %}
+<div class="config-page">
+    <h1>Configuration Globale</h1>
+
+    <form id="config-form" class="config-form">
+        <section class="config-section">
+            <h2>📧 Notification SMTP</h2>
+            <div class="form-group">
+                <label for="smtp-host">Hôte SMTP</label>
+                <input type="text" id="smtp-host" placeholder="smtp.gmail.com">
+            </div>
+            <div class="form-group">
+                <label for="smtp-port">Port SMTP</label>
+                <input type="number" id="smtp-port" value="587">
+            </div>
+            <div class="form-group">
+                <label for="smtp-user">Utilisateur</label>
+                <input type="text" id="smtp-user" placeholder="email@example.com">
+            </div>
+            <div class="form-group">
+                <label for="smtp-password">Mot de passe</label>
+                <input type="password" id="smtp-password" placeholder="••••••••">
+            </div>
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" id="smtp-tls" checked>
+                    Utiliser TLS
+                </label>
+            </div>
+        </section>
+
+        <section class="config-section">
+            <h2>🤖 Ollama</h2>
+            <div class="form-group">
+                <label for="ollama-url">URL Ollama</label>
+                <input type="text" id="ollama-url" placeholder="http://host.docker.internal:11434">
+            </div>
+            <div class="form-group">
+                <label for="ollama-model">Modèle</label>
+                <input type="text" id="ollama-model" placeholder="llama3">
+            </div>
+            <div class="form-group">
+                <label for="system-prompt">Prompt système</label>
+                <textarea id="system-prompt" rows="5" placeholder="Instructions système pour l'analyse..."></textarea>
+            </div>
+        </section>
+
+        <section class="config-section">
+            <h2>🔔 Méthode de notification</h2>
+            <div class="form-group">
+                <label for="notification-method">Méthode</label>
+                <select id="notification-method">
+                    <option value="smtp">SMTP</option>
+                    <option value="apprise">Apprise</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="apprise-url">URL Apprise (si applicable)</label>
+                <input type="text" id="apprise-url" placeholder="http://localhost:8000">
+            </div>
+        </section>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Sauvegarder</button>
+        </div>
+    </form>
+
+    <div id="config-message" class="message hidden"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/config.js"></script>
+{% endblock %}
