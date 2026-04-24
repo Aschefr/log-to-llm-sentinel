@@ -226,19 +226,16 @@ def test_apprise():
         if not apprise_url:
             raise HTTPException(status_code=400, detail="URL Apprise manquante")
 
-        # Test simple de reachability HTTP via POST
-        try:
-            payload = {"title": "Test Apprise", "body": "Ceci est un test de configuration Log Sentinel"}
-            data = json.dumps(payload).encode("utf-8")
-            req = urllib.request.Request(apprise_url, data=data, headers={"Content-Type": "application/json"}, method="POST")
-            with urllib.request.urlopen(req, timeout=8) as r:
-                status = getattr(r, "status", 200)
-                return {"ok": True, "detail": f"Notification Apprise envoyée (HTTP {status})"}
-        except urllib.error.HTTPError as e:
-            # Même s'il renvoie une erreur métier, le serveur a répondu
-            raise HTTPException(status_code=502, detail=f"Apprise a répondu avec l'erreur HTTP {e.code}")
-        except urllib.error.URLError as e:
-            raise HTTPException(status_code=502, detail=f"Apprise injoignable: {str(e)}")
+        from app.services.notification_service import NotificationService
+        notifier = NotificationService()
+        subject = "Test Apprise Log Sentinel"
+        body = "Ceci est un test de configuration Log Sentinel"
+        
+        ok = notifier._send_apprise(subject, body, cfg)
+        if not ok:
+            raise HTTPException(status_code=502, detail="Échec de l'envoi Apprise (vérifie l'URL ou les logs debug)")
+
+        return {"ok": True, "detail": "Notification Apprise envoyée avec succès"}
     finally:
         db.close()
 

@@ -130,7 +130,7 @@ async function loadAnalyses() {
                     <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
                 </div>
                 <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
-                <div class="analysis-response">${escapeHtml(a.ollama_response || '')}</div>
+                <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
             </div>
         `).join('');
     } catch (e) {
