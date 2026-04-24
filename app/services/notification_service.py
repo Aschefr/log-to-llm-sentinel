@@ -147,7 +147,12 @@ class NotificationService:
                 return 200 <= status < 300
 
         except urllib.error.HTTPError as e:
-            logger.error("NotificationService", f"Erreur Apprise HTTP {e.code}: {e.reason}")
+            error_body = ""
+            try:
+                error_body = e.read().decode("utf-8")
+            except:
+                pass
+            logger.error("NotificationService", f"Erreur Apprise HTTP {e.code}: {e.reason} - {error_body}")
             return False
         except Exception as e:
             logger.error("NotificationService", f"Erreur Apprise: {e}")
