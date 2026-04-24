@@ -137,10 +137,28 @@ async function toggleLiveLogs(ruleId, toggleElement, path) {
             try {
                 const res = await apiFetch(`/api/files/tail?path=${encodeURIComponent(path)}&lines=15`);
                 if (res.lines && res.lines.length > 0) {
-                    container.innerHTML = '<pre class="live-log-content" id="live-log-pre-${ruleId}">' + res.lines.map(l => escapeHtml(l)).join('<br>') + '</pre>';
-                    const pre = document.getElementById(`live-log-pre-${ruleId}`);
-                    if (pre) {
-                        pre.scrollTop = pre.scrollHeight;
+                    const newContent = res.lines.map(l => escapeHtml(l)).join('<br>');
+                    let pre = document.getElementById(`live-log-pre-${ruleId}`);
+                    
+                    if (!pre) {
+                        // Première fois : création du conteneur
+                        container.innerHTML = `<pre class="live-log-content" id="live-log-pre-${ruleId}">${newContent}</pre>`;
+                        pre = document.getElementById(`live-log-pre-${ruleId}`);
+                        // Délai pour laisser le DOM se mettre à jour avant de scroller
+                        setTimeout(() => pre.scrollTop = pre.scrollHeight, 10);
+                    } else {
+                        // Éviter de toucher au DOM si le texte est identique
+                        if (pre.innerHTML !== newContent) {
+                            // On vérifie si l'utilisateur est déjà tout en bas
+                            const isAtBottom = Math.abs((pre.scrollHeight - pre.scrollTop) - pre.clientHeight) < 10;
+                            
+                            pre.innerHTML = newContent;
+                            
+                            // Si l'utilisateur lisait en bas, on auto-scroll
+                            if (isAtBottom) {
+                                setTimeout(() => pre.scrollTop = pre.scrollHeight, 10);
+                            }
+                        }
                     }
                 } else {
                     container.innerHTML = '<em>Fichier vide ou illisible.</em>';
