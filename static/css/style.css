@@ -363,7 +363,9 @@ body {
     background: rgba(0, 0, 0, 0.7);
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
+    padding: 2rem 1rem;
+    overflow-y: auto;
     z-index: 1000;
 }
 
@@ -378,6 +380,8 @@ body {
     padding: 2rem;
     width: 95%;
     max-width: 800px;
+    margin-top: auto;
+    margin-bottom: auto;
 }
 
 .modal-header {
