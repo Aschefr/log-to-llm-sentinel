@@ -6,6 +6,7 @@ from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
 from app.services.ollama_service import OllamaService
 from app.services.notification_service import NotificationService
+from app import logger
 
 
 class Orchestrator:
@@ -27,8 +28,11 @@ class Orchestrator:
         if not rule.enabled:
             return
 
+        logger.debug("Orchestrator", f"Régle '{rule.name}' — {len(lines)} nouvelle(s) ligne(s) reçue(s)")
+
         keywords = rule.get_keywords()
         if not keywords:
+            logger.debug("Orchestrator", f"Règle '{rule.name}' : aucun mot-clé configuré, ignorée")
             return
 
         # Filtrer les lignes contenant au moins un mot-clé
@@ -36,8 +40,10 @@ class Orchestrator:
         for line in lines:
             if any(kw.lower() in line.lower() for kw in keywords):
                 matching_lines.append(line)
+                logger.debug("Orchestrator", f"Match '{rule.name}' | kw dans : {line[:120]}")
 
         if not matching_lines:
+            logger.debug("Orchestrator", f"Règle '{rule.name}' : aucune correspondance")
             return
 
         # Récupérer la config globale
@@ -49,7 +55,9 @@ class Orchestrator:
                 "smtp_port": config.smtp_port if config else 587,
                 "smtp_user": config.smtp_user if config else "",
                 "smtp_password": config.smtp_password if config else "",
+                "smtp_recipient": config.smtp_recipient if config else "",
                 "smtp_tls": config.smtp_tls if config else True,
+                "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
                 "ollama_url": config.ollama_url if config else "http://host.docker.internal:11434",
                 "ollama_model": config.ollama_model if config else "llama3",
                 "system_prompt": config.system_prompt if config else "",
@@ -75,12 +83,14 @@ class Orchestrator:
         prompt = self._build_prompt(rule, line, config.get("system_prompt", ""))
 
         # 3. Appeler Ollama (dans un thread séparé pour ne pas bloquer l'Event Loop)
+        logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | ligne={line[:80]}")
         response = await asyncio.to_thread(
             self.ollama.analyze,
             prompt=prompt,
             url=config.get("ollama_url"),
             model=config.get("ollama_model"),
         )
+        logger.debug("Orchestrator", f"Réponse Ollama reçue : {response[:200]}")
 
         # 4. Déterminer la sévérité (simple heuristic ou parsing de la réponse)
         severity = self._detect_severity(response)
@@ -102,6 +112,7 @@ class Orchestrator:
 
         # 6. Notifier
         if rule.notify_on_match:
+            logger.debug("Orchestrator", f"Envoi notification via '{config.get('notification_method')}' pour règle '{rule.name}'")
             subject = f"[Sentinel] Alerte {severity.upper()} : {rule.name}"
             body = f"""
             <h2>Alerte Log Sentinel</h2>

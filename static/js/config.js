@@ -13,13 +13,17 @@ async function loadConfig() {
         document.getElementById('smtp-user').value = config.smtp_user || '';
         document.getElementById('smtp-password').value = '';
         document.getElementById('smtp-recipient').value = config.smtp_recipient || '';
-        document.getElementById('smtp-tls').checked = config.smtp_tls !== false;
+        // ssl_mode: priorité au nouveau champ, fallback legacy
+        const sslMode = config.smtp_ssl_mode || (config.smtp_tls ? 'starttls' : 'none');
+        document.getElementById('smtp-ssl-mode').value = sslMode;
         document.getElementById('ollama-url').value = config.ollama_url || 'http://host.docker.internal:11434';
         // Model select is populated async; keep desired value to apply later.
         window.__desiredOllamaModel = config.ollama_model || 'llama3';
         document.getElementById('system-prompt').value = config.system_prompt || '';
         document.getElementById('notification-method').value = config.notification_method || 'smtp';
         document.getElementById('apprise-url').value = config.apprise_url || '';
+        const debugEl = document.getElementById('debug-mode');
+        if (debugEl) debugEl.checked = config.debug_mode === true;
     } catch (error) {
         console.error('Erreur chargement config:', error);
     }
@@ -71,8 +75,9 @@ async function setupOllamaModelSelect() {
             setCustomVisible(true);
         }
     } catch (e) {
-        // Fallback: allow manual
-        select.innerHTML = `<option value="__custom__">Autre…</option>`;
+        // Fallback avec message d'erreur visible
+        const errMsg = e && e.message ? e.message : 'Ollama injoignable';
+        select.innerHTML = `<option value="__custom__">Autre… (${escapeHtml(errMsg)})</option>`;
         select.value = '__custom__';
         customInput.value = window.__desiredOllamaModel || 'llama3';
         setCustomVisible(true);
@@ -145,12 +150,14 @@ async function saveConfig(messageEl) {
         smtp_user: document.getElementById('smtp-user').value,
         smtp_password: document.getElementById('smtp-password').value,
         smtp_recipient: document.getElementById('smtp-recipient').value,
-        smtp_tls: document.getElementById('smtp-tls').checked,
+        smtp_ssl_mode: document.getElementById('smtp-ssl-mode').value,
+        smtp_tls: document.getElementById('smtp-ssl-mode').value === 'starttls',  // compat legacy
         ollama_url: document.getElementById('ollama-url').value,
         ollama_model: chosenModel,
         system_prompt: document.getElementById('system-prompt').value,
         notification_method: document.getElementById('notification-method').value,
         apprise_url: document.getElementById('apprise-url').value,
+        debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
     };
 
     try {

@@ -15,11 +15,17 @@ def init_db():
     from app import models  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
-    # Migration manuelle pour ajouter smtp_recipient
+    # Migrations manuelles (sûres : ignorées si la colonne existe déjà)
     from sqlalchemy import text
+    migrations = [
+        "ALTER TABLE global_config ADD COLUMN smtp_recipient VARCHAR DEFAULT ''",
+        "ALTER TABLE global_config ADD COLUMN smtp_ssl_mode VARCHAR DEFAULT 'starttls'",
+        "ALTER TABLE global_config ADD COLUMN debug_mode BOOLEAN DEFAULT 0",
+    ]
     with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE global_config ADD COLUMN smtp_recipient VARCHAR DEFAULT ''"))
-            conn.commit()
-        except Exception:
-            pass  # La colonne existe déjà
+        for sql in migrations:
+            try:
+                conn.execute(text(sql))
+                conn.commit()
+            except Exception:
+                pass  # Colonne déjà présente

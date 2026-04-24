@@ -21,11 +21,13 @@ class ConfigUpdate(BaseModel):
     smtp_password: Optional[str] = None
     smtp_recipient: Optional[str] = None
     smtp_tls: Optional[bool] = None
+    smtp_ssl_mode: Optional[str] = None
     ollama_url: Optional[str] = None
     ollama_model: Optional[str] = None
     system_prompt: Optional[str] = None
     notification_method: Optional[str] = None
     apprise_url: Optional[str] = None
+    debug_mode: Optional[bool] = None
 
 
 @router.get("")
@@ -44,11 +46,13 @@ def get_config():
             "smtp_user": config.smtp_user,
             "smtp_recipient": config.smtp_recipient,
             "smtp_tls": config.smtp_tls,
+            "smtp_ssl_mode": config.smtp_ssl_mode,
             "ollama_url": config.ollama_url,
             "ollama_model": config.ollama_model,
             "system_prompt": config.system_prompt,
             "notification_method": config.notification_method,
             "apprise_url": config.apprise_url,
+            "debug_mode": config.debug_mode,
         }
     finally:
         db.close()
@@ -75,6 +79,8 @@ def update_config(config_data: ConfigUpdate):
             config.smtp_recipient = config_data.smtp_recipient
         if config_data.smtp_tls is not None:
             config.smtp_tls = config_data.smtp_tls
+        if config_data.smtp_ssl_mode is not None:
+            config.smtp_ssl_mode = config_data.smtp_ssl_mode
         if config_data.ollama_url is not None:
             config.ollama_url = config_data.ollama_url
         if config_data.ollama_model is not None:
@@ -85,6 +91,8 @@ def update_config(config_data: ConfigUpdate):
             config.notification_method = config_data.notification_method
         if config_data.apprise_url is not None:
             config.apprise_url = config_data.apprise_url
+        if config_data.debug_mode is not None:
+            config.debug_mode = config_data.debug_mode
 
         db.commit()
         return {"message": "Configuration mise à jour"}
@@ -100,11 +108,13 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
         "smtp_password": config.smtp_password if config else "",
         "smtp_recipient": config.smtp_recipient if config else "",
         "smtp_tls": config.smtp_tls if config else True,
+        "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
         "ollama_url": config.ollama_url if config else "http://host.docker.internal:11434",
         "ollama_model": config.ollama_model if config else "llama3",
         "system_prompt": config.system_prompt if config else "",
         "notification_method": config.notification_method if config else "smtp",
         "apprise_url": config.apprise_url if config else "",
+        "debug_mode": config.debug_mode if config else False,
     }
 
 
@@ -125,7 +135,9 @@ def test_ollama():
         # Test minimal en 2 étapes:
         # 1) reachability via /api/tags (plus parlant qu'un 404 sur generate)
         base = url.strip().rstrip("/")
-        if base.endswith("/api"):
+        if base.endswith("/api/generate"):
+            base = base[: -len("/api/generate")]
+        elif base.endswith("/api"):
             base = base[: -len("/api")]
         try:
             req = urllib.request.Request(f"{base}/api/tags", method="GET")

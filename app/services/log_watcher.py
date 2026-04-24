@@ -4,6 +4,7 @@ from typing import Callable, List, Optional
 
 from app.database import SessionLocal
 from app.models import Rule
+from app import logger
 
 
 class LogWatcher:
@@ -29,10 +30,10 @@ class LogWatcher:
         for rule in rules:
             task = asyncio.create_task(self._watch_file(rule))
             self._tasks.append(task)
-            print(f"[LogWatcher] Surveillance de {rule.log_file_path} (règle: {rule.name})")
+            logger.info("LogWatcher", f"Surveillance de {rule.log_file_path} (règle: {rule.name})")
 
         if not rules:
-            print("[LogWatcher] Aucune règle active. Attente...")
+            logger.info("LogWatcher", "Aucune règle active. Attente...")
 
         # Task principale qui garde le watcher vivant
         while self._running:
@@ -61,7 +62,7 @@ class LogWatcher:
                         self._watch_file(rule), name=rule.log_file_path
                     )
                     self._tasks.append(task)
-                    print(f"[LogWatcher] Nouveau watcher: {rule.log_file_path}")
+                    logger.info("LogWatcher", f"Nouveau watcher: {rule.log_file_path}")
         finally:
             db.close()
 
@@ -89,6 +90,7 @@ class LogWatcher:
                     new_position = f.tell()
 
                 if new_lines:
+                    logger.debug("LogWatcher", f"{filepath} — {len(new_lines)} nouvelle(s) ligne(s) détectée(s) à pos {position}")
                     # Mettre à jour la position
                     db = SessionLocal()
                     try:
@@ -110,7 +112,7 @@ class LogWatcher:
                     position = new_position
 
             except Exception as e:
-                print(f"[LogWatcher] Erreur sur {filepath}: {e}")
+                logger.error("LogWatcher", f"Erreur sur {filepath}: {e}")
 
             await asyncio.sleep(1)
 

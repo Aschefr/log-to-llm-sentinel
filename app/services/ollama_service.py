@@ -4,6 +4,8 @@ import urllib.error
 import time
 from typing import Optional
 
+from app import logger
+
 
 class OllamaService:
     """
@@ -41,6 +43,8 @@ class OllamaService:
         attempts = max(1, int(retries) + 1)
         last_err: Optional[str] = None
 
+        logger.debug("OllamaService", f"Appel à {api_url} | modèle={model} | prompt={prompt[:80]}...")
+
         for attempt in range(1, attempts + 1):
             try:
                 data = json.dumps(payload).encode("utf-8")
@@ -53,7 +57,9 @@ class OllamaService:
 
                 with urllib.request.urlopen(req, timeout=timeout) as response:
                     result = json.loads(response.read().decode("utf-8"))
-                    return result.get("response", "Aucune réponse d'Ollama")
+                    answer = result.get("response", "Aucune réponse d'Ollama")
+                    logger.debug("OllamaService", f"Réponse reçue ({len(answer)} car.) : {answer[:120]}")
+                    return answer
 
             except urllib.error.HTTPError as e:
                 # HTTPError is also a file-like object that may contain a JSON body.
@@ -81,6 +87,7 @@ class OllamaService:
                     and "loading model" in str(detail).lower()
                 )
                 last_err = f"[Erreur Ollama] HTTP {getattr(e, 'code', '?')}: {detail}"
+                logger.error("OllamaService", last_err)
                 if retryable and attempt < attempts:
                     time.sleep(retry_delay_s * attempt)
                     continue
@@ -89,6 +96,7 @@ class OllamaService:
             except urllib.error.URLError as e:
                 msg = str(e)
                 last_err = f"[Erreur Ollama] Impossible de joindre Ollama: {msg}"
+                logger.error("OllamaService", last_err)
                 retryable = "timed out" in msg.lower() or "timeout" in msg.lower()
                 if retryable and attempt < attempts:
                     time.sleep(retry_delay_s * attempt)

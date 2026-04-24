@@ -29,11 +29,13 @@
                 <label for="smtp-recipient">Destinataire</label>
                 <input type="text" id="smtp-recipient" placeholder="destinataire@example.com">
             </div>
-            <div class="form-group checkbox-group">
-                <label>
-                    <input type="checkbox" id="smtp-tls" checked>
-                    Utiliser TLS
-                </label>
+            <div class="form-group">
+                <label for="smtp-ssl-mode">Mode de chiffrement</label>
+                <select id="smtp-ssl-mode">
+                    <option value="ssl">SSL (port 465)</option>
+                    <option value="starttls" selected>STARTTLS (port 587)</option>
+                    <option value="none">Aucun (non recommandé)</option>
+                </select>
             </div>
             <div class="form-actions" style="margin-top: 0.5rem;">
                 <button type="button" id="test-smtp-btn" class="btn btn-secondary">Tester SMTP</button>
@@ -76,13 +78,25 @@
                 </select>
             </div>
             <div class="form-group">
-                <label for="apprise-url">URL Apprise (si applicable)</label>
-                <input type="text" id="apprise-url" placeholder="http://localhost:8000">
+                <label for="apprise-url">URL Apprise complète (endpoint notify)</label>
+                <input type="text" id="apprise-url" placeholder="http://192.168.1.100:8780/notify/mon-tag">
+                <div class="form-hint">Format attendu : <code>http://&lt;host&gt;:&lt;port&gt;/notify/&lt;tag&gt;</code> — une requête POST JSON sera envoyée directement à cette URL.</div>
             </div>
             <div class="form-actions" style="margin-top: 0.5rem;">
                 <button type="button" id="test-apprise-btn" class="btn btn-secondary">Tester Apprise</button>
             </div>
             <div id="apprise-test-message" class="message hidden"></div>
+        </section>
+
+        <section class="config-section">
+            <h2>🛠️ Debug</h2>
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" id="debug-mode">
+                    Activer le mode debug (logs verbeux dans la console serveur)
+                </label>
+                <div class="form-hint">Affiche le détail de chaque étape : détection, appel Ollama, envoi de notification. À désactiver en production.</div>
+            </div>
         </section>
 
         <div class="form-actions">

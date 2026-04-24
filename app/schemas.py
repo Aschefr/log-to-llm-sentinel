@@ -11,12 +11,14 @@ class GlobalConfigCreate(BaseModel):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_recipient: str = ""
-    smtp_tls: bool = True
+    smtp_tls: bool = True  # legacy
+    smtp_ssl_mode: str = "starttls"  # 'ssl' | 'starttls' | 'none'
     ollama_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "llama3"
     system_prompt: str = ""
     notification_method: str = "smtp"
     apprise_url: str = ""
+    debug_mode: bool = False
 
 
 class GlobalConfigRead(GlobalConfigCreate):
