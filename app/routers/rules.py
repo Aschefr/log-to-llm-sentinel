@@ -245,6 +245,18 @@ def test_rule(rule_id: int):
         if rule.notify_on_match:
             logger.debug("TestRule", f"Envoi notification via '{config_dict.get('notification_method')}'")
             notifier = NotificationService()
+            subject = f"[Sentinel TEST] Alerte {severity.upper()} : {rule.name}"
+            
+            body = f"""
+            <h2>🧪 Test Log Sentinel</h2>
+            <p><strong>Règle:</strong> {rule.name}</p>
+            <p><strong>Ligne déclenchante:</strong> <code>{last_line}</code></p>
+            <p><strong>Analyse Ollama:</strong></p>
+            <blockquote>{response}</blockquote>
+            <p><strong>Sévérité:</strong> {severity}</p>
+            <hr><p><em>Ceci est un test manuel depuis l'interface Log Sentinel.</em></p>
+            """
+
             # Gestion du résumé IA si nécessaire
             max_chars = config_dict.get("apprise_max_chars", 1900)
             notify_body = body
