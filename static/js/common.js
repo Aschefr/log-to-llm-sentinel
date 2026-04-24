@@ -27,13 +27,22 @@ function showMessage(element, message, type = 'success') {
 }
 
 function formatDate(dateString) {
-    const date = new Date(dateString);
+    if (!dateString) return '';
+    // Si la chaîne ne finit pas par Z et n'a pas de fuseau horaire, 
+    // on ajoute Z pour forcer l'interprétation UTC (format de la DB)
+    let utcString = dateString;
+    if (!dateString.endsWith('Z') && !dateString.includes('+')) {
+        utcString += 'Z';
+    }
+    
+    const date = new Date(utcString);
     return date.toLocaleString('fr-FR', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
+        second: '2-digit'
     });
 }
 
