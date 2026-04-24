@@ -95,16 +95,20 @@ async function loadRules() {
                     <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
                 </div>
-                <div class="rule-toggles">
-                    <div class="rule-history-toggle" onclick="toggleLiveLogs(${rule.id}, this, '${escapeHtml(rule.log_file_path).replace(/'/g, "\\'")}')">
-                        <span class="toggle-icon">▶</span> Log en temps réel
+                <div class="rule-toggles" style="display: flex; flex-direction: column; gap: 0.5rem; flex-basis: 100%;">
+                    <div>
+                        <div class="rule-history-toggle" onclick="toggleLiveLogs(${rule.id}, this, '${escapeHtml(rule.log_file_path).replace(/'/g, "\\'")}')">
+                            <span class="toggle-icon">▶</span> Log en temps réel
+                        </div>
+                        <div id="live-logs-${rule.id}" class="rule-history-inline hidden"></div>
                     </div>
-                    <div class="rule-history-toggle" onclick="toggleRuleHistory(${rule.id}, this)">
-                        <span class="toggle-icon">▶</span> Analyses LLM récentes
+                    <div>
+                        <div class="rule-history-toggle" onclick="toggleRuleHistory(${rule.id}, this)">
+                            <span class="toggle-icon">▶</span> Analyses LLM récentes
+                        </div>
+                        <div id="rule-history-${rule.id}" class="rule-history-inline hidden"></div>
                     </div>
                 </div>
-                <div id="live-logs-${rule.id}" class="rule-history-inline hidden"></div>
-                <div id="rule-history-${rule.id}" class="rule-history-inline hidden"></div>
             </div>
         `).join('');
     } catch (error) {
@@ -133,7 +137,11 @@ async function toggleLiveLogs(ruleId, toggleElement, path) {
             try {
                 const res = await apiFetch(`/api/files/tail?path=${encodeURIComponent(path)}&lines=15`);
                 if (res.lines && res.lines.length > 0) {
-                    container.innerHTML = '<pre class="live-log-content">' + res.lines.map(l => escapeHtml(l)).join('<br>') + '</pre>';
+                    container.innerHTML = '<pre class="live-log-content" id="live-log-pre-${ruleId}">' + res.lines.map(l => escapeHtml(l)).join('<br>') + '</pre>';
+                    const pre = document.getElementById(`live-log-pre-${ruleId}`);
+                    if (pre) {
+                        pre.scrollTop = pre.scrollHeight;
+                    }
                 } else {
                     container.innerHTML = '<em>Fichier vide ou illisible.</em>';
                 }
