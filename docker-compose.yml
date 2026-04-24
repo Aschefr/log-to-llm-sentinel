@@ -36,7 +36,7 @@ services:
   # Aucun changement n'est requis sur votre systeme hote.
   # ==============================================================================
   system-journal-exporter:
-    image: ubuntu:22.04
+    image: ubuntu:24.04
     container_name: log-sentinel-journal-bridge
     command: >
       bash -c "apt-get update && apt-get install -y systemd && 
