@@ -441,7 +441,6 @@ async function browsePath(path) {
 
         const roots = await ensureFileRoots();
         const rootsLinks = (roots || [])
-            .slice(0, 3)
             .map(r => `<span class="chip" data-root="${escapeHtml(r)}">📌 ${escapeHtml(r)}</span>`)
             .join(' ');
 
