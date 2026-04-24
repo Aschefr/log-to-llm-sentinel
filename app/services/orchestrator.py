@@ -59,17 +59,25 @@ class Orchestrator:
 
     async def _flush_buffer(self, rule_id: int):
         """Attend le délai anti-spam puis traite toutes les lignes accumulées."""
-        buffer_delay = 10  # secondes d'anti-spam (peut devenir paramétrable en DB)
-        await asyncio.sleep(buffer_delay)
-
-        lines = self._buffers[rule_id]["lines"]
-        self._buffers[rule_id] = {"lines": [], "task": None}
-
-        if not lines:
-            return
-
         db = SessionLocal()
         try:
+            rule = db.query(Rule).filter(Rule.id == rule_id).first()
+            if not rule or not rule.enabled:
+                return
+
+            buffer_delay = rule.anti_spam_delay or 60
+            db.close() # Free the connection during the sleep
+            
+            await asyncio.sleep(buffer_delay)
+
+            lines = self._buffers[rule_id]["lines"]
+            self._buffers[rule_id] = {"lines": [], "task": None}
+
+            if not lines:
+                return
+                
+            db = SessionLocal()
+            # Re-fetch rule to ensure it's still enabled after sleep
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             if not rule or not rule.enabled:
                 return

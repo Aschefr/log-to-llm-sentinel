@@ -20,6 +20,7 @@ class RuleCreate(BaseModel):
     enabled: bool = True
     notify_on_match: bool = True
     context_lines: int = 5
+    anti_spam_delay: int = 60
 
 
 class RuleUpdate(BaseModel):
@@ -30,6 +31,7 @@ class RuleUpdate(BaseModel):
     enabled: Optional[bool] = None
     notify_on_match: Optional[bool] = None
     context_lines: Optional[int] = None
+    anti_spam_delay: Optional[int] = None
 
 
 @router.get("")
@@ -47,6 +49,7 @@ def get_rules():
                 "enabled": r.enabled,
                 "notify_on_match": r.notify_on_match,
                 "context_lines": r.context_lines or 5,
+                "anti_spam_delay": r.anti_spam_delay or 60,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in rules
@@ -71,6 +74,7 @@ def get_rule(rule_id: int):
             "enabled": rule.enabled,
             "notify_on_match": rule.notify_on_match,
             "context_lines": rule.context_lines or 5,
+            "anti_spam_delay": rule.anti_spam_delay or 60,
         }
     finally:
         db.close()
@@ -87,6 +91,7 @@ def create_rule(rule_data: RuleCreate):
             enabled=rule_data.enabled,
             notify_on_match=rule_data.notify_on_match,
             context_lines=rule_data.context_lines,
+            anti_spam_delay=rule_data.anti_spam_delay,
         )
         rule.set_keywords(rule_data.keywords)
         db.add(rule)
@@ -119,6 +124,8 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.notify_on_match = rule_data.notify_on_match
         if rule_data.context_lines is not None:
             rule.context_lines = rule_data.context_lines
+        if rule_data.anti_spam_delay is not None:
+            rule.anti_spam_delay = rule_data.anti_spam_delay
 
         db.commit()
         return {"id": rule.id, "message": "Règle mise à jour"}

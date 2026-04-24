@@ -258,6 +258,7 @@ function resetForm() {
     document.getElementById('rule-enabled').checked = true;
     document.getElementById('rule-notify').checked = true;
     document.getElementById('rule-context-lines').value = '5';
+    document.getElementById('rule-anti-spam').value = '60';
     document.getElementById('modal-title').textContent = 'Nouvelle règle';
     closeFileBrowser();
     
@@ -416,6 +417,7 @@ async function saveRule() {
         enabled: document.getElementById('rule-enabled').checked,
         notify_on_match: document.getElementById('rule-notify').checked,
         context_lines: parseInt(document.getElementById('rule-context-lines').value) || 5,
+        anti_spam_delay: parseInt(document.getElementById('rule-anti-spam').value) || 60,
     };
 
     try {
@@ -450,6 +452,7 @@ async function editRule(id) {
         document.getElementById('rule-enabled').checked = rule.enabled;
         document.getElementById('rule-notify').checked = rule.notify_on_match;
         document.getElementById('rule-context-lines').value = rule.context_lines || 5;
+        document.getElementById('rule-anti-spam').value = rule.anti_spam_delay || 60;
         document.getElementById('modal-title').textContent = 'Éditer la règle';
         document.getElementById('rule-modal').classList.remove('hidden');
         closeFileBrowser();

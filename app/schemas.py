@@ -38,10 +38,10 @@ class RuleCreate(BaseModel):
     log_file_path: str = Field(..., min_length=1)
     keywords: List[str] = []
     context_lines: int = Field(default=5, ge=0, le=50)
+    anti_spam_delay: int = Field(default=60, ge=1, le=3600)
     application_context: str = ""
     enabled: bool = True
     notify_on_match: bool = True
-    debounce_seconds: int = Field(default=30, ge=1, le=300)
 
 
 class RuleUpdate(BaseModel):
@@ -49,10 +49,10 @@ class RuleUpdate(BaseModel):
     log_file_path: Optional[str] = None
     keywords: Optional[List[str]] = None
     context_lines: Optional[int] = None
+    anti_spam_delay: Optional[int] = None
     application_context: Optional[str] = None
     enabled: Optional[bool] = None
     notify_on_match: Optional[bool] = None
-    debounce_seconds: Optional[int] = None
 
 
 class RuleRead(RuleCreate):
