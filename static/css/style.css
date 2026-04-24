@@ -818,10 +818,32 @@ body {
     font-size: 1.1rem;
 }
 
-.rule-history-inline {
+.rule-history-toggle {
     margin-top: 1rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border-color);
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.rule-history-toggle:hover {
+    color: var(--text-color);
+}
+
+.rule-history-toggle .toggle-icon {
+    font-size: 0.8rem;
+    display: inline-block;
+    width: 15px;
+}
+
+.rule-history-inline {
+    margin-top: 0.5rem;
     width: 100%;
 }
 

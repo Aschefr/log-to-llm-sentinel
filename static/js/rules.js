@@ -91,10 +91,12 @@ async function loadRules() {
                     <p>${rule.enabled ? '✅ Activée' : '❌ Désactivée'} | 🔔 ${rule.notify_on_match ? 'Notifications activées' : 'Notifications désactivées'}</p>
                 </div>
                 <div class="rule-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="toggleRuleHistory(${rule.id})">📜 Historique</button>
                     <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
                     <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
+                </div>
+                <div class="rule-history-toggle" onclick="toggleRuleHistory(${rule.id}, this)">
+                    <span class="toggle-icon">▶</span> Activités récentes
                 </div>
                 <div id="rule-history-${rule.id}" class="rule-history-inline hidden"></div>
             </div>
@@ -104,46 +106,57 @@ async function loadRules() {
     }
 }
 
-async function toggleRuleHistory(ruleId) {
+async function toggleRuleHistory(ruleId, toggleElement) {
     const container = document.getElementById(`rule-history-${ruleId}`);
     if (!container) return;
+
+    let icon = null;
+    if (toggleElement) {
+        icon = toggleElement.querySelector('.toggle-icon');
+    } else {
+        // Fallback for programmatic open
+        const card = container.closest('.rule-card');
+        if (card) {
+            icon = card.querySelector('.toggle-icon');
+        }
+    }
 
     if (container.classList.contains('hidden')) {
         // Afficher l'historique
         container.classList.remove('hidden');
+        if (icon) icon.textContent = '▼';
         
-        // Charger si vide
-        if (container.innerHTML.trim() === '') {
-            container.innerHTML = '<div class="loading">Chargement de l\'historique...</div>';
-            try {
-                const url = `/api/dashboard/recent?limit=10&rule_id=${ruleId}`;
-                const analyses = await apiFetch(url);
+        // Toujours recharger quand on ouvre
+        container.innerHTML = '<div class="loading">Chargement de l\'historique...</div>';
+        try {
+            const url = `/api/dashboard/recent?limit=10&rule_id=${ruleId}`;
+            const analyses = await apiFetch(url);
 
-                if (!analyses || analyses.length === 0) {
-                    container.innerHTML = '<div class="loading">Aucune analyse pour cette règle</div>';
-                    return;
-                }
-
-                container.innerHTML = analyses.map(a => `
-                    <div class="analysis-card inline-history-card">
-                        <div class="analysis-header">
-                            <div>
-                                <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
-                            </div>
-                            <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
-                        </div>
-                        <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
-                        <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
-                    </div>
-                `).join('');
-            } catch (e) {
-                console.error('Erreur analyses:', e);
-                container.innerHTML = `<div class="loading">Erreur: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
+            if (!analyses || analyses.length === 0) {
+                container.innerHTML = '<div class="loading">Aucune analyse pour cette règle</div>';
+                return;
             }
+
+            container.innerHTML = analyses.map(a => `
+                <div class="analysis-card inline-history-card">
+                    <div class="analysis-header">
+                        <div>
+                            <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
+                        </div>
+                        <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                    </div>
+                    <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
+                    <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
+                </div>
+            `).join('');
+        } catch (e) {
+            console.error('Erreur analyses:', e);
+            container.innerHTML = `<div class="loading">Erreur: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
         }
     } else {
         // Masquer l'historique
         container.classList.add('hidden');
+        if (icon) icon.textContent = '▶';
     }
 }
 
@@ -158,10 +171,17 @@ async function testRule(id) {
     }
 
     try {
-        // UI feedback: filter history on this rule after test
-        _analysesRuleFilter = id;
         await apiFetch(`/api/rules/${id}/test`, { method: 'POST' });
-        await loadAnalyses();
+        
+        // S'assurer que le container est visible pour voir le résultat du test
+        const container = document.getElementById(`rule-history-${id}`);
+        if (container && container.classList.contains('hidden')) {
+            await toggleRuleHistory(id);
+        } else if (container) {
+            // Si déjà ouvert, on referme et on rouvre pour recharger
+            await toggleRuleHistory(id);
+            await toggleRuleHistory(id);
+        }
 
         if (btn) {
             btn.innerHTML = '✅ Terminé';
