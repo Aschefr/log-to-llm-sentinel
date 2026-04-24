@@ -21,6 +21,7 @@ class RuleCreate(BaseModel):
     notify_on_match: bool = True
     context_lines: int = 5
     anti_spam_delay: int = 60
+    notify_severity_threshold: str = "info"
 
 
 class RuleUpdate(BaseModel):
@@ -32,6 +33,7 @@ class RuleUpdate(BaseModel):
     notify_on_match: Optional[bool] = None
     context_lines: Optional[int] = None
     anti_spam_delay: Optional[int] = None
+    notify_severity_threshold: Optional[str] = None
 
 
 @router.get("")
@@ -50,6 +52,7 @@ def get_rules():
                 "notify_on_match": r.notify_on_match,
                 "context_lines": r.context_lines or 5,
                 "anti_spam_delay": r.anti_spam_delay or 60,
+                "notify_severity_threshold": r.notify_severity_threshold or "info",
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in rules
@@ -75,6 +78,7 @@ def get_rule(rule_id: int):
             "notify_on_match": rule.notify_on_match,
             "context_lines": rule.context_lines or 5,
             "anti_spam_delay": rule.anti_spam_delay or 60,
+            "notify_severity_threshold": rule.notify_severity_threshold or "info",
         }
     finally:
         db.close()
@@ -92,6 +96,7 @@ def create_rule(rule_data: RuleCreate):
             notify_on_match=rule_data.notify_on_match,
             context_lines=rule_data.context_lines,
             anti_spam_delay=rule_data.anti_spam_delay,
+            notify_severity_threshold=rule_data.notify_severity_threshold,
         )
         rule.set_keywords(rule_data.keywords)
         db.add(rule)
@@ -126,6 +131,8 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.context_lines = rule_data.context_lines
         if rule_data.anti_spam_delay is not None:
             rule.anti_spam_delay = rule_data.anti_spam_delay
+        if rule_data.notify_severity_threshold is not None:
+            rule.notify_severity_threshold = rule_data.notify_severity_threshold
 
         db.commit()
         return {"id": rule.id, "message": "Règle mise à jour"}

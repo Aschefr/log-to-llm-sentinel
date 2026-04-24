@@ -23,6 +23,7 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN debug_mode BOOLEAN DEFAULT 0",
         "ALTER TABLE rules ADD COLUMN context_lines INTEGER DEFAULT 5",
         "ALTER TABLE rules ADD COLUMN anti_spam_delay INTEGER DEFAULT 60",
+        "ALTER TABLE rules ADD COLUMN notify_severity_threshold VARCHAR DEFAULT 'info'",
         "ALTER TABLE global_config ADD COLUMN apprise_tags VARCHAR DEFAULT ''",
         "ALTER TABLE global_config ADD COLUMN apprise_max_chars INTEGER DEFAULT 1900",
     ]

@@ -39,6 +39,7 @@ class RuleCreate(BaseModel):
     keywords: List[str] = []
     context_lines: int = Field(default=5, ge=0, le=50)
     anti_spam_delay: int = Field(default=60, ge=1, le=3600)
+    notify_severity_threshold: str = "info"
     application_context: str = ""
     enabled: bool = True
     notify_on_match: bool = True
@@ -50,6 +51,7 @@ class RuleUpdate(BaseModel):
     keywords: Optional[List[str]] = None
     context_lines: Optional[int] = None
     anti_spam_delay: Optional[int] = None
+    notify_severity_threshold: Optional[str] = None
     application_context: Optional[str] = None
     enabled: Optional[bool] = None
     notify_on_match: Optional[bool] = None

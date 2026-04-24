@@ -158,7 +158,16 @@ class Orchestrator:
         db.refresh(analysis)
 
         # 6. Notifier
-        if rule.notify_on_match:
+        should_notify = rule.notify_on_match
+        if should_notify and getattr(rule, "notify_severity_threshold", "info"):
+            severity_levels = {"info": 0, "warning": 1, "critical": 2}
+            sev_val = severity_levels.get(severity, 0)
+            threshold_val = severity_levels.get(rule.notify_severity_threshold, 0)
+            if sev_val < threshold_val:
+                should_notify = False
+                logger.debug("Orchestrator", f"Notification ignorée: la sévérité '{severity}' est inférieure au seuil '{rule.notify_severity_threshold}'.")
+
+        if should_notify:
             logger.debug("Orchestrator", f"Envoi notification via '{config.get('notification_method')}' pour règle '{rule.name}'")
             subject = f"[Sentinel] Alerte {severity.upper()} : {rule.name}"
             

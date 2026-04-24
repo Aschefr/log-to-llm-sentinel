@@ -88,7 +88,7 @@ async function loadRules() {
                     <p>📁 ${escapeHtml(rule.log_file_path)}</p>
                     <p>🔑 ${rule.keywords.join(', ')}</p>
                     ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}
-                    <p>${rule.enabled ? '✅ Activée' : '❌ Désactivée'} | 🔔 ${rule.notify_on_match ? 'Notifications activées' : 'Notifications désactivées'}</p>
+                    <p>${rule.enabled ? '✅ Activée' : '❌ Désactivée'} | 🔔 ${rule.notify_on_match ? `Seuil: ${rule.notify_severity_threshold || 'info'}` : 'Notifications désactivées'}</p>
                 </div>
                 <div class="rule-actions">
                     <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
@@ -333,6 +333,7 @@ function resetForm() {
     document.getElementById('rule-notify').checked = true;
     document.getElementById('rule-context-lines').value = '5';
     document.getElementById('rule-anti-spam').value = '60';
+    document.getElementById('rule-severity-threshold').value = 'info';
     document.getElementById('modal-title').textContent = 'Nouvelle règle';
     closeFileBrowser();
     
@@ -492,6 +493,7 @@ async function saveRule() {
         notify_on_match: document.getElementById('rule-notify').checked,
         context_lines: parseInt(document.getElementById('rule-context-lines').value) || 5,
         anti_spam_delay: parseInt(document.getElementById('rule-anti-spam').value) || 60,
+        notify_severity_threshold: document.getElementById('rule-severity-threshold').value,
     };
 
     try {
@@ -527,6 +529,7 @@ async function editRule(id) {
         document.getElementById('rule-notify').checked = rule.notify_on_match;
         document.getElementById('rule-context-lines').value = rule.context_lines || 5;
         document.getElementById('rule-anti-spam').value = rule.anti_spam_delay || 60;
+        document.getElementById('rule-severity-threshold').value = rule.notify_severity_threshold || 'info';
         document.getElementById('modal-title').textContent = 'Éditer la règle';
         document.getElementById('rule-modal').classList.remove('hidden');
         closeFileBrowser();

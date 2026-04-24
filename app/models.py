@@ -16,6 +16,7 @@ class Rule(Base):
     notify_on_match = Column(Boolean, default=True)
     context_lines = Column(Integer, default=5)
     anti_spam_delay = Column(Integer, default=60)
+    notify_severity_threshold = Column(String, default="info")
     last_position = Column(Float, default=0.0)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
