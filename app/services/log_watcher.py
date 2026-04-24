@@ -28,7 +28,7 @@ class LogWatcher:
             db.close()
 
         for rule in rules:
-            task = asyncio.create_task(self._watch_file(rule))
+            task = asyncio.create_task(self._watch_file(rule), name=f"rule_{rule.id}")
             self._tasks.append(task)
             logger.info("LogWatcher", f"Surveillance de {rule.log_file_path} (règle: {rule.name})")
 
@@ -46,23 +46,30 @@ class LogWatcher:
         db = SessionLocal()
         try:
             rules = db.query(Rule).filter(Rule.enabled == True).all()
-            current_paths = {r.log_file_path for r in rules}
+            current_rule_ids = {r.id for r in rules}
 
-            # Arrêter les watchers pour les fichiers supprimés/désactivés
-            self._tasks = [
-                t for t in self._tasks
-                if not t.done() or t.get_name() in current_paths
-            ]
+            # Arrêter les watchers pour les règles supprimées/désactivées
+            tasks_to_keep = []
+            for t in self._tasks:
+                task_name = t.get_name()
+                if task_name.startswith("rule_"):
+                    rule_id = int(task_name.split("_")[1])
+                    if rule_id in current_rule_ids:
+                        tasks_to_keep.append(t)
+                        continue
+                logger.info("LogWatcher", f"Arrêt du watcher pour la règle ID: {task_name}")
+                t.cancel()
+            self._tasks = tasks_to_keep
 
             # Démarrer de nouveaux watchers si besoin
-            watched_paths = {t.get_name() for t in self._tasks if not t.done()}
+            watched_rule_ids = {int(t.get_name().split("_")[1]) for t in self._tasks if t.get_name().startswith("rule_")}
             for rule in rules:
-                if rule.log_file_path not in watched_paths:
+                if rule.id not in watched_rule_ids:
                     task = asyncio.create_task(
-                        self._watch_file(rule), name=rule.log_file_path
+                        self._watch_file(rule), name=f"rule_{rule.id}"
                     )
                     self._tasks.append(task)
-                    logger.info("LogWatcher", f"Nouveau watcher: {rule.log_file_path}")
+                    logger.info("LogWatcher", f"Nouveau watcher: {rule.log_file_path} (Règle ID: {rule.id})")
         finally:
             db.close()
 

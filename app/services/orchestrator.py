@@ -22,6 +22,7 @@ class Orchestrator:
     def __init__(self):
         self.ollama = OllamaService()
         self.notifier = NotificationService()
+        self._buffers = {}  # rule_id -> {"lines": [], "task": None}
 
     async def handle_new_lines(self, rule: Rule, lines: List[str]):
         """Traite les nouvelles lignes pour une règle donnée."""
@@ -46,9 +47,33 @@ class Orchestrator:
             logger.debug("Orchestrator", f"Règle '{rule.name}' : aucune correspondance")
             return
 
-        # Récupérer la config globale
+        # Ajouter au buffer de cette règle
+        if rule.id not in self._buffers:
+            self._buffers[rule.id] = {"lines": [], "task": None}
+            
+        self._buffers[rule.id]["lines"].extend(matching_lines)
+
+        # Démarrer le timer anti-spam si pas déjà en cours
+        if self._buffers[rule.id]["task"] is None:
+            self._buffers[rule.id]["task"] = asyncio.create_task(self._flush_buffer(rule.id))
+
+    async def _flush_buffer(self, rule_id: int):
+        """Attend le délai anti-spam puis traite toutes les lignes accumulées."""
+        buffer_delay = 10  # secondes d'anti-spam (peut devenir paramétrable en DB)
+        await asyncio.sleep(buffer_delay)
+
+        lines = self._buffers[rule_id]["lines"]
+        self._buffers[rule_id] = {"lines": [], "task": None}
+
+        if not lines:
+            return
+
         db = SessionLocal()
         try:
+            rule = db.query(Rule).filter(Rule.id == rule_id).first()
+            if not rule or not rule.enabled:
+                return
+
             config = db.query(GlobalConfig).first()
             config_dict = {
                 "smtp_host": config.smtp_host if config else "",
@@ -67,8 +92,20 @@ class Orchestrator:
                 "debug_mode": config.debug_mode if config else False,
             }
 
-            for line in matching_lines:
-                await self._process_match(rule, line, config_dict, db)
+            if len(lines) == 1:
+                await self._process_match(rule, lines[0], config_dict, db)
+            else:
+                # Regrouper les lignes
+                total_lines = len(lines)
+                # On limite à 30 lignes max dans le prompt pour ne pas exploser le contexte
+                recent_lines = lines[-30:]
+                bundled_text = f"Ces {total_lines} événements correspondants sont apparus dans les {buffer_delay} dernières secondes. Voici un extrait des plus récents :\n"
+                bundled_text += "\n".join(recent_lines)
+                
+                logger.info("Orchestrator", f"Envoi groupé pour '{rule.name}' : {total_lines} lignes")
+                await self._process_match(rule, bundled_text, config_dict, db)
+        except Exception as e:
+            logger.error("Orchestrator", f"Erreur lors du flush buffer : {e}")
         finally:
             db.close()
 
