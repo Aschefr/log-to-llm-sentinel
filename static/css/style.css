@@ -275,6 +275,7 @@ body {
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .rule-info {
@@ -830,6 +831,8 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    flex-basis: 100%;
+    width: 100%;
 }
 
 .rule-history-toggle:hover {
