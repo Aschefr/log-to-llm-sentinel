@@ -587,6 +587,7 @@ body {
     padding: 1rem;
     border-radius: 0.5rem;
     margin-top: 1rem;
+    transition: all 0.3s ease;
 }
 
 .message.success {
@@ -600,6 +601,13 @@ body {
     color: var(--danger);
     border: 1px solid var(--danger);
 }
+
+.message.info {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+}
+
 
 .message.hidden {
     display: none;

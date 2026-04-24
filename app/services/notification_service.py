@@ -125,6 +125,8 @@ class NotificationService:
             payload = {
                 "title": subject,
                 "body": body,
+                "type": "info",
+                "format": "html",
             }
 
             data = json.dumps(payload).encode("utf-8")

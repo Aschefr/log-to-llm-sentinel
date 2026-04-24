@@ -109,6 +109,33 @@ function setupForm() {
             document.getElementById('debug-logs').innerHTML = '';
         });
     }
+
+    // Auto-save logic
+    const inputs = form.querySelectorAll('input, select, textarea');
+    const debouncedSave = debounce(() => {
+        saveConfig(messageEl, true);
+    }, 1000);
+
+    inputs.forEach(input => {
+        const eventType = (input.type === 'checkbox' || input.tagName === 'SELECT') ? 'change' : 'input';
+        input.addEventListener(eventType, () => {
+            // Ne pas auto-save le mot de passe s'il est court/en cours de saisie ?
+            // On laisse le debounce gérer le délai.
+            debouncedSave();
+        });
+    });
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 }
 
 function toggleLogsContainer(visible) {
@@ -215,7 +242,12 @@ async function runTest(url, messageEl, buttonEl) {
     }
 }
 
-async function saveConfig(messageEl) {
+async function saveConfig(messageEl, isAutoSave = false) {
+    if (isAutoSave) {
+        messageEl.textContent = 'Auto-sauvegarde...';
+        messageEl.className = 'message info';
+        messageEl.classList.remove('hidden');
+    }
     const modelSelect = document.getElementById('ollama-model');
     const modelCustom = document.getElementById('ollama-model-custom');
     const chosenModel = (modelSelect && modelSelect.value === '__custom__')
@@ -226,10 +258,9 @@ async function saveConfig(messageEl) {
         smtp_host: document.getElementById('smtp-host').value,
         smtp_port: parseInt(document.getElementById('smtp-port').value) || 587,
         smtp_user: document.getElementById('smtp-user').value,
-        smtp_password: document.getElementById('smtp-password').value,
         smtp_recipient: document.getElementById('smtp-recipient').value,
         smtp_ssl_mode: document.getElementById('smtp-ssl-mode').value,
-        smtp_tls: document.getElementById('smtp-ssl-mode').value === 'starttls',  // compat legacy
+        smtp_tls: document.getElementById('smtp-ssl-mode').value === 'starttls',
         ollama_url: document.getElementById('ollama-url').value,
         ollama_model: chosenModel,
         system_prompt: document.getElementById('system-prompt').value,
@@ -238,12 +269,17 @@ async function saveConfig(messageEl) {
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
     };
 
+    const pwd = document.getElementById('smtp-password').value;
+    if (pwd) data.smtp_password = pwd;
+
+
     try {
         await apiFetch('/api/config', {
             method: 'PUT',
             body: data,
         });
-        showMessage(messageEl, 'Configuration sauvegardée avec succès', 'success');
+        const successMsg = isAutoSave ? 'Auto-sauvegardé' : 'Configuration sauvegardée avec succès';
+        showMessage(messageEl, successMsg, 'success');
     } catch (error) {
         console.error('Erreur sauvegarde config:', error);
         showMessage(messageEl, 'Erreur: ' + error.message, 'error');

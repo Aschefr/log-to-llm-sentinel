@@ -67,6 +67,9 @@ def update_config(config_data: ConfigUpdate):
             config = GlobalConfig()
             db.add(config)
 
+        from app import logger
+        logger.debug("ConfigRouter", f"Données reçues: {config_data.dict(exclude={'smtp_password'})}")
+
         if config_data.smtp_host is not None:
             config.smtp_host = config_data.smtp_host
         if config_data.smtp_port is not None:
