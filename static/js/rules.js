@@ -95,14 +95,62 @@ async function loadRules() {
                     <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
                 </div>
-                <div class="rule-history-toggle" onclick="toggleRuleHistory(${rule.id}, this)">
-                    <span class="toggle-icon">▶</span> Activités récentes
+                <div class="rule-toggles">
+                    <div class="rule-history-toggle" onclick="toggleLiveLogs(${rule.id}, this, '${escapeHtml(rule.log_file_path).replace(/'/g, "\\'")}')">
+                        <span class="toggle-icon">▶</span> Log en temps réel
+                    </div>
+                    <div class="rule-history-toggle" onclick="toggleRuleHistory(${rule.id}, this)">
+                        <span class="toggle-icon">▶</span> Analyses LLM récentes
+                    </div>
                 </div>
+                <div id="live-logs-${rule.id}" class="rule-history-inline hidden"></div>
                 <div id="rule-history-${rule.id}" class="rule-history-inline hidden"></div>
             </div>
         `).join('');
     } catch (error) {
         console.error('Erreur chargement règles:', error);
+    }
+}
+
+const liveLogIntervals = {};
+
+async function toggleLiveLogs(ruleId, toggleElement, path) {
+    const container = document.getElementById(`live-logs-${ruleId}`);
+    if (!container) return;
+
+    let icon = null;
+    if (toggleElement) {
+        icon = toggleElement.querySelector('.toggle-icon');
+    }
+
+    if (container.classList.contains('hidden')) {
+        container.classList.remove('hidden');
+        if (icon) icon.textContent = '▼';
+        container.innerHTML = '<div class="loading">Chargement des logs...</div>';
+        
+        const fetchLogs = async () => {
+            if (container.classList.contains('hidden')) return; // Stop if closed
+            try {
+                const res = await apiFetch(`/api/files/tail?path=${encodeURIComponent(path)}&lines=15`);
+                if (res.lines && res.lines.length > 0) {
+                    container.innerHTML = '<pre class="live-log-content">' + res.lines.map(l => escapeHtml(l)).join('<br>') + '</pre>';
+                } else {
+                    container.innerHTML = '<em>Fichier vide ou illisible.</em>';
+                }
+            } catch (e) {
+                container.innerHTML = `<em style="color: var(--danger)">Erreur : ${escapeHtml(e.message)}</em>`;
+            }
+        };
+
+        await fetchLogs();
+        liveLogIntervals[ruleId] = setInterval(fetchLogs, 3000); // refresh every 3s
+    } else {
+        container.classList.add('hidden');
+        if (icon) icon.textContent = '▶';
+        if (liveLogIntervals[ruleId]) {
+            clearInterval(liveLogIntervals[ruleId]);
+            delete liveLogIntervals[ruleId];
+        }
     }
 }
 

@@ -819,10 +819,17 @@ body {
     font-size: 1.1rem;
 }
 
-.rule-history-toggle {
+.rule-toggles {
+    flex-basis: 100%;
+    width: 100%;
+    display: flex;
+    gap: 2rem;
     margin-top: 1rem;
     padding-top: 0.5rem;
     border-top: 1px dashed var(--border-color);
+}
+
+.rule-history-toggle {
     color: var(--text-muted);
     font-size: 0.95rem;
     cursor: pointer;
@@ -831,8 +838,6 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    flex-basis: 100%;
-    width: 100%;
 }
 
 .rule-history-toggle:hover {
@@ -868,4 +873,18 @@ body {
 }
 .inline-history-card .analysis-response {
     font-size: 0.9em;
+}
+
+.live-log-content {
+    background-color: rgba(0, 0, 0, 0.4);
+    color: #a9b7c6;
+    padding: 1rem;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.85rem;
+    max-height: 300px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    border: 1px solid var(--border-color);
 }
