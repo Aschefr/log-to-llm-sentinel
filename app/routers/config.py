@@ -284,3 +284,10 @@ def list_ollama_models():
         return {"models": available_models}
     finally:
         db.close()
+
+
+@router.get("/logs")
+def get_debug_logs():
+    """Retourne les derniers logs en mémoire."""
+    from app.logger import get_logs
+    return {"logs": get_logs()}

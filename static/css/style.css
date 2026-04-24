@@ -347,6 +347,80 @@ body {
     display: flex;
     gap: 1.5rem;
 }
+/* Debug Logs Viewer */
+.debug-logs-container {
+    margin-top: 1.5rem;
+    background: #1e1e1e;
+    border-radius: 8px;
+    border: 1px solid #333;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.debug-logs-header {
+    background: #2d2d2d;
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #333;
+    color: #eee;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.debug-logs {
+    height: 300px;
+    overflow-y: auto;
+    padding: 1rem;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #d4d4d4;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.log-entry {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid #2a2a2a;
+    padding-bottom: 2px;
+}
+
+.log-time {
+    color: #888;
+    white-space: nowrap;
+    min-width: 140px;
+}
+
+.log-level {
+    font-weight: bold;
+    min-width: 60px;
+}
+
+.log-level.DEBUG { color: #3b82f6; }
+.log-level.INFO  { color: #10b981; }
+.log-level.WARN  { color: #f59e0b; }
+.log-level.ERROR { color: #ef4444; }
+
+.log-tag {
+    color: #a78bfa;
+    font-weight: 500;
+    min-width: 120px;
+}
+
+.log-message {
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
+.btn-small {
+    padding: 2px 8px;
+    font-size: 0.75rem;
+}
 
 .checkbox-group label {
     display: flex;

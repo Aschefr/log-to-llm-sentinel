@@ -23,7 +23,10 @@ async function loadConfig() {
         document.getElementById('notification-method').value = config.notification_method || 'smtp';
         document.getElementById('apprise-url').value = config.apprise_url || '';
         const debugEl = document.getElementById('debug-mode');
-        if (debugEl) debugEl.checked = config.debug_mode === true;
+        if (debugEl) {
+            debugEl.checked = config.debug_mode === true;
+            toggleLogsContainer(debugEl.checked);
+        }
     } catch (error) {
         console.error('Erreur chargement config:', error);
     }
@@ -92,6 +95,81 @@ function setupForm() {
         e.preventDefault();
         await saveConfig(messageEl);
     });
+
+    const debugEl = document.getElementById('debug-mode');
+    if (debugEl) {
+        debugEl.addEventListener('change', () => {
+            toggleLogsContainer(debugEl.checked);
+        });
+    }
+
+    const clearBtn = document.getElementById('clear-logs-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+            document.getElementById('debug-logs').innerHTML = '';
+        });
+    }
+}
+
+function toggleLogsContainer(visible) {
+    const container = document.getElementById('debug-logs-container');
+    if (container) {
+        container.classList.toggle('hidden', !visible);
+        if (visible) {
+            startLogPolling();
+        } else {
+            stopLogPolling();
+        }
+    }
+}
+
+let logInterval = null;
+
+function startLogPolling() {
+    if (logInterval) return;
+    logInterval = setInterval(fetchLogs, 2000);
+    fetchLogs();
+}
+
+function stopLogPolling() {
+    if (logInterval) {
+        clearInterval(logInterval);
+        logInterval = null;
+    }
+}
+
+async function fetchLogs() {
+    const container = document.getElementById('debug-logs');
+    if (!container) return;
+
+    try {
+        const res = await apiFetch('/api/config/logs');
+        if (res && res.logs) {
+            renderLogs(res.logs);
+        }
+    } catch (e) {
+        console.error('Erreur logs:', e);
+    }
+}
+
+function renderLogs(logs) {
+    const container = document.getElementById('debug-logs');
+    if (!container) return;
+    
+    const wasAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 20;
+
+    container.innerHTML = logs.map(l => `
+        <div class="log-entry">
+            <span class="log-time">${l.timestamp}</span>
+            <span class="log-level ${l.level}">${l.level}</span>
+            <span class="log-tag">[${l.tag}]</span>
+            <span class="log-message">${escapeHtml(l.message)}</span>
+        </div>
+    `).join('');
+
+    if (wasAtBottom) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 function setupTests() {

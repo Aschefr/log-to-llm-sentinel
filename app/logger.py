@@ -26,18 +26,42 @@ def _get_debug_mode() -> bool:
         return False
 
 
+LOG_BUFFER = []
+MAX_LOGS = 100
+
+
+def _add_to_buffer(level: str, tag: str, message: str):
+    entry = {
+        "timestamp": _now(),
+        "level": level,
+        "tag": tag,
+        "message": message
+    }
+    LOG_BUFFER.append(entry)
+    if len(LOG_BUFFER) > MAX_LOGS:
+        LOG_BUFFER.pop(0)
+
+
+def get_logs():
+    return LOG_BUFFER
+
+
 def debug(tag: str, message: str) -> None:
     if _get_debug_mode():
+        _add_to_buffer("DEBUG", tag, message)
         print(f"[{_now()}] [DEBUG] [{tag}] {message}", file=sys.stdout, flush=True)
 
 
 def info(tag: str, message: str) -> None:
+    _add_to_buffer("INFO", tag, message)
     print(f"[{_now()}] [INFO]  [{tag}] {message}", file=sys.stdout, flush=True)
 
 
 def warning(tag: str, message: str) -> None:
+    _add_to_buffer("WARN", tag, message)
     print(f"[{_now()}] [WARN]  [{tag}] {message}", file=sys.stdout, flush=True)
 
 
 def error(tag: str, message: str) -> None:
+    _add_to_buffer("ERROR", tag, message)
     print(f"[{_now()}] [ERROR] [{tag}] {message}", file=sys.stderr, flush=True)

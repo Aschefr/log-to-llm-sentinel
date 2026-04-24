@@ -97,6 +97,14 @@
                 </label>
                 <div class="form-hint">Affiche le détail de chaque étape : détection, appel Ollama, envoi de notification. À désactiver en production.</div>
             </div>
+            
+            <div id="debug-logs-container" class="debug-logs-container hidden">
+                <div class="debug-logs-header">
+                    <span>Logs en direct</span>
+                    <button type="button" id="clear-logs-btn" class="btn btn-small">Effacer</button>
+                </div>
+                <div id="debug-logs" class="debug-logs"></div>
+            </div>
         </section>
 
         <div class="form-actions">
