@@ -25,11 +25,10 @@ def _get_roots() -> List[Path]:
 
     resolved: List[Path] = []
     for r in roots:
-        try:
-            resolved.append(r.expanduser().resolve())
-        except Exception:
-            # Ignore invalid roots
-            continue
+        # On utilise absolute() au lieu de resolve() pour eviter que Python 
+        # ne supprime la racine si le montage Docker est capricieux ou 
+        # s'il s'agit d'un chemin qui n'existe pas encore.
+        resolved.append(r.expanduser().absolute())
 
     # Deduplicate while preserving order
     uniq: List[Path] = []
