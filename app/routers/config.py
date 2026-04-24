@@ -209,7 +209,7 @@ def test_smtp():
 
         # Envoie un email de test vers smtp_user (comportement existant)
         notifier = NotificationService()
-        subject = "[Sentinel] Test SMTP"
+        subject = "[Log to LLM Sentinel] Test SMTP"
         body = "<p>Ceci est un email de test envoyé par Log-to-LLM-Sentinel.</p>"
         ok = notifier._send_smtp(subject, body, cfg, to_email=cfg.get("smtp_recipient") or cfg.get("smtp_user") or None)
 
@@ -238,8 +238,8 @@ def test_apprise():
 
         from app.services.notification_service import NotificationService
         notifier = NotificationService()
-        subject = "Test Apprise Log Sentinel"
-        body = "Ceci est un test de configuration Log Sentinel"
+        subject = "Test Apprise Log to LLM Sentinel"
+        body = "Ceci est un test de configuration Log to LLM Sentinel"
         
         ok = notifier._send_apprise(subject, body, cfg)
         if not ok:

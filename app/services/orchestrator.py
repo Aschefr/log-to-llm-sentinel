@@ -118,7 +118,7 @@ class Orchestrator:
             subject = f"[Sentinel] Alerte {severity.upper()} : {rule.name}"
             
             body = f"""
-            <h2>Alerte Log Sentinel</h2>
+            <h2>Alerte Log to LLM Sentinel</h2>
             <p><strong>Règle:</strong> {rule.name}</p>
             <p><strong>Ligne déclenchante:</strong> <code>{line}</code></p>
             <p><strong>Analyse Ollama:</strong></p>
@@ -141,7 +141,7 @@ class Orchestrator:
                 )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     notify_body = f"""
-                    <h2>Alerte Log Sentinel (Résumé)</h2>
+                    <h2>Alerte Log to LLM Sentinel (Résumé)</h2>
                     <p><strong>Règle:</strong> {rule.name}</p>
                     <p><strong>Résumé:</strong></p>
                     <blockquote>{summary}</blockquote>

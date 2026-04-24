@@ -1,38 +1,69 @@
 version: "3.8"
 
+# ==============================================================================
+# 🛡️ LOG TO LLM SENTINEL - CONFIGURATION UNIVERSELLE
+# ==============================================================================
+
 services:
   sentinel:
     build: .
+    container_name: log-sentinel
     ports:
       - "10911:10911"
+
     volumes:
+      # 1. Données de l'application (Base de données, sessions)
       - ./data:/app/data
+
+      # 2. Dossier de logs partagé (contient aussi l'export du journal système)
       - ./logs:/logs
-      # -----------------------------
-      # Exemples (à dé-commenter)
-      # Monte un dossier de logs local dans le conteneur en lecture seule :
-      # - "C:/chemin/vers/tes/logs:/host-logs:ro"
-      #
-      # Monte des logs système Linux (si tu es sur Linux) :
-      # - "/var/log:/host-var-log:ro"
-      #
-      # Exemple de dossier de logs applicatifs :
+
+      # 3. Accès aux logs Docker (facultatif mais recommandé)
       - /var/lib/docker/:/docker-logs:ro
-      # -----------------------------
+
+      # 4. Accès aux logs systèmes classiques (/var/log/syslog, auth.log, etc.)
+      - /var/log:/system-logs:ro
+
     environment:
       - PYTHONUNBUFFERED=1
-      # Racines autorisées pour le “browser” de fichiers dans l’UI.
-      # Mets ici les chemins côté conteneur (ceux à droite dans volumes:).
-      - SENTINEL_BROWSE_ROOTS=/logs,/app/data,/docker-logs
-    restart: unless-stopped
-  # (Optionnel) Ollama à côté du sentinel, si tu veux un setup “tout en docker”.
-  # ollama:
-  #   image: ollama/ollama:latest
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama:/root/.ollama
-  #   restart: unless-stopped
 
-  # volumes:
-  #   ollama:
+      # IMPORTANT : Listez ici tous les chemins (côté conteneur) que l'UI doit pouvoir explorer.
+      - SENTINEL_BROWSE_ROOTS=/logs,/app/data,/docker-logs,/system-logs
+
+    restart: unless-stopped
+
+  # ==============================================================================
+  # 🔄 EXPORTATEUR JOURNALD (UNIVERSEL)
+  # Ce service transforme le journal binaire Linux en fichier texte pour Sentinel.
+  # Aucun changement n'est requis sur votre système hôte.
+  # ==============================================================================
+  system-journal-exporter:
+    image: debian:slim
+    container_name: log-sentinel-journal-bridge
+    command: >
+      bash -c "apt-get update && apt-get install -y systemd && 
+               journalctl -f -n 100 > /logs/host_system_journal.log"
+    volumes:
+      # Points de montage nécessaires pour accéder au journal système de l'hôte
+      - /var/log/journal:/var/log/journal:ro
+      - /run/systemd/journal:/run/systemd/journal:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      # On écrit le flux texte dans le dossier partagé avec Sentinel
+      - ./logs:/logs
+    restart: unless-stopped
+
+# ==============================================================================
+# 🤖 NOTES : OLLAMA
+# ==============================================================================
+# Si votre instance Ollama n'est pas sur une autre machine, vous pouvez
+# l'ajouter ici en suivant le modèle standard de l'image ollama/ollama.
+# ollama:
+#   image: ollama/ollama:latest
+#   ports:
+#     - "11434:11434"
+#   volumes:
+#     - ollama:/root/.ollama
+#   restart: unless-stopped
+
+# volumes:
+#   ollama:

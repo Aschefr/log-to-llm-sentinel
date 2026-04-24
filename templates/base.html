@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Log Sentinel{% endblock %}</title>
+    <title>{% block title %}Log to LLM Sentinel{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css?v=2">
 </head>
 <body>
     <nav class="navbar">
-        <div class="nav-brand">🔍 Log Sentinel</div>
+        <div class="nav-brand">🔍 Log to LLM Sentinel</div>
         <div class="nav-links">
             <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
             <a href="/rules" class="{% if request.url.path == '/rules' %}active{% endif %}">Règles</a>

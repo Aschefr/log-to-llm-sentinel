@@ -248,13 +248,13 @@ def test_rule(rule_id: int):
             subject = f"[Sentinel TEST] Alerte {severity.upper()} : {rule.name}"
             
             body = f"""
-            <h2>🧪 Test Log Sentinel</h2>
+            <h2>🧪 Test Log to LLM Sentinel</h2>
             <p><strong>Règle:</strong> {rule.name}</p>
             <p><strong>Ligne déclenchante:</strong> <code>{last_line}</code></p>
             <p><strong>Analyse Ollama:</strong></p>
             <blockquote>{response}</blockquote>
             <p><strong>Sévérité:</strong> {severity}</p>
-            <hr><p><em>Ceci est un test manuel depuis l'interface Log Sentinel.</em></p>
+            <hr><p><em>Ceci est un test manuel depuis l'interface Log to LLM Sentinel.</em></p>
             """
 
             # Gestion du résumé IA si nécessaire
@@ -272,7 +272,7 @@ def test_rule(rule_id: int):
                 )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     notify_body = f"""
-                    <h2>🧪 Test Log Sentinel (Résumé)</h2>
+                    <h2>🧪 Test Log to LLM Sentinel (Résumé)</h2>
                     <p><strong>Règle:</strong> {rule.name}</p>
                     <p><strong>Résumé:</strong></p>
                     <blockquote>{summary}</blockquote>
