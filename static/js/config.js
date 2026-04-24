@@ -23,7 +23,7 @@ async function loadConfig() {
         document.getElementById('system-prompt').value = config.system_prompt || '';
         document.getElementById('notification-method').value = config.notification_method || 'smtp';
         document.getElementById('apprise-url').value = config.apprise_url || '';
-        document.getElementById('apprise-tags').value = config.apprise_tags || '';
+        window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) {
             debugEl.checked = config.debug_mode === true;
@@ -278,7 +278,9 @@ async function saveConfig(messageEl, isAutoSave = false) {
         system_prompt: document.getElementById('system-prompt').value,
         notification_method: document.getElementById('notification-method').value,
         apprise_url: document.getElementById('apprise-url').value,
-        apprise_tags: document.getElementById('apprise-tags').value,
+        apprise_tags: (document.getElementById('apprise-tags-select').value === '__custom__') 
+            ? document.getElementById('apprise-tags').value 
+            : document.getElementById('apprise-tags-select').value,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
     };
 
@@ -302,17 +304,39 @@ async function saveConfig(messageEl, isAutoSave = false) {
 }
 
 async function setupAppriseTags() {
-    const list = document.getElementById('apprise-tags-list');
-    if (!list) return;
+    const select = document.getElementById('apprise-tags-select');
+    const customGroup = document.getElementById('apprise-tags-custom-group');
+    const customInput = document.getElementById('apprise-tags');
+    if (!select || !customGroup || !customInput) return;
+
+    select.addEventListener('change', () => {
+        customGroup.classList.toggle('hidden', select.value !== '__custom__');
+    });
 
     try {
         const res = await apiFetch('/api/config/apprise/tags');
-        if (res && res.tags && res.tags.length > 0) {
-            list.innerHTML = res.tags.map(t => `<option value="${escapeHtml(t)}"></option>`).join('');
+        const tags = (res && res.tags) ? res.tags : [];
+        const desired = window.__desiredAppriseTags || '';
+
+        const options = [];
+        if (tags.length > 0) {
+            options.push(...tags.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`));
+        }
+        options.push('<option value="__custom__">Autre (saisie manuelle)…</option>');
+        select.innerHTML = options.join('');
+
+        if (desired && tags.includes(desired)) {
+            select.value = desired;
+            customGroup.classList.add('hidden');
         } else {
-            list.innerHTML = '';
+            select.value = '__custom__';
+            customInput.value = desired;
+            customGroup.classList.remove('hidden');
         }
     } catch (e) {
-        list.innerHTML = '';
+        select.innerHTML = '<option value="__custom__">Autre (saisie manuelle)…</option>';
+        select.value = '__custom__';
+        customInput.value = window.__desiredAppriseTags || '';
+        customGroup.classList.remove('hidden');
     }
 }
