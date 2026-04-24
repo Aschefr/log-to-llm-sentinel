@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadRules();
     setupModal();
     setupKeywordSuggestions();
+    loadAnalyses();
 });
 
 const TYPICAL_KEYWORDS = [
@@ -81,27 +82,21 @@ async function loadRules() {
         }
 
         container.innerHTML = rules.map(rule => `
-            <div class="rule-card" id="rule-card-${rule.id}">
-                <div class="rule-main-content">
-                    <div class="rule-info">
-                        <h3>${escapeHtml(rule.name)}</h3>
-                        <p>📁 ${escapeHtml(rule.log_file_path)}</p>
-                        <p>🔑 ${rule.keywords.join(', ')}</p>
-                        ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}
-                        <p>${rule.enabled ? '✅ Activée' : '❌ Désactivée'} | 🔔 ${rule.notify_on_match ? 'Notifications activées' : 'Notifications désactivées'}</p>
-                    </div>
-                    <div class="rule-actions">
-                        <button class="btn btn-secondary btn-sm" onclick="toggleHistory(${rule.id})">📜 Historique</button>
-                        <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
-                        <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
-                        <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
-                    </div>
+            <div class="rule-card">
+                <div class="rule-info">
+                    <h3>${escapeHtml(rule.name)}</h3>
+                    <p>📁 ${escapeHtml(rule.log_file_path)}</p>
+                    <p>🔑 ${rule.keywords.join(', ')}</p>
+                    ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}
+                    <p>${rule.enabled ? '✅ Activée' : '❌ Désactivée'} | 🔔 ${rule.notify_on_match ? 'Notifications activées' : 'Notifications désactivées'}</p>
                 </div>
-                <div id="history-${rule.id}" class="rule-history hidden">
-                    <div class="history-content">
-                        <div class="loading-small">Chargement de l'historique...</div>
-                    </div>
+                <div class="rule-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="toggleRuleHistory(${rule.id})">📜 Historique</button>
+                    <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
+                    <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
                 </div>
+                <div id="rule-history-${rule.id}" class="rule-history-inline hidden"></div>
             </div>
         `).join('');
     } catch (error) {
@@ -109,104 +104,46 @@ async function loadRules() {
     }
 }
 
-async function toggleHistory(ruleId) {
-    const historyDiv = document.getElementById(`history-${ruleId}`);
-    if (!historyDiv) return;
-
-    // Si on ferme le volet
-    if (!historyDiv.classList.contains('hidden')) {
-        historyDiv.classList.add('hidden');
-        return;
-    }
-
-    // Si on ouvre le volet
-    historyDiv.classList.remove('hidden');
-    const content = historyDiv.querySelector('.history-content');
-    content.innerHTML = '<div class="loading-small">Chargement...</div>';
-
-    try {
-        const analyses = await apiFetch(`/api/dashboard/recent?limit=5&rule_id=${ruleId}`);
-        
-        if (!analyses || analyses.length === 0) {
-            content.innerHTML = '<div class="no-history">Aucune analyse récente pour cette règle.</div>';
-            return;
-        }
-
-        content.innerHTML = analyses.map(a => `
-            <div class="history-item ${escapeHtml(a.severity)}">
-                <div class="history-item-header">
-                    <span class="severity-dot ${escapeHtml(a.severity)}"></span>
-                    <span class="history-date">${formatDate(a.analyzed_at)}</span>
-                    <span class="severity-text">${escapeHtml(a.severity)}</span>
-                </div>
-                <div class="history-line"><code>${escapeHtml(a.triggered_line || '')}</code></div>
-                <div class="history-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
-            </div>
-        `).join('');
-    } catch (e) {
-        content.innerHTML = `<div class="error">Erreur: ${escapeHtml(e.message)}</div>`;
-    }
-}
-
-let _analysesRuleFilter = null;
-let _analysesRuleName = null;
-
-function filterAnalyses(id, name) {
-    _analysesRuleFilter = id;
-    _analysesRuleName = name;
-    
-    // Mise à jour de l'UI du titre
-    const title = document.querySelector('.recent-section h2');
-    if (title) {
-        title.innerHTML = `Historique des analyses : <span class="filter-tag">${escapeHtml(name)} <span onclick="clearAnalysisFilter(event)" class="filter-clear">&times;</span></span>`;
-    }
-    
-    loadAnalyses();
-    
-    // Scroll doux vers l'historique
-    document.querySelector('.recent-section').scrollIntoView({ behavior: 'smooth' });
-}
-
-function clearAnalysisFilter(e) {
-    if (e) e.stopPropagation();
-    _analysesRuleFilter = null;
-    _analysesRuleName = null;
-    const title = document.querySelector('.recent-section h2');
-    if (title) title.textContent = 'Historique des analyses';
-    loadAnalyses();
-}
-
-async function loadAnalyses() {
-    const container = document.getElementById('rules-analyses');
+async function toggleRuleHistory(ruleId) {
+    const container = document.getElementById(`rule-history-${ruleId}`);
     if (!container) return;
 
-    try {
-        const url = _analysesRuleFilter
-            ? `/api/dashboard/recent?limit=20&rule_id=${encodeURIComponent(_analysesRuleFilter)}`
-            : '/api/dashboard/recent?limit=20';
-        const analyses = await apiFetch(url);
+    if (container.classList.contains('hidden')) {
+        // Afficher l'historique
+        container.classList.remove('hidden');
+        
+        // Charger si vide
+        if (container.innerHTML.trim() === '') {
+            container.innerHTML = '<div class="loading">Chargement de l\'historique...</div>';
+            try {
+                const url = `/api/dashboard/recent?limit=10&rule_id=${ruleId}`;
+                const analyses = await apiFetch(url);
 
-        if (!analyses || analyses.length === 0) {
-            container.innerHTML = '<div class="loading">Aucune analyse pour le moment</div>';
-            return;
-        }
+                if (!analyses || analyses.length === 0) {
+                    container.innerHTML = '<div class="loading">Aucune analyse pour cette règle</div>';
+                    return;
+                }
 
-        container.innerHTML = analyses.map(a => `
-            <div class="analysis-card">
-                <div class="analysis-header">
-                    <div>
-                        <strong class="analysis-rule-name">${escapeHtml(a.rule_name || 'Règle #' + a.rule_id)}</strong>
-                        <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
+                container.innerHTML = analyses.map(a => `
+                    <div class="analysis-card inline-history-card">
+                        <div class="analysis-header">
+                            <div>
+                                <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
+                            </div>
+                            <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                        </div>
+                        <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
+                        <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
                     </div>
-                    <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
-                </div>
-                <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
-                <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
-            </div>
-        `).join('');
-    } catch (e) {
-        console.error('Erreur analyses:', e);
-        container.innerHTML = `<div class="loading">Erreur: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
+                `).join('');
+            } catch (e) {
+                console.error('Erreur analyses:', e);
+                container.innerHTML = `<div class="loading">Erreur: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
+            }
+        }
+    } else {
+        // Masquer l'historique
+        container.classList.add('hidden');
     }
 }
 
