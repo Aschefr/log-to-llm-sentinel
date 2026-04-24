@@ -54,4 +54,17 @@ services:
 # NOTES : OLLAMA
 # ==============================================================================
 # Si votre instance Ollama n'est pas sur une autre machine, vous pouvez
-# l'ajouter ici en suivant le modele standard de l'image ollama/ollama.
+# l'ajouter ici. 
+# Pour telecharger le modele : docker exec -it ollama-server ollama pull gemma4:e2b
+#
+#   ollama:
+#     image: ollama/ollama:latest
+#     container_name: ollama-server
+#     ports:
+#       - "11434:11434"
+#     volumes:
+#       - ollama_data:/root/.ollama
+#     restart: unless-stopped
+#
+# volumes:
+#   ollama_data:
