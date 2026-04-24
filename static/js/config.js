@@ -23,6 +23,7 @@ async function loadConfig() {
         document.getElementById('system-prompt').value = config.system_prompt || '';
         document.getElementById('notification-method').value = config.notification_method || 'smtp';
         document.getElementById('apprise-url').value = config.apprise_url || '';
+        document.getElementById('apprise-max-chars').value = config.apprise_max_chars || 1900;
         window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) {
@@ -107,8 +108,13 @@ function setupForm() {
 
     const clearBtn = document.getElementById('clear-logs-btn');
     if (clearBtn) {
-        clearBtn.addEventListener('click', () => {
-            document.getElementById('debug-logs').innerHTML = '';
+        clearBtn.addEventListener('click', async () => {
+            try {
+                await apiFetch('/api/config/logs', { method: 'DELETE' });
+                document.getElementById('debug-logs').innerHTML = '';
+            } catch (e) {
+                console.error('Erreur effacement logs:', e);
+            }
         });
     }
 
@@ -281,6 +287,7 @@ async function saveConfig(messageEl, isAutoSave = false) {
         apprise_tags: (document.getElementById('apprise-tags-select').value === '__custom__') 
             ? document.getElementById('apprise-tags').value 
             : document.getElementById('apprise-tags-select').value,
+        apprise_max_chars: parseInt(document.getElementById('apprise-max-chars').value) || 1900,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
     };
 
@@ -338,5 +345,14 @@ async function setupAppriseTags() {
         select.value = '__custom__';
         customInput.value = window.__desiredAppriseTags || '';
         customGroup.classList.remove('hidden');
+    }
+}
+
+window.setAppriseMax = (val) => {
+    const input = document.getElementById('apprise-max-chars');
+    if (input) {
+        input.value = val;
+        // Trigger save if auto-save is enabled
+        input.dispatchEvent(new Event('input'));
     }
 }

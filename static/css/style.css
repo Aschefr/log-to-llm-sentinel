@@ -764,3 +764,26 @@ body {
         gap: 1rem;
     }
 }
+
+/* Chips for presets */
+.preset-chips {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    flex-wrap: wrap;
+}
+.chip {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-dim);
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.chip:hover {
+    background: var(--accent-glow);
+    color: white;
+    border-color: var(--accent-primary);
+}

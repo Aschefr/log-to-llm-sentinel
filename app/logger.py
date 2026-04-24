@@ -46,6 +46,11 @@ def get_logs():
     return LOG_BUFFER
 
 
+def clear_logs():
+    global LOG_BUFFER
+    LOG_BUFFER.clear()
+
+
 def debug(tag: str, message: str) -> None:
     if _get_debug_mode():
         _add_to_buffer("DEBUG", tag, message)

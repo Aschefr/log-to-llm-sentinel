@@ -245,18 +245,31 @@ def test_rule(rule_id: int):
         if rule.notify_on_match:
             logger.debug("TestRule", f"Envoi notification via '{config_dict.get('notification_method')}'")
             notifier = NotificationService()
-            subject = f"[Sentinel TEST] Alerte {severity.upper()} : {rule.name}"
-            body = f"""
-            <h2>🧪 Test Log Sentinel</h2>
-            <p><strong>Règle:</strong> {rule.name}</p>
-            <p><strong>Ligne déclenchante:</strong> <code>{last_line}</code></p>
-            <p><strong>Analyse Ollama:</strong></p>
-            <blockquote>{response}</blockquote>
-            <p><strong>Sévérité:</strong> {severity}</p>
-            <hr><p><em>Ceci est un test manuel depuis l'interface Log Sentinel.</em></p>
-            """
+            # Gestion du résumé IA si nécessaire
+            max_chars = config_dict.get("apprise_max_chars", 1900)
+            notify_body = body
+
+            if config_dict.get("notification_method") == "apprise" and len(body) > max_chars:
+                logger.debug("TestRule", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
+                summary_prompt = f"Résume l'analyse suivante en moins de {max_chars - 400} caractères. Garde l'essentiel (Sévérité, Cause, Action). Format clair.\n\nAnalyse : {response}"
+                summary = orchestrator.ollama.analyze(
+                    prompt=summary_prompt,
+                    url=config_dict.get("ollama_url"),
+                    model=config_dict.get("ollama_model"),
+                    timeout=60
+                )
+                if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
+                    notify_body = f"""
+                    <h2>🧪 Test Log Sentinel (Résumé)</h2>
+                    <p><strong>Règle:</strong> {rule.name}</p>
+                    <p><strong>Résumé:</strong></p>
+                    <blockquote>{summary}</blockquote>
+                    <p><strong>Sévérité:</strong> {severity}</p>
+                    <p><em>(Analyse complète disponible dans l'interface)</em></p>
+                    """
+
             try:
-                ok = notifier.send(subject, body, config_dict)
+                ok = notifier.send(subject, notify_body, config_dict)
                 if ok:
                     logger.info("TestRule", "Notification de test envoyée avec succès")
                     analysis.notified = True

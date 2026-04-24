@@ -122,9 +122,15 @@ class NotificationService:
         logger.debug("NotificationService", f"Apprise POST → {apprise_url}")
 
         try:
+            # Discord et d'autres services ont des limites de caractères (souvent 2000).
+            # On tronque le body s'il est trop long pour éviter une erreur 400.
+            safe_body = body
+            if len(body) > 1900:
+                safe_body = body[:1850] + "\n\n... (message tronqué car trop long) ..."
+
             payload = {
                 "title": subject,
-                "body": body,
+                "body": safe_body,
                 "type": "info",
                 "format": "html",
             }

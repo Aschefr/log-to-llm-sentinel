@@ -19,6 +19,7 @@ class GlobalConfigCreate(BaseModel):
     notification_method: str = "smtp"
     apprise_url: str = ""
     apprise_tags: str = ""
+    apprise_max_chars: int = 1900
     debug_mode: bool = False
 
 

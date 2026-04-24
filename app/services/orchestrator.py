@@ -116,6 +116,7 @@ class Orchestrator:
         if rule.notify_on_match:
             logger.debug("Orchestrator", f"Envoi notification via '{config.get('notification_method')}' pour règle '{rule.name}'")
             subject = f"[Sentinel] Alerte {severity.upper()} : {rule.name}"
+            
             body = f"""
             <h2>Alerte Log Sentinel</h2>
             <p><strong>Règle:</strong> {rule.name}</p>
@@ -124,7 +125,31 @@ class Orchestrator:
             <blockquote>{response}</blockquote>
             <p><strong>Sévérité:</strong> {severity}</p>
             """
-            await asyncio.to_thread(self.notifier.send, subject, body, config)
+
+            # Gestion du résumé IA si nécessaire (pour Apprise/Discord/etc.)
+            max_chars = config.get("apprise_max_chars", 1900)
+            notify_body = body
+
+            if config.get("notification_method") == "apprise" and len(body) > max_chars:
+                logger.debug("Orchestrator", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
+                summary_prompt = f"Résume l'analyse suivante en moins de {max_chars - 400} caractères. Garde l'essentiel (Sévérité, Cause, Action). Format clair.\n\nAnalyse : {response}"
+                summary = await asyncio.to_thread(
+                    self.ollama.analyze,
+                    prompt=summary_prompt,
+                    url=config.get("ollama_url"),
+                    model=config.get("ollama_model"),
+                )
+                if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
+                    notify_body = f"""
+                    <h2>Alerte Log Sentinel (Résumé)</h2>
+                    <p><strong>Règle:</strong> {rule.name}</p>
+                    <p><strong>Résumé:</strong></p>
+                    <blockquote>{summary}</blockquote>
+                    <p><strong>Sévérité:</strong> {severity}</p>
+                    <p><em>(Analyse complète disponible dans l'interface)</em></p>
+                    """
+
+            await asyncio.to_thread(self.notifier.send, subject, notify_body, config)
             analysis.notified = True
             db.commit()
 
