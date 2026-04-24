@@ -61,5 +61,6 @@ class GlobalConfig(Base):
     system_prompt = Column(Text, default="")
     notification_method = Column(String, default="smtp")
     apprise_url = Column(String, default="")
+    apprise_tags = Column(String, default="")
     debug_mode = Column(Boolean, default=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

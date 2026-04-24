@@ -18,6 +18,7 @@ class GlobalConfigCreate(BaseModel):
     system_prompt: str = ""
     notification_method: str = "smtp"
     apprise_url: str = ""
+    apprise_tags: str = ""
     debug_mode: bool = False
 
 

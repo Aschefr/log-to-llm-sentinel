@@ -22,6 +22,7 @@ async function loadConfig() {
         document.getElementById('system-prompt').value = config.system_prompt || '';
         document.getElementById('notification-method').value = config.notification_method || 'smtp';
         document.getElementById('apprise-url').value = config.apprise_url || '';
+        document.getElementById('apprise-tags').value = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) {
             debugEl.checked = config.debug_mode === true;
@@ -276,6 +277,7 @@ async function saveConfig(messageEl, isAutoSave = false) {
         system_prompt: document.getElementById('system-prompt').value,
         notification_method: document.getElementById('notification-method').value,
         apprise_url: document.getElementById('apprise-url').value,
+        apprise_tags: document.getElementById('apprise-tags').value,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
     };
 

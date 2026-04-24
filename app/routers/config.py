@@ -27,6 +27,7 @@ class ConfigUpdate(BaseModel):
     system_prompt: Optional[str] = None
     notification_method: Optional[str] = None
     apprise_url: Optional[str] = None
+    apprise_tags: Optional[str] = None
     debug_mode: Optional[bool] = None
 
 
@@ -52,6 +53,7 @@ def get_config():
             "system_prompt": config.system_prompt,
             "notification_method": config.notification_method,
             "apprise_url": config.apprise_url,
+            "apprise_tags": config.apprise_tags,
             "debug_mode": config.debug_mode,
         }
     finally:
@@ -94,6 +96,8 @@ def update_config(config_data: ConfigUpdate):
             config.notification_method = config_data.notification_method
         if config_data.apprise_url is not None:
             config.apprise_url = config_data.apprise_url
+        if config_data.apprise_tags is not None:
+            config.apprise_tags = config_data.apprise_tags
         if config_data.debug_mode is not None:
             config.debug_mode = config_data.debug_mode
 
