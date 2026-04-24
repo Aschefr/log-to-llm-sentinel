@@ -152,3 +152,25 @@ def browse(
 
     return BrowseResponse(path=str(target), parent=parent, entries=entries)
 
+@router.get("/tail")
+def tail_file(
+    path: str = Query(..., description="Chemin du fichier"),
+    lines: int = Query(10, description="Nombre de lignes à retourner")
+):
+    target = _resolve_under_roots(path)
+    
+    if not target.exists():
+        raise HTTPException(status_code=404, detail="Fichier introuvable")
+    if not target.is_file():
+        raise HTTPException(status_code=400, detail="Le chemin doit être un fichier")
+    if not os.access(str(target), os.R_OK):
+        raise HTTPException(status_code=403, detail="Fichier illisible")
+        
+    try:
+        import collections
+        with open(target, 'r', encoding='utf-8', errors='ignore') as f:
+            tail_lines = collections.deque(f, lines)
+            return {"lines": [line.rstrip('\n') for line in tail_lines]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
