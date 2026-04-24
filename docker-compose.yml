@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🛡️ LOG TO LLM SENTINEL - CONFIGURATION UNIVERSELLE
+# LOG TO LLM SENTINEL - CONFIGURATION UNIVERSELLE
 # ==============================================================================
 
 services:
@@ -10,30 +10,30 @@ services:
       - "10911:10911"
 
     volumes:
-      # 1. Données de l'application (Base de données, sessions)
+      # 1. Donnees de l'application (Base de donnees, sessions)
       - ./data:/app/data
 
-      # 2. Dossier de logs partagé (contient aussi l'export du journal système)
+      # 2. Dossier de logs partage (contient aussi l'export du journal systeme)
       - ./logs:/logs
 
-      # 3. Accès aux logs Docker (facultatif mais recommandé)
+      # 3. Acces aux logs Docker (facultatif mais recommande)
       - /var/lib/docker/:/docker-logs:ro
 
-      # 4. Accès aux logs systèmes classiques (/var/log/syslog, auth.log, etc.)
+      # 4. Acces aux logs systemes classiques (/var/log/syslog, auth.log, etc.)
       - /var/log:/system-logs:ro
 
     environment:
       - PYTHONUNBUFFERED=1
 
-      # IMPORTANT : Listez ici tous les chemins (côté conteneur) que l'UI doit pouvoir explorer.
+      # IMPORTANT : Listez ici tous les chemins (cote conteneur) que l'UI doit explorer.
       - SENTINEL_BROWSE_ROOTS=/logs,/app/data,/docker-logs,/system-logs
 
     restart: unless-stopped
 
   # ==============================================================================
-  # 🔄 EXPORTATEUR JOURNALD (UNIVERSEL)
+  # EXPORTATEUR JOURNALD (UNIVERSEL)
   # Ce service transforme le journal binaire Linux en fichier texte pour Sentinel.
-  # Aucun changement n'est requis sur votre système hôte.
+  # Aucun changement n'est requis sur votre systeme hote.
   # ==============================================================================
   system-journal-exporter:
     image: debian:slim
@@ -42,26 +42,16 @@ services:
       bash -c "apt-get update && apt-get install -y systemd && 
                journalctl -f -n 100 > /logs/host_system_journal.log"
     volumes:
-      # Points de montage nécessaires pour accéder au journal système de l'hôte
+      # Points de montage necessaires pour acceder au journal systeme de l'hote
       - /var/log/journal:/var/log/journal:ro
       - /run/systemd/journal:/run/systemd/journal:ro
       - /etc/machine-id:/etc/machine-id:ro
-      # On écrit le flux texte dans le dossier partagé avec Sentinel
+      # On ecrit le flux texte dans le dossier partage avec Sentinel
       - ./logs:/logs
     restart: unless-stopped
 
 # ==============================================================================
-# 🤖 NOTES : OLLAMA
+# NOTES : OLLAMA
 # ==============================================================================
 # Si votre instance Ollama n'est pas sur une autre machine, vous pouvez
-# l'ajouter ici en suivant le modèle standard de l'image ollama/ollama.
-# ollama:
-#   image: ollama/ollama:latest
-#   ports:
-#     - "11434:11434"
-#   volumes:
-#     - ollama:/root/.ollama
-#   restart: unless-stopped
-
-# volumes:
-#   ollama:
+# l'ajouter ici en suivant le modele standard de l'image ollama/ollama.
