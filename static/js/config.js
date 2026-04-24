@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupForm();
     setupTests();
     setupOllamaModelSelect();
+    setupAppriseTags();
 });
 
 async function loadConfig() {
@@ -297,5 +298,21 @@ async function saveConfig(messageEl, isAutoSave = false) {
         console.error('Erreur sauvegarde config:', error);
         showMessage(messageEl, 'Erreur: ' + error.message, 'error');
         return false;
+    }
+}
+
+async function setupAppriseTags() {
+    const list = document.getElementById('apprise-tags-list');
+    if (!list) return;
+
+    try {
+        const res = await apiFetch('/api/config/apprise/tags');
+        if (res && res.tags && res.tags.length > 0) {
+            list.innerHTML = res.tags.map(t => `<option value="${escapeHtml(t)}"></option>`).join('');
+        } else {
+            list.innerHTML = '';
+        }
+    } catch (e) {
+        list.innerHTML = '';
     }
 }

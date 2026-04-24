@@ -84,7 +84,8 @@
             </div>
             <div class="form-group">
                 <label for="apprise-tags">Tags Apprise (optionnel)</label>
-                <input type="text" id="apprise-tags" placeholder="quentin-gmail, discord-alert">
+                <input type="text" id="apprise-tags" list="apprise-tags-list" placeholder="quentin-gmail, discord-alert">
+                <datalist id="apprise-tags-list"></datalist>
                 <div class="form-hint">Les tags à cibler lors de l'envoi, séparés par des virgules. Sera inclus dans la requête JSON.</div>
             </div>
             <div class="form-actions" style="margin-top: 0.5rem;">

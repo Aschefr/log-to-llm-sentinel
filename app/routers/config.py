@@ -244,6 +244,41 @@ def test_apprise():
         db.close()
 
 
+@router.get("/apprise/tags")
+def list_apprise_tags():
+    """Tente de récupérer les tags configurés dans l'API Apprise."""
+    db = SessionLocal()
+    try:
+        config = db.query(GlobalConfig).first()
+        if not config or not config.apprise_url:
+            return {"tags": []}
+
+        url = config.apprise_url.strip()
+        if "/notify/" in url:
+            json_url = url.replace("/notify/", "/json/urls/")
+        else:
+            return {"tags": []}
+
+        try:
+            req = urllib.request.Request(json_url, method="GET")
+            with urllib.request.urlopen(req, timeout=5) as r:
+                data = json.loads(r.read().decode("utf-8"))
+        except Exception as e:
+            from app import logger
+            logger.debug("ConfigRouter", f"Erreur fetch tags Apprise: {e}")
+            return {"tags": []}
+
+        tags = set()
+        for item in data.get("urls", []):
+            item_tags = item.get("tags", [])
+            for t in item_tags:
+                tags.add(t)
+
+        return {"tags": sorted(list(tags))}
+    finally:
+        db.close()
+
+
 @router.get("/ollama/models")
 def list_ollama_models():
     """Retourne la liste des modèles disponibles sur le serveur Ollama configuré."""

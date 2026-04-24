@@ -131,7 +131,7 @@ class NotificationService:
             
             apprise_tags = config.get("apprise_tags", "").strip()
             if apprise_tags:
-                payload["tags"] = apprise_tags
+                payload["tag"] = apprise_tags
 
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
