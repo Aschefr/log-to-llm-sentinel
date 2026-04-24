@@ -210,6 +210,8 @@ def test_rule(rule_id: int):
             "system_prompt": config.system_prompt if config else "",
             "notification_method": config.notification_method if config else "smtp",
             "apprise_url": config.apprise_url if config else "",
+            "apprise_tags": config.apprise_tags if config else "",
+            "debug_mode": config.debug_mode if config else False,
         }
 
         prompt = orchestrator._build_prompt(rule, last_line, config_dict.get("system_prompt", ""), context_lines=last_lines[:-1])

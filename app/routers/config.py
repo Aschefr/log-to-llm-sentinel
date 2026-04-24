@@ -121,6 +121,7 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
         "system_prompt": config.system_prompt if config else "",
         "notification_method": config.notification_method if config else "smtp",
         "apprise_url": config.apprise_url if config else "",
+        "apprise_tags": config.apprise_tags if config else "",
         "debug_mode": config.debug_mode if config else False,
     }
 
