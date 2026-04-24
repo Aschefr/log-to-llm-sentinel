@@ -52,7 +52,8 @@ class NotificationService:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = smtp_user
-            msg["To"] = to_email or smtp_user
+            recipient = to_email or config.get("smtp_recipient") or smtp_user
+            msg["To"] = recipient
 
             msg.attach(MIMEText(body, "html"))
 
@@ -65,10 +66,10 @@ class NotificationService:
                 server.ehlo()
 
             server.login(smtp_user, smtp_password)
-            server.sendmail(smtp_user, to_email or smtp_user, msg.as_string())
+            server.sendmail(smtp_user, recipient, msg.as_string())
             server.quit()
 
-            print(f"[Notification] Email envoyé à {to_email or smtp_user}")
+            print(f"[Notification] Email envoyé à {recipient}")
             return True
 
         except Exception as e:
@@ -93,22 +94,21 @@ class NotificationService:
 
         try:
             payload = {
-                "urls": [apprise_url],
                 "title": subject,
                 "body": body,
             }
 
             data = json.dumps(payload).encode("utf-8")
             req = urllib.request.Request(
-                "http://localhost:8000/notify",
+                apprise_url,
                 data=data,
                 headers={"Content-Type": "application/json"},
                 method="POST",
             )
 
             with urllib.request.urlopen(req, timeout=10) as response:
-                result = json.loads(response.read().decode("utf-8"))
-                return result.get("success", False)
+                status = getattr(response, "status", 200)
+                return 200 <= status < 300
 
         except Exception as e:
             print(f"[Notification] Erreur Apprise: {e}")

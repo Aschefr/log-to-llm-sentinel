@@ -10,6 +10,7 @@ class GlobalConfigCreate(BaseModel):
     smtp_port: int = 587
     smtp_user: str = ""
     smtp_password: str = ""
+    smtp_recipient: str = ""
     smtp_tls: bool = True
     ollama_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "llama3"

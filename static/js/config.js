@@ -12,6 +12,7 @@ async function loadConfig() {
         document.getElementById('smtp-port').value = config.smtp_port || 587;
         document.getElementById('smtp-user').value = config.smtp_user || '';
         document.getElementById('smtp-password').value = '';
+        document.getElementById('smtp-recipient').value = config.smtp_recipient || '';
         document.getElementById('smtp-tls').checked = config.smtp_tls !== false;
         document.getElementById('ollama-url').value = config.ollama_url || 'http://host.docker.internal:11434';
         // Model select is populated async; keep desired value to apply later.
@@ -143,6 +144,7 @@ async function saveConfig(messageEl) {
         smtp_port: parseInt(document.getElementById('smtp-port').value) || 587,
         smtp_user: document.getElementById('smtp-user').value,
         smtp_password: document.getElementById('smtp-password').value,
+        smtp_recipient: document.getElementById('smtp-recipient').value,
         smtp_tls: document.getElementById('smtp-tls').checked,
         ollama_url: document.getElementById('ollama-url').value,
         ollama_model: chosenModel,

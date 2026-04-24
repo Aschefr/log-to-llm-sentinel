@@ -52,6 +52,7 @@ class GlobalConfig(Base):
     smtp_port = Column(Integer, default=587)
     smtp_user = Column(String, default="")
     smtp_password = Column(String, default="")
+    smtp_recipient = Column(String, default="")
     smtp_tls = Column(Boolean, default=True)
     ollama_url = Column(String, default="http://host.docker.internal:11434")
     ollama_model = Column(String, default="llama3")

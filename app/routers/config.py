@@ -19,6 +19,7 @@ class ConfigUpdate(BaseModel):
     smtp_port: Optional[int] = None
     smtp_user: Optional[str] = None
     smtp_password: Optional[str] = None
+    smtp_recipient: Optional[str] = None
     smtp_tls: Optional[bool] = None
     ollama_url: Optional[str] = None
     ollama_model: Optional[str] = None
@@ -41,6 +42,7 @@ def get_config():
             "smtp_host": config.smtp_host,
             "smtp_port": config.smtp_port,
             "smtp_user": config.smtp_user,
+            "smtp_recipient": config.smtp_recipient,
             "smtp_tls": config.smtp_tls,
             "ollama_url": config.ollama_url,
             "ollama_model": config.ollama_model,
@@ -69,6 +71,8 @@ def update_config(config_data: ConfigUpdate):
             config.smtp_user = config_data.smtp_user
         if config_data.smtp_password is not None:
             config.smtp_password = config_data.smtp_password
+        if config_data.smtp_recipient is not None:
+            config.smtp_recipient = config_data.smtp_recipient
         if config_data.smtp_tls is not None:
             config.smtp_tls = config_data.smtp_tls
         if config_data.ollama_url is not None:
@@ -94,6 +98,7 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
         "smtp_port": config.smtp_port if config else 587,
         "smtp_user": config.smtp_user if config else "",
         "smtp_password": config.smtp_password if config else "",
+        "smtp_recipient": config.smtp_recipient if config else "",
         "smtp_tls": config.smtp_tls if config else True,
         "ollama_url": config.ollama_url if config else "http://host.docker.internal:11434",
         "ollama_model": config.ollama_model if config else "llama3",
@@ -181,7 +186,7 @@ def test_smtp():
         notifier = NotificationService()
         subject = "[Sentinel] Test SMTP"
         body = "<p>Ceci est un email de test envoyé par Log-to-LLM-Sentinel.</p>"
-        ok = notifier._send_smtp(subject, body, cfg, to_email=cfg.get("smtp_user") or None)
+        ok = notifier._send_smtp(subject, body, cfg, to_email=cfg.get("smtp_recipient") or cfg.get("smtp_user") or None)
 
         if not ok:
             raise HTTPException(status_code=502, detail="Échec de l'envoi SMTP (vérifie hôte/port/user/mdp/TLS)")
@@ -206,12 +211,17 @@ def test_apprise():
         if not apprise_url:
             raise HTTPException(status_code=400, detail="URL Apprise manquante")
 
-        # Test simple de reachability HTTP
+        # Test simple de reachability HTTP via POST
         try:
-            req = urllib.request.Request(apprise_url, method="GET")
+            payload = {"title": "Test Apprise", "body": "Ceci est un test de configuration Log Sentinel"}
+            data = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(apprise_url, data=data, headers={"Content-Type": "application/json"}, method="POST")
             with urllib.request.urlopen(req, timeout=8) as r:
                 status = getattr(r, "status", 200)
-                return {"ok": True, "detail": f"Apprise joignable (HTTP {status})"}
+                return {"ok": True, "detail": f"Notification Apprise envoyée (HTTP {status})"}
+        except urllib.error.HTTPError as e:
+            # Même s'il renvoie une erreur métier, le serveur a répondu
+            raise HTTPException(status_code=502, detail=f"Apprise a répondu avec l'erreur HTTP {e.code}")
         except urllib.error.URLError as e:
             raise HTTPException(status_code=502, detail=f"Apprise injoignable: {str(e)}")
     finally:
@@ -231,7 +241,9 @@ def list_ollama_models():
             raise HTTPException(status_code=400, detail="URL Ollama manquante")
 
         base = url.rstrip("/")
-        if base.endswith("/api"):
+        if base.endswith("/api/generate"):
+            base = base[: -len("/api/generate")]
+        elif base.endswith("/api"):
             base = base[: -len("/api")]
 
         try:

@@ -14,3 +14,12 @@ def init_db():
     """Crée les tables si elles n'existent pas."""
     from app import models  # noqa: F401
     Base.metadata.create_all(bind=engine)
+
+    # Migration manuelle pour ajouter smtp_recipient
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE global_config ADD COLUMN smtp_recipient VARCHAR DEFAULT ''"))
+            conn.commit()
+        except Exception:
+            pass  # La colonne existe déjà
