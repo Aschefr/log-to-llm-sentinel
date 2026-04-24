@@ -1,3 +1,4 @@
+import asyncio
 from typing import List, Optional
 from datetime import datetime
 
@@ -21,7 +22,7 @@ class Orchestrator:
         self.ollama = OllamaService()
         self.notifier = NotificationService()
 
-    def handle_new_lines(self, rule: Rule, lines: List[str]):
+    async def handle_new_lines(self, rule: Rule, lines: List[str]):
         """Traite les nouvelles lignes pour une règle donnée."""
         if not rule.enabled:
             return
@@ -57,11 +58,11 @@ class Orchestrator:
             }
 
             for line in matching_lines:
-                self._process_match(rule, line, config_dict, db)
+                await self._process_match(rule, line, config_dict, db)
         finally:
             db.close()
 
-    def _process_match(self, rule: Rule, line: str, config: dict, db):
+    async def _process_match(self, rule: Rule, line: str, config: dict, db):
         """Traite une ligne correspondante."""
         # 1. Préparer le contexte
         context_before = []
@@ -73,8 +74,9 @@ class Orchestrator:
         # 2. Construire le prompt
         prompt = self._build_prompt(rule, line, config.get("system_prompt", ""))
 
-        # 3. Appeler Ollama
-        response = self.ollama.analyze(
+        # 3. Appeler Ollama (dans un thread séparé pour ne pas bloquer l'Event Loop)
+        response = await asyncio.to_thread(
+            self.ollama.analyze,
             prompt=prompt,
             url=config.get("ollama_url"),
             model=config.get("ollama_model"),
@@ -109,7 +111,7 @@ class Orchestrator:
             <blockquote>{response}</blockquote>
             <p><strong>Sévérité:</strong> {severity}</p>
             """
-            self.notifier.send(subject, body, config)
+            await asyncio.to_thread(self.notifier.send, subject, body, config)
             analysis.notified = True
             db.commit()
 

@@ -101,7 +101,13 @@ class LogWatcher:
 
                     # Envoyer au callback
                     if self.on_new_lines:
-                        self.on_new_lines(rule, [line.strip() for line in new_lines])
+                        if asyncio.iscoroutinefunction(self.on_new_lines):
+                            await self.on_new_lines(rule, [line.strip() for line in new_lines])
+                        else:
+                            self.on_new_lines(rule, [line.strip() for line in new_lines])
+
+                    # Mettre à jour la position locale pour le prochain tour de boucle
+                    position = new_position
 
             except Exception as e:
                 print(f"[LogWatcher] Erreur sur {filepath}: {e}")
