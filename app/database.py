@@ -21,6 +21,7 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN smtp_recipient VARCHAR DEFAULT ''",
         "ALTER TABLE global_config ADD COLUMN smtp_ssl_mode VARCHAR DEFAULT 'starttls'",
         "ALTER TABLE global_config ADD COLUMN debug_mode BOOLEAN DEFAULT 0",
+        "ALTER TABLE rules ADD COLUMN context_lines INTEGER DEFAULT 5",
     ]
     with engine.connect() as conn:
         for sql in migrations:

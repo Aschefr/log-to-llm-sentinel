@@ -74,6 +74,11 @@
                     <label for="rule-context">Contexte applicatif (optionnel)</label>
                     <textarea id="rule-context" rows="3" placeholder="Description du contexte..."></textarea>
                 </div>
+                <div class="form-group">
+                    <label for="rule-context-lines">Nombre de lignes de log envoyées à Ollama</label>
+                    <input type="number" id="rule-context-lines" min="1" max="100" value="5" placeholder="5">
+                    <div class="form-hint">Nombre de lignes de contexte à inclure dans la requête Ollama (défaut: 5).</div>
+                </div>
                 <div class="form-group checkbox-group">
                     <label>
                         <input type="checkbox" id="rule-enabled" checked>

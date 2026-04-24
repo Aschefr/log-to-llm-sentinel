@@ -229,6 +229,7 @@ function resetForm() {
     document.getElementById('rule-context').value = '';
     document.getElementById('rule-enabled').checked = true;
     document.getElementById('rule-notify').checked = true;
+    document.getElementById('rule-context-lines').value = '5';
     document.getElementById('modal-title').textContent = 'Nouvelle règle';
     closeFileBrowser();
     
@@ -386,6 +387,7 @@ async function saveRule() {
         application_context: document.getElementById('rule-context').value,
         enabled: document.getElementById('rule-enabled').checked,
         notify_on_match: document.getElementById('rule-notify').checked,
+        context_lines: parseInt(document.getElementById('rule-context-lines').value) || 5,
     };
 
     try {
@@ -419,6 +421,7 @@ async function editRule(id) {
         document.getElementById('rule-context').value = rule.application_context || '';
         document.getElementById('rule-enabled').checked = rule.enabled;
         document.getElementById('rule-notify').checked = rule.notify_on_match;
+        document.getElementById('rule-context-lines').value = rule.context_lines || 5;
         document.getElementById('modal-title').textContent = 'Éditer la règle';
         document.getElementById('rule-modal').classList.remove('hidden');
         closeFileBrowser();

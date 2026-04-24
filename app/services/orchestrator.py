@@ -127,14 +127,18 @@ class Orchestrator:
             analysis.notified = True
             db.commit()
 
-    def _build_prompt(self, rule: Rule, line: str, system_prompt: str) -> str:
+    def _build_prompt(self, rule: Rule, line: str, system_prompt: str, context_lines: list = None) -> str:
         """Construit le prompt pour Ollama."""
+        context_block = ""
+        if context_lines:
+            context_block = "\n        Lignes de contexte précédentes:\n" + "\n".join(f"        {l}" for l in context_lines) + "\n"
+
         base_prompt = f"""
         Analyse la ligne de log suivante et détermine sa sévérité (info, warning, critical).
         Fournis un résumé court de l'incident.
 
         Contexte de l'application: {rule.application_context}
-        Ligne: {line}
+{context_block}        Ligne déclenchante: {line}
         """
 
         if system_prompt:

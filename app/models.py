@@ -14,6 +14,7 @@ class Rule(Base):
     application_context = Column(Text, default="")
     enabled = Column(Boolean, default=True)
     notify_on_match = Column(Boolean, default=True)
+    context_lines = Column(Integer, default=5)
     last_position = Column(Float, default=0.0)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
