@@ -39,21 +39,22 @@ def get_stats():
 def get_recent_analyses(limit: int = 10, rule_id: int | None = None):
     db = SessionLocal()
     try:
-        q = db.query(Analysis)
+        q = db.query(Analysis, Rule.name).outerjoin(Rule, Analysis.rule_id == Rule.id)
         if rule_id is not None:
             q = q.filter(Analysis.rule_id == rule_id)
 
-        analyses = q.order_by(Analysis.analyzed_at.desc()).limit(limit).all()
+        results = q.order_by(Analysis.analyzed_at.desc()).limit(limit).all()
         return [
             {
                 "id": a.id,
                 "rule_id": a.rule_id,
+                "rule_name": rule_name,
                 "triggered_line": a.triggered_line,
                 "ollama_response": a.ollama_response,
                 "severity": a.severity,
                 "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
             }
-            for a in analyses
+            for a, rule_name in results
         ]
     finally:
         db.close()

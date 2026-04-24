@@ -91,6 +91,7 @@ async function loadRules() {
                     <p>${rule.enabled ? '✅ Activée' : '❌ Désactivée'} | 🔔 ${rule.notify_on_match ? 'Notifications activées' : 'Notifications désactivées'}</p>
                 </div>
                 <div class="rule-actions">
+                    <button class="btn btn-secondary btn-sm" onclick="filterAnalyses(${rule.id}, '${escapeHtml(rule.name)}')">📜 Historique</button>
                     <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
                     <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
@@ -103,11 +104,36 @@ async function loadRules() {
 }
 
 let _analysesRuleFilter = null;
+let _analysesRuleName = null;
+
+function filterAnalyses(id, name) {
+    _analysesRuleFilter = id;
+    _analysesRuleName = name;
+    
+    // Mise à jour de l'UI du titre
+    const title = document.querySelector('.recent-section h2');
+    if (title) {
+        title.innerHTML = `Historique des analyses : <span class="filter-tag">${escapeHtml(name)} <span onclick="clearAnalysisFilter(event)" class="filter-clear">&times;</span></span>`;
+    }
+    
+    loadAnalyses();
+    
+    // Scroll doux vers l'historique
+    document.querySelector('.recent-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function clearAnalysisFilter(e) {
+    if (e) e.stopPropagation();
+    _analysesRuleFilter = null;
+    _analysesRuleName = null;
+    const title = document.querySelector('.recent-section h2');
+    if (title) title.textContent = 'Historique des analyses';
+    loadAnalyses();
+}
 
 async function loadAnalyses() {
     const container = document.getElementById('rules-analyses');
     if (!container) return;
-    container.innerHTML = '<div class="loading">Chargement...</div>';
 
     try {
         const url = _analysesRuleFilter
@@ -124,7 +150,7 @@ async function loadAnalyses() {
             <div class="analysis-card">
                 <div class="analysis-header">
                     <div>
-                        <strong>Règle #${a.rule_id}</strong>
+                        <strong class="analysis-rule-name">${escapeHtml(a.rule_name || 'Règle #' + a.rule_id)}</strong>
                         <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
                     </div>
                     <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
