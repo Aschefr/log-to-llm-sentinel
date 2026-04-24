@@ -91,7 +91,7 @@ async function loadRules() {
                     <p>${rule.enabled ? '✅ Activée' : '❌ Désactivée'} | 🔔 ${rule.notify_on_match ? 'Notifications activées' : 'Notifications désactivées'}</p>
                 </div>
                 <div class="rule-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
+                    <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
                     <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
                 </div>
@@ -140,18 +140,47 @@ async function loadAnalyses() {
 }
 
 async function testRule(id) {
+    const btn = document.getElementById(`test-btn-${id}`);
+    const originalText = btn ? btn.innerHTML : '🧪 Tester';
+    
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Test en cours...';
+        btn.classList.add('pulse-animation');
+    }
+
     try {
         // UI feedback: filter history on this rule after test
         _analysesRuleFilter = id;
-        const res = await apiFetch(`/api/rules/${id}/test`, { method: 'POST' });
+        await apiFetch(`/api/rules/${id}/test`, { method: 'POST' });
         await loadAnalyses();
 
-        // Quick inline info for the user
-        const sev = res.severity ? res.severity.toUpperCase() : 'INFO';
-        alert(`Test OK (${sev}). Réponse ajoutée à l’historique.`);
+        if (btn) {
+            btn.innerHTML = '✅ Terminé';
+            btn.classList.remove('pulse-animation');
+            btn.classList.add('btn-success-temporary');
+            setTimeout(() => {
+                if (document.getElementById(`test-btn-${id}`)) {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.classList.remove('btn-success-temporary');
+                }
+            }, 2500);
+        }
     } catch (e) {
         console.error('Erreur test règle:', e);
-        alert('Erreur test: ' + (e.message || 'inconnue'));
+        if (btn) {
+            btn.innerHTML = '❌ Erreur';
+            btn.classList.remove('pulse-animation');
+            btn.classList.add('btn-danger');
+            setTimeout(() => {
+                if (document.getElementById(`test-btn-${id}`)) {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    btn.classList.remove('btn-danger');
+                }
+            }, 2500);
+        }
     }
 }
 
@@ -181,6 +210,15 @@ function setupModal() {
         e.preventDefault();
         await saveRule();
     });
+
+    const pathInput = document.getElementById('rule-path');
+    let previewTimeout;
+    pathInput.addEventListener('input', () => {
+        clearTimeout(previewTimeout);
+        previewTimeout = setTimeout(() => {
+            fetchFilePreview(pathInput.value);
+        }, 500);
+    });
 }
 
 function resetForm() {
@@ -193,6 +231,12 @@ function resetForm() {
     document.getElementById('rule-notify').checked = true;
     document.getElementById('modal-title').textContent = 'Nouvelle règle';
     closeFileBrowser();
+    
+    const previewContainer = document.getElementById('file-preview-container');
+    if (previewContainer) {
+        previewContainer.classList.add('hidden');
+        document.getElementById('file-preview-content').innerHTML = '';
+    }
 }
 
 let _fileRootsCache = null;
@@ -237,6 +281,7 @@ function setupFileBrowser() {
         } else {
             document.getElementById('rule-path').value = path;
             closeFileBrowser();
+            fetchFilePreview(path);
         }
     });
 
@@ -377,6 +422,7 @@ async function editRule(id) {
         document.getElementById('modal-title').textContent = 'Éditer la règle';
         document.getElementById('rule-modal').classList.remove('hidden');
         closeFileBrowser();
+        fetchFilePreview(rule.log_file_path);
     } catch (error) {
         console.error('Erreur chargement règle:', error);
     }
@@ -401,3 +447,30 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+async function fetchFilePreview(path) {
+    const container = document.getElementById('file-preview-container');
+    const content = document.getElementById('file-preview-content');
+    if (!container || !content) return;
+    
+    if (!path || path.trim() === '') {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    content.innerHTML = '<em>Chargement de l\'aperçu...</em>';
+    
+    try {
+        const res = await apiFetch(`/api/files/tail?path=${encodeURIComponent(path)}&lines=10`);
+        if (res.lines && res.lines.length > 0) {
+            content.innerHTML = res.lines.map(l => escapeHtml(l)).join('<br>');
+        } else {
+            content.innerHTML = '<em>Fichier vide.</em>';
+        }
+        content.scrollTop = content.scrollHeight;
+    } catch (e) {
+        content.innerHTML = `<em style="color: var(--danger)">Aperçu non disponible : ${escapeHtml(e.message)}</em>`;
+    }
+}
+

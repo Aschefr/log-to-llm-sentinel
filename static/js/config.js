@@ -112,15 +112,25 @@ function setupForm() {
 
     // Auto-save logic
     const inputs = form.querySelectorAll('input, select, textarea');
-    const debouncedSave = debounce(() => {
-        saveConfig(messageEl, true);
+    let modifiedInputs = new Set();
+    
+    const debouncedSave = debounce(async () => {
+        const inputsToGlow = Array.from(modifiedInputs);
+        modifiedInputs.clear();
+        
+        const success = await saveConfig(messageEl, true);
+        if (success) {
+            inputsToGlow.forEach(input => {
+                input.classList.add('save-success-glow');
+                setTimeout(() => input.classList.remove('save-success-glow'), 1500);
+            });
+        }
     }, 1000);
 
     inputs.forEach(input => {
         const eventType = (input.type === 'checkbox' || input.tagName === 'SELECT') ? 'change' : 'input';
         input.addEventListener(eventType, () => {
-            // Ne pas auto-save le mot de passe s'il est court/en cours de saisie ?
-            // On laisse le debounce gérer le délai.
+            modifiedInputs.add(input);
             debouncedSave();
         });
     });
@@ -280,8 +290,10 @@ async function saveConfig(messageEl, isAutoSave = false) {
         });
         const successMsg = isAutoSave ? 'Auto-sauvegardé' : 'Configuration sauvegardée avec succès';
         showMessage(messageEl, successMsg, 'success');
+        return true;
     } catch (error) {
         console.error('Erreur sauvegarde config:', error);
         showMessage(messageEl, 'Erreur: ' + error.message, 'error');
+        return false;
     }
 }
