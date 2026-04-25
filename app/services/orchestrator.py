@@ -260,7 +260,6 @@ class Orchestrator:
                         model=config.get("ollama_model"),
                     )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
-                    from app import logger
                     logger.add_ollama_log(summary_prompt, summary)
                     notify_body = f"""### {severity_emoji} Alerte Sentinel (Résumé) : {rule.name}
 **ID:** `{detection_id or 'N/A'}` | **Sévérité:** {severity.upper()}
