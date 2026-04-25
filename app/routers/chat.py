@@ -132,13 +132,41 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
         if analysis and _orchestrator:
             rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
             cfg = db.query(GlobalConfig).first()
-            base_prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, cfg.system_prompt if cfg else "")
-            prompt = f"{base_prompt}\n\nHistorique :\nAssistant (initial) : {analysis.ollama_response}\n"
+            system_prompt = cfg.system_prompt.strip() if cfg and cfg.system_prompt else ""
+
+            # On construit un prompt de CHAT — pas un prompt d'analyse.
+            # Le but est de donner le contexte à l'IA pour qu'elle réponde
+            # aux questions de l'utilisateur en tant qu'assistant, sans
+            # ré-imposer le format SEVERITY ni les instructions d'analyse.
+            context_block = "\n".join([
+                system_prompt if system_prompt else "",
+                "",
+                "Tu es un assistant expert en systèmes Linux et en infrastructure.",
+                "L'utilisateur souhaite approfondir une analyse de log déjà effectuée.",
+                "",
+                f"=== Contexte de la règle : {rule.name if rule else 'Inconnue'} ===",
+                f"Application : {rule.application_context if rule else ''}",
+                "",
+                "=== Ligne de log déclenchante ===",
+                analysis.triggered_line,
+                "",
+                "=== Analyse déjà réalisée ===",
+                analysis.ollama_response,
+                "",
+                "=== Instructions ===",
+                "Réponds aux questions de l'utilisateur en te basant sur ce contexte.",
+                "Ne refais pas une analyse complète, ne répète pas le format SEVERITY.",
+                "Réponds directement, de façon conversationnelle et précise.",
+                "",
+                "=== Conversation ===",
+            ])
+            prompt = context_block.strip() + "\n"
 
     for m in history[-10:]:
         role_label = "Utilisateur" if m.role == "user" else "Assistant"
         prompt += f"{role_label} : {m.content}\n"
     prompt += "Assistant : "
+
 
     cfg = db.query(GlobalConfig).first()
     ollama_url    = (cfg.ollama_url    or "http://ollama:11434") if cfg else "http://ollama:11434"
