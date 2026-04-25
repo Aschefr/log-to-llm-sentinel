@@ -111,3 +111,27 @@ class OllamaService:
                 return last_err
 
         return last_err or "[Erreur Ollama] Erreur inconnue"
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        url: str = "http://ollama:11434",
+        model: str = "llama3",
+    ):
+        """
+        Génère une réponse en streaming via Ollama.
+        """
+        import httpx
+        base = (url or "http://ollama:11434").strip().rstrip("/")
+        api_url = f"{base}/api/generate"
+        payload = {
+            "model": model,
+            "prompt": prompt,
+            "stream": True,
+        }
+
+        async with httpx.AsyncClient(timeout=None) as client:
+            async with client.stream("POST", api_url, json=payload) as response:
+                async for line in response.aiter_lines():
+                    if line:
+                        yield json.loads(line)

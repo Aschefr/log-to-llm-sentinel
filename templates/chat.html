@@ -418,31 +418,60 @@ async function sendMessage() {
         <div class="message-bubble user">
             <div class="markdown-body">${escapeHtml(content)}</div>
         </div>
-        <div class="message-bubble assistant" id="loading-ai">
-            <div class="loading">Ollama réfléchit...</div>
+        <div class="message-bubble assistant" id="streaming-ai">
+            <div class="markdown-body"></div>
         </div>
     `;
     input.value = '';
     input.style.height = 'auto';
     container.scrollTop = container.scrollHeight;
 
+    const aiBubble = document.getElementById('streaming-ai');
+    const aiContent = aiBubble.querySelector('.markdown-body');
+    let fullText = "";
+
     try {
-        const res = await apiFetch('/chat/api/send', {
+        const response = await fetch('/chat/api/send', {
             method: 'POST',
-            body: { conversation_id: activeConvId, content: content }
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversation_id: activeConvId, content: content })
         });
+
+        if (!response.ok) throw new Error('Erreur réseau');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n\n');
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.substring(6));
+                        if (data.error) throw new Error(data.error);
+                        if (data.text) {
+                            fullText += data.text;
+                            aiContent.innerHTML = marked.parse(fullText);
+                            container.scrollTop = container.scrollHeight;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing stream chunk', e);
+                    }
+                }
+            }
+        }
         
-        const loading = document.getElementById('loading-ai');
-        if (loading) loading.remove();
-        
-        container.innerHTML += `
-            <div class="message-bubble assistant">
-                <div class="markdown-body">${marked.parse(res.response)}</div>
-            </div>
-        `;
-        container.scrollTop = container.scrollHeight;
+        // Finalize
+        aiBubble.removeAttribute('id');
+        // Re-load sidebar for potential title updates or just consistency
+        loadConversations();
     } catch (e) {
-        alert('Erreur: ' + e.message);
+        aiContent.innerHTML = `<span style="color:var(--danger)">Erreur: ${e.message}</span>`;
     }
 }
 

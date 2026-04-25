@@ -100,6 +100,9 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
         ]
     }
 
+from fastapi.responses import HTMLResponse, StreamingResponse
+import json
+
 @router.post("/api/send")
 async def send_message(data: dict, db: Session = Depends(get_db)):
     conv_id = data.get("conversation_id")
@@ -118,7 +121,6 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     db.commit()
 
     # 2. Construire le contexte pour Ollama
-    # On récupère toute l'histoire
     history = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).order_by(ChatMessage.created_at.asc()).all()
     
     prompt = ""
@@ -129,7 +131,6 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
             cfg = db.query(GlobalConfig).first()
             base_prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, cfg.system_prompt if cfg else "")
             prompt = f"{base_prompt}\n\nHistorique de la conversation :\n"
-            # On ajoute la réponse initiale si elle n'est pas déjà dans les messages
             prompt += f"Assistant (initial) : {analysis.ollama_response}\n"
 
     for m in history:
@@ -138,23 +139,40 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     
     prompt += "\nAssistant : "
 
-    # 3. Appel Ollama
     cfg = db.query(GlobalConfig).first()
-    async with _orchestrator._ollama_semaphore:
-        response = await asyncio.to_thread(
-            _orchestrator.ollama.analyze,
-            prompt=prompt,
-            url=cfg.ollama_url,
-            model=cfg.ollama_model,
-            timeout=300
-        )
+    ollama_url = cfg.ollama_url
+    ollama_model = cfg.ollama_model
 
-    # 4. Sauvegarder la réponse de l'IA
-    ai_msg = ChatMessage(conversation_id=conv_id, role="assistant", content=response)
-    db.add(ai_msg)
-    db.commit()
+    async def event_generator():
+        full_response = ""
+        try:
+            async with _orchestrator._ollama_semaphore:
+                async for chunk in _orchestrator.ollama.generate_stream(
+                    prompt=prompt,
+                    url=ollama_url,
+                    model=ollama_model
+                ):
+                    if "response" in chunk:
+                        text = chunk["response"]
+                        full_response += text
+                        yield f"data: {json.dumps({'text': text})}\n\n"
+                    if chunk.get("done"):
+                        break
+            
+            # 4. Sauvegarder la réponse complète en BDD à la fin
+            # On a besoin d'une nouvelle session car l'ancienne est fermée par Depends(get_db) après le retour de StreamingResponse
+            new_db = SessionLocal()
+            try:
+                ai_msg = ChatMessage(conversation_id=conv_id, role="assistant", content=full_response)
+                new_db.add(ai_msg)
+                new_db.commit()
+            finally:
+                new_db.close()
+                
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
-    return {"status": "ok", "response": response}
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @router.delete("/api/delete/{conv_id}")
 async def delete_conversation(conv_id: int, db: Session = Depends(get_db)):

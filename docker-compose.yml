@@ -56,6 +56,13 @@ services:
 # Si votre instance Ollama n'est pas sur une autre machine, vous pouvez
 # l'ajouter ici. Décommentez les lignes ci-dessous pour l'activer.
 #
+# --- NOTE SUR FLASH ATTENTION ---
+# Flash Attention est conçu pour optimiser les accès à la mémoire SRAM des GPU Nvidia.
+# Sur GPU : Accélère massivement le calcul de l'attention.
+# Sur CPU (AMD/ARM) : Les architectures CPU gèrent le cache différemment. (déconseillé) 
+#--- NOTE SUR KV CACHE ---
+# KV Cache type : q8_0 permet de réduire l'usage RAM sans perte de précision notable.
+#
 #   ollama:
 #     image: ollama/ollama:latest
 #     container_name: ollama-server
@@ -64,16 +71,9 @@ services:
 #     volumes:
 #       - ./ollama_data:/root/.ollama
 #     environment:
-#       # KV Cache type : q8_0 permet de réduire l'usage RAM sans perte de précision notable.
-#       - OLLAMA_KV_CACHE_TYPE=q8_0
 #
-#       # --- NOTE SUR FLASH ATTENTION ---
-#       # Flash Attention est conçu pour optimiser les accès à la mémoire SRAM des GPU Nvidia.
-#       # Verdict : Peu utile sur CPU (pour l'instant).
-#       # Sur GPU : Accélère massivement le calcul de l'attention.
-#       # Sur CPU (AMD/ARM) : Les architectures CPU gèrent le cache différemment. 
-#       # Activer Flash Attention sur CPU n'apporte souvent aucun gain et peut échouer.
-#       # - OLLAMA_FLASH_ATTENTION=1 
+#       - OLLAMA_KV_CACHE_TYPE=q8_0
+#       - OLLAMA_FLASH_ATTENTION=1 
 #
 #     restart: unless-stopped
 #
