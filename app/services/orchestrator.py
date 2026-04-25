@@ -186,10 +186,10 @@ class Orchestrator:
                             "num_ctx": config.get("ollama_ctx", 4096)
                         }
                     ),
-                    timeout=120.0
+                    timeout=300.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
+                response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
         logger.debug("Orchestrator", f"Réponse Ollama reçue : {response[:200]}")
         logger.add_ollama_log(prompt, response, detection_id)
 
@@ -303,11 +303,12 @@ class Orchestrator:
 
     def _build_prompt(self, rule: Rule, line: str, system_prompt: str, context_lines: list = None) -> str:
         """Construit le prompt pour Ollama."""
+        import textwrap
         context_block = ""
         if context_lines:
-            context_block = "\n        Lignes de contexte précédentes:\n" + "\n".join(f"        {l}" for l in context_lines) + "\n"
+            context_block = "\nContexte précédent :\n" + "\n".join(f"{l}" for l in context_lines) + "\n"
 
-        base_prompt = f"""
+        base_prompt = textwrap.dedent(f"""
         Analyse la ligne de log suivante et détermine sa sévérité.
         Ta réponse DOIT impérativement commencer par une ligne indiquant la sévérité sous ce format EXACT :
         SEVERITY: [info|warning|critical]
@@ -315,11 +316,12 @@ class Orchestrator:
         Ensuite, fournis un résumé court et explicatif de l'incident.
 
         Contexte de l'application: {rule.application_context}
-{context_block}        Ligne déclenchante: {line}
-        """
+        {context_block}
+        Ligne déclenchante: {line}
+        """).strip()
 
         if system_prompt:
-            return f"{system_prompt}\n\n{base_prompt}"
+            return f"{system_prompt.strip()}\n\n{base_prompt}"
         return base_prompt
 
     def _detect_severity(self, response: str) -> str:

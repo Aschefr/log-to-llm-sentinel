@@ -264,10 +264,10 @@ async def test_rule(rule_id: int):
                             "num_ctx": config_dict.get("ollama_ctx", 4096)
                         }
                     ),
-                    timeout=120.0
+                    timeout=300.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
+                response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
         logger.debug("TestRule", f"Réponse Ollama reçue ({len(response)} chars)")
         severity = orchestrator._detect_severity(response)
         logger.debug("TestRule", f"Sévérité détectée : {severity}")

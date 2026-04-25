@@ -255,10 +255,10 @@ async def test_ollama():
                                     "num_ctx": cfg.get("ollama_ctx", 4096)
                                 }
                             ),
-                            timeout=120.0
+                            timeout=300.0
                         )
                     except asyncio.TimeoutError:
-                        resp = "[Erreur Ollama] Délai d'attente dépassé (120s)"
+                        resp = "[Erreur Ollama] Délai d'attente dépassé (300s)"
                 
                 if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
                     raise HTTPException(status_code=502, detail=resp)

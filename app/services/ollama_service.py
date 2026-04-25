@@ -29,15 +29,22 @@ class OllamaService:
             if "error" in chunk:
                 return f"[Erreur Ollama] {chunk['error']}"
             
-            text = chunk.get("response", "")
+            # Compatibilité /api/chat (message.content) et /api/generate (response)
+            text = chunk.get("message", {}).get("content", "") or chunk.get("response", "")
+            thinking = chunk.get("message", {}).get("thinking", "") or chunk.get("thinking", "")
+            
             if text:
                 combined_text += text
-                # Log de progression toutes les 5 secondes pour rassurer l'utilisateur
-                if time.time() - last_log_time > 5.0:
-                    logger.debug("OllamaService", f"Réception en cours... ({len(combined_text)} car. reçus)")
-                    last_log_time = time.time()
             
-            if not text and chunk.get("done"):
+            # Log de progression toutes les 5 secondes pour rassurer l'utilisateur
+            if time.time() - last_log_time > 5.0:
+                if thinking and not text:
+                    logger.debug("OllamaService", f"Réflexion en cours... (modèle en cours de raisonnement)")
+                else:
+                    logger.debug("OllamaService", f"Réception en cours... ({len(combined_text)} car. reçus)")
+                last_log_time = time.time()
+            
+            if chunk.get("done"):
                 logger.debug("OllamaService", "Fin du stream (done: true)")
                 break
 
@@ -69,10 +76,12 @@ class OllamaService:
         Génère une réponse en streaming via Ollama (Asynchrone).
         """
         base = (url or "http://ollama:11434").strip().rstrip("/")
-        api_url = f"{base}/api/generate"
+        api_url = f"{base}/api/chat"
         payload = {
             "model": model,
-            "prompt": prompt,
+            "messages": [
+                {"role": "user", "content": prompt}
+            ],
             "stream": True,
         }
         # On n'envoie 'think': False que si l'utilisateur veut explicitement désactiver 

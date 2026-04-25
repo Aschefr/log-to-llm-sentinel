@@ -165,10 +165,10 @@ async def retry_analysis(analysis_id: int):
                             "num_ctx": config.get("ollama_ctx", 4096)
                         }
                     ),
-                    timeout=120.0
+                    timeout=300.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
+                response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
 
         from app import logger
         logger.add_ollama_log(prompt, response, analysis.detection_id)
@@ -241,10 +241,10 @@ async def analyze_line(data: dict):
                             "num_ctx": config.get("ollama_ctx", 4096)
                         }
                     ),
-                    timeout=120.0
+                    timeout=300.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
+                response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
             
         from app import logger
         logger.add_ollama_log(prompt, response, "MANUAL")
@@ -331,10 +331,10 @@ async def chat_analysis(data: dict):
                             "num_ctx": cfg.ollama_ctx if hasattr(cfg, 'ollama_ctx') else 4096
                         }
                     ),
-                    timeout=120.0
+                    timeout=300.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
+                response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
             
         from app import logger
         logger.add_ollama_log(f"CHAT: {question}", response, "CHAT")
