@@ -260,8 +260,11 @@ class Orchestrator:
             context_block = "\n        Lignes de contexte précédentes:\n" + "\n".join(f"        {l}" for l in context_lines) + "\n"
 
         base_prompt = f"""
-        Analyse la ligne de log suivante et détermine sa sévérité (info, warning, critical).
-        Fournis un résumé court de l'incident.
+        Analyse la ligne de log suivante et détermine sa sévérité.
+        Ta réponse DOIT impérativement commencer par une ligne indiquant la sévérité sous ce format EXACT :
+        SEVERITY: [info|warning|critical]
+
+        Ensuite, fournis un résumé court et explicatif de l'incident.
 
         Contexte de l'application: {rule.application_context}
 {context_block}        Ligne déclenchante: {line}
@@ -273,7 +276,27 @@ class Orchestrator:
 
     def _detect_severity(self, response: str) -> str:
         """Détermine la sévérité à partir de la réponse Ollama."""
+        # Priorité : chercher le tag explicite demandé dans le prompt
+        lines = response.splitlines()
+        for line in lines[:10]: # On regarde les premières lignes
+            l = line.upper()
+            if "SEVERITY:" in l:
+                if "CRITICAL" in l: return "critical"
+                if "WARNING" in l: return "warning"
+                if "INFO" in l: return "info"
+
+        # Fallback : recherche heuristique plus stricte
         lower_resp = response.lower()
+        # On cherche des mentions isolées ou en début de phrase pour éviter les faux positifs
+        # comme "ce n'est pas une erreur CRITICAL"
+        if "severity: critical" in lower_resp or "sévérité: critical" in lower_resp:
+            return "critical"
+        if "severity: warning" in lower_resp or "sévérité: warning" in lower_resp:
+            return "warning"
+        if "severity: info" in lower_resp or "sévérité: info" in lower_resp:
+            return "info"
+            
+        # Ultime fallback (moins fiable)
         if "critical" in lower_resp or "urgent" in lower_resp:
             return "critical"
         elif "warning" in lower_resp or "warn" in lower_resp:
