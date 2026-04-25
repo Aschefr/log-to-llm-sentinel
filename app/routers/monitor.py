@@ -225,17 +225,29 @@ async def analyze_line(data: dict):
         
         severity = _orchestrator._detect_severity(response)
         
-        # On ne l'enregistre pas forcément en BDD comme une analyse "automatique"
-        # pour ne pas polluer l'historique de détection, ou alors on l'ajoute avec un flag ?
-        # Ici on retourne juste le résultat.
+        # Enregistrer l'analyse manuelle en BDD pour persistance et chat
+        import uuid
+        det_id = f"MANUAL-{uuid.uuid4().hex[:8]}"
+        analysis = Analysis(
+            rule_id=rule_id,
+            detection_id=det_id,
+            triggered_line=line,
+            ollama_response=response,
+            severity=severity,
+            matched_keywords_json="[]"
+        )
+        db.add(analysis)
+        db.commit()
+        db.refresh(analysis)
         
         return {
             "status": "ok",
             "analysis": {
+                "id": analysis.id,
                 "severity": severity,
                 "ollama_response": response,
-                "analyzed_at": datetime.now().isoformat(),
-                "detection_id": "MANUAL"
+                "analyzed_at": analysis.analyzed_at.isoformat(),
+                "detection_id": det_id
             }
         }
     finally:

@@ -534,13 +534,8 @@ async function manualAnalyze(ruleId, btn) {
 
         if (res.status === 'ok') {
             const a = res.analysis;
-            const chatId = 'manual-' + Math.random().toString(36).substr(2, 9);
             const content = document.getElementById(`detail-panel-content-${ruleId}`);
             if (content) {
-                // On prépare les données de contexte pour le chat manuel
-                const safePrompt = res.analysis.original_prompt || ''; 
-                const safeResponse = res.analysis.ollama_response || '';
-
                 content.innerHTML += `
                     <div class="manual-analysis-result" style="margin-top: 1.5rem; border-top: 2px dashed var(--accent); padding-top: 1rem;">
                         <div class="detail-row">
@@ -549,7 +544,7 @@ async function manualAnalyze(ruleId, btn) {
                         </div>
                         <div class="analysis-response markdown-body">${marked.parse(a.ollama_response)}</div>
                         <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
-                            <button class="btn btn-primary btn-sm" onclick="openChat(null, \`${escapeHtml(selectedLineText).replace(/`/g, '\\`')}\`, \`${escapeHtml(a.ollama_response).replace(/`/g, '\\`')}\`)">💬 Approfondir avec l'IA</button>
+                            <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 Approfondir avec l'IA</button>
                         </div>
                     </div>
                 `;

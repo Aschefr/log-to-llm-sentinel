@@ -244,7 +244,7 @@
 </style>
 
 <script>
-let activeConvId = {{ conversation_id|default('null') }};
+let activeConvId = {{ conversation_id if conversation_id else 'null' }};
 let conversations = [];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -303,7 +303,7 @@ async function selectConversation(id) {
 
 async function loadHistory(id) {
     const container = document.getElementById('chat-messages');
-    container.innerHTML = '<div class="loading">Chargement de l'histoire...</div>';
+    container.innerHTML = '<div class="loading">Chargement de l\'histoire...</div>';
     
     try {
         const data = await apiFetch(`/chat/api/history/${id}`);
