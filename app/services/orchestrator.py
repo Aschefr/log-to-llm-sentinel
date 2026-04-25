@@ -109,6 +109,8 @@ class Orchestrator:
                 "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
                 "ollama_url": config.ollama_url if config and config.ollama_url else "http://ollama:11434",
                 "ollama_model": config.ollama_model if config and config.ollama_model else "gemma4:e4b",
+                "ollama_temp": config.ollama_temp if config else 0.1,
+                "ollama_ctx": config.ollama_ctx if config else 4096,
                 "system_prompt": config.system_prompt if config else "",
                 "notification_method": config.notification_method if config else "smtp",
                 "apprise_url": config.apprise_url if config else "",
@@ -173,6 +175,10 @@ class Orchestrator:
                 prompt=prompt,
                 url=config.get("ollama_url"),
                 model=config.get("ollama_model"),
+                options={
+                    "temperature": config.get("ollama_temp", 0.1),
+                    "num_ctx": config.get("ollama_ctx", 4096)
+                }
             )
         logger.debug("Orchestrator", f"Réponse Ollama reçue : {response[:200]}")
         logger.add_ollama_log(prompt, response, detection_id)
@@ -259,6 +265,10 @@ class Orchestrator:
                         url=config.get("ollama_url"),
                         model=config.get("ollama_model"),
                         timeout=120,
+                        options={
+                            "temperature": 0.1, # Résumé toujours à basse température
+                            "num_ctx": 2048,    # Résumé n'a pas besoin d'un gros contexte
+                        }
                     )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     logger.add_ollama_log(summary_prompt, summary, detection_id)

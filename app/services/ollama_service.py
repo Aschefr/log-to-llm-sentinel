@@ -19,6 +19,7 @@ class OllamaService:
         timeout: int = 180,
         retries: int = 2,
         retry_delay_s: float = 2.0,
+        options: Optional[dict] = None,
     ) -> str:
         """
         Envoie un prompt à Ollama et retourne la réponse (Synchrone).
@@ -31,11 +32,13 @@ class OllamaService:
             "prompt": prompt,
             "stream": False,
         }
+        if options:
+            payload["options"] = options
 
         attempts = max(1, int(retries) + 1)
         last_err: Optional[str] = None
 
-        logger.debug("OllamaService", f"Appel à {api_url} | modèle={model}")
+        logger.debug("OllamaService", f"Appel à {api_url} | modèle={model} | prompt={prompt[:100]}...")
 
         for attempt in range(1, attempts + 1):
             try:
@@ -90,7 +93,7 @@ class OllamaService:
         if options:
             payload["options"] = options
 
-        logger.debug("OllamaService", f"Streaming à {api_url} | modèle={model}")
+        logger.debug("OllamaService", f"Streaming à {api_url} | modèle={model} | prompt={prompt[:100]}...")
         try:
             async with httpx.AsyncClient(timeout=None) as client:
                 async with client.stream("POST", api_url, json=payload) as response:
