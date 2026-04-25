@@ -23,6 +23,7 @@ class Orchestrator:
         self.ollama = OllamaService()
         self.notifier = NotificationService()
         self._buffers = {}  # rule_id -> {"lines": [], "task": None}
+        self._ollama_semaphore = asyncio.Semaphore(1)
 
     async def handle_new_lines(self, rule: Rule, lines: List[str]):
         """Traite les nouvelles lignes pour une règle donnée."""
@@ -148,14 +149,15 @@ class Orchestrator:
         # 2. Construire le prompt
         prompt = self._build_prompt(rule, line, config.get("system_prompt", ""))
 
-        # 3. Appeler Ollama (dans un thread séparé pour ne pas bloquer l'Event Loop)
+        # 3. Appeler Ollama (sous verrou pour éviter de surcharger le CPU)
         logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | ligne={line[:80]}")
-        response = await asyncio.to_thread(
-            self.ollama.analyze,
-            prompt=prompt,
-            url=config.get("ollama_url"),
-            model=config.get("ollama_model"),
-        )
+        async with self._ollama_semaphore:
+            response = await asyncio.to_thread(
+                self.ollama.analyze,
+                prompt=prompt,
+                url=config.get("ollama_url"),
+                model=config.get("ollama_model"),
+            )
         logger.debug("Orchestrator", f"Réponse Ollama reçue : {response[:200]}")
 
         # 4. Déterminer la sévérité (simple heuristic ou parsing de la réponse)
@@ -206,12 +208,13 @@ class Orchestrator:
             if config.get("notification_method") == "apprise" and len(body) > max_chars:
                 logger.debug("Orchestrator", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
                 summary_prompt = f"Résume l'analyse suivante en moins de {max_chars - 400} caractères. Garde l'essentiel (Sévérité, Cause, Action). Format clair.\n\nAnalyse : {response}"
-                summary = await asyncio.to_thread(
-                    self.ollama.analyze,
-                    prompt=summary_prompt,
-                    url=config.get("ollama_url"),
-                    model=config.get("ollama_model"),
-                )
+                async with self._ollama_semaphore:
+                    summary = await asyncio.to_thread(
+                        self.ollama.analyze,
+                        prompt=summary_prompt,
+                        url=config.get("ollama_url"),
+                        model=config.get("ollama_model"),
+                    )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     notify_body = f"""
                     <h2>Alerte Log to LLM Sentinel (Résumé)</h2>
