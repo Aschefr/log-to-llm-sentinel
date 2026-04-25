@@ -130,8 +130,19 @@ class OllamaService:
             "stream": True,
         }
 
-        async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream("POST", api_url, json=payload) as response:
-                async for line in response.aiter_lines():
-                    if line:
-                        yield json.loads(line)
+        logger.debug("OllamaService", f"Streaming à {api_url} | modèle={model}")
+        try:
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream("POST", api_url, json=payload) as response:
+                    if response.status_code != 200:
+                        err_body = await response.aread()
+                        logger.error("OllamaService", f"Erreur streaming Ollama ({response.status_code}): {err_body.decode()}")
+                        yield {"error": f"Ollama HTTP {response.status_code}"}
+                        return
+
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield json.loads(line)
+        except Exception as e:
+            logger.error("OllamaService", f"Exception pendant le stream : {str(e)}")
+            yield {"error": str(e)}

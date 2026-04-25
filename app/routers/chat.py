@@ -145,31 +145,42 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
 
     async def event_generator():
         full_response = ""
+        logger.debug("ChatRouter", f"Début event_generator pour conv {conv_id}")
         try:
             async with _orchestrator._ollama_semaphore:
+                logger.debug("ChatRouter", "Sémophore acquis, début stream Ollama")
                 async for chunk in _orchestrator.ollama.generate_stream(
                     prompt=prompt,
                     url=ollama_url,
                     model=ollama_model
                 ):
+                    if "error" in chunk:
+                        logger.error("ChatRouter", f"Erreur dans le stream : {chunk['error']}")
+                        yield f"data: {json.dumps({'error': chunk['error']})}\n\n"
+                        return
+
                     if "response" in chunk:
                         text = chunk["response"]
                         full_response += text
                         yield f"data: {json.dumps({'text': text})}\n\n"
+                    
                     if chunk.get("done"):
+                        logger.debug("ChatRouter", "Stream Ollama terminé (flag done)")
                         break
             
+            logger.debug("ChatRouter", f"Sauvegarde de la réponse complète ({len(full_response)} car.)")
             # 4. Sauvegarder la réponse complète en BDD à la fin
-            # On a besoin d'une nouvelle session car l'ancienne est fermée par Depends(get_db) après le retour de StreamingResponse
             new_db = SessionLocal()
             try:
                 ai_msg = ChatMessage(conversation_id=conv_id, role="assistant", content=full_response)
                 new_db.add(ai_msg)
                 new_db.commit()
+                logger.debug("ChatRouter", "Réponse sauvegardée en BDD")
             finally:
                 new_db.close()
                 
         except Exception as e:
+            logger.error("ChatRouter", f"Exception dans event_generator : {str(e)}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
