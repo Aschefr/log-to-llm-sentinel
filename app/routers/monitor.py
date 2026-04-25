@@ -158,6 +158,9 @@ async def retry_analysis(analysis_id: int):
                 model=config.get("ollama_model"),
             )
 
+        from app import logger
+        logger.add_ollama_log(prompt, response)
+
         severity = _orchestrator._detect_severity(response)
 
         # Mise à jour de l'analyse

@@ -29,6 +29,9 @@ def _get_debug_mode() -> bool:
 LOG_BUFFER = []
 MAX_LOGS = 100
 
+OLLAMA_BUFFER = []
+MAX_OLLAMA_LOGS = 20
+
 
 def _add_to_buffer(level: str, tag: str, message: str):
     entry = {
@@ -49,6 +52,29 @@ def get_logs():
 def clear_logs():
     global LOG_BUFFER
     LOG_BUFFER.clear()
+
+
+def add_ollama_log(prompt: str, response: str):
+    """Enregistre un appel Ollama (Prompt complet / Réponse tronquée) pour le débug."""
+    if not _get_debug_mode():
+        return
+    entry = {
+        "timestamp": _now(),
+        "prompt": prompt,
+        "response": response[:250] + "..." if len(response) > 250 else response
+    }
+    OLLAMA_BUFFER.append(entry)
+    if len(OLLAMA_BUFFER) > MAX_OLLAMA_LOGS:
+        OLLAMA_BUFFER.pop(0)
+
+
+def get_ollama_logs():
+    return OLLAMA_BUFFER
+
+
+def clear_ollama_logs():
+    global OLLAMA_BUFFER
+    OLLAMA_BUFFER.clear()
 
 
 def debug(tag: str, message: str) -> None:

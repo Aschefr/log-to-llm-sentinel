@@ -123,16 +123,18 @@ class NotificationService:
 
         try:
             # Discord et d'autres services ont des limites de caractères (souvent 2000).
-            # On tronque le body s'il est trop long pour éviter une erreur 400.
+            # On utilise la limite configurée (apprise_max_chars).
+            max_chars = config.get("apprise_max_chars", 1900)
             safe_body = body
-            if len(body) > 1900:
-                safe_body = body[:1850] + "\n\n... (message tronqué car trop long) ..."
+            if len(body) > max_chars:
+                trunc_msg = "\n\n⚠️ **Message tronqué car trop long...**"
+                safe_body = body[:max_chars - len(trunc_msg)] + trunc_msg
 
             payload = {
                 "title": subject,
                 "body": safe_body,
                 "type": "info",
-                "format": "html",
+                "format": "markdown",  # On utilise maintenant le markdown pour Apprise (plus lisible sur Discord/Telegram)
             }
             
             apprise_tags = config.get("apprise_tags", "").strip()

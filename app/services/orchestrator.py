@@ -175,6 +175,7 @@ class Orchestrator:
                 model=config.get("ollama_model"),
             )
         logger.debug("Orchestrator", f"Réponse Ollama reçue : {response[:200]}")
+        logger.add_ollama_log(prompt, response)
 
         # 4. Déterminer la sévérité (simple heuristic ou parsing de la réponse)
         severity = self._detect_severity(response)
@@ -211,16 +212,33 @@ class Orchestrator:
             logger.debug("Orchestrator", f"Envoi notification via '{config.get('notification_method')}' pour règle '{rule.name}'")
             subject = f"[Sentinel] Alerte {severity.upper()} : {rule.name}{det_id_label}"
             
+            severity_emoji = "🔴" if severity == "critical" else "🟠" if severity == "warning" else "🔵"
+            
             body = f"""
-            <h2>Alerte Log to LLM Sentinel</h2>
+            <h2>{severity_emoji} Alerte Log to LLM Sentinel</h2>
             <p><strong>Règle:</strong> {rule.name}</p>
             <p><strong>ID de détection:</strong> <code>{detection_id or 'N/A'}</code></p>
-            <p><strong>Mots-clés déclencheurs:</strong> {', '.join(matched_keywords) if matched_keywords else 'N/A'}</p>
-            <p><strong>Ligne déclenchante:</strong> <code>{line}</code></p>
+            <p><strong>Mots-clés:</strong> {', '.join(matched_keywords) if matched_keywords else 'N/A'}</p>
+            <hr/>
+            <p><strong>Ligne déclenchante:</strong></p>
+            <pre><code>{line}</code></pre>
             <p><strong>Analyse Ollama:</strong></p>
             <blockquote>{response}</blockquote>
-            <p><strong>Sévérité:</strong> {severity}</p>
+            <p><strong>Sévérité:</strong> {severity.upper()}</p>
             """
+            
+            # Si Apprise, on prépare une version plus lisible pour Discord/Telegram (souvent Markdown)
+            if config.get("notification_method") == "apprise":
+                body = f"""### {severity_emoji} Alerte Sentinel : {rule.name}
+**ID:** `{detection_id or 'N/A'}` | **Sévérité:** {severity.upper()}
+**Mots-clés:** {', '.join(matched_keywords) if matched_keywords else 'N/A'}
+
+**Ligne:**
+`{line}`
+
+**Analyse Ollama:**
+{response}
+"""
 
             # Gestion du résumé IA si nécessaire (pour Apprise/Discord/etc.)
             max_chars = config.get("apprise_max_chars", 1900)
@@ -228,7 +246,12 @@ class Orchestrator:
 
             if config.get("notification_method") == "apprise" and len(body) > max_chars:
                 logger.debug("Orchestrator", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
-                summary_prompt = f"Résume l'analyse suivante en moins de {max_chars - 400} caractères. Garde l'essentiel (Sévérité, Cause, Action). Format clair.\n\nAnalyse : {response}"
+                summary_prompt = (
+                    f"Résume l'analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\n"
+                    f"Utilise des puces (bullet points) et des sections claires (Problème, Cause, Solution).\n"
+                    f"Limite-toi à {max_chars - 500} caractères maximum.\n\n"
+                    f"Analyse à résumer :\n{response}"
+                )
                 async with self._ollama_semaphore:
                     summary = await asyncio.to_thread(
                         self.ollama.analyze,
@@ -237,14 +260,15 @@ class Orchestrator:
                         model=config.get("ollama_model"),
                     )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
-                    notify_body = f"""
-                    <h2>Alerte Log to LLM Sentinel (Résumé)</h2>
-                    <p><strong>Règle:</strong> {rule.name}</p>
-                    <p><strong>Résumé:</strong></p>
-                    <blockquote>{summary}</blockquote>
-                    <p><strong>Sévérité:</strong> {severity}</p>
-                    <p><em>(Analyse complète disponible dans l'interface)</em></p>
-                    """
+                    from app import logger
+                    logger.add_ollama_log(summary_prompt, summary)
+                    notify_body = f"""### {severity_emoji} Alerte Sentinel (Résumé) : {rule.name}
+**ID:** `{detection_id or 'N/A'}` | **Sévérité:** {severity.upper()}
+
+**Résumé de l'analyse :**
+{summary}
+
+*(Analyse complète disponible dans l'interface)*"""
 
             await asyncio.to_thread(self.notifier.send, subject, notify_body, config)
             analysis.notified = True

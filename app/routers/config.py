@@ -354,3 +354,18 @@ def clear_debug_logs():
     from app.logger import clear_logs
     clear_logs()
     return {"message": "Logs effacés"}
+
+
+@router.get("/ollama/logs")
+def get_ollama_debug_logs():
+    """Retourne les derniers appels Ollama en mémoire."""
+    from app.logger import get_ollama_logs
+    return {"logs": get_ollama_logs()}
+
+
+@router.delete("/ollama/logs")
+def clear_ollama_debug_logs():
+    """Efface les logs Ollama en mémoire."""
+    from app.logger import clear_ollama_logs
+    clear_ollama_logs()
+    return {"message": "Logs Ollama effacés"}

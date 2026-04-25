@@ -120,6 +120,18 @@ function setupForm() {
         });
     }
 
+    const clearOllamaBtn = document.getElementById('clear-ollama-logs-btn');
+    if (clearOllamaBtn) {
+        clearOllamaBtn.addEventListener('click', async () => {
+            try {
+                await apiFetch('/api/config/ollama/logs', { method: 'DELETE' });
+                document.getElementById('ollama-debug-logs').innerHTML = '';
+            } catch (e) {
+                console.error('Erreur effacement logs Ollama:', e);
+            }
+        });
+    }
+
     const copyBtn = document.getElementById('copy-logs-btn');
     if (copyBtn) {
         copyBtn.addEventListener('click', () => {
@@ -179,13 +191,14 @@ function debounce(func, wait) {
 
 function toggleLogsContainer(visible) {
     const container = document.getElementById('debug-logs-container');
-    if (container) {
-        container.classList.toggle('hidden', !visible);
-        if (visible) {
-            startLogPolling();
-        } else {
-            stopLogPolling();
-        }
+    const ollamaContainer = document.getElementById('ollama-logs-container');
+    if (container) container.classList.toggle('hidden', !visible);
+    if (ollamaContainer) ollamaContainer.classList.toggle('hidden', !visible);
+
+    if (visible) {
+        startLogPolling();
+    } else {
+        stopLogPolling();
     }
 }
 
@@ -193,8 +206,12 @@ let logInterval = null;
 
 function startLogPolling() {
     if (logInterval) return;
-    logInterval = setInterval(fetchLogs, 2000);
+    logInterval = setInterval(() => {
+        fetchLogs();
+        fetchOllamaLogs();
+    }, 2000);
     fetchLogs();
+    fetchOllamaLogs();
 }
 
 function stopLogPolling() {
@@ -232,6 +249,41 @@ function renderLogs(logs) {
             <span class="log-message">${escapeHtml(l.message)}</span>
         </div>
     `).join('');
+
+    if (wasAtBottom) {
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+async function fetchOllamaLogs() {
+    const container = document.getElementById('ollama-debug-logs');
+    if (!container) return;
+    try {
+        const res = await apiFetch('/api/config/ollama/logs');
+        if (res && res.logs) {
+            renderOllamaLogs(res.logs);
+        }
+    } catch (e) {}
+}
+
+function renderOllamaLogs(logs) {
+    const container = document.getElementById('ollama-debug-logs');
+    if (!container) return;
+    const wasAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 20;
+
+    container.innerHTML = logs.map(l => `
+        <div class="log-entry ollama-log-entry">
+            <div class="log-time">${l.timestamp}</div>
+            <div class="ollama-debug-block">
+                <strong>PROMPT :</strong>
+                <pre>${escapeHtml(l.prompt)}</pre>
+            </div>
+            <div class="ollama-debug-block">
+                <strong>RÉPONSE :</strong>
+                <pre>${escapeHtml(l.response)}</pre>
+            </div>
+        </div>
+    `).reverse().join(''); // Les plus récents en haut pour Ollama ? Non, gardons cohérent.
 
     if (wasAtBottom) {
         container.scrollTop = container.scrollHeight;
