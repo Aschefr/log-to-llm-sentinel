@@ -339,6 +339,9 @@ async function onLineClick(el, ruleId) {
             <span class="detail-label">Réponse LLM</span>
             <div class="detail-value analysis-response markdown-body">${relatedAnalysis.ollama_response ? marked.parse(relatedAnalysis.ollama_response) : '—'}</div>
         </div>
+        <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+            <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${relatedAnalysis.id}, this)">🔄 Ré-essayer l'analyse</button>
+        </div>
         ` : `<div class="detail-row"><em>Aucune analyse LLM trouvée pour cette ligne.</em></div>`}
     `;
 }
@@ -402,6 +405,33 @@ async function loadRuleAnalyses(ruleId) {
     }
 }
 
+async function retryAnalysis(analysisId, btn) {
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳...';
+    try {
+        const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { method: 'POST' });
+        if (res.status === 'ok') {
+            // Re-cliquer sur la ligne sélectionnée pour rafraîchir le panneau
+            const selected = document.querySelector('.log-line.selected');
+            if (selected) {
+                // On simule un clic sur la ligne pour forcer la mise à jour des données du panneau
+                // sans avoir à réécrire toute la logique de onLineClick
+                onLineClick(selected, activeRuleId);
+            } else {
+                // Si on est dans la recherche, on relance la recherche pour voir le résultat mis à jour
+                const searchInput = document.getElementById('monitor-search-id');
+                if (searchInput && searchInput.value) searchById();
+            }
+        }
+    } catch (e) {
+        alert('Erreur: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+    }
+}
+
 // ─── Recherche par ID ──────────────────────────────────────────────────────
 
 async function searchById() {
@@ -433,6 +463,9 @@ async function searchById() {
                     <div class="detail-value analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : '—'}</div>
                 </div>
                 <div class="detail-row"><span class="detail-label">Notifié</span><span class="detail-value">${a.notified ? '✅ Oui' : '❌ Non'}</span></div>
+                <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                    <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer l'analyse</button>
+                </div>
             </div>
         `;
     } catch (e) {

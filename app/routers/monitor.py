@@ -1,6 +1,8 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 import json
+import asyncio
+from datetime import datetime
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis
@@ -117,6 +119,61 @@ def search_by_detection_id(id: str = Query(..., description="ID de détection à
                 "ollama_response": analysis.ollama_response,
                 "notified": analysis.notified,
                 "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
+            }
+        }
+    finally:
+        db.close()
+
+
+@router.post("/retry/{analysis_id}")
+async def retry_analysis(analysis_id: int):
+    """Relance une analyse Ollama échouée."""
+    if _orchestrator is None:
+        raise HTTPException(status_code=500, detail="Orchestrateur non initialisé")
+
+    db = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analyse non trouvée")
+
+        rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="Règle non trouvée")
+
+        from app.models import GlobalConfig
+        config_obj = db.query(GlobalConfig).first()
+        from app.routers.config import _get_config_dict
+        config = _get_config_dict(config_obj)
+
+        # On reconstruit le prompt
+        prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, config.get("system_prompt", ""))
+
+        # Appel Ollama
+        async with _orchestrator._ollama_semaphore:
+            response = await asyncio.to_thread(
+                _orchestrator.ollama.analyze,
+                prompt=prompt,
+                url=config.get("ollama_url"),
+                model=config.get("ollama_model"),
+            )
+
+        severity = _orchestrator._detect_severity(response)
+
+        # Mise à jour de l'analyse
+        analysis.ollama_response = response
+        analysis.severity = severity
+        analysis.analyzed_at = datetime.utcnow()
+        db.commit()
+        db.refresh(analysis)
+
+        return {
+            "status": "ok",
+            "analysis": {
+                "id": analysis.id,
+                "ollama_response": analysis.ollama_response,
+                "severity": analysis.severity,
+                "analyzed_at": analysis.analyzed_at.isoformat()
             }
         }
     finally:
