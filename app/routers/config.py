@@ -12,7 +12,8 @@ import urllib.request
 import urllib.error
 import asyncio
 from fastapi.responses import StreamingResponse
-import httpx # httpx est généralement dispo avec fastapi
+import httpx 
+from app.logger import logger
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 

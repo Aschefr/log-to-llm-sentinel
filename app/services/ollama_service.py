@@ -83,74 +83,10 @@ class OllamaService:
 
         return full_text.strip() if full_text else "Aucune réponse d'Ollama"
 
-    def analyze(
-        self,
-        prompt: str,
-        url: str = "http://ollama:11434",
-        model: str = "gemma4:e4b",
-        timeout: int = 180,
-        retries: int = 2,
-        retry_delay_s: float = 2.0,
-        options: Optional[dict] = None,
-        think: bool = True,
-    ) -> str:
-        """
-        Envoie un prompt à Ollama et retourne la réponse (Synchrone).
-        """
-        base = (url or "http://ollama:11434").strip().rstrip("/")
-        api_url = f"{base}/api/generate"
-        
-        payload = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-        }
-        # On n'envoie 'think' que si explicitement spécifié (pour éviter les 500 sur modèles non-compatibles)
-        if think is not None:
-            payload["think"] = think
-
-        if options:
-            payload["options"] = options
-
-        attempts = max(1, int(retries) + 1)
-        last_err: Optional[str] = None
-
-        logger.debug("OllamaService", f"Appel à {api_url} (Timeout {timeout}s) | modèle={model} | prompt={prompt[:300]}...")
-
-        for attempt in range(1, attempts + 1):
-            try:
-                # On force un timeout plus long pour éviter les coupures Sentinel
-                with httpx.Client(timeout=300) as client:
-                    response = client.post(api_url, json=payload)
-                    response.raise_for_status()
-                    logger.debug("OllamaService", f"Réponse HTTP {response.status_code} reçue en {response.elapsed.total_seconds():.1f}s")
-                    result = response.json()
-                    answer = result.get("response", "Aucune réponse d'Ollama")
-                    return answer
-
-            except httpx.HTTPStatusError as e:
-                detail = e.response.text
-                last_err = f"[Erreur Ollama] HTTP {e.response.status_code}: {detail}"
-                logger.error("OllamaService", last_err)
-                if e.response.status_code in (500, 503) and attempt < attempts:
-                    time.sleep(retry_delay_s * attempt)
-                    continue
-                return last_err
-
-            except (httpx.ConnectError, httpx.ReadTimeout) as e:
-                last_err = f"[Erreur Ollama] Connexion impossible ou délai dépassé: {str(e)}"
-                logger.error("OllamaService", last_err)
-                if attempt < attempts:
-                    time.sleep(retry_delay_s * attempt)
-                    continue
-                return last_err
-
-            except Exception as e:
-                last_err = f"[Erreur Ollama] {str(e)}"
-                logger.error("OllamaService", last_err)
-                return last_err
-
-        return last_err or "[Erreur Ollama] Erreur inconnue"
+    def analyze(self, *args, **kwargs):
+        """DEPRECATED: Cette méthode synchrone ne doit plus être utilisée."""
+        logger.error("OllamaService", "APPEL INTERDIT : La méthode synchrone 'analyze' a été appelée ! Merci de passer en 'analyze_async'.")
+        raise RuntimeError("APPEL SYNCHRONE INTERDIT - Utilisez analyze_async")
 
     async def generate_stream(
         self,
