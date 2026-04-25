@@ -97,11 +97,13 @@ async function pollSystemStats() {
 async function updateSystemStatsUI() {
     try {
         const stats = await apiFetch('/api/dashboard/system-stats');
-        const cpuEl = document.getElementById('stat-cpu');
+        const cpuAppEl = document.getElementById('stat-cpu-app');
+        const cpuSysEl = document.getElementById('stat-cpu-sys');
         const ramEl = document.getElementById('stat-ram');
         const uptimeEl = document.getElementById('stat-uptime');
         
-        if (cpuEl) cpuEl.textContent = `${Math.round(stats.app_cpu)}% / ${Math.round(stats.sys_cpu)}%`;
+        if (cpuAppEl) cpuAppEl.textContent = `${Math.round(stats.app_cpu)}%`;
+        if (cpuSysEl) cpuSysEl.textContent = `${Math.round(stats.sys_cpu)}%`;
         if (ramEl) ramEl.textContent = `${stats.app_ram} MB`;
         if (uptimeEl) uptimeEl.textContent = formatUptime(stats.uptime);
     } catch (e) {}

@@ -9,7 +9,14 @@
     "rules": "Rules",
     "monitor": "Monitor",
     "chat": "Log Chat",
-    "config": "Configuration"
+    "config": "Configuration",
+    "cpu_app": "App",
+    "cpu_sys": "Sys",
+    "ram": "RAM",
+    "uptime": "Uptime",
+    "tooltip_cpu": "CPU Usage (App / System)",
+    "tooltip_ram": "RAM Usage (App)",
+    "tooltip_uptime": "Uptime"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -110,7 +117,8 @@
     "stop": "🛑 Stop",
     "manually_analyzed_badge": "Manually analyzed",
     "manual_analysis": "Manual analysis",
-    "search_no_result": "No results for this ID."
+    "search_no_result": "No results for this ID.",
+    "detection_id_title": "Detection ID"
   },
   "chat": {
     "title": "AI Analysis Center",
@@ -130,8 +138,9 @@
     "delete_btn_title": "Delete",
     "refresh_btn_title": "Refresh",
     "label_user": "You",
-    "label_ollama": "Ollama",
-    "label_context": "Attached Analysis"
+    "label_context": "Attached Analysis",
+    "regenerate": "Regenerate",
+    "edit_resend": "Edit and resend"
   },
   "config": {
     "title": "Global Configuration",
@@ -228,6 +237,8 @@
     "na": "N/A",
     "done": "Done",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "copy_analysis": "Copy analysis",
+    "delete_analysis": "Delete this analysis"
   }
 }

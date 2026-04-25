@@ -9,7 +9,14 @@
     "rules": "Règles",
     "monitor": "Monitor",
     "chat": "Log Chat",
-    "config": "Configuration"
+    "config": "Configuration",
+    "cpu_app": "App",
+    "cpu_sys": "Sys",
+    "ram": "RAM",
+    "uptime": "En ligne",
+    "tooltip_cpu": "Utilisation CPU (App / Système)",
+    "tooltip_ram": "Utilisation RAM (App)",
+    "tooltip_uptime": "Temps de fonctionnement"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -110,7 +117,8 @@
     "stop": "🛑 Arrêter",
     "manually_analyzed_badge": "Analysé manuellement",
     "manual_analysis": "Analyse manuelle",
-    "search_no_result": "Aucun résultat pour cet ID."
+    "search_no_result": "Aucun résultat pour cet ID.",
+    "detection_id_title": "ID de détection"
   },
   "chat": {
     "title": "Centre d'Analyse IA",
@@ -130,8 +138,9 @@
     "delete_btn_title": "Supprimer",
     "refresh_btn_title": "Rafraîchir",
     "label_user": "Vous",
-    "label_ollama": "Ollama",
-    "label_context": "Analyse attachée"
+    "label_context": "Analyse attachée",
+    "regenerate": "Régénérer",
+    "edit_resend": "Modifier et renvoyer"
   },
   "config": {
     "title": "Configuration Globale",
@@ -228,6 +237,8 @@
     "na": "N/A",
     "done": "Terminé",
     "cancel": "Annuler",
-    "confirm": "Valider"
+    "confirm": "Valider",
+    "copy_analysis": "Copier l'analyse",
+    "delete_analysis": "Supprimer cette analyse"
   }
 }

@@ -428,7 +428,7 @@ async function loadRuleAnalyses(ruleId) {
         container.innerHTML = analyses.map(a => `
             <div class="monitor-analysis-card">
                 <div class="monitor-analysis-header">
-                    <span class="detection-id-badge" title="ID de détection">${escapeHtml(a.detection_id || '—')}</span>
+                    <span class="detection-id-badge" title="${window.t('monitor.detection_id_title')}">${escapeHtml(a.detection_id || '—')}</span>
                     <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
                     <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
                 </div>
