@@ -83,3 +83,34 @@ function copyToClipboard(text) {
         });
     }
 }
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    pollSystemStats();
+});
+
+async function pollSystemStats() {
+    updateSystemStatsUI();
+    setInterval(updateSystemStatsUI, 10000);
+}
+
+async function updateSystemStatsUI() {
+    try {
+        const stats = await apiFetch('/api/dashboard/system-stats');
+        const cpuEl = document.getElementById('stat-cpu');
+        const ramEl = document.getElementById('stat-ram');
+        const uptimeEl = document.getElementById('stat-uptime');
+        
+        if (cpuEl) cpuEl.textContent = \\% / \%\;
+        if (ramEl) ramEl.textContent = \\ MB\;
+        if (uptimeEl) uptimeEl.textContent = formatUptime(stats.uptime);
+    } catch (e) {}
+}
+
+function formatUptime(seconds) {
+    if (seconds < 60) return \\s\;
+    if (seconds < 3600) return \\m\;
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return \\h\m\;
+}

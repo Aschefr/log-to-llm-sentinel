@@ -15,6 +15,20 @@
             <a href="/monitor" class="{% if request.url.path == '/monitor' %}active{% endif %}">Monitor</a>
             <a href="/config" class="{% if request.url.path == '/config' %}active{% endif %}">Configuration</a>
         </div>
+        <div class="nav-stats" id="nav-system-stats">
+            <div class="stat-item" title="Utilisation CPU (App / Système)">
+                <span class="stat-icon">📊</span>
+                <span id="stat-cpu">--%</span>
+            </div>
+            <div class="stat-item" title="Utilisation RAM (App)">
+                <span class="stat-icon">💾</span>
+                <span id="stat-ram">-- MB</span>
+            </div>
+            <div class="stat-item" title="Uptime">
+                <span class="stat-icon">⏱️</span>
+                <span id="stat-uptime">--</span>
+            </div>
+        </div>
     </nav>
     <main class="container">
         {% block content %}{% endblock %}

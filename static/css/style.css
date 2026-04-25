@@ -1053,3 +1053,12 @@ body {
 .ollama-debug-block pre { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.05); border-radius: 4px; padding: 0.75rem; font-size: 0.8rem; color: #d1d1d1; white-space: pre-wrap; word-break: break-all; margin: 0; }
 
 .ollama-debug-logs { height: 600px !important; }
+
+/* --- Navbar Stats ------------------------------------------------------ */
+.navbar { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+.nav-stats { display: flex; gap: 1.5rem; background: rgba(0,0,0,0.2); padding: 0.4rem 1rem; border-radius: 2rem; border: 1px solid rgba(255,255,255,0.05); }
+.stat-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-family: 'Consolas', monospace; color: var(--text-secondary); }
+.stat-icon { font-size: 0.9rem; filter: grayscale(0.5); }
+.stat-item span:last-child { color: var(--accent); font-weight: 600; }
+
+@media (max-width: 900px) { .nav-stats { display: none; } }

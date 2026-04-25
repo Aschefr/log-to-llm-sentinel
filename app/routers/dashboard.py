@@ -1,10 +1,44 @@
 from fastapi import APIRouter
 from datetime import datetime, timedelta
+import os
+import time
+from typing import Optional
+
+try:
+    import psutil
+except ImportError:
+    psutil = None
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+
+START_TIME = time.time()
+
+
+@router.get("/system-stats")
+def get_system_stats():
+    """Retourne les statistiques d'utilisation des ressources."""
+    stats = {
+        "app_cpu": 0,
+        "app_ram": 0,
+        "sys_cpu": 0,
+        "sys_ram": 0,
+        "uptime": int(time.time() - START_TIME)
+    }
+    
+    if psutil:
+        try:
+            process = psutil.Process(os.getpid())
+            stats["app_cpu"] = process.cpu_percent(interval=None) # Use None to not block
+            stats["app_ram"] = round(process.memory_info().rss / (1024 * 1024), 1)
+            stats["sys_cpu"] = psutil.cpu_percent()
+            stats["sys_ram"] = psutil.virtual_memory().percent
+        except:
+            pass
+            
+    return stats
 
 
 @router.get("/stats")
