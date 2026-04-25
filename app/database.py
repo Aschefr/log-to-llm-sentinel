@@ -29,6 +29,7 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN max_log_chars INTEGER DEFAULT 5000",
         "ALTER TABLE analyses ADD COLUMN detection_id VARCHAR DEFAULT NULL",
         "ALTER TABLE analyses ADD COLUMN matched_keywords_json TEXT DEFAULT '[]'",
+        "ALTER TABLE global_config ADD COLUMN monitor_log_lines INTEGER DEFAULT 60",
     ]
     with engine.connect() as conn:
         for sql in migrations:

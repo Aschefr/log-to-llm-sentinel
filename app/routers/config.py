@@ -30,6 +30,7 @@ class ConfigUpdate(BaseModel):
     apprise_tags: Optional[str] = None
     apprise_max_chars: Optional[int] = None
     max_log_chars: Optional[int] = None
+    monitor_log_lines: Optional[int] = None
     debug_mode: Optional[bool] = None
 
 
@@ -58,6 +59,7 @@ def get_config():
             "apprise_tags": config.apprise_tags,
             "apprise_max_chars": config.apprise_max_chars,
             "max_log_chars": config.max_log_chars,
+            "monitor_log_lines": config.monitor_log_lines,
             "debug_mode": config.debug_mode,
         }
     finally:
@@ -106,6 +108,8 @@ def update_config(config_data: ConfigUpdate):
             config.apprise_max_chars = config_data.apprise_max_chars
         if config_data.max_log_chars is not None:
             config.max_log_chars = config_data.max_log_chars
+        if config_data.monitor_log_lines is not None:
+            config.monitor_log_lines = config_data.monitor_log_lines
         if config_data.debug_mode is not None:
             config.debug_mode = config_data.debug_mode
 
@@ -132,6 +136,7 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
         "apprise_tags": config.apprise_tags if config else "",
         "apprise_max_chars": config.apprise_max_chars if config else 1900,
         "max_log_chars": config.max_log_chars if config else 5000,
+        "monitor_log_lines": config.monitor_log_lines if config else 60,
         "debug_mode": config.debug_mode if config else False,
     }
 

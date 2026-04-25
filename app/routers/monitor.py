@@ -21,20 +21,27 @@ def get_monitored_rules():
     """Retourne toutes les règles actives avec leurs métadonnées pour le monitor."""
     db = SessionLocal()
     try:
+        from app.models import GlobalConfig
+        config = db.query(GlobalConfig).first()
+        monitor_lines = config.monitor_log_lines if config else 60
+
         rules = db.query(Rule).filter(Rule.enabled == True).all()
-        return [
-            {
-                "id": r.id,
-                "name": r.name,
-                "log_file_path": r.log_file_path,
-                "keywords": r.get_keywords(),
-                "application_context": r.application_context,
-                "anti_spam_delay": r.anti_spam_delay or 60,
-                "notify_severity_threshold": r.notify_severity_threshold or "info",
-                "notify_on_match": r.notify_on_match,
-            }
-            for r in rules
-        ]
+        return {
+            "monitor_log_lines": monitor_lines,
+            "rules": [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "log_file_path": r.log_file_path,
+                    "keywords": r.get_keywords(),
+                    "application_context": r.application_context,
+                    "anti_spam_delay": r.anti_spam_delay or 60,
+                    "notify_severity_threshold": r.notify_severity_threshold or "info",
+                    "notify_on_match": r.notify_on_match,
+                }
+                for r in rules
+            ]
+        }
     finally:
         db.close()
 

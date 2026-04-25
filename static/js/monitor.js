@@ -3,11 +3,13 @@
 // et du panneau de détail au clic.
 
 let monitorRules = [];
+let monitorLogLines = 60;
 let activeRuleId = null;
 let tailIntervals = {};
 let bufferIntervals = {};
 let isFrozen = false;
 let frozenContent = null;
+let selectedLineText = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadMonitorRules();
@@ -22,7 +24,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadMonitorRules() {
     try {
-        monitorRules = await apiFetch('/api/monitor/rules');
+        const res = await apiFetch('/api/monitor/rules');
+        monitorRules = res.rules || [];
+        monitorLogLines = res.monitor_log_lines || 60;
+        
         renderTabs();
         if (monitorRules.length > 0) {
             selectTab(monitorRules[0].id);
@@ -153,7 +158,7 @@ async function fetchLogs(rule) {
     try {
         const kwParam = rule.keywords.join(',');
         const res = await apiFetch(
-            `/api/files/tail?path=${encodeURIComponent(rule.log_file_path)}&lines=60&keywords=${encodeURIComponent(kwParam)}`
+            `/api/files/tail?path=${encodeURIComponent(rule.log_file_path)}&lines=${monitorLogLines}&keywords=${encodeURIComponent(kwParam)}`
         );
 
         if (!res.lines || res.lines.length === 0) {
@@ -164,12 +169,16 @@ async function fetchLogs(rule) {
         const isAtBottom = Math.abs((viewer.scrollHeight - viewer.scrollTop) - viewer.clientHeight) < 20;
 
         viewer.innerHTML = res.lines.map((line, idx) => {
-            const text = escapeHtml(line.text || '');
+            const rawText = line.text || '';
+            const text = escapeHtml(rawText);
+            const isSelected = selectedLineText === rawText;
             const matchClass = line.matched ? 'matched' : '';
+            const selectClass = isSelected ? 'selected' : '';
+            
             const kwBadges = line.matched_keywords && line.matched_keywords.length > 0
                 ? `<span class="log-kw-badges">${line.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('')}</span>`
                 : '';
-            return `<div class="log-line ${matchClass}" data-rule="${rule.id}" data-idx="${idx}" data-text="${encodeURIComponent(line.text || '')}" onclick="onLineClick(this, ${rule.id})">
+            return `<div class="log-line ${matchClass} ${selectClass}" data-rule="${rule.id}" data-idx="${idx}" data-text="${encodeURIComponent(rawText)}" onclick="onLineClick(this, ${rule.id})">
                 <span class="log-text">${text}</span>${kwBadges}
             </div>`;
         }).join('');
@@ -223,6 +232,7 @@ async function onLineClick(el, ruleId) {
     // Mise en évidence de la ligne
     document.querySelectorAll('.log-line.selected').forEach(l => l.classList.remove('selected'));
     el.classList.add('selected');
+    selectedLineText = text;
 
     // Chercher une analyse correspondant à cette ligne
     let relatedAnalysis = null;
@@ -272,6 +282,7 @@ function closeDetailPanel(ruleId) {
     const panel = document.getElementById(`detail-panel-${ruleId}`);
     if (panel) panel.classList.add('hidden');
     document.querySelectorAll('.log-line.selected').forEach(l => l.classList.remove('selected'));
+    selectedLineText = null;
 }
 
 // ─── Figer / copier ────────────────────────────────────────────────────────
