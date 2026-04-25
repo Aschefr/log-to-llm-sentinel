@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime
 
 from app.database import SessionLocal
-from app.models import Rule, Analysis
+from app.models import Rule, Analysis, GlobalConfig
 from app.services.orchestrator import Orchestrator
 
 router = APIRouter(prefix="/api/monitor", tags=["monitor"])
