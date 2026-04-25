@@ -317,12 +317,17 @@ async def test_rule(rule_id: int):
                 logger.debug("TestRule", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
                 summary_prompt = f"Résume cette analyse de log :\n{response}"
                 async with orchestrator._ollama_semaphore:
-                    summary = await orchestrator.ollama.analyze_async(
-                        prompt=summary_prompt,
-                        url=config_dict.get("ollama_url"),
-                        model=config_dict.get("ollama_model"),
-                        think=False
-                    )
+                    try:
+                        summary = await asyncio.wait_for(
+                            orchestrator.ollama.analyze_async(
+                                prompt=summary_prompt,
+                                url=config_dict.get("ollama_url"),
+                                model=config_dict.get("ollama_model")
+                            ),
+                            timeout=30.0
+                        )
+                    except asyncio.TimeoutError:
+                        summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (30s)"
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     notify_body = f"""
                     <h2>🧪 Test Log to LLM Sentinel (Résumé)</h2>

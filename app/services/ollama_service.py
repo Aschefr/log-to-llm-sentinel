@@ -87,7 +87,9 @@ class OllamaService:
 
         logger.debug("OllamaService", f"Streaming à {api_url} | modèle={model} | prompt={prompt[:300]}...")
         try:
-            async with httpx.AsyncClient(timeout=None) as client:
+            # Timeout de connexion de 5s pour détecter un Ollama figé immédiatement
+            timeout = httpx.Timeout(None, connect=5.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream("POST", api_url, json=payload) as response:
                     if response.status_code != 200:
                         err_body = await response.aread()

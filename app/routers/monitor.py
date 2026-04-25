@@ -156,17 +156,12 @@ async def retry_analysis(analysis_id: int):
                     _orchestrator.ollama.analyze_async(
                         prompt=prompt,
                         url=config.get("ollama_url"),
-                        model=config.get("ollama_model"),
-                        think=config.get("ollama_think", True),
-                        options={
-                            "temperature": config.get("ollama_temp", 0.1),
-                            "num_ctx": config.get("ollama_ctx", 4096)
-                        }
+                        model=config.get("ollama_model")
                     ),
-                    timeout=90.0
+                    timeout=30.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (90s)"
+                response = "[Erreur Ollama] Délai d'attente dépassé (30s)"
 
         from app import logger
         logger.add_ollama_log(prompt, response, analysis.detection_id)
@@ -226,17 +221,12 @@ async def analyze_line(data: dict):
                     _orchestrator.ollama.analyze_async(
                         prompt=prompt,
                         url=config.get("ollama_url"),
-                        model=config.get("ollama_model"),
-                        think=getattr(cfg, "ollama_think", True) if cfg else True,
-                        options={
-                            "temperature": getattr(cfg, "ollama_temp", 0.1) if cfg else 0.1,
-                            "num_ctx": getattr(cfg, "ollama_ctx", 4096) if cfg else 4096
-                        }
+                        model=config.get("ollama_model")
                     ),
-                    timeout=60.0
+                    timeout=30.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (60s)"
+                response = "[Erreur Ollama] Délai d'attente dépassé (30s)"
             
         from app import logger
         logger.add_ollama_log(prompt, response, "MANUAL")
