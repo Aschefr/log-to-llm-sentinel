@@ -143,6 +143,7 @@ async function loadConfig() {
             debugEl.checked = config.debug_mode === true;
             toggleLogsContainer(debugEl.checked);
         }
+        window.__configLoaded = true;
     } catch (error) {
         console.error('Erreur chargement config:', error);
     }
@@ -448,6 +449,10 @@ async function runTest(url, messageEl, buttonEl) {
 }
 
 async function saveConfig(messageEl, isAutoSave = false) {
+    if (!window.__configLoaded) {
+        console.warn('Sauvegarde annulée: la config n\'a pas encore été chargée correctement.');
+        return false;
+    }
     if (isAutoSave) {
         messageEl.textContent = 'Auto-sauvegarde...';
         messageEl.className = 'message info';
