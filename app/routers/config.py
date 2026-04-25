@@ -13,7 +13,7 @@ import urllib.error
 import asyncio
 from fastapi.responses import StreamingResponse
 import httpx 
-from app.logger import logger
+from app import logger
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
