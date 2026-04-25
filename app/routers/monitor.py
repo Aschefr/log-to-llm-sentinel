@@ -7,6 +7,7 @@ from datetime import datetime
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
 from app.services.orchestrator import Orchestrator
+from app.utils.log_utils import clean_log_line
 
 router = APIRouter(prefix="/api/monitor", tags=["monitor"])
 
@@ -146,8 +147,9 @@ async def retry_analysis(analysis_id: int):
         from app.routers.config import _get_config_dict
         config = _get_config_dict(config_obj)
 
-        # On reconstruit le prompt
-        prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, config.get("system_prompt", ""))
+        # On reconstruit le prompt en s'assurant que la ligne est nettoyée
+        cleaned_line = clean_log_line(analysis.triggered_line)
+        prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""))
 
         # Appel Ollama (streaming asynchrone protégé)
         async with _orchestrator._ollama_semaphore:
@@ -156,12 +158,17 @@ async def retry_analysis(analysis_id: int):
                     _orchestrator.ollama.analyze_async(
                         prompt=prompt,
                         url=config.get("ollama_url"),
-                        model=config.get("ollama_model")
+                        model=config.get("ollama_model"),
+                        think=config.get("ollama_think", True),
+                        options={
+                            "temperature": config.get("ollama_temp", 0.1),
+                            "num_ctx": config.get("ollama_ctx", 4096)
+                        }
                     ),
-                    timeout=30.0
+                    timeout=120.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (30s)"
+                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
 
         from app import logger
         logger.add_ollama_log(prompt, response, analysis.detection_id)
@@ -208,11 +215,17 @@ async def analyze_line(data: dict):
         config = {
             "ollama_url": cfg.ollama_url if cfg else "http://ollama:11434",
             "ollama_model": cfg.ollama_model if cfg else "qwen3.5:0.8b",
+            "ollama_temp": cfg.ollama_temp if cfg else 0.1,
+            "ollama_ctx": cfg.ollama_ctx if cfg else 4096,
+            "ollama_think": cfg.ollama_think if cfg else True,
             "system_prompt": cfg.system_prompt if cfg else ""
         }
         
+        # Nettoyage de la ligne (JSON -> Texte lisible)
+        cleaned_line = clean_log_line(line)
+        
         # Simuler une détection pour construire le prompt
-        prompt = _orchestrator._build_prompt(rule, line, config.get("system_prompt", ""))
+        prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""))
         
         # Appel Ollama (streaming asynchrone protégé)
         async with _orchestrator._ollama_semaphore:
@@ -221,12 +234,17 @@ async def analyze_line(data: dict):
                     _orchestrator.ollama.analyze_async(
                         prompt=prompt,
                         url=config.get("ollama_url"),
-                        model=config.get("ollama_model")
+                        model=config.get("ollama_model"),
+                        think=config.get("ollama_think", True),
+                        options={
+                            "temperature": config.get("ollama_temp", 0.1),
+                            "num_ctx": config.get("ollama_ctx", 4096)
+                        }
                     ),
-                    timeout=30.0
+                    timeout=120.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (30s)"
+                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
             
         from app import logger
         logger.add_ollama_log(prompt, response, "MANUAL")
@@ -301,13 +319,22 @@ async def chat_analysis(data: dict):
             raise HTTPException(status_code=500, detail="Configuration non trouvée")
 
         async with _orchestrator._ollama_semaphore:
-            response = await asyncio.to_thread(
-                _orchestrator.ollama.analyze,
-                prompt=prompt,
-                url=cfg.ollama_url,
-                model=cfg.ollama_model,
-                timeout=120  # Plus long pour le chat
-            )
+            try:
+                response = await asyncio.wait_for(
+                    _orchestrator.ollama.analyze_async(
+                        prompt=prompt,
+                        url=cfg.ollama_url,
+                        model=cfg.ollama_model,
+                        think=cfg.ollama_think if hasattr(cfg, 'ollama_think') else True,
+                        options={
+                            "temperature": cfg.ollama_temp if hasattr(cfg, 'ollama_temp') else 0.1,
+                            "num_ctx": cfg.ollama_ctx if hasattr(cfg, 'ollama_ctx') else 4096
+                        }
+                    ),
+                    timeout=120.0
+                )
+            except asyncio.TimeoutError:
+                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
             
         from app import logger
         logger.add_ollama_log(f"CHAT: {question}", response, "CHAT")

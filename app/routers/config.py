@@ -210,11 +210,6 @@ async def test_ollama():
         url = (cfg.get("ollama_url") or "").strip()
         model = (cfg.get("ollama_model") or "").strip()
         try:
-            config = db.query(GlobalConfig).first()
-            cfg = _get_config_dict(config)
-
-            url = (cfg.get("ollama_url") or "").strip()
-            model = (cfg.get("ollama_model") or "").strip()
             if not url:
                 raise HTTPException(status_code=400, detail="URL Ollama manquante")
             if not model:
@@ -253,12 +248,17 @@ async def test_ollama():
                             ollama.analyze_async(
                                 prompt=prompt, 
                                 url=url, 
-                                model=model
+                                model=model,
+                                think=cfg.get("ollama_think", True),
+                                options={
+                                    "temperature": cfg.get("ollama_temp", 0.1),
+                                    "num_ctx": cfg.get("ollama_ctx", 4096)
+                                }
                             ),
-                            timeout=30.0
+                            timeout=120.0
                         )
                     except asyncio.TimeoutError:
-                        resp = "[Erreur Ollama] Délai d'attente dépassé (30s)"
+                        resp = "[Erreur Ollama] Délai d'attente dépassé (120s)"
                 
                 if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
                     raise HTTPException(status_code=502, detail=resp)

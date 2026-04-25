@@ -22,10 +22,8 @@ class OllamaService:
         """
         Version asynchrone d'analyse blindée contre les timeouts et les balises coupées.
         """
-        full_text = ""
-        buffer = ""
-        is_thinking = False
-        last_log_len = 0
+        combined_text = ""
+        last_log_time = time.time()
         
         async for chunk in self.generate_stream(prompt, url, model, options, think):
             if "error" in chunk:
@@ -33,29 +31,29 @@ class OllamaService:
             
             text = chunk.get("response", "")
             if text:
-                logger.debug("OllamaService", f"Chunk reçu ({len(text)} chars)")
+                combined_text += text
+                # Log de progression toutes les 5 secondes pour rassurer l'utilisateur
+                if time.time() - last_log_time > 5.0:
+                    logger.debug("OllamaService", f"Réception en cours... ({len(combined_text)} car. reçus)")
+                    last_log_time = time.time()
             
-            if not text:
-                if chunk.get("done"): 
-                    logger.debug("OllamaService", "Fin du stream (done: true)")
-                    break
-                continue
+            if not text and chunk.get("done"):
+                logger.debug("OllamaService", "Fin du stream (done: true)")
+                break
 
-            # Filtrage simple
-            if not is_thinking:
-                if "<think>" in text:
-                    is_thinking = True
-                    text = text.split("<think>", 1)[0]
-                full_text += text
+        # Filtrage robuste après récupération
+        result = combined_text
+        while "<think>" in result:
+            start = result.find("<think>")
+            end = result.find("</think>")
+            if end != -1:
+                result = result[:start] + result[end+8:]
             else:
-                if "</think>" in text:
-                    is_thinking = False
-                    full_text += text.split("</think>", 1)[-1]
-
-            # Log de progression léger
-            if len(full_text) - last_log_len > 100:
-                logger.debug("OllamaService", f"Analyse en cours... ({len(full_text)} car.)")
-                last_log_len = len(full_text)
+                result = result[:start]
+                break
+        
+        full_text = result.strip()
+        logger.debug("OllamaService", f"Analyse terminée. Taille finale: {len(full_text)} car.")
         
         return full_text.strip() if full_text else "Aucune réponse d'Ollama"
 

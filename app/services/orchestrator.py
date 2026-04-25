@@ -8,6 +8,7 @@ from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
 from app.services.ollama_service import OllamaService
 from app.services.notification_service import NotificationService
+from app.utils.log_utils import clean_log_line
 from app import logger
 
 
@@ -124,7 +125,7 @@ class Orchestrator:
             max_chars = config_dict.get("max_log_chars", 5000)
 
             if len(lines) == 1:
-                line = self._clean_log_line(lines[0])
+                line = clean_log_line(lines[0])
                 # Si la ligne est trop longue, on la tronque
                 if len(line) > max_chars:
                     logger.warning("Orchestrator", f"Ligne trop longue ({len(line)} chars), troncature à {max_chars}")
@@ -135,7 +136,7 @@ class Orchestrator:
                 # Regrouper les lignes
                 total_lines = len(lines)
                 # On limite à 30 lignes max dans le prompt pour ne pas exploser le contexte
-                recent_lines = [self._clean_log_line(l) for l in lines[-30:]]
+                recent_lines = [clean_log_line(l) for l in lines[-30:]]
                 
                 bundled_text = f"Ces {total_lines} événements correspondants sont apparus dans les {buffer_delay} dernières secondes. Voici un extrait des plus récents :\n"
                 
@@ -173,16 +174,22 @@ class Orchestrator:
         # 3. Appeler Ollama (en streaming asynchrone pour éviter les timeouts)
         logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | ligne={line[:80]}")
         async with self._ollama_semaphore:
-            response = await self.ollama.analyze_async(
-                prompt=prompt,
-                url=config.get("ollama_url"),
-                model=config.get("ollama_model"),
-                think=config.get("ollama_think", True),
-                options={
-                    "temperature": config.get("ollama_temp", 0.1),
-                    "num_ctx": config.get("ollama_ctx", 4096)
-                }
-            )
+            try:
+                response = await asyncio.wait_for(
+                    self.ollama.analyze_async(
+                        prompt=prompt,
+                        url=config.get("ollama_url"),
+                        model=config.get("ollama_model"),
+                        think=config.get("ollama_think", True),
+                        options={
+                            "temperature": config.get("ollama_temp", 0.1),
+                            "num_ctx": config.get("ollama_ctx", 4096)
+                        }
+                    ),
+                    timeout=120.0
+                )
+            except asyncio.TimeoutError:
+                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
         logger.debug("Orchestrator", f"Réponse Ollama reçue : {response[:200]}")
         logger.add_ollama_log(prompt, response, detection_id)
 
@@ -262,16 +269,22 @@ class Orchestrator:
                     f"Analyse à résumer :\n{response}"
                 )
                 async with self._ollama_semaphore:
-                    summary = await self.ollama.analyze_async(
-                        prompt=summary_prompt,
-                        url=config.get("ollama_url"),
-                        model=config.get("ollama_model"),
-                        think=False, # Pas de raisonnement pour un résumé court
-                        options={
-                            "temperature": 0.1, # Résumé toujours à basse température
-                            "num_ctx": 2048,    # Résumé n'a pas besoin d'un gros contexte
-                        }
-                    )
+                    try:
+                        summary = await asyncio.wait_for(
+                            self.ollama.analyze_async(
+                                prompt=summary_prompt,
+                                url=config.get("ollama_url"),
+                                model=config.get("ollama_model"),
+                                think=False, # Pas de raisonnement pour un résumé court
+                                options={
+                                    "temperature": 0.1, # Résumé toujours à basse température
+                                    "num_ctx": 2048,    # Résumé n'a pas besoin d'un gros contexte
+                                }
+                            ),
+                            timeout=60.0
+                        )
+                    except asyncio.TimeoutError:
+                        summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (60s)"
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     logger.add_ollama_log(summary_prompt, summary, detection_id)
                     notify_body = f"""### {severity_emoji} Alerte Sentinel (Résumé) : {rule.name}
@@ -286,32 +299,7 @@ class Orchestrator:
             analysis.notified = True
             db.commit()
 
-    def _clean_log_line(self, line: str) -> str:
-        """Tente de nettoyer une ligne de log si elle est au format JSON (ex: Nextcloud)."""
-        import json
-        stripped = line.strip()
-        if not (stripped.startswith('{') and stripped.endswith('}')):
-            return line
-
-        try:
-            data = json.loads(stripped)
-            # Pour Nextcloud : extraire message, app, et éventuellement exception
-            msg = data.get("message", "")
-            app = data.get("app", "")
-            exc = data.get("exception", "") or data.get("data", {}).get("exception", "")
-            
-            if msg:
-                cleaned = f"[{app}] {msg}"
-                if exc:
-                    # On ne garde que le début de l'exception si elle est énorme
-                    exc_str = str(exc)
-                    if len(exc_str) > 1000:
-                        exc_str = exc_str[:1000] + "... [EXCEPTION TRONQUÉE]"
-                    cleaned += f" | Exception: {exc_str}"
-                return cleaned
-            return line # Fallback si pas de champ message
-        except:
-            return line
+    # La méthode _clean_log_line a été déplacée dans app.utils.log_utils.clean_log_line
 
     def _build_prompt(self, rule: Rule, line: str, system_prompt: str, context_lines: list = None) -> str:
         """Construit le prompt pour Ollama."""

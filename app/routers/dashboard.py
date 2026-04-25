@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from datetime import datetime, timedelta
 import os
 import time
@@ -107,7 +107,7 @@ def delete_analysis(analysis_id: int):
             db.delete(analysis)
             db.commit()
             return {"status": "ok"}
-        return {"status": "error", "message": "Analysis not found"}, 404
+        raise HTTPException(status_code=404, detail="Analysis not found")
     finally:
         db.close()
 

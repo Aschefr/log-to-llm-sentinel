@@ -7,6 +7,7 @@ import os
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
 from app.services.orchestrator import Orchestrator
+from app.utils.log_utils import clean_log_line
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
 orchestrator = None
@@ -236,8 +237,8 @@ async def test_rule(rule_id: int):
             "smtp_recipient": config.smtp_recipient if config else "",
             "smtp_tls": config.smtp_tls if config else True,
             "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
-            "ollama_url": config.ollama_url if config else "http://host.docker.internal:11434",
-            "ollama_model": config.ollama_model if config else "llama3",
+            "ollama_url": config.ollama_url if config and config.ollama_url else "http://ollama:11434",
+            "ollama_model": config.ollama_model if config and config.ollama_model else "gemma4:e4b",
             "system_prompt": config.system_prompt if config else "",
             "notification_method": config.notification_method if config else "smtp",
             "apprise_url": config.apprise_url if config else "",
@@ -245,20 +246,28 @@ async def test_rule(rule_id: int):
             "debug_mode": config.debug_mode if config else False,
         }
 
-        prompt = orchestrator._build_prompt(rule, last_line, config_dict.get("system_prompt", ""), context_lines=last_lines[:-1])
+        cleaned_context = [clean_log_line(l) for l in last_lines[:-1]]
+        cleaned_last_line = clean_log_line(last_line)
+        prompt = orchestrator._build_prompt(rule, cleaned_last_line, config_dict.get("system_prompt", ""), context_lines=cleaned_context)
         logger.debug("TestRule", f"Envoi à Ollama (via stream) — modèle={config_dict.get('ollama_model')}")
 
         async with orchestrator._ollama_semaphore:
-            response = await orchestrator.ollama.analyze_async(
-                prompt=prompt,
-                url=config_dict.get("ollama_url"),
-                model=config_dict.get("ollama_model"),
-                think=config_dict.get("ollama_think", True),
-                options={
-                    "temperature": config_dict.get("ollama_temp", 0.1),
-                    "num_ctx": config_dict.get("ollama_ctx", 4096)
-                }
-            )
+            try:
+                response = await asyncio.wait_for(
+                    orchestrator.ollama.analyze_async(
+                        prompt=prompt,
+                        url=config_dict.get("ollama_url"),
+                        model=config_dict.get("ollama_model"),
+                        think=config_dict.get("ollama_think", True),
+                        options={
+                            "temperature": config_dict.get("ollama_temp", 0.1),
+                            "num_ctx": config_dict.get("ollama_ctx", 4096)
+                        }
+                    ),
+                    timeout=120.0
+                )
+            except asyncio.TimeoutError:
+                response = "[Erreur Ollama] Délai d'attente dépassé (120s)"
         logger.debug("TestRule", f"Réponse Ollama reçue ({len(response)} chars)")
         severity = orchestrator._detect_severity(response)
         logger.debug("TestRule", f"Sévérité détectée : {severity}")
@@ -324,10 +333,10 @@ async def test_rule(rule_id: int):
                                 url=config_dict.get("ollama_url"),
                                 model=config_dict.get("ollama_model")
                             ),
-                            timeout=30.0
+                            timeout=60.0
                         )
                     except asyncio.TimeoutError:
-                        summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (30s)"
+                        summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (60s)"
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     notify_body = f"""
                     <h2>🧪 Test Log to LLM Sentinel (Résumé)</h2>
