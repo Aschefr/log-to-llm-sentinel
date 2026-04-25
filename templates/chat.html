@@ -278,13 +278,21 @@
 </style>
 
 <script>
-let activeConvId = {{ conversation_id if conversation_id else 'null' }};
+let activeConvId = {% if conversation_id %}{{ conversation_id }}{% else %}null{% endif %};
 let conversations = [];
 
+console.log("Chat initialized with activeConvId:", activeConvId);
+
 document.addEventListener('DOMContentLoaded', async () => {
-    await loadConversations();
-    if (activeConvId) {
-        selectConversation(activeConvId);
+    console.log("DOM Loaded, starting loadConversations...");
+    try {
+        await loadConversations();
+        if (activeConvId) {
+            console.log("Auto-selecting conversation:", activeConvId);
+            selectConversation(activeConvId);
+        }
+    } catch (err) {
+        console.error("Initialization error:", err);
     }
 
     const input = document.getElementById('chat-input');
@@ -335,7 +343,7 @@ function renderConversationList() {
 async function deleteConversation(id) {
     if (!confirm('Supprimer cette conversation ?')) return;
     try {
-        await apiFetch(\`/chat/api/delete/\${id}\`, { method: 'DELETE' });
+        await apiFetch(`/chat/api/delete/${id}`, { method: 'DELETE' });
         if (activeConvId === id) {
             activeConvId = null;
             document.getElementById('chat-interface').classList.add('hidden');
