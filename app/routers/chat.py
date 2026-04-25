@@ -128,11 +128,12 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
             base_prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, cfg.system_prompt if cfg else "")
             prompt = f"{base_prompt}\n\nHistorique :\nAssistant (initial) : {analysis.ollama_response}\n"
 
-    for m in history:
+    # On ne prend que les 10 derniers messages pour ne pas exploser le contexte
+    for m in history[-10:]:
         role_label = "Utilisateur" if m.role == "user" else "Assistant"
         prompt += f"{role_label} : {m.content}\n"
     
-    prompt += "\nAssistant : "
+    prompt += "Assistant : "
 
     cfg = db.query(GlobalConfig).first()
     ollama_url = (cfg.ollama_url or "http://ollama:11434") if cfg else "http://ollama:11434"
@@ -143,6 +144,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
 
     async def event_generator():
         full_response = ""
+        is_thinking = False
         logger.info("ChatRouter", f"Démarrage event_generator pour conv {conv_id}")
         try:
             if not _orchestrator:
@@ -150,7 +152,6 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
                 return
 
             async with _orchestrator._ollama_semaphore:
-                logger.debug("ChatRouter", "Sémophore acquis")
                 async for chunk in _orchestrator.ollama.generate_stream(
                     prompt=prompt,
                     url=ollama_url,
@@ -165,8 +166,20 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
                         yield f"data: {json.dumps({'error': chunk['error']})}\n\n"
                         return
 
-                    if "response" in chunk:
-                        text = chunk["response"]
+                    text = chunk.get("response", "")
+                    if not text:
+                        continue
+                    
+                    # Filtrage basique des balises <think> (pour modèles type R1)
+                    if "<think>" in text:
+                        is_thinking = True
+                        text = text.split("<think>")[0]
+                    
+                    if "</think>" in text:
+                        is_thinking = False
+                        text = text.split("</think>")[-1]
+                    
+                    if not is_thinking and text:
                         full_response += text
                         yield f"data: {json.dumps({'text': text})}\n\n"
                     
