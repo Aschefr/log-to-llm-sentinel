@@ -285,6 +285,7 @@ async def test_rule(rule_id: int):
             if sev_val < threshold_val:
                 logger.debug("TestRule", f"Notification de test ignorée: la sévérité '{severity}' est inférieure au seuil '{rule.notify_severity_threshold}'.")
                 return {
+                    "status": "ok",
                     "id": analysis.id,
                     "rule_id": analysis.rule_id,
                     "triggered_line": analysis.triggered_line,
@@ -346,6 +347,7 @@ async def test_rule(rule_id: int):
             logger.debug("TestRule", "Notification désactivée pour cette règle")
 
         return {
+            "status": "ok",
             "id": analysis.id,
             "rule_id": analysis.rule_id,
             "triggered_line": analysis.triggered_line,

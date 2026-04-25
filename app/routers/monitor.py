@@ -149,15 +149,24 @@ async def retry_analysis(analysis_id: int):
         # On reconstruit le prompt
         prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, config.get("system_prompt", ""))
 
-        # Appel Ollama
+        # Appel Ollama (streaming asynchrone protégé)
         async with _orchestrator._ollama_semaphore:
-            response = await asyncio.to_thread(
-                _orchestrator.ollama.analyze,
-                prompt=prompt,
-                url=config.get("ollama_url"),
-                model=config.get("ollama_model"),
-                timeout=90,
-            )
+            try:
+                response = await asyncio.wait_for(
+                    _orchestrator.ollama.analyze_async(
+                        prompt=prompt,
+                        url=config.get("ollama_url"),
+                        model=config.get("ollama_model"),
+                        think=config.get("ollama_think", True),
+                        options={
+                            "temperature": config.get("ollama_temp", 0.1),
+                            "num_ctx": config.get("ollama_ctx", 4096)
+                        }
+                    ),
+                    timeout=90.0
+                )
+            except asyncio.TimeoutError:
+                response = "[Erreur Ollama] Délai d'attente dépassé (90s)"
 
         from app import logger
         logger.add_ollama_log(prompt, response, analysis.detection_id)
@@ -250,7 +259,7 @@ async def analyze_line(data: dict):
         db.refresh(analysis)
         
         return {
-            "ok": True,
+            "status": "ok",
             "analysis": {
                 "id": analysis.id,
                 "detection_id": analysis.detection_id,

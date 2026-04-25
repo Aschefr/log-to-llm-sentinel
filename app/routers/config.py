@@ -264,6 +264,7 @@ async def test_ollama():
                     raise HTTPException(status_code=502, detail=resp)
 
                 return {
+                    "status": "ok",
                     "ok": True,
                     "detail": "Connexion Ollama OK",
                     "sample": resp,
