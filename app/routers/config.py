@@ -234,9 +234,7 @@ async def test_ollama():
                         ollama.analyze_async(
                             prompt=prompt, 
                             url=url, 
-                            model=model,
-                            think=None,
-                            options={"temperature": 0.1}
+                            model=model
                         ),
                         timeout=30.0
                     )

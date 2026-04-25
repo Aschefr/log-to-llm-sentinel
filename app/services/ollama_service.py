@@ -32,11 +32,16 @@ class OllamaService:
                 return f"[Erreur Ollama] {chunk['error']}"
             
             text = chunk.get("response", "")
+            if text:
+                logger.debug("OllamaService", f"Chunk reçu ({len(text)} chars)")
+            
             if not text:
-                if chunk.get("done"): break
+                if chunk.get("done"): 
+                    logger.debug("OllamaService", "Fin du stream (done: true)")
+                    break
                 continue
 
-            # Filtrage simple mais efficace
+            # Filtrage simple
             if not is_thinking:
                 if "<think>" in text:
                     is_thinking = True
