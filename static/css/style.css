@@ -917,3 +917,43 @@ body {
     word-break: break-all;
     border: 1px solid var(--border-color);
 }
+.live-logs-header-inline {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.live-log-content {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.85rem;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+}
+
+.btn-icon {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-icon:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.btn-icon.delete-analysis-btn:hover {
+    color: var(--danger);
+}

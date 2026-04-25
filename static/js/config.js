@@ -125,33 +125,7 @@ function setupForm() {
             const logsEl = document.getElementById('debug-logs');
             const text = logsEl.innerText;
             
-            const doCopy = (txt) => {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    return navigator.clipboard.writeText(txt);
-                } else {
-                    // Fallback pour environnements non-sécurisés (HTTP via IP)
-                    return new Promise((resolve, reject) => {
-                        try {
-                            const textArea = document.createElement("textarea");
-                            textArea.value = txt;
-                            textArea.style.position = "fixed";
-                            textArea.style.left = "-9999px";
-                            textArea.style.top = "0";
-                            document.body.appendChild(textArea);
-                            textArea.focus();
-                            textArea.select();
-                            const successful = document.execCommand('copy');
-                            document.body.removeChild(textArea);
-                            if (successful) resolve();
-                            else reject(new Error('ExecCommand copy failed'));
-                        } catch (err) {
-                            reject(err);
-                        }
-                    });
-                }
-            };
-
-            doCopy(text).then(() => {
+            copyToClipboard(text).then(() => {
                 const oldText = copyBtn.innerHTML;
                 copyBtn.innerHTML = '✅ Copié !';
                 setTimeout(() => {

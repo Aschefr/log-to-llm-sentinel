@@ -39,16 +39,19 @@ def get_stats():
 def get_recent_analyses(limit: int = 10, rule_id: int | None = None):
     db = SessionLocal()
     try:
-        q = db.query(Analysis, Rule.name).outerjoin(Rule, Analysis.rule_id == Rule.id)
+        # Jointure explicite pour récupérer l'objet Analysis et le nom de la Règle associée
+        q = db.query(Analysis, Rule.name).join(Rule, Analysis.rule_id == Rule.id)
+        
         if rule_id is not None:
             q = q.filter(Analysis.rule_id == rule_id)
 
         results = q.order_by(Analysis.analyzed_at.desc()).limit(limit).all()
+        
         return [
             {
                 "id": a.id,
                 "rule_id": a.rule_id,
-                "rule_name": rule_name,
+                "rule_name": rule_name or f"Règle #{a.rule_id}",
                 "triggered_line": a.triggered_line,
                 "ollama_response": a.ollama_response,
                 "severity": a.severity,

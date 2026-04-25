@@ -61,6 +61,9 @@ async function loadRecentAnalyses() {
                     </div>
                     <div class="analysis-actions">
                         <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                        <button class="btn-icon" onclick="copyAnalysisText(this)" title="Copier l'analyse">
+                            <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+                        </button>
                         <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysis(${a.id})" title="Supprimer cette analyse">
                             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
                         </button>
@@ -88,9 +91,27 @@ async function deleteAnalysis(id) {
     }
 }
 
+function copyAnalysisText(btn) {
+    const card = btn.closest('.analysis-card');
+    if (!card) return;
+    const line = card.querySelector('.analysis-line').innerText;
+    const response = card.querySelector('.analysis-response').innerText;
+    const text = `Ligne: ${line}\n\nAnalyse:\n${response}`;
+    
+    copyToClipboard(text).then(() => {
+        const oldContent = btn.innerHTML;
+        btn.innerHTML = '✅';
+        setTimeout(() => { btn.innerHTML = oldContent; }, 2000);
+    }).catch(err => {
+        console.error('Erreur copie:', err);
+    });
+}
+
 async function loadRulesStatus() {
+    console.log("Appel loadRulesStatus...");
     try {
         const rules = await apiFetch('/api/rules');
+        console.log("Règles reçues:", rules);
         const container = document.getElementById('rules-status-list');
         
         if (!container) return;
@@ -113,5 +134,9 @@ async function loadRulesStatus() {
         `).join('');
     } catch (error) {
         console.error('Erreur chargement état des logs:', error);
+        const container = document.getElementById('rules-status-list');
+        if (container) {
+            container.innerHTML = `<div class="loading" style="color: var(--danger)">Erreur : ${escapeHtml(error.message)}</div>`;
+        }
     }
 }

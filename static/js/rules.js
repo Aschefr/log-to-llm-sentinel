@@ -146,7 +146,13 @@ async function toggleLiveLogs(ruleId, toggleElement, path) {
                     
                     if (!pre) {
                         // Première fois : création du conteneur
-                        container.innerHTML = `<pre class="live-log-content" id="live-log-pre-${ruleId}">${newContent}</pre>`;
+                        container.innerHTML = `
+                            <div class="live-logs-header-inline">
+                                <button class="btn btn-secondary btn-sm" onclick="copyLiveLogs(${ruleId})">📋 Copier</button>
+                                <button class="btn btn-secondary btn-sm" onclick="clearLiveLogs(${ruleId})">🗑️ Effacer</button>
+                            </div>
+                            <pre class="live-log-content" id="live-log-pre-${ruleId}">${newContent}</pre>
+                        `;
                         pre = document.getElementById(`live-log-pre-${ruleId}`);
                         // Délai pour laisser le DOM se mettre à jour avant de scroller
                         setTimeout(() => pre.scrollTop = pre.scrollHeight, 10);
@@ -229,6 +235,9 @@ async function toggleRuleHistory(ruleId, toggleElement) {
                         </div>
                         <div class="analysis-actions">
                             <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                            <button class="btn-icon" onclick="copyAnalysisText(this)" title="Copier l'analyse">
+                                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+                            </button>
                             <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysisInRules(${a.id}, ${ruleId})" title="Supprimer cette analyse">
                                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
                             </button>
@@ -247,6 +256,38 @@ async function toggleRuleHistory(ruleId, toggleElement) {
         container.classList.add('hidden');
         if (icon) icon.textContent = '▶';
     }
+}
+
+async function clearLiveLogs(ruleId) {
+    const pre = document.getElementById(`live-log-pre-${ruleId}`);
+    if (pre) pre.innerHTML = '';
+}
+
+async function copyLiveLogs(ruleId) {
+    const pre = document.getElementById(`live-log-pre-${ruleId}`);
+    if (!pre) return;
+    try {
+        await copyToClipboard(pre.innerText);
+        alert('Logs copiés !');
+    } catch (e) {
+        console.error('Erreur copie logs:', e);
+    }
+}
+
+function copyAnalysisText(btn) {
+    const card = btn.closest('.analysis-card');
+    if (!card) return;
+    const line = card.querySelector('.analysis-line').innerText;
+    const response = card.querySelector('.analysis-response').innerText;
+    const text = `Ligne: ${line}\n\nAnalyse:\n${response}`;
+    
+    copyToClipboard(text).then(() => {
+        const oldContent = btn.innerHTML;
+        btn.innerHTML = '✅';
+        setTimeout(() => { btn.innerHTML = oldContent; }, 2000);
+    }).catch(err => {
+        console.error('Erreur copie:', err);
+    });
 }
 
 async function deleteAnalysisInRules(id, ruleId) {
