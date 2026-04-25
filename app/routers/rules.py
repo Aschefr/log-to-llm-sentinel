@@ -258,8 +258,15 @@ def test_rule(rule_id: int):
 
         # Envoyer une notification (comme en production)
         if rule.notify_on_match:
-            logger.debug("TestRule", f"Envoi notification via '{config_dict.get('notification_method')}'")
-            notifier = NotificationService()
+            severity_levels = {"info": 0, "warning": 1, "critical": 2}
+            sev_val = severity_levels.get(severity, 0)
+            threshold_val = severity_levels.get(rule.notify_severity_threshold, 0)
+            
+            if sev_val < threshold_val:
+                logger.debug("TestRule", f"Notification de test ignorée: la sévérité '{severity}' est inférieure au seuil '{rule.notify_severity_threshold}'.")
+            else:
+                logger.debug("TestRule", f"Envoi notification via '{config_dict.get('notification_method')}'")
+                notifier = NotificationService()
             subject = f"[Sentinel TEST] Alerte {severity.upper()} : {rule.name}"
             
             body = f"""
