@@ -193,17 +193,17 @@ async function loadRulesStatus() {
         }
     }
 }
-function toggleSection(containerId) {
+function toggleSection(containerId, arrowId) {
     const container = document.getElementById(containerId);
-    const arrow = document.getElementById('rules-status-arrow');
+    const arrow = document.getElementById(arrowId);
     if (!container) return;
 
     const isHidden = container.classList.contains('hidden');
     if (isHidden) {
         container.classList.remove('hidden');
-        if (arrow) arrow.textContent = '?';
+        if (arrow) arrow.classList.add('expanded');
     } else {
         container.classList.add('hidden');
-        if (arrow) arrow.textContent = '?';
+        if (arrow) arrow.classList.remove('expanded');
     }
 }

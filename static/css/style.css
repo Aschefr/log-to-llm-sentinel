@@ -1078,3 +1078,7 @@ body {
 .collapsible-section .section-header:hover { background: rgba(255,255,255,0.06); }
 .collapsible-section #rules-status-arrow { font-size: 0.8rem; margin-left: 10px; opacity: 0.5; transition: transform 0.2s; }
 
+
+.section-arrow { transition: transform 0.3s ease; opacity: 0.6; }
+.section-arrow.expanded { transform: rotate(90deg); opacity: 1; }
+

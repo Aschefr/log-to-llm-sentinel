@@ -40,10 +40,14 @@
         </div>
     </div>
     
-    <section class="rules-status-section collapsible-section" style="margin-bottom: 2rem;">
-        <div class="section-header clickable" onclick="toggleSection('rules-status-container')">
-            <h2 style="margin: 0;">État des fichiers logs <span id="rules-status-arrow">▶</span></h2>
-            <span class="text-secondary" style="font-size: 0.8rem;">Dernières lignes détectées par règle</span>
+    <!-- État des fichiers logs -->
+    <section class="collapsible-section" style="margin-bottom: 2rem;">
+        <div class="section-header clickable" onclick="toggleSection('rules-status-container', 'rules-status-arrow')">
+            <h2 style="margin: 0;">État des fichiers logs</h2>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <span class="text-secondary" style="font-size: 0.8rem;">Monitoring des fichiers</span>
+                <svg id="rules-status-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
+            </div>
         </div>
         <div id="rules-status-container" class="hidden">
             <div id="rules-status-list" class="rules-list" style="margin-top: 1rem;">
@@ -52,16 +56,22 @@
         </div>
     </section>
  
-    <section class="recent-section">
-        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+    <!-- Analyses récentes -->
+    <section class="collapsible-section recent-section">
+        <div class="section-header clickable" onclick="toggleSection('recent-analyses-container', 'recent-analyses-arrow')">
             <div style="display: flex; align-items: baseline; gap: 1rem;">
                 <h2 style="margin: 0;">Analyses récentes</h2>
-                <span id="active-filter-label" class="filter-badge hidden" onclick="setSeverityFilter(null)">Filtre: <span id="filter-name">--</span> ✖</span>
+                <span id="active-filter-label" class="filter-badge hidden" onclick="event.stopPropagation(); setSeverityFilter(null)">Filtre: <span id="filter-name">--</span> ✖</span>
             </div>
-            <button class="btn btn-secondary btn-sm" id="clear-all-analyses-btn">🗑️ Tout effacer</button>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <button class="btn btn-secondary btn-sm" id="clear-all-analyses-btn" onclick="event.stopPropagation()">🗑️ Tout effacer</button>
+                <svg id="recent-analyses-arrow" class="section-arrow expanded" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
+            </div>
         </div>
-        <div id="recent-analyses" class="analyses-list">
-            <div class="loading">Chargement...</div>
+        <div id="recent-analyses-container">
+            <div id="recent-analyses" class="analyses-list" style="margin-top: 1rem;">
+                <div class="loading">Chargement...</div>
+            </div>
         </div>
     </section>
 </div>
