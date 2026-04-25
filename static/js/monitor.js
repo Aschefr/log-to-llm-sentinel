@@ -217,13 +217,11 @@ function toggleKeywordFilter(badgeEl, ruleId) {
     if (!kw) return;
 
     if (activeKeywordFilter === kw && kw !== '__matches__') {
-        // Revenir au mode matches par défaut si on reclique sur un filtre déjà actif
         activeKeywordFilter = '__matches__';
     } else {
         activeKeywordFilter = kw;
     }
 
-    // Mettre à jour l'apparence
     document.querySelectorAll('.kw-filter-btn').forEach(b => {
         const bKw = decodeURIComponent(b.dataset.kw || '');
         b.classList.toggle('active', bKw === activeKeywordFilter);
@@ -231,6 +229,12 @@ function toggleKeywordFilter(badgeEl, ruleId) {
 
     applyKeywordFilter(ruleId);
     updateFilterLabel(ruleId);
+
+    // Auto-scroll si "Tout voir"
+    if (activeKeywordFilter === '__all__') {
+        const viewer = document.getElementById(`log-viewer-${ruleId}`);
+        if (viewer) viewer.scrollTop = viewer.scrollHeight;
+    }
 }
 
 function applyKeywordFilter(ruleId) {
@@ -241,11 +245,9 @@ function applyKeywordFilter(ruleId) {
         if (activeKeywordFilter === '__all__') {
             line.style.display = '';
         } else if (activeKeywordFilter === '__matches__') {
-            // Afficher seulement s'il y a au moins un badge mot-clé
             const hasBadge = line.querySelector('.log-kw-badge') !== null;
             line.style.display = hasBadge ? '' : 'none';
         } else {
-            // Filtre par mot-clé spécifique
             const badges = Array.from(line.querySelectorAll('.log-kw-badge'))
                 .map(b => b.textContent.trim().toLowerCase());
             line.style.display = badges.includes(activeKeywordFilter.toLowerCase()) ? '' : 'none';
@@ -290,9 +292,7 @@ async function fetchBufferStatus(ruleId) {
             dot.className = 'buffer-dot idle';
             label.textContent = 'Buffer inactif';
         }
-    } catch (e) {
-        // Silencieux
-    }
+    } catch (e) {}
 }
 
 // ─── Clic sur une ligne ────────────────────────────────────────────────────
@@ -301,12 +301,16 @@ async function onLineClick(el, ruleId) {
     const text = decodeURIComponent(el.dataset.text || '');
     const panel = document.getElementById(`detail-panel-${ruleId}`);
     const content = document.getElementById(`detail-panel-content-${ruleId}`);
+    const viewer = document.getElementById(`log-viewer-${ruleId}`);
     if (!panel || !content) return;
 
     panel.classList.remove('hidden');
 
-    // Mise en évidence de la ligne
-    document.querySelectorAll('.log-line.selected').forEach(l => l.classList.remove('selected'));
+    // Nettoyage sélections précédentes
+    document.querySelectorAll('.log-line.selected, .log-line.bundle-selected').forEach(l => {
+        l.classList.remove('selected');
+        l.classList.remove('bundle-selected');
+    });
     el.classList.add('selected');
     selectedLineText = text;
 
@@ -315,9 +319,19 @@ async function onLineClick(el, ruleId) {
     try {
         const analyses = await apiFetch(`/api/monitor/analyses/${ruleId}`);
         relatedAnalysis = analyses.find(a =>
-            a.triggered_line && a.triggered_line.includes(text.substring(0, 60))
+            a.triggered_line && a.triggered_line.includes(text.substring(0, 80))
         );
     } catch (e) {}
+
+    // Si analyse trouvée, mettre en évidence le bundle si nécessaire
+    if (relatedAnalysis && viewer) {
+        viewer.querySelectorAll('.log-line').forEach(line => {
+            const lText = decodeURIComponent(line.dataset.text || '');
+            if (lText && relatedAnalysis.triggered_line.includes(lText.substring(0, 60))) {
+                line.classList.add('bundle-selected');
+            }
+        });
+    }
 
     const matchedKws = el.querySelectorAll('.log-kw-badge');
     const kwList = matchedKws.length > 0
@@ -336,7 +350,7 @@ async function onLineClick(el, ruleId) {
         ${relatedAnalysis ? `
         <div class="detail-row">
             <span class="detail-label">ID de détection</span>
-            <code class="detail-value detection-id-badge">${escapeHtml(relatedAnalysis.detection_id || 'N/A')}</code>
+            <code class="detail-value detection-id-badge">#${escapeHtml(relatedAnalysis.detection_id || 'N/A')}</code>
         </div>
         <div class="detail-row">
             <span class="detail-label">Sévérité</span>
@@ -353,14 +367,22 @@ async function onLineClick(el, ruleId) {
         <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
             <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${relatedAnalysis.id}, this)">🔄 Ré-essayer l'analyse</button>
         </div>
-        ` : `<div class="detail-row"><em>Aucune analyse LLM trouvée pour cette ligne.</em></div>`}
+        ` : `
+        <div class="detail-row"><em>Aucune analyse automatique trouvée pour cette ligne.</em></div>
+        <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+            <button class="btn btn-primary btn-sm" onclick="manualAnalyze(${ruleId}, this)">🤖 Analyser cette ligne avec Ollama</button>
+        </div>
+        `}
     `;
 }
 
 function closeDetailPanel(ruleId) {
     const panel = document.getElementById(`detail-panel-${ruleId}`);
     if (panel) panel.classList.add('hidden');
-    document.querySelectorAll('.log-line.selected').forEach(l => l.classList.remove('selected'));
+    document.querySelectorAll('.log-line.selected, .log-line.bundle-selected').forEach(l => {
+        l.classList.remove('selected');
+        l.classList.remove('bundle-selected');
+    });
     selectedLineText = null;
 }
 
@@ -487,5 +509,47 @@ async function searchById() {
         `;
     } catch (e) {
         resultPanel.innerHTML = `<div class="loading" style="color:var(--danger)">Erreur : ${escapeHtml(e.message)}</div>`;
+    }
+}
+
+async function manualAnalyze(ruleId, btn) {
+    if (!selectedLineText) return;
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Analyse en cours...';
+
+    try {
+        const res = await apiFetch('/api/monitor/analyze-line', {
+            method: 'POST',
+            body: {
+                line: selectedLineText,
+                rule_id: ruleId
+            }
+        });
+
+        if (res.status === 'ok') {
+            const a = res.analysis;
+            const content = document.getElementById(`detail-panel-content-${ruleId}`);
+            if (content) {
+                content.innerHTML += `
+                    <div class="manual-analysis-result" style="margin-top: 1.5rem; border-top: 2px dashed var(--accent); padding-top: 1rem;">
+                        <div class="detail-row">
+                            <span class="detail-label">Analyse manuelle</span>
+                            <span class="severity-badge ${a.severity}">${a.severity}</span>
+                        </div>
+                        <div class="analysis-response markdown-body">${marked.parse(a.ollama_response)}</div>
+                    </div>
+                `;
+            }
+            btn.innerHTML = '✅ Analyse terminée';
+        } else {
+            alert('Erreur: ' + res.detail);
+            btn.innerHTML = oldHtml;
+            btn.disabled = false;
+        }
+    } catch (e) {
+        alert('Erreur: ' + e.message);
+        btn.innerHTML = oldHtml;
+        btn.disabled = false;
     }
 }

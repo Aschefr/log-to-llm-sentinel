@@ -182,3 +182,61 @@ async def retry_analysis(analysis_id: int):
         }
     finally:
         db.close()
+@router.post("/analyze-line")
+async def analyze_line(data: dict):
+    """Effectue une analyse manuelle d'une ligne spécifique."""
+    line = data.get("line")
+    rule_id = data.get("rule_id")
+    
+    if not line or not rule_id:
+        raise HTTPException(status_code=400, detail="Données manquantes")
+        
+    if _orchestrator is None:
+        raise HTTPException(status_code=500, detail="Orchestrateur non initialisé")
+
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="Règle non trouvée")
+            
+        cfg = db.query(GlobalConfig).first()
+        config = {
+            "ollama_url": cfg.ollama_url if cfg else None,
+            "ollama_model": cfg.ollama_model if cfg else None,
+            "system_prompt": cfg.system_prompt if cfg else ""
+        }
+        
+        # Simuler une détection pour construire le prompt
+        prompt = _orchestrator._build_prompt(rule, line, config.get("system_prompt", ""))
+        
+        # Appel Ollama (timeout généreux pour manuel)
+        async with _orchestrator._ollama_semaphore:
+            response = await asyncio.to_thread(
+                _orchestrator.ollama.analyze,
+                prompt=prompt,
+                url=config.get("ollama_url"),
+                model=config.get("ollama_model"),
+                timeout=90
+            )
+            
+        from app import logger
+        logger.add_ollama_log(prompt, response, "MANUAL")
+        
+        severity = _orchestrator._detect_severity(response)
+        
+        # On ne l'enregistre pas forcément en BDD comme une analyse "automatique"
+        # pour ne pas polluer l'historique de détection, ou alors on l'ajoute avec un flag ?
+        # Ici on retourne juste le résultat.
+        
+        return {
+            "status": "ok",
+            "analysis": {
+                "severity": severity,
+                "ollama_response": response,
+                "analyzed_at": datetime.now().isoformat(),
+                "detection_id": "MANUAL"
+            }
+        }
+    finally:
+        db.close()

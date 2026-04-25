@@ -1092,3 +1092,6 @@ body {
 .kw-filter-btn[data-kw='__all__'] { background: rgba(255,255,255,0.05) !important; color: #aaa !important; border-color: #444 !important; }
 .kw-filter-btn.active { outline: 2px solid #fff; outline-offset: 1px; opacity: 1 !important; }
 
+
+.log-line.bundle-selected { background: rgba(59,130,246,0.1) !important; border-left: 3px solid var(--accent) !important; opacity: 1 !important; }
+
