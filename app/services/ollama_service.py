@@ -15,7 +15,7 @@ class OllamaService:
     def analyze(
         self,
         prompt: str,
-        url: str = "http://host.docker.internal:11434",
+        url: str = "http://ollama:11434",
         model: str = "llama3",
         timeout: int = 60,
         retries: int = 2,
@@ -24,7 +24,7 @@ class OllamaService:
         """
         Envoie un prompt à Ollama et retourne la réponse.
         """
-        base = (url or "").strip()
+        base = (url or "http://ollama:11434").strip()
         # Users often paste "...:11434/api" in the UI. Normalize to the base.
         base = base.rstrip("/")
         if base.endswith("/api"):
