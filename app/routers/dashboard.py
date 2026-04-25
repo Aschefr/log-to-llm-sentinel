@@ -91,6 +91,7 @@ def get_recent_analyses(limit: int = 10, rule_id: int | None = None, severity: s
                 "triggered_line": a.triggered_line,
                 "ollama_response": a.ollama_response,
                 "severity": a.severity,
+                "detection_id": a.detection_id,
                 "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
             }
             for a, rule_name in results

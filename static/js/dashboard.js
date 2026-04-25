@@ -71,6 +71,7 @@ async function loadRecentAnalyses() {
                 <div class="analysis-header">
                     <div>
                         <strong>Règle: ${escapeHtml(a.rule_name || 'Règle #' + a.rule_id)}</strong>
+                        ${a.detection_id ? `<span class="detection-id" style="font-size: 0.7rem; margin-left: 0.5rem; opacity: 0.6;">#${escapeHtml(a.detection_id)}</span>` : ''}
                         <span class="analysis-time">${formatDate(a.analyzed_at)}</span>
                     </div>
                     <div class="analysis-actions">

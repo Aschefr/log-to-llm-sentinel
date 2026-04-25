@@ -175,7 +175,7 @@ class Orchestrator:
                 model=config.get("ollama_model"),
             )
         logger.debug("Orchestrator", f"Réponse Ollama reçue : {response[:200]}")
-        logger.add_ollama_log(prompt, response)
+        logger.add_ollama_log(prompt, response, detection_id)
 
         # 4. Déterminer la sévérité (simple heuristic ou parsing de la réponse)
         severity = self._detect_severity(response)
@@ -261,7 +261,7 @@ class Orchestrator:
                         timeout=60,
                     )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
-                    logger.add_ollama_log(summary_prompt, summary)
+                    logger.add_ollama_log(summary_prompt, summary, detection_id)
                     notify_body = f"""### {severity_emoji} Alerte Sentinel (Résumé) : {rule.name}
 **ID:** `{detection_id or 'N/A'}` | **Sévérité:** {severity.upper()}
 

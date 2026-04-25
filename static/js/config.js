@@ -273,7 +273,10 @@ function renderOllamaLogs(logs) {
 
     container.innerHTML = logs.map(l => `
         <div class="log-entry ollama-log-entry">
-            <div class="log-time">${l.timestamp}</div>
+            <div class="log-time">
+                ${l.timestamp}
+                ${l.detection_id ? `<span class="detection-id-badge" style="margin-left: 10px;">#${escapeHtml(l.detection_id)}</span>` : ''}
+            </div>
             <div class="ollama-debug-block">
                 <strong>PROMPT :</strong>
                 <pre>${escapeHtml(l.prompt)}</pre>

@@ -160,7 +160,7 @@ async def retry_analysis(analysis_id: int):
             )
 
         from app import logger
-        logger.add_ollama_log(prompt, response)
+        logger.add_ollama_log(prompt, response, analysis.detection_id)
 
         severity = _orchestrator._detect_severity(response)
 

@@ -54,12 +54,13 @@ def clear_logs():
     LOG_BUFFER.clear()
 
 
-def add_ollama_log(prompt: str, response: str):
+def add_ollama_log(prompt: str, response: str, detection_id: str = None):
     """Enregistre un appel Ollama (Prompt complet / Réponse tronquée) pour le débug."""
     if not _get_debug_mode():
         return
     entry = {
         "timestamp": _now(),
+        "detection_id": detection_id,
         "prompt": prompt,
         "response": response[:250] + "..." if len(response) > 250 else response
     }
