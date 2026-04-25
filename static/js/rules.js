@@ -672,19 +672,19 @@ function applyTemplate(type) {
     const templates = {
         'auth': {
             name: 'Sécurité SSH / Connexions',
-            path: '/var/log/auth.log',
+            path: '/system-logs/auth.log',
             keywords: 'failed, Accepted, invalid user, authentication failure, sudo',
             context: 'Surveillance des tentatives de connexion SSH et de l\'utilisation de sudo sur Ubuntu.'
         },
         'syslog': {
             name: 'Stabilité Système',
-            path: '/var/log/syslog',
+            path: '/system-logs/syslog',
             keywords: 'error, failed, fatal, critical, oom-killer, stopped',
             context: 'Journaux système généraux d\'Ubuntu. Surveille les plantages de services et les erreurs système.'
         },
         'journald': {
             name: 'Journald (Relais Docker)',
-            path: '/logs/journald.log',
+            path: '/system-logs/journald.log',
             keywords: 'error, fatal, panic, critical, failed',
             context: 'Relais des journaux binaires Systemd (journalctl) vers un fichier texte lisible.'
         }
