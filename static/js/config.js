@@ -264,6 +264,22 @@ function setupForm() {
         });
     }
 
+    const copyOllamaBtn = document.getElementById('copy-ollama-logs-btn');
+    if (copyOllamaBtn) {
+        copyOllamaBtn.addEventListener('click', () => {
+            const logsEl = document.getElementById('ollama-debug-logs');
+            const text = logsEl.innerText;
+            copyToClipboard(text).then(() => {
+                const oldText = copyOllamaBtn.innerHTML;
+                copyOllamaBtn.innerHTML = '\u2705 Copié !';
+                setTimeout(() => { copyOllamaBtn.innerHTML = oldText; }, 2000);
+            }).catch(err => {
+                console.error('Erreur copie Ollama:', err);
+                alert('Impossible de copier dans le presse-papier. Vérifiez les permissions de votre navigateur.');
+            });
+        });
+    }
+
     // Auto-save logic
     const inputs = form.querySelectorAll('input, select, textarea');
     let modifiedInputs = new Set();
@@ -382,6 +398,16 @@ async function fetchOllamaLogs() {
 function renderOllamaLogs(logs) {
     const container = document.getElementById('ollama-debug-logs');
     if (!container) return;
+
+    // Ne pas écraser le DOM si l'utilisateur a une sélection active dans ce conteneur
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && sel.toString().length > 0) {
+        const range = sel.getRangeAt(0);
+        if (container.contains(range.commonAncestorContainer)) {
+            return; // Protéger la sélection, on rafraîchira au prochain cycle
+        }
+    }
+
     const wasAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 20;
 
     container.innerHTML = logs.map(l => `
@@ -399,7 +425,7 @@ function renderOllamaLogs(logs) {
                 <pre>${escapeHtml(l.response)}</pre>
             </div>
         </div>
-    `).reverse().join(''); // Les plus récents en haut pour Ollama ? Non, gardons cohérent.
+    `).reverse().join('');
 
     if (wasAtBottom) {
         container.scrollTop = container.scrollHeight;
