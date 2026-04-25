@@ -101,16 +101,16 @@ async function updateSystemStatsUI() {
         const ramEl = document.getElementById('stat-ram');
         const uptimeEl = document.getElementById('stat-uptime');
         
-        if (cpuEl) cpuEl.textContent = \\% / \%\;
-        if (ramEl) ramEl.textContent = \\ MB\;
+        if (cpuEl) cpuEl.textContent = `${Math.round(stats.app_cpu)}% / ${Math.round(stats.sys_cpu)}%`;
+        if (ramEl) ramEl.textContent = `${stats.app_ram} MB`;
         if (uptimeEl) uptimeEl.textContent = formatUptime(stats.uptime);
     } catch (e) {}
 }
 
 function formatUptime(seconds) {
-    if (seconds < 60) return \\s\;
-    if (seconds < 3600) return \\m\;
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.floor(seconds/60)}m`;
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
-    return \\h\m\;
+    return `${h}h${m}m`;
 }
