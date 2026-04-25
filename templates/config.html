@@ -142,7 +142,7 @@
             
             <div class="form-group">
                 <label for="system-prompt">Prompt système</label>
-                <textarea id="system-prompt" rows="3" placeholder="Instructions système pour l'analyse..."></textarea>
+                <textarea id="system-prompt" rows="5" placeholder="Instructions système pour l'analyse..."></textarea>
             </div>
             <div class="form-group">
                 <label for="max-log-chars">Limite de caractères par log</label>
@@ -154,60 +154,70 @@
             </div>
             <div id="ollama-test-message" class="message hidden"></div>
 
-            <div class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
-                <h3>⚡ Réglages de performance</h3>
-                <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                    <div class="form-group" style="flex: 1; min-width: 120px;">
-                        <label for="ollama-temp">Température</label>
-                        <input type="number" id="ollama-temp" step="0.1" min="0" max="1">
-                        <div class="form-hint">Bas = direct, Haut = créatif.</div>
-                    </div>
-                    <div class="form-group" style="flex: 1; min-width: 120px;">
-                        <label for="ollama-ctx">Contexte (tokens)</label>
-                        <input type="number" id="ollama-ctx" step="1024" min="1024" max="32768">
-                        <div class="form-hint">Taille de la mémoire.</div>
-                    </div>
+            <div class="collapsible-section" style="margin-top: 1.5rem;">
+                <div class="section-header" onclick="toggleSection('performance-settings-container', 'performance-arrow')">
+                    <h3 style="margin: 0;">⚡ Réglages de performance</h3>
+                    <svg id="performance-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
                 </div>
-                <div class="form-group checkbox-group">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="ollama-think">
-                        <span class="toggle-slider"></span>
-                        <span class="toggle-label">Activer le raisonnement profond (DeepSeek R1 / think)</span>
-                    </label>
-                    <div class="form-hint">Si décoché, Ollama utilisera "think": false pour répondre instantanément. Utile pour les petits processeurs.</div>
-                </div>
+                <div id="performance-settings-container" class="config-subsection hidden" style="padding-top: 1.5rem; border-top: none;">
+                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <div class="form-group" style="flex: 1; min-width: 120px;">
+                            <label for="ollama-temp">Température</label>
+                            <input type="number" id="ollama-temp" step="0.1" min="0" max="1">
+                            <div class="form-hint">Bas = direct, Haut = créatif.</div>
+                        </div>
+                        <div class="form-group" style="flex: 1; min-width: 120px;">
+                            <label for="ollama-ctx">Contexte (tokens)</label>
+                            <input type="number" id="ollama-ctx" step="1024" min="1024" max="32768">
+                            <div class="form-hint">Taille de la mémoire.</div>
+                        </div>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="ollama-think">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label">Activer le raisonnement profond (DeepSeek R1 / think)</span>
+                        </label>
+                        <div class="form-hint">Si décoché, Ollama utilisera "think": false pour répondre instantanément. Utile pour les petits processeurs.</div>
+                    </div>
 
-                <div class="profile-selectors" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <span class="config-hint-label">Profils rapides :</span>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')">💻 Profil Éco (Petit CPU)</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')">⚖️ Profil Équilibré</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')">🚀 Profil GPU / Gamer</button>
+                    <div class="profile-selectors" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <span class="config-hint-label">Profils rapides :</span>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')">💻 Profil Éco (Petit CPU)</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')">⚖️ Profil Équilibré</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')">🚀 Profil GPU / Gamer</button>
+                    </div>
                 </div>
             </div>
 
-            <div class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
-                <h3>📦 Gestion des modèles</h3>
-                <div class="form-group">
-                    <label>Télécharger un nouveau modèle</label>
-                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                        <input type="text" id="pull-model-name" placeholder="ex: llama3.2" style="flex: 1;">
-                        <button type="button" id="pull-model-btn" class="btn btn-primary">Télécharger</button>
-                    </div>
-                    <div class="form-hint" style="margin-bottom: 0.75rem;">
-                        Plus le modèle est gros, plus il nécessite de VRAM (GPU) ou de RAM système disponible, mais plus ses réponses seront pertinentes et précises. Les modèles <strong>Gemma 4</strong> sont recommandés pour leur excellent rapport performance/taille.
-                    </div>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('qwen3.5:2b')">Qwen 3.5 - 2b (2.7GB)</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('qwen3.5:4b')">Qwen 3.5 - 4b (3.4GB)</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('gemma4:e2b')">Gemma 4 - e2b (7.2GB)</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('gemma4:e4b')">Gemma 4 - e4b (9.6GB)</button>
-                    </div>
+            <div class="collapsible-section" style="margin-top: 1.5rem;">
+                <div class="section-header" onclick="toggleSection('model-management-container', 'model-management-arrow')">
+                    <h3 style="margin: 0;">📦 Gestion des modèles</h3>
+                    <svg id="model-management-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
                 </div>
-                <div id="pull-progress-container" class="hidden" style="margin-top: 1rem;">
-                    <div class="progress-bar-container" style="height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem;">
-                        <div id="pull-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s;"></div>
+                <div id="model-management-container" class="config-subsection hidden" style="padding-top: 1.5rem; border-top: none;">
+                    <div class="form-group">
+                        <label>Télécharger un nouveau modèle</label>
+                        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                            <input type="text" id="pull-model-name" placeholder="ex: llama3.2" style="flex: 1;">
+                            <button type="button" id="pull-model-btn" class="btn btn-primary">Télécharger</button>
+                        </div>
+                        <div class="form-hint" style="margin-bottom: 0.75rem;">
+                            Plus le modèle est gros, plus il nécessite de VRAM (GPU) ou de RAM système disponible, mais plus ses réponses seront pertinentes et précises. Les modèles <strong>Gemma 4</strong> sont recommandés pour leur excellent rapport performance/taille.
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('qwen3.5:2b')">Qwen 3.5 - 2b (2.7GB)</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('qwen3.5:4b')">Qwen 3.5 - 4b (3.4GB)</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('gemma4:e2b')">Gemma 4 - e2b (7.2GB)</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('gemma4:e4b')">Gemma 4 - e4b (9.6GB)</button>
+                        </div>
                     </div>
-                    <div id="pull-status" class="config-status-text">Initialisation...</div>
+                    <div id="pull-progress-container" class="hidden" style="margin-top: 1rem;">
+                        <div class="progress-bar-container" style="height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem;">
+                            <div id="pull-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s;"></div>
+                        </div>
+                        <div id="pull-status" class="config-status-text">Initialisation...</div>
+                    </div>
                 </div>
             </div>
         </section>

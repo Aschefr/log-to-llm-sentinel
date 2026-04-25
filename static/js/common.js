@@ -188,3 +188,18 @@ async function askQuestion(analysisId, inputEl, contextPrompt = null, contextRes
     }
     historyEl.scrollTop = historyEl.scrollHeight;
 }
+
+function toggleSection(containerId, arrowId) {
+    const container = document.getElementById(containerId);
+    const arrow = document.getElementById(arrowId);
+    if (!container) return;
+
+    const isHidden = container.classList.contains('hidden');
+    if (isHidden) {
+        container.classList.remove('hidden');
+        if (arrow) arrow.classList.add('expanded');
+    } else {
+        container.classList.add('hidden');
+        if (arrow) arrow.classList.remove('expanded');
+    }
+}

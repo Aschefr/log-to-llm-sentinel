@@ -12,16 +12,18 @@ function setupNotificationMethodToggle() {
     const select = document.getElementById('notification-method');
     if (!select) return;
 
-    function updateVisibility() {
-        const method = select.value;
-        const smtpEl = document.getElementById('smtp-section');
-        const appriseEl = document.getElementById('apprise-section');
-        if (smtpEl)    smtpEl.style.display    = (method === 'smtp')    ? '' : 'none';
-        if (appriseEl) appriseEl.style.display = (method === 'apprise') ? '' : 'none';
-    }
+    select.addEventListener('change', updateNotificationVisibility);
+    updateNotificationVisibility(); // Appliquer au chargement
+}
 
-    select.addEventListener('change', updateVisibility);
-    updateVisibility(); // Appliquer au chargement
+function updateNotificationVisibility() {
+    const select = document.getElementById('notification-method');
+    if (!select) return;
+    const method = select.value;
+    const smtpEl = document.getElementById('smtp-section');
+    const appriseEl = document.getElementById('apprise-section');
+    if (smtpEl)    smtpEl.style.display    = (method === 'smtp')    ? '' : 'none';
+    if (appriseEl) appriseEl.style.display = (method === 'apprise') ? '' : 'none';
 }
 
 
@@ -162,6 +164,7 @@ async function loadConfig() {
             debugEl.checked = config.debug_mode === true;
             toggleLogsContainer(debugEl.checked);
         }
+        updateNotificationVisibility();
         window.__configLoaded = true;
     } catch (error) {
         console.error('Erreur chargement config:', error);
