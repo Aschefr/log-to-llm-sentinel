@@ -119,13 +119,8 @@ class OllamaService:
                     async for line in response.aiter_lines():
                         if line:
                             chunk = json.loads(line)
-                            # Log discret pour ne pas polluer mais voir si on reçoit quelque chose
-                            if "response" in chunk:
-                                logger.debug("OllamaService", f"Chunk reçu ({len(chunk['response'])} chars)")
-                            elif "error" in chunk:
+                            if "error" in chunk:
                                 logger.error("OllamaService", f"Erreur dans le chunk: {chunk['error']}")
-                            else:
-                                logger.debug("OllamaService", f"Chunk sans 'response' reçu. Clés: {list(chunk.keys())}")
                             
                             yield chunk
         except Exception as e:
