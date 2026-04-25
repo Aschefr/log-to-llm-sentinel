@@ -58,3 +58,37 @@ def get_recent_analyses(limit: int = 10, rule_id: int | None = None):
         ]
     finally:
         db.close()
+@router.delete("/analyses/{analysis_id}")
+def delete_analysis(analysis_id: int):
+    db = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if analysis:
+            db.delete(analysis)
+            db.commit()
+            return {"status": "ok"}
+        return {"status": "error", "message": "Analysis not found"}, 404
+    finally:
+        db.close()
+
+
+@router.delete("/analyses/rule/{rule_id}")
+def delete_rule_analyses(rule_id: int):
+    db = SessionLocal()
+    try:
+        db.query(Analysis).filter(Analysis.rule_id == rule_id).delete()
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
+@router.delete("/analyses/all/confirm")
+def delete_all_analyses():
+    db = SessionLocal()
+    try:
+        db.query(Analysis).delete()
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()

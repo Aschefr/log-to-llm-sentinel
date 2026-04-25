@@ -206,18 +206,29 @@ async function toggleRuleHistory(ruleId, toggleElement) {
             const url = `/api/dashboard/recent?limit=10&rule_id=${ruleId}`;
             const analyses = await apiFetch(url);
 
+            const header = `
+                <div class="history-actions" style="margin-bottom: 0.5rem; display: flex; justify-content: flex-end;">
+                    <button class="btn btn-secondary btn-sm" onclick="clearRuleHistory(${ruleId})">🗑️ Effacer tout l'historique</button>
+                </div>
+            `;
+
             if (!analyses || analyses.length === 0) {
-                container.innerHTML = '<div class="loading">Aucune analyse pour cette règle</div>';
+                container.innerHTML = header + '<div class="loading">Aucune analyse pour cette règle</div>';
                 return;
             }
 
-            container.innerHTML = analyses.map(a => `
+            container.innerHTML = header + analyses.map(a => `
                 <div class="analysis-card inline-history-card">
                     <div class="analysis-header">
                         <div>
                             <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
                         </div>
-                        <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                        <div class="analysis-actions">
+                            <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                            <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysisInRules(${a.id}, ${ruleId})" title="Supprimer cette analyse">
+                                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
+                            </button>
+                        </div>
                     </div>
                     <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
                     <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
@@ -231,6 +242,33 @@ async function toggleRuleHistory(ruleId, toggleElement) {
         // Masquer l'historique
         container.classList.add('hidden');
         if (icon) icon.textContent = '▶';
+    }
+}
+
+async function deleteAnalysisInRules(id, ruleId) {
+    if (!confirm('Supprimer cette analyse ?')) return;
+    try {
+        await apiFetch(`/api/dashboard/analyses/${id}`, { method: 'DELETE' });
+        // Recharger l'historique (on referme/rouvre ou on appelle juste le contenu)
+        const container = document.getElementById(`rule-history-${ruleId}`);
+        container.classList.add('hidden'); // Hack simple pour forcer le re-toggle
+        await toggleRuleHistory(ruleId);
+    } catch (error) {
+        console.error('Erreur suppression:', error);
+        alert('Erreur lors de la suppression');
+    }
+}
+
+async function clearRuleHistory(ruleId) {
+    if (!confirm('Effacer TOUT l\'historique d\'analyses pour cette règle ?')) return;
+    try {
+        await apiFetch(`/api/dashboard/analyses/rule/${ruleId}`, { method: 'DELETE' });
+        const container = document.getElementById(`rule-history-${ruleId}`);
+        container.classList.add('hidden');
+        await toggleRuleHistory(ruleId);
+    } catch (error) {
+        console.error('Erreur suppression:', error);
+        alert('Erreur lors de la suppression');
     }
 }
 
