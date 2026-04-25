@@ -667,3 +667,42 @@ async function fetchFilePreview(path) {
     }
 }
 
+function applyTemplate(type) {
+    resetForm();
+    const templates = {
+        'auth': {
+            name: 'Sécurité SSH / Connexions',
+            path: '/var/log/auth.log',
+            keywords: 'failed, Accepted, invalid user, authentication failure, sudo',
+            context: 'Surveillance des tentatives de connexion SSH et de l\'utilisation de sudo sur Ubuntu.'
+        },
+        'syslog': {
+            name: 'Stabilité Système',
+            path: '/var/log/syslog',
+            keywords: 'error, failed, fatal, critical, oom-killer, stopped',
+            context: 'Journaux système généraux d\'Ubuntu. Surveille les plantages de services et les erreurs système.'
+        },
+        'journald': {
+            name: 'Journald (Relais Docker)',
+            path: '/logs/journald.log',
+            keywords: 'error, fatal, panic, critical, failed',
+            context: 'Relais des journaux binaires Systemd (journalctl) vers un fichier texte lisible.'
+        }
+    };
+
+    const t = templates[type];
+    if (t) {
+        document.getElementById('rule-name').value = t.name;
+        document.getElementById('rule-path').value = t.path;
+        document.getElementById('rule-keywords').value = t.keywords;
+        document.getElementById('rule-context').value = t.context;
+        
+        // Ouvrir la modal
+        document.getElementById('rule-modal').classList.remove('hidden');
+        document.getElementById('modal-title').textContent = 'Nouvelle règle (Modèle)';
+        
+        // Déclencher l'aperçu si possible
+        fetchFilePreview(t.path);
+    }
+}
+

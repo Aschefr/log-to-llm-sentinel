@@ -9,6 +9,15 @@
         <button id="add-rule-btn" class="btn btn-primary">+ Nouvelle règle</button>
     </div>
 
+    <div class="quick-templates" style="margin-bottom: 2rem;">
+        <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 0.75rem;">Modèles de surveillance rapides</h3>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('auth')">🛡️ Connexions (auth.log)</button>
+            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('syslog')">⚙️ Système (syslog)</button>
+            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('journald')">📜 Journald (Relais)</button>
+        </div>
+    </div>
+
     <div id="rules-list" class="rules-list">
         <div class="loading">Chargement des règles...</div>
     </div>
