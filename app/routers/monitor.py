@@ -19,6 +19,37 @@ def set_orchestrator(orch: Orchestrator):
     _orchestrator = orch
 
 
+@router.post("/notify/{analysis_id}")
+async def notify_analysis(analysis_id: int):
+    """Envoie manuellement une notification pour une analyse."""
+    if _orchestrator is None:
+        raise HTTPException(status_code=500, detail="Orchestrateur non initialisé")
+
+    db = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="Analyse non trouvée")
+
+        rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="Règle non trouvée")
+
+        from app.models import GlobalConfig
+        from app.routers.config import _get_config_dict
+        config_obj = db.query(GlobalConfig).first()
+        if not config_obj:
+            raise HTTPException(status_code=500, detail="Configuration globale non trouvée")
+            
+        config = _get_config_dict(config_obj)
+        
+        await _orchestrator.trigger_notification(analysis, rule, config, db)
+        
+        return {"status": "ok", "message": "Notification envoyée"}
+    finally:
+        db.close()
+
+
 @router.get("/rules")
 def get_monitored_rules():
     """Retourne toutes les règles actives avec leurs métadonnées pour le monitor."""
@@ -143,8 +174,11 @@ async def retry_analysis(analysis_id: int, request: Request):
             raise HTTPException(status_code=404, detail="Règle non trouvée")
 
         from app.models import GlobalConfig
-        config_obj = db.query(GlobalConfig).first()
         from app.routers.config import _get_config_dict
+        config_obj = db.query(GlobalConfig).first()
+        if not config_obj:
+            raise HTTPException(status_code=500, detail="Configuration globale non trouvée")
+            
         config = _get_config_dict(config_obj)
 
         # On reconstruit le prompt en s'assurant que la ligne est nettoyée

@@ -87,7 +87,10 @@ async function loadRecentAnalyses() {
                 <div class="analysis-line">${escapeHtml(a.triggered_line)}</div>
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
                 <div class="analysis-footer" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                    <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer</button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer</button>
+                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 Envoyer la notification</button>
+                    </div>
                     <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 Approfondir avec l'IA</button>
                 </div>
             </div>
@@ -141,6 +144,34 @@ async function retryAnalysis(analysisId, btn) {
     } finally {
         btn.disabled = false;
         btn.innerHTML = oldHtml;
+    }
+}
+
+async function notifyAnalysis(analysisId, btn) {
+    const oldHtml = btn.innerHTML;
+    try {
+        btn.innerHTML = `⏳ Envoi...`;
+        btn.disabled = true;
+
+        const res = await apiFetch(`/api/monitor/notify/${analysisId}`, {
+            method: 'POST'
+        });
+
+        if (res.status === 'ok') {
+            btn.innerHTML = `✅ Envoyée`;
+            setTimeout(() => {
+                btn.innerHTML = oldHtml;
+                btn.disabled = false;
+            }, 2000);
+        } else {
+            alert("Erreur: " + res.detail);
+            btn.innerHTML = oldHtml;
+            btn.disabled = false;
+        }
+    } catch (e) {
+        alert("Erreur API : " + e.message);
+        btn.innerHTML = oldHtml;
+        btn.disabled = false;
     }
 }
 

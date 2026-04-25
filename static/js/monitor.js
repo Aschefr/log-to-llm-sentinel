@@ -364,9 +364,11 @@ async function onLineClick(el, ruleId) {
             <span class="detail-label">Réponse LLM</span>
             <div class="detail-value analysis-response markdown-body">${relatedAnalysis.ollama_response ? marked.parse(relatedAnalysis.ollama_response) : '—'}</div>
         </div>
-        
-        <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
-            <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${relatedAnalysis.id}, this)">🔄 Ré-essayer l'analyse</button>
+        <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${relatedAnalysis.id}, this)">🔄 Ré-essayer l'analyse</button>
+                <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${relatedAnalysis.id}, this)">🔔 Envoyer la notification</button>
+            </div>
             <button class="btn btn-primary btn-sm" onclick="openChat(${relatedAnalysis.id})">💬 Approfondir avec l'IA</button>
         </div>
         ` : `
@@ -434,7 +436,10 @@ async function loadRuleAnalyses(ruleId) {
                 <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
                 <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                    <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer</button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer</button>
+                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 Envoyer la notification</button>
+                    </div>
                     <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 Approfondir avec l'IA</button>
                 </div>
             </div>
@@ -524,8 +529,11 @@ async function searchById() {
                 </div>
 
                 <div class="detail-row"><span class="detail-label">Notifié</span><span class="detail-value">${a.notified ? '✅ Oui' : '❌ Non'}</span></div>
-                <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
-                    <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer l'analyse</button>
+                <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer l'analyse</button>
+                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 Envoyer la notification</button>
+                    </div>
                     <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 Approfondir avec l'IA</button>
                 </div>
             </div>
@@ -594,5 +602,33 @@ async function manualAnalyze(ruleId, btn) {
         btn.disabled = false;
     } finally {
         if (stopBtn.parentNode) stopBtn.parentNode.removeChild(stopBtn);
+    }
+}
+
+async function notifyAnalysis(analysisId, btn) {
+    const oldHtml = btn.innerHTML;
+    try {
+        btn.innerHTML = `⏳ Envoi...`;
+        btn.disabled = true;
+
+        const res = await apiFetch(`/api/monitor/notify/${analysisId}`, {
+            method: 'POST'
+        });
+
+        if (res.status === 'ok') {
+            btn.innerHTML = `✅ Envoyée`;
+            setTimeout(() => {
+                btn.innerHTML = oldHtml;
+                btn.disabled = false;
+            }, 2000);
+        } else {
+            alert("Erreur: " + res.detail);
+            btn.innerHTML = oldHtml;
+            btn.disabled = false;
+        }
+    } catch (e) {
+        alert("Erreur API : " + e.message);
+        btn.innerHTML = oldHtml;
+        btn.disabled = false;
     }
 }
