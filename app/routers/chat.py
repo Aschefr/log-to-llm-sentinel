@@ -1,14 +1,16 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
 import asyncio
+import json
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessage
 from app.services.orchestrator import Orchestrator
+from app import logger
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 templates = Jinja2Templates(directory="templates")
@@ -61,11 +63,7 @@ async def create_conversation(data: dict, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(conv)
     
-    # Si c'est une analyse manuelle (sans ID), on injecte le contexte comme premier message
     if raw_prompt and raw_response:
-        # On peut tricher en mettant le contexte dans un message système caché ou juste le premier message
-        # Ici on va l'injecter comme un message spécial ou juste le stocker
-        # Pour l'instant, on va l'injecter comme message assistant initial
         msg = ChatMessage(conversation_id=conv.id, role="assistant", content=f"**Contexte Manuel :**\n{raw_prompt}\n\n**Analyse initiale :**\n{raw_response}")
         db.add(msg)
         db.commit()
@@ -80,7 +78,6 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
     
     messages = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).order_by(ChatMessage.created_at.asc()).all()
     
-    # Récupérer l'analyse liée pour le contexte initial
     analysis = None
     if conv.analysis_id:
         a = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
@@ -100,13 +97,12 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
         ]
     }
 
-from fastapi.responses import HTMLResponse, StreamingResponse
-import json
-
 @router.post("/api/send")
 async def send_message(data: dict, db: Session = Depends(get_db)):
     conv_id = data.get("conversation_id")
     content = data.get("content")
+    
+    logger.info("ChatRouter", f"Requête reçue pour conv {conv_id}")
     
     if not conv_id or not content:
         raise HTTPException(status_code=400, detail="Données manquantes")
@@ -120,18 +116,17 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     db.add(user_msg)
     db.commit()
 
-    # 2. Construire le contexte pour Ollama
+    # 2. Construire le contexte
     history = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).order_by(ChatMessage.created_at.asc()).all()
     
     prompt = ""
     if conv.analysis_id:
         analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
-        if analysis:
+        if analysis and _orchestrator:
             rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
             cfg = db.query(GlobalConfig).first()
             base_prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, cfg.system_prompt if cfg else "")
-            prompt = f"{base_prompt}\n\nHistorique de la conversation :\n"
-            prompt += f"Assistant (initial) : {analysis.ollama_response}\n"
+            prompt = f"{base_prompt}\n\nHistorique :\nAssistant (initial) : {analysis.ollama_response}\n"
 
     for m in history:
         role_label = "Utilisateur" if m.role == "user" else "Assistant"
@@ -140,22 +135,25 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     prompt += "\nAssistant : "
 
     cfg = db.query(GlobalConfig).first()
-    ollama_url = cfg.ollama_url
-    ollama_model = cfg.ollama_model
+    ollama_url = (cfg.ollama_url or "http://ollama:11434") if cfg else "http://ollama:11434"
+    ollama_model = (cfg.ollama_model or "gemma4:e4b") if cfg else "gemma4:e4b"
 
     async def event_generator():
         full_response = ""
-        logger.debug("ChatRouter", f"Début event_generator pour conv {conv_id}")
+        logger.info("ChatRouter", f"Démarrage event_generator pour conv {conv_id}")
         try:
+            if not _orchestrator:
+                yield f"data: {json.dumps({'error': 'Orchestrateur non initialisé'})}\n\n"
+                return
+
             async with _orchestrator._ollama_semaphore:
-                logger.debug("ChatRouter", "Sémophore acquis, début stream Ollama")
+                logger.debug("ChatRouter", "Sémophore acquis")
                 async for chunk in _orchestrator.ollama.generate_stream(
                     prompt=prompt,
                     url=ollama_url,
                     model=ollama_model
                 ):
                     if "error" in chunk:
-                        logger.error("ChatRouter", f"Erreur dans le stream : {chunk['error']}")
                         yield f"data: {json.dumps({'error': chunk['error']})}\n\n"
                         return
 
@@ -165,22 +163,20 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
                         yield f"data: {json.dumps({'text': text})}\n\n"
                     
                     if chunk.get("done"):
-                        logger.debug("ChatRouter", "Stream Ollama terminé (flag done)")
                         break
             
-            logger.debug("ChatRouter", f"Sauvegarde de la réponse complète ({len(full_response)} car.)")
-            # 4. Sauvegarder la réponse complète en BDD à la fin
+            # Sauvegarde BDD
             new_db = SessionLocal()
             try:
                 ai_msg = ChatMessage(conversation_id=conv_id, role="assistant", content=full_response)
                 new_db.add(ai_msg)
                 new_db.commit()
-                logger.debug("ChatRouter", "Réponse sauvegardée en BDD")
+                logger.info("ChatRouter", f"Réponse sauvegardée ({len(full_response)} car.)")
             finally:
                 new_db.close()
                 
         except Exception as e:
-            logger.error("ChatRouter", f"Exception dans event_generator : {str(e)}")
+            logger.error("ChatRouter", f"Erreur dans event_generator : {str(e)}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
