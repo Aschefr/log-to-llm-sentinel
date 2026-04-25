@@ -71,7 +71,7 @@ async function loadRecentAnalyses() {
                 <div class="analysis-header">
                     <div>
                         <strong>Règle: ${escapeHtml(a.rule_name || 'Règle #' + a.rule_id)}</strong>
-                        ${a.detection_id ? `<span class="detection-id" style="font-size: 0.7rem; margin-left: 0.5rem; opacity: 0.6;">#${escapeHtml(a.detection_id)}</span>` : ''}
+                        ${a.detection_id ? `<span class="detection-id-badge" style="margin-left: 0.75rem;">#${escapeHtml(a.detection_id)}</span>` : ''}
                         <span class="analysis-time">${formatDate(a.analyzed_at)}</span>
                     </div>
                     <div class="analysis-actions">
@@ -178,8 +178,9 @@ async function loadRulesStatus() {
                     <h3 style="margin: 0; font-size: 1rem;">${escapeHtml(rule.name)}</h3>
                     <p style="margin-bottom: 0.5rem; font-size: 0.8rem; opacity: 0.8;">📁 ${escapeHtml(rule.log_file_path)}</p>
                     <div class="rule-last-line" style="margin-bottom: 0;">
-                        <strong>Dernière ligne détectée :</strong>
-                        <div class="last-line-content" style="font-size: 0.75rem;">${escapeHtml(rule.last_log_line || 'Aucune ligne trouvée ou fichier inaccessible')}</div>
+                        <strong>Dernière détection :</strong>
+                        ${rule.last_detection_id ? `<span class="detection-id-badge" style="font-size: 0.7rem; vertical-align: middle;">#${escapeHtml(rule.last_detection_id)}</span>` : '<span style="font-size: 0.75rem; opacity: 0.6;">Aucune</span>'}
+                        <div class="last-line-content" style="font-size: 0.75rem; margin-top: 0.25rem;">${escapeHtml(rule.last_log_line || 'Aucune ligne trouvée ou fichier inaccessible')}</div>
                     </div>
                 </div>
             </div>
@@ -190,5 +191,19 @@ async function loadRulesStatus() {
         if (container) {
             container.innerHTML = `<div class="loading" style="color: var(--danger)">Erreur : ${escapeHtml(error.message)}</div>`;
         }
+    }
+}
+function toggleSection(containerId) {
+    const container = document.getElementById(containerId);
+    const arrow = document.getElementById('rules-status-arrow');
+    if (!container) return;
+
+    const isHidden = container.classList.contains('hidden');
+    if (isHidden) {
+        container.classList.remove('hidden');
+        if (arrow) arrow.textContent = '?';
+    } else {
+        container.classList.add('hidden');
+        if (arrow) arrow.textContent = '?';
     }
 }

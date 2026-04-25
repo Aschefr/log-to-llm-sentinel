@@ -40,10 +40,15 @@
         </div>
     </div>
     
-    <section class="rules-status-section" style="margin-bottom: 2rem;">
-        <h2>État des fichiers logs</h2>
-        <div id="rules-status-list" class="rules-list">
-            <div class="loading">Chargement de l'état des logs...</div>
+    <section class="rules-status-section collapsible-section" style="margin-bottom: 2rem;">
+        <div class="section-header clickable" onclick="toggleSection('rules-status-container')">
+            <h2 style="margin: 0;">État des fichiers logs <span id="rules-status-arrow">▶</span></h2>
+            <span class="text-secondary" style="font-size: 0.8rem;">Dernières lignes détectées par règle</span>
+        </div>
+        <div id="rules-status-container" class="hidden">
+            <div id="rules-status-list" class="rules-list" style="margin-top: 1rem;">
+                <div class="loading">Chargement de l'état des logs...</div>
+            </div>
         </div>
     </section>
  

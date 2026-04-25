@@ -1072,3 +1072,9 @@ body {
 .filter-badge { background: rgba(59,130,246,0.1); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); border-radius: 2rem; padding: 0.25rem 0.75rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
 .filter-badge:hover { background: rgba(239,68,68,0.1); color: var(--danger); border-color: var(--danger); }
 .filter-badge span { text-transform: uppercase; margin: 0 0.25rem; }
+
+/* --- Collapsible Sections ------------------------------------------- */
+.collapsible-section .section-header { cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.25rem; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border); transition: background 0.2s; }
+.collapsible-section .section-header:hover { background: rgba(255,255,255,0.06); }
+.collapsible-section #rules-status-arrow { font-size: 0.8rem; margin-left: 10px; opacity: 0.5; transition: transform 0.2s; }
+

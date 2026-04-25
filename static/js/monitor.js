@@ -274,7 +274,7 @@ async function fetchBufferStatus(ruleId) {
             const kwStr = buf.matched_keywords.length > 0
                 ? ` — mots-clés: <strong>${buf.matched_keywords.map(k => escapeHtml(k)).join(', ')}</strong>`
                 : '';
-            label.innerHTML = `⏳ Buffer actif [<code>${escapeHtml(buf.detection_id || '...')}</code>] — ${buf.line_count} ligne(s) en attente${kwStr}`;
+            label.innerHTML = `⏳ Buffer actif <span class="detection-id-badge" style="font-size: 0.7rem; vertical-align: middle;">#${escapeHtml(buf.detection_id || '...')}</span> — ${buf.line_count} ligne(s) en attente${kwStr}`;
         } else {
             dot.className = 'buffer-dot idle';
             label.textContent = 'Buffer inactif';

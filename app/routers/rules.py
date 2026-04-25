@@ -46,7 +46,7 @@ def get_rules():
             last_lines = _read_last_lines(r.log_file_path, n=1)
             last_line = last_lines[0] if last_lines else None
             
-            result.append({
+            rule_item = {
                 "id": r.id,
                 "name": r.name,
                 "log_file_path": r.log_file_path,
@@ -59,7 +59,16 @@ def get_rules():
                 "notify_severity_threshold": r.notify_severity_threshold or "info",
                 "last_log_line": last_line,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
-            })
+                "last_detection_id": None,
+                "last_analysis_severity": None,
+            }
+            
+            last_analysis = db.query(Analysis).filter(Analysis.rule_id == r.id).order_by(Analysis.analyzed_at.desc()).first()
+            if last_analysis:
+                rule_item["last_detection_id"] = last_analysis.detection_id
+                rule_item["last_analysis_severity"] = last_analysis.severity
+
+            result.append(rule_item)
         return result
     finally:
         db.close()
