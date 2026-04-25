@@ -172,43 +172,23 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
                         if chunk.get("done"): break
                         continue
                     
-                    buffer += text
-
-                    # Filtrage robuste à état (identique à OllamaService)
-                    while True:
-                        if not is_thinking:
-                            if "<think>" in buffer:
-                                parts = buffer.split("<think>", 1)
-                                to_send = parts[0]
-                                if to_send:
-                                    full_response += to_send
-                                    yield f"data: {json.dumps({'text': to_send})}\n\n"
-                                buffer = parts[1]
-                                is_thinking = True
-                                continue
-                            elif "<" in buffer and not buffer.endswith(">"):
-                                idx = buffer.find("<")
-                                to_send = buffer[:idx]
-                                if to_send:
-                                    full_response += to_send
-                                    yield f"data: {json.dumps({'text': to_send})}\n\n"
-                                buffer = buffer[idx:]
-                                break
-                            else:
-                                if buffer:
-                                    full_response += buffer
-                                    yield f"data: {json.dumps({'text': buffer})}\n\n"
-                                buffer = ""
-                                break
+                    if not is_thinking:
+                        if "<think>" in text:
+                            is_thinking = True
+                            to_send = text.split("<think>", 1)[0]
+                            if to_send:
+                                full_response += to_send
+                                yield f"data: {json.dumps({'text': to_send})}\n\n"
                         else:
-                            if "</think>" in buffer:
-                                parts = buffer.split("</think>", 1)
-                                buffer = parts[1]
-                                is_thinking = False
-                                continue
-                            else:
-                                buffer = ""
-                                break
+                            full_response += text
+                            yield f"data: {json.dumps({'text': text})}\n\n"
+                    else:
+                        if "</think>" in text:
+                            is_thinking = False
+                            to_send = text.split("</think>", 1)[-1]
+                            if to_send:
+                                full_response += to_send
+                                yield f"data: {json.dumps({'text': to_send})}\n\n"
                     
                     if chunk.get("done"):
                         break

@@ -229,13 +229,19 @@ async def test_ollama():
             # On utilise le sémaphore global s'il est dispo
             sem = _orchestrator._ollama_semaphore if _orchestrator else asyncio.Semaphore(1)
             async with sem:
-                resp = await ollama.analyze_async(
-                    prompt=prompt, 
-                    url=url, 
-                    model=model,
-                    think=None,
-                    options={"temperature": 0.1}
-                )
+                try:
+                    resp = await asyncio.wait_for(
+                        ollama.analyze_async(
+                            prompt=prompt, 
+                            url=url, 
+                            model=model,
+                            think=None,
+                            options={"temperature": 0.1}
+                        ),
+                        timeout=30.0
+                    )
+                except asyncio.TimeoutError:
+                    resp = "[Erreur Ollama] Délai d'attente dépassé (30s)"
             
             if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
                 raise HTTPException(status_code=502, detail=resp)
