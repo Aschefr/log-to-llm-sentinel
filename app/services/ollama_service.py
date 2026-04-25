@@ -33,9 +33,9 @@ class OllamaService:
             "prompt": prompt,
             "stream": False,
         }
-        # Désactivé temporairement car peut causer des 500 sur certains modèles non-R1
-        # if think is False:
-        #    payload["think"] = False
+        # On n'envoie 'think' que si explicitement spécifié (pour éviter les 500 sur modèles non-compatibles)
+        if think is not None:
+            payload["think"] = think
 
         if options:
             payload["options"] = options
@@ -43,7 +43,7 @@ class OllamaService:
         attempts = max(1, int(retries) + 1)
         last_err: Optional[str] = None
 
-        logger.debug("OllamaService", f"Appel à {api_url} (Timeout {timeout}s) | modèle={model}")
+        logger.debug("OllamaService", f"Appel à {api_url} (Timeout {timeout}s) | modèle={model} | prompt={prompt[:300]}...")
 
         for attempt in range(1, attempts + 1):
             try:
@@ -98,13 +98,14 @@ class OllamaService:
             "prompt": prompt,
             "stream": True,
         }
-        # if think is False:
-        #    payload["think"] = False
+        # On n'envoie 'think' que si explicitement spécifié
+        if think is not None:
+            payload["think"] = think
             
         if options:
             payload["options"] = options
 
-        logger.debug("OllamaService", f"Streaming à {api_url} | modèle={model} | prompt={prompt[:100]}...")
+        logger.debug("OllamaService", f"Streaming à {api_url} | modèle={model} | prompt={prompt[:300]}...")
         try:
             async with httpx.AsyncClient(timeout=None) as client:
                 async with client.stream("POST", api_url, json=payload) as response:
@@ -117,7 +118,16 @@ class OllamaService:
                     logger.debug("OllamaService", "Flux streaming ouvert, réception des données...")
                     async for line in response.aiter_lines():
                         if line:
-                            yield json.loads(line)
+                            chunk = json.loads(line)
+                            # Log discret pour ne pas polluer mais voir si on reçoit quelque chose
+                            if "response" in chunk:
+                                logger.debug("OllamaService", f"Chunk reçu ({len(chunk['response'])} chars)")
+                            elif "error" in chunk:
+                                logger.error("OllamaService", f"Erreur dans le chunk: {chunk['error']}")
+                            else:
+                                logger.debug("OllamaService", f"Chunk sans 'response' reçu. Clés: {list(chunk.keys())}")
+                            
+                            yield chunk
         except Exception as e:
             logger.error("OllamaService", f"Exception pendant le stream : {str(e)}")
             yield {"error": str(e)}
