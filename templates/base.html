@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Log to LLM Sentinel{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=4">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         /* ── Language Switcher ── */
         .lang-switcher-wrapper { position: relative; }
@@ -61,7 +64,7 @@
             <div id="lang-switcher"></div>
         </div>
     </nav>
-    <main class="container">
+    <main class="{% block container_class %}container{% endblock %}">
         {% block content %}{% endblock %}
     </main>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>

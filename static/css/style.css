@@ -65,7 +65,13 @@ body {
 
 /* Container */
 .container {
-    max-width: 100%; /* Bord à bord par défaut */
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.container-fluid {
+    max-width: 100%;
     margin: 0;
     padding: 2rem;
 }
