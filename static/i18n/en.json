@@ -128,7 +128,10 @@
     "thinking": "Ollama is thinking...",
     "error_network": "Network error",
     "delete_btn_title": "Delete",
-    "refresh_btn_title": "Refresh"
+    "refresh_btn_title": "Refresh",
+    "label_user": "You",
+    "label_ollama": "Ollama",
+    "label_context": "Attached Analysis"
   },
   "config": {
     "title": "Global Configuration",
@@ -223,6 +226,8 @@
     "notified_yes": "✅ Yes",
     "notified_no": "❌ No",
     "na": "N/A",
-    "done": "Done"
+    "done": "Done",
+    "cancel": "Cancel",
+    "confirm": "Confirm"
   }
 }

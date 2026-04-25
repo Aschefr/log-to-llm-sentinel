@@ -52,7 +52,7 @@
             <footer class="chat-footer">
                 <div class="chat-input-wrapper">
                     <textarea id="chat-input" data-i18n-placeholder="chat.input_placeholder" placeholder="Posez votre question sur ce diagnostic..." rows="1"></textarea>
-                    <button id="send-btn" class="btn btn-primary" onclick="sendMessage()" data-i18n="chat.send">Envoyer</button>
+                    <button id="send-btn" class="btn btn-primary" onclick="handleSendOrStop()" data-i18n="chat.send">Envoyer</button>
                 </div>
                 <p class="chat-disclaimer" data-i18n="chat.disclaimer">L'IA peut faire des erreurs. Vérifiez les informations critiques.</p>
             </footer>
@@ -363,10 +363,84 @@
     background: rgba(239,68,68,0.07);
 }
 
+/* Label d'identité au-dessus des bulles */
+.msg-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.45;
+    padding: 0 0.25rem;
+    user-select: none;
+}
+
+.message-wrapper.user .msg-label { text-align: right; }
+.message-wrapper.assistant .msg-label { text-align: left; }
+
 /* Edit mode : surligner l'input */
 .chat-input-wrapper.editing {
     border-color: var(--accent);
     box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}
+
+/* Éditeur inline dans la bulle utilisateur */
+.inline-edit-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-end;
+    width: 100%;
+    max-width: 92%;
+}
+
+.inline-edit-textarea {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--accent);
+    border-radius: 0.6rem;
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    font-family: inherit;
+    font-size: 1rem;
+    line-height: 1.6;
+    resize: none;
+    min-height: 52px;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.18);
+    transition: box-shadow 0.15s;
+}
+
+.inline-edit-textarea:focus { outline: none; }
+
+.inline-edit-actions {
+    display: flex;
+    gap: 0.4rem;
+}
+
+.inline-edit-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: all 0.15s;
+}
+
+.inline-edit-btn.confirm {
+    border-color: #22c55e;
+    color: #22c55e;
+}
+.inline-edit-btn.confirm:hover {
+    background: rgba(34,197,94,0.1);
+}
+.inline-edit-btn.cancel:hover {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: rgba(239,68,68,0.07);
 }
 
 @media (max-width: 800px) {
@@ -493,6 +567,7 @@ async function loadHistory(id) {
         let html = '';
         if (data.analysis) {
             html += `
+                <div class="msg-label" style="text-align:center; margin-bottom:0.25rem;">${window.t ? window.t('chat.label_context') : 'Analyse attachée'}</div>
                 <div class="message-bubble context">
                     <strong>${window.t('chat.analysis_context')} #${data.analysis.detection_id || '...'}</strong><br>
                     <code style="display:block; margin-top:0.5rem; opacity:0.8; font-size:0.8rem;">${escapeHtml(data.analysis.triggered_line)}</code>
@@ -536,12 +611,58 @@ async function loadHistory(id) {
 
                 if (_streamAbort) _streamAbort.abort();
                 _streamAbort = new AbortController();
+                setSendBtn(true);
                 readStream(pending.task_id, 0, _streamAbort.signal);
             }
         } catch (_) { /* pending check optionnel, on ignore les erreurs */ }
 
     } catch (e) {
         container.innerHTML = `<div class="loading" style="color:var(--danger)">Erreur: ${e.message}</div>`;
+    }
+}
+
+// ── Basculement Envoyer / Arrêter ────────────────────────────────────────────
+function setSendBtn(generating) {
+    const btn = document.getElementById('send-btn');
+    if (!btn) return;
+    if (generating) {
+        btn.textContent = '🛑 Arrêter';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-danger');
+        btn.removeAttribute('data-i18n');
+    } else {
+        btn.textContent = window.t ? window.t('chat.send') : 'Envoyer';
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-primary');
+        btn.setAttribute('data-i18n', 'chat.send');
+    }
+}
+
+function handleSendOrStop() {
+    if (_activeTaskId) {
+        // Arrêter la génération en cours
+        if (_streamAbort) _streamAbort.abort();
+        _streamAbort = null;
+        _activeTaskId = null;
+        _streamFullText = '';
+        // Finaliser la bulle en cours
+        const aiBubble = document.getElementById('streaming-ai');
+        if (aiBubble) {
+            const thinkingState = aiBubble.querySelector('.thinking-state');
+            if (thinkingState) thinkingState.style.display = 'none';
+            aiBubble.removeAttribute('id');
+            const wrapper = document.getElementById('streaming-wrapper');
+            if (wrapper) {
+                wrapper.removeAttribute('id');
+                if (!wrapper.querySelector('.message-actions')) {
+                    const text = wrapper.querySelector('.markdown-body')?.innerText || '';
+                    wrapper.insertAdjacentHTML('beforeend', aiActionsHtml(text));
+                }
+            }
+        }
+        setSendBtn(false);
+    } else {
+        sendMessage();
     }
 }
 
@@ -588,11 +709,14 @@ function userActionsHtml(text) {
  */
 function buildMessageWrapper(role, content, index) {
     const isUser = role === 'user';
+    const label = isUser
+        ? `<div class="msg-label">${window.t ? window.t('chat.label_user') : 'Vous'}</div>`
+        : `<div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'}</div>`;
     const bubbleHtml = isUser
         ? `<div class="message-bubble user"><div class="markdown-body">${escapeHtml(content)}</div></div>`
         : `<div class="message-bubble assistant"><div class="markdown-body">${marked.parse(content)}</div></div>`;
     const actionsHtml = isUser ? userActionsHtml(content) : aiActionsHtml(content);
-    return `<div class="message-wrapper ${role}">${bubbleHtml}${actionsHtml}</div>`;
+    return `<div class="message-wrapper ${role}">${label}${bubbleHtml}${actionsHtml}</div>`;
 }
 
 /** Copie le texte d'un message dans le presse-papier */
@@ -604,18 +728,89 @@ async function copyMsg(btn) {
     setTimeout(() => { btn.innerHTML = orig; }, 1500);
 }
 
-/** Met le message en édition dans la zone de saisie */
-let _editMode = false;
+/** Transformation de la bulle en éditeur inline (style ChatGPT) */
 function editMsg(btn) {
     const text = btn.dataset.text;
-    const input = document.getElementById('chat-input');
-    const wrapper = document.getElementById('chat-input-wrapper') || input.closest('.chat-input-wrapper');
-    input.value = text;
-    input.style.height = 'auto';
-    input.style.height = input.scrollHeight + 'px';
-    input.focus();
-    if (wrapper) wrapper.classList.add('editing');
-    _editMode = true;  // sendMessage supprimera les 2 derniers messages avant d'envoyer
+    const msgWrapper = btn.closest('.message-wrapper');
+    // Stocker le HTML original sur l'élément pour annulation
+    msgWrapper._editOriginalHTML = msgWrapper.innerHTML;
+
+    const labelHtml = `<div class="msg-label">${window.t ? window.t('chat.label_user') : 'Vous'}</div>`;
+    msgWrapper.innerHTML = `
+        ${labelHtml}
+        <div class="inline-edit-container">
+            <textarea class="inline-edit-textarea"></textarea>
+            <div class="inline-edit-actions">
+                <button class="inline-edit-btn cancel" onclick="cancelEdit(this)">
+                    ✕ ${window.t ? window.t('common.cancel') : 'Annuler'}
+                </button>
+                <button class="inline-edit-btn confirm" onclick="confirmEdit(this)">
+                    ✓ ${window.t ? window.t('common.confirm') : 'Valider'}
+                </button>
+            </div>
+        </div>
+    `;
+
+    const ta = msgWrapper.querySelector('.inline-edit-textarea');
+    ta.value = text;
+    ta.style.height = 'auto';
+    ta.style.height = ta.scrollHeight + 'px';
+    ta.focus();
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+
+    // Auto-resize
+    ta.addEventListener('input', () => {
+        ta.style.height = 'auto';
+        ta.style.height = ta.scrollHeight + 'px';
+    });
+    // Raccourcis clavier
+    ta.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            confirmEdit(msgWrapper.querySelector('.inline-edit-btn.confirm'));
+        }
+        if (e.key === 'Escape') cancelEdit(msgWrapper.querySelector('.inline-edit-btn.cancel'));
+    });
+}
+
+/** Annuler l'édition : restaurer la bulle originale */
+function cancelEdit(btn) {
+    const msgWrapper = btn.closest('.message-wrapper');
+    if (msgWrapper._editOriginalHTML) {
+        msgWrapper.innerHTML = msgWrapper._editOriginalHTML;
+        delete msgWrapper._editOriginalHTML;
+    }
+}
+
+/** Valider l'édition : tronquer puis relancer la génération */
+async function confirmEdit(btn) {
+    const msgWrapper = btn.closest('.message-wrapper');
+    const ta = msgWrapper.querySelector('.inline-edit-textarea');
+    const newText = ta ? ta.value.trim() : '';
+    if (!newText) return;
+
+    const container = document.getElementById('chat-messages');
+
+    // Calculer combien de messages supprimer en BDD
+    // (ce message + tous ceux qui suivent)
+    const allWrappers = [...container.querySelectorAll('.message-wrapper')];
+    const idx = allWrappers.indexOf(msgWrapper);
+    const deleteCount = idx >= 0 ? allWrappers.length - idx : 1;
+
+    // Supprimer visuellement depuis ce wrapper
+    allWrappers.slice(idx).forEach(w => w.remove());
+
+    // Supprimer en BDD
+    try { await apiFetch(`/chat/api/messages/${activeConvId}?count=${deleteCount}`, { method: 'DELETE' }); } catch(_){}
+
+    // Ajouter la bulle utilisateur éditée
+    const userDiv = document.createElement('div');
+    userDiv.innerHTML = buildMessageWrapper('user', newText, null);
+    container.appendChild(userDiv.firstElementChild);
+    container.scrollTop = container.scrollHeight;
+
+    // Lancer la génération
+    await _triggerGeneration(newText);
 }
 
 /** Régénère la dernière réponse IA */
@@ -681,6 +876,7 @@ async function sendMessage() {
     aiWrapper.className = 'message-wrapper assistant';
     aiWrapper.id = 'streaming-wrapper';
     aiWrapper.innerHTML = `
+        <div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'}</div>
         <div class="message-bubble assistant" id="streaming-ai">
             <div class="thinking-state">
                 <span class="thinking-dot"></span>
@@ -694,14 +890,9 @@ async function sendMessage() {
     container.appendChild(aiWrapper);
     input.value = '';
     input.style.height = 'auto';
-    // Quitter le mode édition
+    // Quitter le mode édition (hors édition inline qui passe par confirmEdit)
     const inputWrapper = input.closest('.chat-input-wrapper');
     if (inputWrapper) inputWrapper.classList.remove('editing');
-    if (_editMode) {
-        // Supprimer les 2 derniers messages (question originale + réponse) avant de renvoyer
-        try { await apiFetch(`/chat/api/messages/${activeConvId}?count=2`, { method: 'DELETE' }); } catch(_){}
-        _editMode = false;
-    }
     container.scrollTop = container.scrollHeight;
 
     try {
@@ -719,6 +910,7 @@ async function sendMessage() {
         _activeTaskId = data.task_id;
         _streamPos = 0;
         _streamAbort = new AbortController();
+        setSendBtn(true);  // ← Passer en mode "Arrêter"
         readStream(data.task_id, 0, _streamAbort.signal);
 
     } catch (e) {
@@ -728,6 +920,7 @@ async function sendMessage() {
                 `<span style="color:var(--danger)">Erreur: ${escapeHtml(e.message)}</span>`;
             aiBubble.removeAttribute('id');
         }
+        setSendBtn(false);
     }
 }
 
@@ -785,6 +978,7 @@ async function readStream(taskId, fromPos, signal) {
                         aiContent.innerHTML = `<span style="color:var(--danger)">Erreur: ${escapeHtml(evt.error)}</span>`;
                         aiBubble.removeAttribute('id');
                         _activeTaskId = null;
+                        setSendBtn(false);
                         return;
                     }
                     if (evt.text) {
@@ -808,6 +1002,7 @@ async function readStream(taskId, fromPos, signal) {
                         aiBubble.removeAttribute('id');
                         _activeTaskId = null;
                         _streamFullText = '';
+                        setSendBtn(false);  // ← Revenir en mode "Envoyer"
                         loadConversations();
                         return;
                     }
@@ -840,6 +1035,7 @@ document.addEventListener('visibilitychange', async () => {
     if (_activeTaskId) {
         // Un stream était en cours : se reconnecter depuis la dernière position connue
         _streamAbort = new AbortController();
+        setSendBtn(true);
         readStream(_activeTaskId, _streamPos, _streamAbort.signal);
     } else if (activeConvId) {
         // Vérifier si une génération tourne en arrière-plan pour cette conversation
@@ -850,6 +1046,7 @@ document.addEventListener('visibilitychange', async () => {
                 _streamPos = 0;
                 _streamFullText = '';
                 _streamAbort = new AbortController();
+                setSendBtn(true);
                 // Montrer l'interface de streaming
                 const container = document.getElementById('chat-messages');
                 if (container && !document.getElementById('streaming-ai')) {
