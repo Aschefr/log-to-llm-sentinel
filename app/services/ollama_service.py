@@ -32,8 +32,12 @@ class OllamaService:
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "think": think,
         }
+        # On n'envoie 'think' que s'il est désactivé (pour optimiser)
+        # Si True, on laisse le comportement par défaut du modèle
+        if think is False:
+            payload["think"] = False
+
         if options:
             payload["options"] = options
 
@@ -47,6 +51,7 @@ class OllamaService:
                 with httpx.Client(timeout=timeout) as client:
                     response = client.post(api_url, json=payload)
                     response.raise_for_status()
+                    logger.debug("OllamaService", f"Réponse HTTP {response.status_code} reçue")
                     result = response.json()
                     answer = result.get("response", "Aucune réponse d'Ollama")
                     return answer
@@ -92,8 +97,10 @@ class OllamaService:
             "model": model,
             "prompt": prompt,
             "stream": True,
-            "think": think,
         }
+        if think is False:
+            payload["think"] = False
+            
         if options:
             payload["options"] = options
 
@@ -107,6 +114,7 @@ class OllamaService:
                         yield {"error": f"Ollama HTTP {response.status_code}"}
                         return
 
+                    logger.debug("OllamaService", "Flux streaming ouvert, réception des données...")
                     async for line in response.aiter_lines():
                         if line:
                             yield json.loads(line)
