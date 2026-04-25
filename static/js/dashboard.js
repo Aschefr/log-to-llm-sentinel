@@ -1,10 +1,12 @@
 document.addEventListener('DOMContentLoaded', () => {
     loadStats();
+    loadRulesStatus();
     loadRecentAnalyses();
 
     // Auto-refresh toutes les 30 secondes
     setInterval(() => {
         loadStats();
+        loadRulesStatus();
         loadRecentAnalyses();
     }, 30000);
 
@@ -83,5 +85,33 @@ async function deleteAnalysis(id) {
     } catch (error) {
         console.error('Erreur suppression:', error);
         alert('Erreur lors de la suppression');
+    }
+}
+
+async function loadRulesStatus() {
+    try {
+        const rules = await apiFetch('/api/rules');
+        const container = document.getElementById('rules-status-list');
+        
+        if (!container) return;
+        if (rules.length === 0) {
+            container.innerHTML = '<div class="loading">Aucune règle configurée</div>';
+            return;
+        }
+
+        container.innerHTML = rules.map(rule => `
+            <div class="rule-card">
+                <div class="rule-info">
+                    <h3 style="margin: 0; font-size: 1rem;">${escapeHtml(rule.name)}</h3>
+                    <p style="margin-bottom: 0.5rem; font-size: 0.8rem; opacity: 0.8;">📁 ${escapeHtml(rule.log_file_path)}</p>
+                    <div class="rule-last-line" style="margin-bottom: 0;">
+                        <strong>Dernière ligne détectée :</strong>
+                        <div class="last-line-content" style="font-size: 0.75rem;">${escapeHtml(rule.last_log_line || 'Aucune ligne trouvée ou fichier inaccessible')}</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Erreur chargement état des logs:', error);
     }
 }

@@ -61,6 +61,7 @@ class RuleUpdate(BaseModel):
 class RuleRead(RuleCreate):
     id: int
     last_position: int = 0
+    last_log_line: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 

@@ -302,6 +302,35 @@ body {
     flex-shrink: 0;
 }
 
+.rule-last-line {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.rule-last-line strong {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.25rem;
+    text-transform: uppercase;
+}
+
+.last-line-content {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+    word-break: break-all;
+    white-space: pre-wrap;
+    max-height: 4.5em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+}
+
 /* Buttons */
 .btn {
     padding: 0.5rem 1rem;

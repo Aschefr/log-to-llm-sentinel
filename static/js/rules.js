@@ -96,6 +96,10 @@ async function loadRules() {
                     <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
                 </div>
                 <div class="rule-toggles" style="display: flex; flex-direction: column; gap: 0.5rem; flex-basis: 100%;">
+                    <div class="rule-last-line">
+                        <strong>Dernière ligne détectée :</strong>
+                        <div class="last-line-content">${escapeHtml(rule.last_log_line || 'Aucune ligne trouvée ou fichier inaccessible')}</div>
+                    </div>
                     <div>
                         <div class="rule-history-toggle" onclick="toggleLiveLogs(${rule.id}, this, '${escapeHtml(rule.log_file_path).replace(/'/g, "\\'")}')">
                             <span class="toggle-icon">▶</span> Log en temps réel

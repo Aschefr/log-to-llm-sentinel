@@ -53,6 +53,7 @@ def get_rules():
                 "context_lines": r.context_lines or 5,
                 "anti_spam_delay": r.anti_spam_delay or 60,
                 "notify_severity_threshold": r.notify_severity_threshold or "info",
+                "last_log_line": _read_last_lines(r.log_file_path, n=1)[0] if _read_last_lines(r.log_file_path, n=1) else None,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in rules
