@@ -216,16 +216,20 @@ async def test_ollama():
         except Exception as e:
             logger.warning("ConfigRouter", f"Impossible de joindre /api/tags : {e}")
 
-        # 2) generation asynchrone (streaming)
+        # 2) generation asynchrone (streaming) protégée par le sémaphore
         prompt = "Réponds uniquement par 'OK'."
+        from app.services.orchestrator import get_orchestrator
+        orchestrator = get_orchestrator()
+        
         try:
-            resp = await ollama.analyze_async(
-                prompt=prompt, 
-                url=url, 
-                model=model,
-                think=False,
-                options={"temperature": 0.1}
-            )
+            async with orchestrator._ollama_semaphore:
+                resp = await ollama.analyze_async(
+                    prompt=prompt, 
+                    url=url, 
+                    model=model,
+                    think=False,
+                    options={"temperature": 0.1}
+                )
             
             if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
                 raise HTTPException(status_code=502, detail=resp)

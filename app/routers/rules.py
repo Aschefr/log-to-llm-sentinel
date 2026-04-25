@@ -196,7 +196,7 @@ def _read_last_lines(path: str, n: int = 5, max_bytes: int = 65536) -> List[str]
 
 
 @router.post("/{rule_id}/test")
-def test_rule(rule_id: int):
+async def test_rule(rule_id: int):
     """
     Envoie les dernières lignes du fichier log de la règle pour analyse,
     sauvegarde l'analyse en BDD, envoie une notification, et renvoie le résultat.
@@ -242,15 +242,19 @@ def test_rule(rule_id: int):
         }
 
         prompt = orchestrator._build_prompt(rule, last_line, config_dict.get("system_prompt", ""), context_lines=last_lines[:-1])
-        logger.debug("TestRule", f"Envoi à Ollama — modèle={config_dict.get('ollama_model')}")
+        logger.debug("TestRule", f"Envoi à Ollama (via stream) — modèle={config_dict.get('ollama_model')}")
 
-        response = orchestrator.ollama.analyze(
-            prompt=prompt,
-            url=config_dict.get("ollama_url"),
-            model=config_dict.get("ollama_model"),
-            timeout=90,
-            retries=2,
-        )
+        async with orchestrator._ollama_semaphore:
+            response = await orchestrator.ollama.analyze_async(
+                prompt=prompt,
+                url=config_dict.get("ollama_url"),
+                model=config_dict.get("ollama_model"),
+                think=config_dict.get("ollama_think", True),
+                options={
+                    "temperature": config_dict.get("ollama_temp", 0.1),
+                    "num_ctx": config_dict.get("ollama_ctx", 4096)
+                }
+            )
         logger.debug("TestRule", f"Réponse Ollama reçue ({len(response)} chars)")
         severity = orchestrator._detect_severity(response)
         logger.debug("TestRule", f"Sévérité détectée : {severity}")
@@ -306,13 +310,14 @@ def test_rule(rule_id: int):
 
             if config_dict.get("notification_method") == "apprise" and len(body) > max_chars:
                 logger.debug("TestRule", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
-                summary_prompt = f"Résume l'analyse suivante en moins de {max_chars - 400} caractères. Garde l'essentiel (Sévérité, Cause, Action). Format clair.\n\nAnalyse : {response}"
-                summary = orchestrator.ollama.analyze(
-                    prompt=summary_prompt,
-                    url=config_dict.get("ollama_url"),
-                    model=config_dict.get("ollama_model"),
-                    timeout=60
-                )
+                summary_prompt = f"Résume cette analyse de log :\n{response}"
+                async with orchestrator._ollama_semaphore:
+                    summary = await orchestrator.ollama.analyze_async(
+                        prompt=summary_prompt,
+                        url=config_dict.get("ollama_url"),
+                        model=config_dict.get("ollama_model"),
+                        think=False
+                    )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     notify_body = f"""
                     <h2>🧪 Test Log to LLM Sentinel (Résumé)</h2>

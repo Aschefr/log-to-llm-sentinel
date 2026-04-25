@@ -145,6 +145,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     async def event_generator():
         full_response = ""
         is_thinking = False
+        buffer = ""
         logger.info("ChatRouter", f"Démarrage event_generator pour conv {conv_id}")
         try:
             if not _orchestrator:
@@ -168,20 +169,46 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
 
                     text = chunk.get("response", "")
                     if not text:
+                        if chunk.get("done"): break
                         continue
                     
-                    # Filtrage basique des balises <think> (pour modèles type R1)
-                    if "<think>" in text:
-                        is_thinking = True
-                        text = text.split("<think>")[0]
-                    
-                    if "</think>" in text:
-                        is_thinking = False
-                        text = text.split("</think>")[-1]
-                    
-                    if not is_thinking and text:
-                        full_response += text
-                        yield f"data: {json.dumps({'text': text})}\n\n"
+                    buffer += text
+
+                    # Filtrage robuste à état (identique à OllamaService)
+                    while True:
+                        if not is_thinking:
+                            if "<think>" in buffer:
+                                parts = buffer.split("<think>", 1)
+                                to_send = parts[0]
+                                if to_send:
+                                    full_response += to_send
+                                    yield f"data: {json.dumps({'text': to_send})}\n\n"
+                                buffer = parts[1]
+                                is_thinking = True
+                                continue
+                            elif "<" in buffer and not buffer.endswith(">"):
+                                idx = buffer.find("<")
+                                to_send = buffer[:idx]
+                                if to_send:
+                                    full_response += to_send
+                                    yield f"data: {json.dumps({'text': to_send})}\n\n"
+                                buffer = buffer[idx:]
+                                break
+                            else:
+                                if buffer:
+                                    full_response += buffer
+                                    yield f"data: {json.dumps({'text': buffer})}\n\n"
+                                buffer = ""
+                                break
+                        else:
+                            if "</think>" in buffer:
+                                parts = buffer.split("</think>", 1)
+                                buffer = parts[1]
+                                is_thinking = False
+                                continue
+                            else:
+                                buffer = ""
+                                break
                     
                     if chunk.get("done"):
                         break

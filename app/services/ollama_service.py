@@ -20,10 +20,10 @@ class OllamaService:
         think: bool = True,
     ) -> str:
         """
-        Version asynchrone d'analyse utilisant le streaming pour éviter les timeouts
-        sur les longues générations (CPU).
+        Version asynchrone d'analyse blindée contre les timeouts et les balises coupées.
         """
         full_text = ""
+        buffer = ""
         is_thinking = False
         last_log_len = 0
         
@@ -32,25 +32,56 @@ class OllamaService:
                 return f"[Erreur Ollama] {chunk['error']}"
             
             text = chunk.get("response", "")
-            if not text: continue
+            if not text:
+                if chunk.get("done"): break
+                continue
 
-            # Filtrage des balises <think>
-            if "<think>" in text:
-                is_thinking = True
-                text = text.split("<think>")[0]
-            if "</think>" in text:
-                is_thinking = False
-                text = text.split("</think>")[-1]
+            buffer += text
+            
+            # Gestion robuste des balises <think> et </think>
+            # On traite le buffer tant qu'on y trouve des balises
+            while True:
+                if not is_thinking:
+                    if "<think>" in buffer:
+                        parts = buffer.split("<think>", 1)
+                        full_text += parts[0]
+                        buffer = parts[1]
+                        is_thinking = True
+                        continue
+                    else:
+                        # On ne peut libérer le buffer que s'il ne contient pas un début de balise
+                        # Pour éviter de libérer "<th" par exemple.
+                        if "<" in buffer and not buffer.endswith(">"):
+                            # On garde ce qui commence par < pour le prochain chunk
+                            idx = buffer.find("<")
+                            full_text += buffer[:idx]
+                            buffer = buffer[idx:]
+                            break
+                        else:
+                            full_text += buffer
+                            buffer = ""
+                            break
+                else:
+                    if "</think>" in buffer:
+                        parts = buffer.split("</think>", 1)
+                        buffer = parts[1]
+                        is_thinking = False
+                        continue
+                    else:
+                        # On est en train de penser, on vide le buffer car on ignore tout
+                        buffer = ""
+                        break
 
-            if not is_thinking and text:
-                full_text += text
-                
-                # Petit log de progression tous les 100 caractères
-                if len(full_text) - last_log_len > 100:
-                    logger.debug("OllamaService", f"Analyse en cours... ({len(full_text)} car. reçus)")
-                    last_log_len = len(full_text)
+            # Log de progression
+            if len(full_text) - last_log_len > 100:
+                logger.debug("OllamaService", f"Analyse en cours... ({len(full_text)} car. générés)")
+                last_log_len = len(full_text)
         
-        return full_text if full_text else "Aucune réponse d'Ollama"
+        # On ajoute le reste du buffer si on n'est pas en train de penser
+        if not is_thinking:
+            full_text += buffer
+
+        return full_text.strip() if full_text else "Aucune réponse d'Ollama"
 
     def analyze(
         self,
