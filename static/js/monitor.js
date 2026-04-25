@@ -446,10 +446,23 @@ async function loadRuleAnalyses(ruleId) {
 
 async function retryAnalysis(analysisId, btn) {
     const oldHtml = btn.innerHTML;
+    
+    const abortController = new AbortController();
+    const stopBtn = document.createElement('button');
+    stopBtn.className = 'btn btn-danger btn-sm';
+    stopBtn.style.marginLeft = '0.5rem';
+    stopBtn.innerHTML = '🛑 Arrêter';
+    stopBtn.onclick = () => abortController.abort();
+    
+    btn.parentNode.insertBefore(stopBtn, btn.nextSibling);
+    
     btn.disabled = true;
     btn.innerHTML = '⏳...';
     try {
-        const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { method: 'POST' });
+        const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { 
+            method: 'POST',
+            signal: abortController.signal
+        });
         if (res.status === 'ok') {
             // Re-cliquer sur la ligne sélectionnée pour rafraîchir le panneau
             const selected = document.querySelector('.log-line.selected');
@@ -467,10 +480,15 @@ async function retryAnalysis(analysisId, btn) {
             if (searchInput && searchInput.value) searchById();
         }
     } catch (e) {
-        alert('Erreur: ' + e.message);
+        if (e.name === 'AbortError') {
+            alert("Nouvelle analyse annulée.");
+        } else {
+            alert('Erreur: ' + e.message);
+        }
     } finally {
         btn.disabled = false;
         btn.innerHTML = oldHtml;
+        if (stopBtn.parentNode) stopBtn.parentNode.removeChild(stopBtn);
     }
 }
 
@@ -520,6 +538,16 @@ async function searchById() {
 async function manualAnalyze(ruleId, btn) {
     if (!selectedLineText) return;
     const oldHtml = btn.innerHTML;
+    
+    const abortController = new AbortController();
+    const stopBtn = document.createElement('button');
+    stopBtn.className = 'btn btn-danger btn-sm';
+    stopBtn.style.marginLeft = '0.5rem';
+    stopBtn.innerHTML = '🛑 Arrêter';
+    stopBtn.onclick = () => abortController.abort();
+    
+    btn.parentNode.insertBefore(stopBtn, btn.nextSibling);
+    
     btn.disabled = true;
     btn.innerHTML = '⏳ Analyse en cours...';
 
@@ -529,7 +557,8 @@ async function manualAnalyze(ruleId, btn) {
             body: {
                 line: selectedLineText,
                 rule_id: ruleId
-            }
+            },
+            signal: abortController.signal
         });
 
         if (res.status === 'ok') {
@@ -556,8 +585,14 @@ async function manualAnalyze(ruleId, btn) {
             btn.disabled = false;
         }
     } catch (e) {
-        alert('Erreur: ' + e.message);
+        if (e.name === 'AbortError') {
+            alert("Analyse annulée.");
+        } else {
+            alert('Erreur: ' + e.message);
+        }
         btn.innerHTML = oldHtml;
         btn.disabled = false;
+    } finally {
+        if (stopBtn.parentNode) stopBtn.parentNode.removeChild(stopBtn);
     }
 }

@@ -436,16 +436,34 @@ async function runTest(url, messageEl, buttonEl) {
     const oldText = buttonEl.textContent;
     buttonEl.disabled = true;
     buttonEl.textContent = 'Test en cours...';
+    
+    const abortController = new AbortController();
+    const stopBtn = document.createElement('button');
+    stopBtn.className = 'btn btn-danger btn-sm';
+    stopBtn.style.marginLeft = '0.5rem';
+    stopBtn.innerHTML = '🛑 Arrêter';
+    stopBtn.onclick = () => abortController.abort();
+    
+    buttonEl.parentNode.insertBefore(stopBtn, buttonEl.nextSibling);
+    
     try {
-        const res = await apiFetch(url, { method: 'POST' });
+        const res = await apiFetch(url, { 
+            method: 'POST',
+            signal: abortController.signal
+        });
         const detail = (res && res.detail) ? res.detail : 'OK';
         showMessage(messageEl, detail, 'success');
     } catch (error) {
-        console.error('Erreur test:', error);
-        showMessage(messageEl, 'Erreur: ' + (error.message || 'inconnue'), 'error');
+        if (error.name === 'AbortError') {
+            showMessage(messageEl, 'Test annulé', 'error');
+        } else {
+            console.error('Erreur test:', error);
+            showMessage(messageEl, 'Erreur: ' + (error.message || 'inconnue'), 'error');
+        }
     } finally {
         buttonEl.disabled = false;
         buttonEl.textContent = oldText;
+        if (stopBtn.parentNode) stopBtn.parentNode.removeChild(stopBtn);
     }
 }
 

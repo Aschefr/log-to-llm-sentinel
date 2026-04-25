@@ -144,11 +144,17 @@ async function askQuestion(analysisId, inputEl, contextPrompt = null, contextRes
     historyEl.innerHTML += `<div class="chat-msg user"><strong>Vous :</strong> ${escapeHtml(question)}</div>`;
     inputEl.value = '';
 
+    const abortController = new AbortController();
+
     const aiMsgEl = document.createElement('div');
     aiMsgEl.className = 'chat-msg ai';
-    aiMsgEl.innerHTML = '<strong>Ollama :</strong> ⏳...';
+    aiMsgEl.innerHTML = `<strong>Ollama :</strong> <span class="ai-content">⏳...</span> <button class="btn btn-danger btn-sm stop-chat-btn" style="float: right; padding: 2px 5px; font-size: 0.8rem;">🛑 Arrêter</button>`;
     historyEl.appendChild(aiMsgEl);
     historyEl.scrollTop = historyEl.scrollHeight;
+    
+    const stopBtn = aiMsgEl.querySelector('.stop-chat-btn');
+    const contentSpan = aiMsgEl.querySelector('.ai-content');
+    stopBtn.onclick = () => abortController.abort();
 
     try {
         const res = await apiFetch('/api/monitor/chat', {
@@ -158,16 +164,25 @@ async function askQuestion(analysisId, inputEl, contextPrompt = null, contextRes
                 question: question,
                 context_prompt: contextPrompt,
                 context_response: contextResponse
-            }
+            },
+            signal: abortController.signal
         });
 
         if (res.status === 'ok') {
-            aiMsgEl.innerHTML = `<strong>Ollama :</strong> ${marked.parse(res.response)}`;
+            contentSpan.innerHTML = marked.parse(res.response);
         } else {
-            aiMsgEl.innerHTML = `<strong>Ollama :</strong> ❌ Erreur : ${res.detail}`;
+            contentSpan.innerHTML = `❌ Erreur : ${res.detail}`;
         }
     } catch (e) {
-        aiMsgEl.innerHTML = `<strong>Ollama :</strong> ❌ Erreur : ${e.message}`;
+        if (e.name === 'AbortError') {
+            contentSpan.innerHTML = `❌ Génération annulée.`;
+        } else {
+            contentSpan.innerHTML = `❌ Erreur : ${e.message}`;
+        }
+    } finally {
+        if (stopBtn && stopBtn.parentNode) {
+            stopBtn.parentNode.removeChild(stopBtn);
+        }
     }
     historyEl.scrollTop = historyEl.scrollHeight;
 }

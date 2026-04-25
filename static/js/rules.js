@@ -321,14 +321,27 @@ async function testRule(id) {
     const btn = document.getElementById(`test-btn-${id}`);
     const originalText = btn ? btn.innerHTML : '🧪 Tester';
     
+    const abortController = new AbortController();
+    let stopBtn = null;
+    
     if (btn) {
         btn.disabled = true;
         btn.innerHTML = '⏳ Test en cours...';
         btn.classList.add('pulse-animation');
+        
+        stopBtn = document.createElement('button');
+        stopBtn.className = 'btn btn-danger btn-sm';
+        stopBtn.style.marginLeft = '0.5rem';
+        stopBtn.innerHTML = '🛑 Arrêter';
+        stopBtn.onclick = () => abortController.abort();
+        btn.parentNode.insertBefore(stopBtn, btn.nextSibling);
     }
 
     try {
-        await apiFetch(`/api/rules/${id}/test`, { method: 'POST' });
+        await apiFetch(`/api/rules/${id}/test`, { 
+            method: 'POST',
+            signal: abortController.signal
+        });
         
         // S'assurer que le container est visible pour voir le résultat du test
         const container = document.getElementById(`rule-history-${id}`);
@@ -353,11 +366,15 @@ async function testRule(id) {
             }, 2500);
         }
     } catch (e) {
-        console.error('Erreur test règle:', e);
         if (btn) {
-            btn.innerHTML = '❌ Erreur';
             btn.classList.remove('pulse-animation');
             btn.classList.add('btn-danger');
+            if (e.name === 'AbortError') {
+                btn.innerHTML = '❌ Annulé';
+            } else {
+                console.error('Erreur test règle:', e);
+                btn.innerHTML = '❌ Erreur';
+            }
             setTimeout(() => {
                 if (document.getElementById(`test-btn-${id}`)) {
                     btn.innerHTML = originalText;
@@ -365,6 +382,10 @@ async function testRule(id) {
                     btn.classList.remove('btn-danger');
                 }
             }, 2500);
+        }
+    } finally {
+        if (stopBtn && stopBtn.parentNode) {
+            stopBtn.parentNode.removeChild(stopBtn);
         }
     }
 }
