@@ -241,8 +241,6 @@ async def test_ollama():
             raise HTTPException(status_code=502, detail=f"Erreur génération : {str(e)}")
     finally:
         db.close()
-    finally:
-        db.close()
 
 
 @router.post("/test/smtp")
