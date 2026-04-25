@@ -22,6 +22,17 @@ def set_orchestrator(o):
     global _orchestrator
     _orchestrator = o
 
+def _get_config_dict(config):
+    if not config: return {}
+    return {
+        "ollama_url": config.ollama_url,
+        "ollama_model": config.ollama_model,
+        "ollama_temp": config.ollama_temp,
+        "ollama_ctx": config.ollama_ctx,
+        "ollama_think": config.ollama_think,
+        "system_prompt": config.system_prompt,
+    }
+
 @router.post("/pull-model")
 async def pull_model(data: dict):
     model_name = data.get("model")
@@ -198,61 +209,75 @@ async def test_ollama():
 
         url = (cfg.get("ollama_url") or "").strip()
         model = (cfg.get("ollama_model") or "").strip()
-        if not url:
-            raise HTTPException(status_code=400, detail="URL Ollama manquante")
-        if not model:
-            raise HTTPException(status_code=400, detail="Modèle Ollama manquant")
-
-        # 1) reachability via /api/tags
-        base = url.strip().rstrip("/")
-        if base.endswith("/api/generate"):
-            base = base[: -len("/api/generate")]
-        elif base.endswith("/api"):
-            base = base[: -len("/api")]
-            
-        available_models = []
         try:
-            req = urllib.request.Request(f"{base}/api/tags", method="GET")
-            with urllib.request.urlopen(req, timeout=8) as r:
-                tags_raw = r.read().decode("utf-8", errors="ignore")
-                tags = json.loads(tags_raw)
-                for m in tags.get("models", []) or []:
-                    name = m.get("name")
-                    if name: available_models.append(name)
-        except Exception as e:
-            logger.warning("ConfigRouter", f"Impossible de joindre /api/tags : {e}")
+            config = db.query(GlobalConfig).first()
+            cfg = _get_config_dict(config)
 
-        # 2) generation asynchrone (streaming) protégée par le sémaphore
-        prompt = "Réponds uniquement par 'OK'."
-        
-        try:
-            # On utilise le sémaphore global s'il est dispo
-            sem = _orchestrator._ollama_semaphore if _orchestrator else asyncio.Semaphore(1)
-            async with sem:
-                try:
-                    resp = await asyncio.wait_for(
-                        ollama.analyze_async(
-                            prompt=prompt, 
-                            url=url, 
-                            model=model
-                        ),
-                        timeout=30.0
-                    )
-                except asyncio.TimeoutError:
-                    resp = "[Erreur Ollama] Délai d'attente dépassé (30s)"
+            url = (cfg.get("ollama_url") or "").strip()
+            model = (cfg.get("ollama_model") or "").strip()
+            if not url:
+                raise HTTPException(status_code=400, detail="URL Ollama manquante")
+            if not model:
+                raise HTTPException(status_code=400, detail="Modèle Ollama manquant")
+
+            # 1) vérification /api/tags (optionnel)
+            base = url
+            if base.endswith("/"):
+                base = base[:-1]
+            if base.endswith("/api/generate"):
+                base = base[: -len("/api/generate")]
+            elif base.endswith("/api"):
+                base = base[: -len("/api")]
+                
+            available_models = []
+            try:
+                req = urllib.request.Request(f"{base}/api/tags", method="GET")
+                with urllib.request.urlopen(req, timeout=8) as r:
+                    tags_raw = r.read().decode("utf-8", errors="ignore")
+                    tags = json.loads(tags_raw)
+                    for m in tags.get("models", []) or []:
+                        name = m.get("name")
+                        if name: available_models.append(name)
+            except Exception as e:
+                logger.warning("ConfigRouter", f"Impossible de joindre /api/tags : {e}")
+
+            # 2) generation asynchrone (streaming) protégée par le sémaphore
+            prompt = "Réponds uniquement par 'OK'."
             
-            if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
-                raise HTTPException(status_code=502, detail=resp)
+            try:
+                # On utilise le sémaphore global s'il est dispo
+                sem = _orchestrator._ollama_semaphore if _orchestrator else asyncio.Semaphore(1)
+                async with sem:
+                    try:
+                        resp = await asyncio.wait_for(
+                            ollama.analyze_async(
+                                prompt=prompt, 
+                                url=url, 
+                                model=model
+                            ),
+                            timeout=30.0
+                        )
+                    except asyncio.TimeoutError:
+                        resp = "[Erreur Ollama] Délai d'attente dépassé (30s)"
+                
+                if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
+                    raise HTTPException(status_code=502, detail=resp)
 
-            return {
-                "ok": True,
-                "detail": "Connexion Ollama OK",
-                "sample": resp,
-                "available_models": available_models,
-            }
+                return {
+                    "ok": True,
+                    "detail": "Connexion Ollama OK",
+                    "sample": resp,
+                    "available_models": available_models,
+                }
+            except Exception as e:
+                if isinstance(e, HTTPException): raise e
+                raise HTTPException(status_code=502, detail=f"Erreur génération : {str(e)}")
         except Exception as e:
+            import traceback
+            error_msg = f"Erreur Test Ollama: {str(e)}\n{traceback.format_exc()}"
+            logger.error("ConfigRouter", error_msg)
             if isinstance(e, HTTPException): raise e
-            raise HTTPException(status_code=502, detail=f"Erreur génération : {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
     finally:
         db.close()
 

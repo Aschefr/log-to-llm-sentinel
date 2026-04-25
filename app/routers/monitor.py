@@ -202,8 +202,8 @@ async def analyze_line(data: dict):
             
         cfg = db.query(GlobalConfig).first()
         config = {
-            "ollama_url": cfg.ollama_url if cfg else None,
-            "ollama_model": cfg.ollama_model if cfg else None,
+            "ollama_url": cfg.ollama_url if cfg else "http://ollama:11434",
+            "ollama_model": cfg.ollama_model if cfg else "qwen3.5:0.8b",
             "system_prompt": cfg.system_prompt if cfg else ""
         }
         
@@ -212,16 +212,22 @@ async def analyze_line(data: dict):
         
         # Appel Ollama (streaming asynchrone protégé)
         async with _orchestrator._ollama_semaphore:
-            response = await _orchestrator.ollama.analyze_async(
-                prompt=prompt,
-                url=config.get("ollama_url"),
-                model=config.get("ollama_model"),
-                think=getattr(cfg, "ollama_think", True),
-                options={
-                    "temperature": getattr(cfg, "ollama_temp", 0.1),
-                    "num_ctx": getattr(cfg, "ollama_ctx", 4096)
-                }
-            )
+            try:
+                response = await asyncio.wait_for(
+                    _orchestrator.ollama.analyze_async(
+                        prompt=prompt,
+                        url=config.get("ollama_url"),
+                        model=config.get("ollama_model"),
+                        think=getattr(cfg, "ollama_think", True) if cfg else True,
+                        options={
+                            "temperature": getattr(cfg, "ollama_temp", 0.1) if cfg else 0.1,
+                            "num_ctx": getattr(cfg, "ollama_ctx", 4096) if cfg else 4096
+                        }
+                    ),
+                    timeout=60.0
+                )
+            except asyncio.TimeoutError:
+                response = "[Erreur Ollama] Délai d'attente dépassé (60s)"
             
         from app import logger
         logger.add_ollama_log(prompt, response, "MANUAL")
@@ -232,29 +238,36 @@ async def analyze_line(data: dict):
         import uuid
         det_id = f"MANUAL-{uuid.uuid4().hex[:8]}"
         analysis = Analysis(
-            rule_id=rule_id,
+            rule_id=rule.id,
             detection_id=det_id,
             triggered_line=line,
             ollama_response=response,
             severity=severity,
-            matched_keywords_json="[]"
+            analyzed_at=datetime.utcnow(),
         )
         db.add(analysis)
         db.commit()
         db.refresh(analysis)
         
         return {
-            "status": "ok",
+            "ok": True,
             "analysis": {
                 "id": analysis.id,
-                "severity": severity,
-                "ollama_response": response,
-                "analyzed_at": analysis.analyzed_at.isoformat(),
-                "detection_id": det_id
+                "detection_id": analysis.detection_id,
+                "ollama_response": analysis.ollama_response,
+                "severity": analysis.severity,
+                "analyzed_at": analysis.analyzed_at.isoformat()
             }
         }
+    except Exception as e:
+        import traceback
+        error_msg = f"Erreur Analyse Manuelle: {str(e)}\n{traceback.format_exc()}"
+        from app import logger
+        logger.error("MonitorRouter", error_msg)
+        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
     finally:
         db.close()
+
 @router.post("/chat")
 async def chat_analysis(data: dict):
     """Continue la conversation sur une analyse."""
