@@ -258,6 +258,7 @@ class Orchestrator:
                         prompt=summary_prompt,
                         url=config.get("ollama_url"),
                         model=config.get("ollama_model"),
+                        timeout=60,
                     )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     logger.add_ollama_log(summary_prompt, summary)

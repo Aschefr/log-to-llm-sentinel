@@ -156,6 +156,7 @@ async def retry_analysis(analysis_id: int):
                 prompt=prompt,
                 url=config.get("ollama_url"),
                 model=config.get("ollama_model"),
+                timeout=90,
             )
 
         from app import logger

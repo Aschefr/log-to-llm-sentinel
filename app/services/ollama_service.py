@@ -17,7 +17,7 @@ class OllamaService:
         prompt: str,
         url: str = "http://host.docker.internal:11434",
         model: str = "llama3",
-        timeout: int = 30,
+        timeout: int = 60,
         retries: int = 2,
         retry_delay_s: float = 2.0,
     ) -> str:
