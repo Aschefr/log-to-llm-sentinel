@@ -204,24 +204,26 @@
 
 .message-bubble {
     max-width: 92%;
-    padding: 1rem 1.5rem;
-    border-radius: 0.75rem;
+    padding: 0.85rem 1.25rem;
+    border-radius: 0.5rem;
     line-height: 1.6;
     position: relative;
-    font-weight: 300; /* Police plus fine */
+    font-weight: 300;
+    font-size: 0.9rem;
 }
 
 .message-bubble.user {
     align-self: flex-end;
-    background: var(--accent);
-    color: #fff;
+    background: rgba(59, 130, 246, 0.12); /* Bleu très subtil */
+    border: 1px solid rgba(59, 130, 246, 0.25); /* Bordure fine et sobre */
+    color: #f8fafc;
     border-bottom-right-radius: 0.2rem;
 }
 
 .message-bubble.assistant {
     align-self: flex-start;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02); /* Presque transparent */
+    border: 1px solid rgba(255, 255, 255, 0.08); /* Bordure très discrète */
     border-bottom-left-radius: 0.2rem;
 }
 
@@ -232,13 +234,14 @@
 .message-bubble.context {
     align-self: center;
     max-width: 95%;
-    background: rgba(255,255,255,0.03);
-    border: 1px dashed var(--border);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     font-size: 0.85rem;
     color: var(--text-secondary);
-    min-height: 120px;  /* Empêche l'écrasement quand l'IA répond */
-    max-height: 300px;
+    min-height: 120px;
+    max-height: 50vh; /* Espace respirant pour le contexte */
     overflow-y: auto;
+    border-radius: 0.5rem;
 }
 
 /* Animations de réflexion */
@@ -266,18 +269,20 @@
 }
 
 .chat-footer {
-    padding: 1.5rem 2rem;
-    border-top: 1px solid var(--border);
+    padding: 1rem 2rem 2rem 2rem;
+    border-top: none;
+    background: transparent;
 }
 
 .chat-input-wrapper {
     display: flex;
     gap: 1rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 0.75rem;
     padding: 0.5rem;
     align-items: flex-end;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
 .chat-input-wrapper textarea {
