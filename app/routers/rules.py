@@ -9,7 +9,11 @@ from app.models import Rule, Analysis, GlobalConfig
 from app.services.orchestrator import Orchestrator
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
-orchestrator = Orchestrator()
+orchestrator = None
+
+def set_orchestrator(o):
+    global orchestrator
+    orchestrator = o
 
 
 class RuleCreate(BaseModel):

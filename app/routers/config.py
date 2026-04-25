@@ -16,6 +16,11 @@ import httpx
 from app import logger
 
 router = APIRouter(prefix="/api/config", tags=["config"])
+_orchestrator = None
+
+def set_orchestrator(o):
+    global _orchestrator
+    _orchestrator = o
 
 @router.post("/pull-model")
 async def pull_model(data: dict):
@@ -219,16 +224,16 @@ async def test_ollama():
 
         # 2) generation asynchrone (streaming) protégée par le sémaphore
         prompt = "Réponds uniquement par 'OK'."
-        from app.services.orchestrator import get_orchestrator
-        orchestrator = get_orchestrator()
         
         try:
-            async with orchestrator._ollama_semaphore:
+            # On utilise le sémaphore global s'il est dispo
+            sem = _orchestrator._ollama_semaphore if _orchestrator else asyncio.Semaphore(1)
+            async with sem:
                 resp = await ollama.analyze_async(
                     prompt=prompt, 
                     url=url, 
                     model=model,
-                    think=False,
+                    think=None,
                     options={"temperature": 0.1}
                 )
             

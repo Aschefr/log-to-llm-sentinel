@@ -101,9 +101,10 @@ class OllamaService:
             "prompt": prompt,
             "stream": True,
         }
-        # On n'envoie 'think' que si explicitement spécifié
-        if think is not None:
-            payload["think"] = think
+        # On n'envoie 'think': False que si l'utilisateur veut explicitement désactiver 
+        # le raisonnement, car les vieilles versions d'Ollama plantent si elles reçoivent ce champ.
+        if think is False:
+            payload["think"] = False
             
         if options:
             payload["options"] = options

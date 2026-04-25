@@ -34,6 +34,8 @@ async def lifespan(app: FastAPI):
     # Partager l'orchestrateur avec les routers (pour accès aux buffers et Ollama)
     monitor_router.set_orchestrator(orchestrator)
     chat_router.set_orchestrator(orchestrator)
+    config.set_orchestrator(orchestrator)
+    rules.set_orchestrator(orchestrator)
 
     # Démarre le watcher en background
     watcher_task = asyncio.create_task(log_watcher.start())
