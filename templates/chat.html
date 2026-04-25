@@ -668,9 +668,14 @@ function handleSendOrStop() {
 
 // ── Fonctions utilitaires pour les bulles de message ─────────────────────────
 
-/** Échappe une chaîne pour l'injection dans un attribut HTML onclick="..." */
+/** Échappe une chaîne pour l'injection dans un attribut HTML data-* */
 function escapeAttr(s) {
-    return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+    // Dans un attribut HTML data-text="...", on n'a besoin que d'entités HTML.
+    // PAS de backslash-escaping (\' etc.) — ce serait interprété littéralement.
+    return (s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/\r?\n/g, '&#10;');
 }
 
 /** Construit le HTML des boutons d'action d'une bulle IA */
@@ -835,6 +840,7 @@ async function _triggerGeneration(content) {
     aiWrapper.className = 'message-wrapper assistant';
     aiWrapper.id = 'streaming-wrapper';
     aiWrapper.innerHTML = `
+        <div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'}</div>
         <div class="message-bubble assistant" id="streaming-ai">
             <div class="thinking-state">
                 <span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span>
@@ -846,12 +852,13 @@ async function _triggerGeneration(content) {
     container.appendChild(aiWrapper);
     container.scrollTop = container.scrollHeight;
 
+    setSendBtn(true); // ← Basculer le bouton dès le lancement
     const res = await fetch('/chat/api/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversation_id: activeConvId, content: content })
     });
-    if (!res.ok) throw new Error('Erreur réseau');
+    if (!res.ok) { setSendBtn(false); throw new Error('Erreur réseau'); }
     const data = await res.json();
     _activeTaskId = data.task_id;
     _streamPos = 0;
@@ -863,6 +870,9 @@ async function sendMessage() {
     const input = document.getElementById('chat-input');
     const content = input.value.trim();
     if (!content || !activeConvId) return;
+
+    // Passer immédiatement en mode "Arrêter" (avant le fetch asynchrone)
+    setSendBtn(true);
 
     const container = document.getElementById('chat-messages');
     
@@ -910,7 +920,7 @@ async function sendMessage() {
         _activeTaskId = data.task_id;
         _streamPos = 0;
         _streamAbort = new AbortController();
-        setSendBtn(true);  // ← Passer en mode "Arrêter"
+        // (setSendBtn(true) est déjà appelé au début de sendMessage)
         readStream(data.task_id, 0, _streamAbort.signal);
 
     } catch (e) {
