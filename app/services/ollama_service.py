@@ -11,6 +11,47 @@ class OllamaService:
     Service de communication avec Ollama pour l'analyse des logs.
     """
 
+    async def analyze_async(
+        self,
+        prompt: str,
+        url: str = "http://ollama:11434",
+        model: str = "gemma4:e4b",
+        options: Optional[dict] = None,
+        think: bool = True,
+    ) -> str:
+        """
+        Version asynchrone d'analyse utilisant le streaming pour éviter les timeouts
+        sur les longues générations (CPU).
+        """
+        full_text = ""
+        is_thinking = False
+        last_log_len = 0
+        
+        async for chunk in self.generate_stream(prompt, url, model, options, think):
+            if "error" in chunk:
+                return f"[Erreur Ollama] {chunk['error']}"
+            
+            text = chunk.get("response", "")
+            if not text: continue
+
+            # Filtrage des balises <think>
+            if "<think>" in text:
+                is_thinking = True
+                text = text.split("<think>")[0]
+            if "</think>" in text:
+                is_thinking = False
+                text = text.split("</think>")[-1]
+
+            if not is_thinking and text:
+                full_text += text
+                
+                # Petit log de progression tous les 100 caractères
+                if len(full_text) - last_log_len > 100:
+                    logger.debug("OllamaService", f"Analyse en cours... ({len(full_text)} car. reçus)")
+                    last_log_len = len(full_text)
+        
+        return full_text if full_text else "Aucune réponse d'Ollama"
+
     def analyze(
         self,
         prompt: str,

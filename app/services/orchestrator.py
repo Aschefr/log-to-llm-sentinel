@@ -170,9 +170,10 @@ class Orchestrator:
 
         # 3. Appeler Ollama (sous verrou pour éviter de surcharger le CPU)
         logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | ligne={line[:80]}")
+        # 3. Appeler Ollama (en streaming asynchrone pour éviter les timeouts)
+        logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | ligne={line[:80]}")
         async with self._ollama_semaphore:
-            response = await asyncio.to_thread(
-                self.ollama.analyze,
+            response = await self.ollama.analyze_async(
                 prompt=prompt,
                 url=config.get("ollama_url"),
                 model=config.get("ollama_model"),
@@ -261,12 +262,10 @@ class Orchestrator:
                     f"Analyse à résumer :\n{response}"
                 )
                 async with self._ollama_semaphore:
-                    summary = await asyncio.to_thread(
-                        self.ollama.analyze,
+                    summary = await self.ollama.analyze_async(
                         prompt=summary_prompt,
                         url=config.get("ollama_url"),
                         model=config.get("ollama_model"),
-                        timeout=120,
                         think=False, # Pas de raisonnement pour un résumé court
                         options={
                             "temperature": 0.1, # Résumé toujours à basse température
