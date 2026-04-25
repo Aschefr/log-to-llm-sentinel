@@ -118,7 +118,8 @@
     "manually_analyzed_badge": "Analysé manuellement",
     "manual_analysis": "Analyse manuelle",
     "search_no_result": "Aucun résultat pour cet ID.",
-    "detection_id_title": "ID de détection"
+    "detection_id_title": "ID de détection",
+    "no_logs_filter": "Aucune ligne à afficher pour ce filtre."
   },
   "chat": {
     "title": "Centre d'Analyse IA",

@@ -48,8 +48,8 @@
                 </select>
             </div>
 
-            <div class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
-                <h3>📧 Configuration SMTP</h3>
+            <div id="smtp-section" class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
+                <h3 data-i18n="config.smtp_title">📧 Configuration SMTP</h3>
                 <div class="panel-grid-2">
                     <div class="form-group panel-grid-full">
                         <label for="smtp-host">Hôte SMTP</label>
@@ -86,8 +86,8 @@
                 <div id="smtp-test-message" class="message hidden"></div>
             </div>
 
-            <div class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
-                <h3>🚀 Configuration Apprise</h3>
+            <div id="apprise-section" class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
+                <h3 data-i18n="config.apprise_title">🚀 Configuration Apprise</h3>
                 <div class="form-group">
                     <label for="apprise-url">URL Apprise (endpoint notify)</label>
                     <input type="text" id="apprise-url" placeholder="http://192.168.1.100:8780/notify/apprise">
@@ -177,7 +177,7 @@
                 </div>
 
                 <div class="profile-selectors" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                    <span style="width: 100%; font-size: 0.85rem; margin-bottom: 0.25rem; opacity: 0.7;">Profils rapides :</span>
+                    <span class="config-hint-label">Profils rapides :</span>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')">💻 Profil Éco (Petit CPU)</button>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')">⚖️ Profil Équilibré</button>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')">🚀 Profil GPU / Gamer</button>
@@ -206,7 +206,7 @@
                     <div class="progress-bar-container" style="height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem;">
                         <div id="pull-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s;"></div>
                     </div>
-                    <div id="pull-status" style="font-size: 0.85rem; color: var(--text-secondary);">Initialisation...</div>
+                    <div id="pull-status" class="config-status-text">Initialisation...</div>
                 </div>
             </div>
         </section>

@@ -245,18 +245,38 @@ function applyKeywordFilter(ruleId) {
     const viewer = document.getElementById(`log-viewer-${ruleId}`);
     if (!viewer) return;
 
+    let visibleCount = 0;
     viewer.querySelectorAll('.log-line').forEach(line => {
+        let show = false;
         if (activeKeywordFilter === '__all__') {
-            line.style.display = '';
+            show = true;
         } else if (activeKeywordFilter === '__matches__') {
-            const hasBadge = line.querySelector('.log-kw-badge') !== null;
-            line.style.display = hasBadge ? '' : 'none';
+            show = line.querySelector('.log-kw-badge') !== null;
         } else {
             const badges = Array.from(line.querySelectorAll('.log-kw-badge'))
                 .map(b => b.textContent.trim().toLowerCase());
-            line.style.display = badges.includes(activeKeywordFilter.toLowerCase()) ? '' : 'none';
+            show = badges.includes(activeKeywordFilter.toLowerCase());
         }
+        line.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
     });
+
+    // Encart vide si aucune ligne ne correspond au filtre actif
+    const emptyId = `kw-empty-${ruleId}`;
+    let emptyEl = viewer.querySelector(`#${emptyId}`);
+    if (visibleCount === 0 && viewer.querySelectorAll('.log-line').length > 0) {
+        if (!emptyEl) {
+            emptyEl = document.createElement('em');
+            emptyEl.id = emptyId;
+            emptyEl.className = 'no-logs';
+            viewer.appendChild(emptyEl);
+        }
+        const filterName = activeKeywordFilter === '__matches__' ? 'matches' :
+                           activeKeywordFilter === '__all__'    ? 'tout' : `"${activeKeywordFilter}"`;
+        emptyEl.textContent = window.t ? window.t('monitor.no_logs_filter') : `Aucune ligne à afficher pour le filtre : ${filterName}`;
+    } else if (emptyEl) {
+        emptyEl.remove();
+    }
 }
 
 function updateFilterLabel(ruleId) {

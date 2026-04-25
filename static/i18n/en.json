@@ -118,7 +118,8 @@
     "manually_analyzed_badge": "Manually analyzed",
     "manual_analysis": "Manual analysis",
     "search_no_result": "No results for this ID.",
-    "detection_id_title": "Detection ID"
+    "detection_id_title": "Detection ID",
+    "no_logs_filter": "No lines to display for this filter."
   },
   "chat": {
     "title": "AI Analysis Center",

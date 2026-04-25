@@ -5,7 +5,25 @@ document.addEventListener('DOMContentLoaded', () => {
     setupOllamaModelSelect();
     setupAppriseTags();
     setupModelPulling();
+    setupNotificationMethodToggle();
 });
+
+function setupNotificationMethodToggle() {
+    const select = document.getElementById('notification-method');
+    if (!select) return;
+
+    function updateVisibility() {
+        const method = select.value;
+        const smtpEl = document.getElementById('smtp-section');
+        const appriseEl = document.getElementById('apprise-section');
+        if (smtpEl)    smtpEl.style.display    = (method === 'smtp')    ? '' : 'none';
+        if (appriseEl) appriseEl.style.display = (method === 'apprise') ? '' : 'none';
+    }
+
+    select.addEventListener('change', updateVisibility);
+    updateVisibility(); // Appliquer au chargement
+}
+
 
 function setPullModel(name) {
     const input = document.getElementById('pull-model-name');
