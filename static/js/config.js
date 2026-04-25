@@ -4,7 +4,90 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTests();
     setupOllamaModelSelect();
     setupAppriseTags();
+    setupModelPulling();
 });
+
+function setPullModel(name) {
+    const input = document.getElementById('pull-model-name');
+    if (input) input.value = name;
+}
+
+function setupModelPulling() {
+    const btn = document.getElementById('pull-model-btn');
+    const input = document.getElementById('pull-model-name');
+    const progressContainer = document.getElementById('pull-progress-container');
+    const progressBar = document.getElementById('pull-progress-bar');
+    const statusText = document.getElementById('pull-status');
+
+    if (!btn || !input) return;
+
+    btn.addEventListener('click', async () => {
+        const model = input.value.trim();
+        if (!model) {
+            alert('Veuillez saisir un nom de modèle');
+            return;
+        }
+
+        btn.disabled = true;
+        progressContainer.classList.remove('hidden');
+        progressBar.style.width = '0%';
+        statusText.textContent = `Démarrage du téléchargement de ${model}...`;
+
+        try {
+            const response = await fetch('/api/config/pull-model', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ model: model })
+            });
+
+            if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.detail || 'Erreur lors du pull');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value);
+                const lines = chunk.split('\n\n');
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            if (data.error) throw new Error(data.error);
+                            
+                            if (data.status) {
+                                statusText.textContent = data.status;
+                                if (data.completed && data.total) {
+                                    const pct = Math.round((data.completed / data.total) * 100);
+                                    progressBar.style.width = `${pct}%`;
+                                    statusText.textContent = `${data.status} (${pct}%)`;
+                                }
+                                if (data.status === 'success') {
+                                    progressBar.style.width = '100%';
+                                    statusText.textContent = '✅ Modèle téléchargé avec succès !';
+                                    setTimeout(() => setupOllamaModelSelect(), 2000); // Rafraîchir la liste
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Erreur parse chunk:', e);
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            statusText.textContent = `❌ Erreur : ${e.message}`;
+            statusText.style.color = 'var(--danger)';
+        } finally {
+            btn.disabled = false;
+        }
+    });
+}
 
 async function loadConfig() {
     try {

@@ -10,8 +10,39 @@ from app.services.ollama_service import OllamaService
 import json
 import urllib.request
 import urllib.error
+import asyncio
+from fastapi.responses import StreamingResponse
+import httpx # httpx est généralement dispo avec fastapi
 
 router = APIRouter(prefix="/api/config", tags=["config"])
+
+@router.post("/pull-model")
+async def pull_model(data: dict):
+    model_name = data.get("model")
+    if not model_name:
+        raise HTTPException(status_code=400, detail="Nom du modèle requis")
+    
+    db = SessionLocal()
+    config = db.query(GlobalConfig).first()
+    db.close()
+    
+    if not config or not config.ollama_url:
+        raise HTTPException(status_code=400, detail="URL Ollama non configurée")
+    
+    ollama_url = config.ollama_url.rstrip("/")
+    pull_url = f"{ollama_url}/api/pull"
+
+    async def event_generator():
+        try:
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream("POST", pull_url, json={"name": model_name}) as response:
+                    async for line in response.aiter_lines():
+                        if line:
+                            yield f"data: {line}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 class ConfigUpdate(BaseModel):
