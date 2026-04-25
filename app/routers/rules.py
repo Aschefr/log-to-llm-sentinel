@@ -264,9 +264,18 @@ def test_rule(rule_id: int):
             
             if sev_val < threshold_val:
                 logger.debug("TestRule", f"Notification de test ignorée: la sévérité '{severity}' est inférieure au seuil '{rule.notify_severity_threshold}'.")
-            else:
-                logger.debug("TestRule", f"Envoi notification via '{config_dict.get('notification_method')}'")
-                notifier = NotificationService()
+                return {
+                    "id": analysis.id,
+                    "rule_id": analysis.rule_id,
+                    "triggered_line": analysis.triggered_line,
+                    "ollama_response": analysis.ollama_response,
+                    "severity": analysis.severity,
+                    "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
+                    "notification_skipped": True
+                }
+
+            logger.debug("TestRule", f"Envoi notification via '{config_dict.get('notification_method')}'")
+            notifier = NotificationService()
             subject = f"[Sentinel TEST] Alerte {severity.upper()} : {rule.name}"
             
             body = f"""
