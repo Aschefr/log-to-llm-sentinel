@@ -936,24 +936,36 @@ body {
     border: 1px solid var(--border);
 }
 
+.analysis-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
 .btn-icon {
-    background: none;
-    border: none;
-    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-dim);
     cursor: pointer;
-    padding: 0.25rem;
+    width: 28px;
+    height: 28px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 4px;
-    transition: all 0.2s;
+    border-radius: 6px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-icon:hover {
     background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
     color: var(--text-primary);
+    transform: translateY(-1px);
 }
 
 .btn-icon.delete-analysis-btn:hover {
-    color: var(--danger);
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
 }
+
