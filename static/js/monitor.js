@@ -398,6 +398,9 @@ async function loadRuleAnalyses(ruleId) {
                 </div>
                 <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
+                <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">
+                    <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer</button>
+                </div>
             </div>
         `).join('');
     } catch (e) {
@@ -418,11 +421,14 @@ async function retryAnalysis(analysisId, btn) {
                 // On simule un clic sur la ligne pour forcer la mise à jour des données du panneau
                 // sans avoir à réécrire toute la logique de onLineClick
                 onLineClick(selected, activeRuleId);
-            } else {
-                // Si on est dans la recherche, on relance la recherche pour voir le résultat mis à jour
-                const searchInput = document.getElementById('monitor-search-id');
-                if (searchInput && searchInput.value) searchById();
             }
+            
+            // Rafraîchir aussi la liste des analyses récentes de l'onglet
+            if (activeRuleId) loadRuleAnalyses(activeRuleId);
+
+            // Si on est dans la recherche
+            const searchInput = document.getElementById('monitor-search-id');
+            if (searchInput && searchInput.value) searchById();
         }
     } catch (e) {
         alert('Erreur: ' + e.message);

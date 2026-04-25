@@ -71,6 +71,9 @@ async function loadRecentAnalyses() {
                 </div>
                 <div class="analysis-line">${escapeHtml(a.triggered_line)}</div>
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
+                <div class="analysis-footer" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+                    <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer</button>
+                </div>
             </div>
         `).join('');
     } catch (error) {
@@ -105,6 +108,24 @@ function copyAnalysisText(btn) {
     }).catch(err => {
         console.error('Erreur copie:', err);
     });
+}
+
+async function retryAnalysis(analysisId, btn) {
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '⏳...';
+    try {
+        const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { method: 'POST' });
+        if (res.status === 'ok') {
+            loadRecentAnalyses();
+            loadStats();
+        }
+    } catch (e) {
+        alert('Erreur: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+    }
 }
 
 async function loadRulesStatus() {
