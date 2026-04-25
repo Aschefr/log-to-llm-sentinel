@@ -84,10 +84,14 @@ class OllamaService:
             ],
             "stream": True,
         }
+        if options is None:
+            options = {}
+            
         # On n'envoie 'think': False que si l'utilisateur veut explicitement désactiver 
-        # le raisonnement, car les vieilles versions d'Ollama plantent si elles reçoivent ce champ.
+        # le raisonnement. Selon la version d'Ollama, c'est à la racine ou dans options.
         if think is False:
             payload["think"] = False
+            options["think"] = False
             
         if options:
             payload["options"] = options

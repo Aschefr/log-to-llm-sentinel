@@ -22,7 +22,8 @@ Ligne déclenchante: [updater] \OC\Updater::startCheckCodeIntegrity: Starting co
     ],
     "stream": True,
     "options": {
-        "num_ctx": 4096
+        "num_ctx": 4096,
+        "think": False
     }
 }
 
