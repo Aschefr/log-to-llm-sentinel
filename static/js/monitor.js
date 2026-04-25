@@ -10,6 +10,7 @@ let bufferIntervals = {};
 let isFrozen = false;
 let frozenContent = null;
 let selectedLineText = null;
+let activeKeywordFilter = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadMonitorRules();
@@ -55,6 +56,8 @@ function selectTab(ruleId) {
     stopAllPolling();
     isFrozen = false;
     frozenContent = null;
+    selectedLineText = null;
+    activeKeywordFilter = null;
     activeRuleId = ruleId;
 
     // Mettre à jour l'onglet actif
@@ -78,7 +81,14 @@ function renderTabContent(rule) {
         <div class="monitor-rule-info">
             <div class="rule-info-grid">
                 <div><span class="info-label">📁 Fichier</span><code>${escapeHtml(rule.log_file_path)}</code></div>
-                <div><span class="info-label">🔑 Mots-clés</span><code>${escapeHtml(kwList)}</code></div>
+                <div>
+                    <span class="info-label">🔑 Mots-clés (cliquer pour filtrer)</span>
+                    <div class="kw-filter-badges" id="kw-filters-${rule.id}">
+                        ${rule.keywords.map(kw =>
+                            `<span class="log-kw-badge kw-filter-btn" data-kw="${encodeURIComponent(kw)}" onclick="toggleKeywordFilter(this, ${rule.id})">${escapeHtml(kw)}</span>`
+                        ).join('')}
+                    </div>
+                </div>
                 <div><span class="info-label">⏱ Anti-spam</span>${rule.anti_spam_delay}s</div>
                 <div><span class="info-label">🔔 Seuil</span>${rule.notify_severity_threshold}</div>
             </div>
@@ -92,7 +102,7 @@ function renderTabContent(rule) {
 
         <!-- Visionneuse de logs -->
         <div class="monitor-viewer-header">
-            <span class="viewer-title">📄 Log en direct <span class="viewer-linecount" id="linecount-${rule.id}"></span></span>
+            <span class="viewer-title">📄 Log en direct <span class="viewer-linecount" id="linecount-${rule.id}"></span><span class="kw-filter-label hidden" id="kw-filter-label-${rule.id}"></span></span>
             <div class="viewer-actions">
                 <button class="btn btn-secondary btn-sm" id="freeze-btn-${rule.id}" onclick="toggleFreeze(${rule.id})">❄️ Figer</button>
                 <button class="btn btn-secondary btn-sm" onclick="copyViewerContent(${rule.id})">📋 Copier</button>
@@ -190,12 +200,67 @@ async function fetchLogs(rule) {
 
         if (isAtBottom) viewer.scrollTop = viewer.scrollHeight;
 
+        // Réappliquer le filtre mot-clé actif
+        applyKeywordFilter(rule.id);
+        updateFilterLabel(rule.id);
+
     } catch (e) {
         viewer.innerHTML = `<em class="no-logs" style="color:var(--danger)">Erreur : ${escapeHtml(e.message)}</em>`;
     }
 }
 
-// ─── Buffer anti-spam ──────────────────────────────────────────────────────
+// ─── Filtre par mot-clé ────────────────────────────────────────────────────
+
+function toggleKeywordFilter(badgeEl, ruleId) {
+    const kw = decodeURIComponent(badgeEl.dataset.kw || '');
+    if (!kw) return;
+
+    if (activeKeywordFilter === kw) {
+        // Désactiver le filtre
+        activeKeywordFilter = null;
+    } else {
+        // Activer ce filtre
+        activeKeywordFilter = kw;
+    }
+
+    // Mettre à jour l'apparence de tous les badges de filtre
+    document.querySelectorAll('.kw-filter-btn').forEach(b => {
+        const bKw = decodeURIComponent(b.dataset.kw || '');
+        b.classList.toggle('active', bKw === activeKeywordFilter);
+    });
+
+    applyKeywordFilter(ruleId);
+    updateFilterLabel(ruleId);
+}
+
+function applyKeywordFilter(ruleId) {
+    const viewer = document.getElementById(`log-viewer-${ruleId}`);
+    if (!viewer) return;
+
+    viewer.querySelectorAll('.log-line').forEach(line => {
+        if (!activeKeywordFilter) {
+            line.style.display = '';
+        } else {
+            // Vérifier si cette ligne a un badge correspondant au filtre actif
+            const badges = Array.from(line.querySelectorAll('.log-kw-badge'))
+                .map(b => b.textContent.trim().toLowerCase());
+            line.style.display = badges.includes(activeKeywordFilter.toLowerCase()) ? '' : 'none';
+        }
+    });
+}
+
+function updateFilterLabel(ruleId) {
+    const label = document.getElementById(`kw-filter-label-${ruleId}`);
+    if (!label) return;
+    if (activeKeywordFilter) {
+        label.textContent = ` — filtre: "${activeKeywordFilter}"`;
+        label.classList.remove('hidden');
+    } else {
+        label.textContent = '';
+        label.classList.add('hidden');
+    }
+}
+
 
 async function fetchBufferStatus(ruleId) {
     try {
