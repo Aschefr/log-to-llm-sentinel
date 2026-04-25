@@ -225,6 +225,10 @@
     border-bottom-left-radius: 0.2rem;
 }
 
+.hidden {
+    display: none !important;
+}
+
 .message-bubble.context {
     align-self: center;
     max-width: 95%;
@@ -232,6 +236,8 @@
     border: 1px dashed var(--border);
     font-size: 0.85rem;
     color: var(--text-secondary);
+    max-height: 300px; /* Limite la taille du résumé initial */
+    overflow-y: auto;
 }
 
 .chat-footer {

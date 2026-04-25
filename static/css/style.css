@@ -1105,3 +1105,6 @@ body {
 .chat-msg.user { background: rgba(59,130,246,0.1); border-left: 3px solid var(--accent); }
 .chat-msg.ai { background: rgba(255,255,255,0.03); border-left: 3px solid #666; }
 
+
+.hidden { display: none !important; }
+
