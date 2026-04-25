@@ -210,14 +210,17 @@ async def analyze_line(data: dict):
         # Simuler une détection pour construire le prompt
         prompt = _orchestrator._build_prompt(rule, line, config.get("system_prompt", ""))
         
-        # Appel Ollama (timeout généreux pour manuel)
+        # Appel Ollama (streaming asynchrone protégé)
         async with _orchestrator._ollama_semaphore:
-            response = await asyncio.to_thread(
-                _orchestrator.ollama.analyze,
+            response = await _orchestrator.ollama.analyze_async(
                 prompt=prompt,
                 url=config.get("ollama_url"),
                 model=config.get("ollama_model"),
-                timeout=90
+                think=getattr(cfg, "ollama_think", True),
+                options={
+                    "temperature": getattr(cfg, "ollama_temp", 0.1),
+                    "num_ctx": getattr(cfg, "ollama_ctx", 4096)
+                }
             )
             
         from app import logger

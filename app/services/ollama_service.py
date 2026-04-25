@@ -83,11 +83,6 @@ class OllamaService:
 
         return full_text.strip() if full_text else "Aucune réponse d'Ollama"
 
-    def analyze(self, *args, **kwargs):
-        """DEPRECATED: Cette méthode synchrone ne doit plus être utilisée."""
-        logger.error("OllamaService", "APPEL INTERDIT : La méthode synchrone 'analyze' a été appelée ! Merci de passer en 'analyze_async'.")
-        raise RuntimeError("APPEL SYNCHRONE INTERDIT - Utilisez analyze_async")
-
     async def generate_stream(
         self,
         prompt: str,
