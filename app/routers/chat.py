@@ -141,22 +141,26 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
             context_block = "\n".join([
                 system_prompt if system_prompt else "",
                 "",
-                "Tu es un assistant expert en systèmes Linux et en infrastructure.",
-                "L'utilisateur souhaite approfondir une analyse de log déjà effectuée.",
+                "Tu es un assistant expert en systèmes Linux, Docker et infrastructure.",
+                "Une analyse de log a été effectuée. L'utilisateur te pose des questions de suivi.",
                 "",
-                f"=== Contexte de la règle : {rule.name if rule else 'Inconnue'} ===",
+                f"=== Règle : {rule.name if rule else 'Inconnue'} ===",
                 f"Application : {rule.application_context if rule else ''}",
                 "",
-                "=== Ligne de log déclenchante ===",
+                "=== Ligne de log concernée ===",
                 analysis.triggered_line,
                 "",
-                "=== Analyse déjà réalisée ===",
+                "=== Analyse initiale ===",
                 analysis.ollama_response,
                 "",
-                "=== Instructions ===",
-                "Réponds aux questions de l'utilisateur en te basant sur ce contexte.",
-                "Ne refais pas une analyse complète, ne répète pas le format SEVERITY.",
-                "Réponds directement, de façon conversationnelle et précise.",
+                "=== Mode de réponse (IMPORTANT) ===",
+                "Tu participes à une CONVERSATION. L'analyse est déjà faite ci-dessus.",
+                "Règles absolues :",
+                "- Réponds à LA QUESTION posée, rien de plus",
+                "- Pas de format SEVERITY, pas de liste 'd'étapes de correction' sauf si demandé explicitement",
+                "- Si l'utilisateur dit que le service fonctionne, prends-le en compte dans ta réponse",
+                "- Ton naturel et direct, comme dans un chat entre collègues experts",
+                "- Si la question est courte, la réponse peut l'être aussi",
                 "",
                 "=== Conversation ===",
             ])
@@ -331,3 +335,54 @@ async def delete_conversation(conv_id: int, db: Session = Depends(get_db)):
     db.delete(conv)
     db.commit()
     return {"status": "ok"}
+
+
+@router.post("/api/regenerate/{conv_id}")
+async def regenerate_last(conv_id: int, db: Session = Depends(get_db)):
+    """
+    Supprime le dernier message assistant de la conversation et retourne
+    le contenu du dernier message utilisateur pour redéclencher la génération.
+    Utilisé par le bouton 'Ré-essayer' sur les bulles IA.
+    """
+    # Supprimer le dernier message assistant
+    last_assistant = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.conversation_id == conv_id, ChatMessage.role == "assistant")
+        .order_by(ChatMessage.created_at.desc())
+        .first()
+    )
+    if last_assistant:
+        db.delete(last_assistant)
+        db.commit()
+
+    # Retourner le dernier message utilisateur (pour le reré-envoyer)
+    last_user = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.conversation_id == conv_id, ChatMessage.role == "user")
+        .order_by(ChatMessage.created_at.desc())
+        .first()
+    )
+    if not last_user:
+        raise HTTPException(status_code=404, detail="Aucun message utilisateur trouvé")
+
+    return {"status": "ok", "last_user_content": last_user.content}
+
+
+@router.delete("/api/messages/{conv_id}")
+async def delete_last_messages(conv_id: int, count: int = 2, db: Session = Depends(get_db)):
+    """
+    Supprime les N derniers messages d'une conversation.
+    Utilisé pour l'édition d'un message (supprime le message original
+    et la réponse IA associée avant de renvoyer le message modifié).
+    """
+    messages = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.conversation_id == conv_id)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(count)
+        .all()
+    )
+    for m in messages:
+        db.delete(m)
+    db.commit()
+    return {"status": "ok", "deleted": len(messages)}

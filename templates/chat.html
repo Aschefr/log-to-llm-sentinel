@@ -236,7 +236,8 @@
     border: 1px dashed var(--border);
     font-size: 0.85rem;
     color: var(--text-secondary);
-    max-height: 300px; /* Limite la taille du résumé initial */
+    min-height: 120px;  /* Empêche l'écrasement quand l'IA répond */
+    max-height: 300px;
     overflow-y: auto;
 }
 
@@ -299,6 +300,73 @@
     color: var(--text-secondary);
     text-align: center;
     margin-top: 0.75rem;
+}
+
+
+/* ── Message actions (hover-reveal) ─────────────────────────────────────────*/
+.message-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    position: relative;
+}
+
+.message-wrapper.user {
+    align-items: flex-end;
+}
+
+.message-wrapper.assistant {
+    align-items: flex-start;
+}
+
+.message-actions {
+    display: flex;
+    gap: 0.25rem;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    padding: 0 0.25rem;
+}
+
+.message-wrapper:hover .message-actions,
+.message-wrapper:focus-within .message-actions {
+    opacity: 1;
+}
+
+.message-wrapper.user .message-actions {
+    justify-content: flex-end;
+}
+
+.msg-action-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 0.4rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 0.2rem 0.45rem;
+    font-size: 0.72rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    transition: all 0.15s;
+    white-space: nowrap;
+}
+
+.msg-action-btn:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: var(--border);
+    color: var(--text-primary);
+}
+
+.msg-action-btn.danger:hover {
+    color: var(--danger);
+    border-color: rgba(239,68,68,0.3);
+    background: rgba(239,68,68,0.07);
+}
+
+/* Edit mode : surligner l'input */
+.chat-input-wrapper.editing {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
 }
 
 @media (max-width: 800px) {
@@ -434,11 +502,7 @@ async function loadHistory(id) {
             `;
         }
         
-        html += data.messages.map(m => `
-            <div class="message-bubble ${m.role}">
-                <div class="markdown-body">${marked.parse(m.content)}</div>
-            </div>
-        `).join('');
+        html += data.messages.map((m, i) => buildMessageWrapper(m.role, m.content, i)).join('');
         
         container.innerHTML = html;
         container.scrollTop = container.scrollHeight;
@@ -481,6 +545,125 @@ async function loadHistory(id) {
     }
 }
 
+// ── Fonctions utilitaires pour les bulles de message ─────────────────────────
+
+/** Échappe une chaîne pour l'injection dans un attribut HTML onclick="..." */
+function escapeAttr(s) {
+    return (s || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n');
+}
+
+/** Construit le HTML des boutons d'action d'une bulle IA */
+function aiActionsHtml(text) {
+    return `<div class="message-actions">
+        <button class="msg-action-btn" onclick="copyMsg(this)" data-text="${escapeAttr(text)}" title="Copier">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copier
+        </button>
+        <button class="msg-action-btn" onclick="retryLastAiMsg()" title="Régénérer">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+            Ré-essayer
+        </button>
+    </div>`;
+}
+
+/** Construit le HTML des boutons d'action d'une bulle utilisateur */
+function userActionsHtml(text) {
+    return `<div class="message-actions">
+        <button class="msg-action-btn" onclick="copyMsg(this)" data-text="${escapeAttr(text)}" title="Copier">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copier
+        </button>
+        <button class="msg-action-btn" onclick="editMsg(this)" data-text="${escapeAttr(text)}" title="Modifier et renvoyer">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Modifier
+        </button>
+    </div>`;
+}
+
+/**
+ * Construit un wrapper de message avec bulle + boutons d'action.
+ * @param {'user'|'assistant'} role
+ * @param {string} content - texte brut (markdown pour assistant, texte pour user)
+ * @param {number|null} index - index dans l'historique (pour détecter le dernier message)
+ */
+function buildMessageWrapper(role, content, index) {
+    const isUser = role === 'user';
+    const bubbleHtml = isUser
+        ? `<div class="message-bubble user"><div class="markdown-body">${escapeHtml(content)}</div></div>`
+        : `<div class="message-bubble assistant"><div class="markdown-body">${marked.parse(content)}</div></div>`;
+    const actionsHtml = isUser ? userActionsHtml(content) : aiActionsHtml(content);
+    return `<div class="message-wrapper ${role}">${bubbleHtml}${actionsHtml}</div>`;
+}
+
+/** Copie le texte d'un message dans le presse-papier */
+async function copyMsg(btn) {
+    const text = btn.dataset.text;
+    await copyToClipboard(text);
+    const orig = btn.innerHTML;
+    btn.innerHTML = btn.innerHTML.replace(/Copier|Copy/, '✅');
+    setTimeout(() => { btn.innerHTML = orig; }, 1500);
+}
+
+/** Met le message en édition dans la zone de saisie */
+let _editMode = false;
+function editMsg(btn) {
+    const text = btn.dataset.text;
+    const input = document.getElementById('chat-input');
+    const wrapper = document.getElementById('chat-input-wrapper') || input.closest('.chat-input-wrapper');
+    input.value = text;
+    input.style.height = 'auto';
+    input.style.height = input.scrollHeight + 'px';
+    input.focus();
+    if (wrapper) wrapper.classList.add('editing');
+    _editMode = true;  // sendMessage supprimera les 2 derniers messages avant d'envoyer
+}
+
+/** Régénère la dernière réponse IA */
+async function retryLastAiMsg() {
+    if (!activeConvId || _activeTaskId) return;
+    try {
+        const res = await apiFetch(`/chat/api/regenerate/${activeConvId}`, { method: 'POST' });
+        if (!res.last_user_content) return;
+        // Recharger l'historique (sans le dernier message assistant)
+        await loadHistory(activeConvId);
+        // Déclencher la génération avec le même message utilisateur
+        _triggerGeneration(res.last_user_content);
+    } catch (e) {
+        alert(window.t('common.error') + ': ' + e.message);
+    }
+}
+
+/** Déclenche la génération sans sauvegarder un nouveau message utilisateur en BDD */
+async function _triggerGeneration(content) {
+    const container = document.getElementById('chat-messages');
+    const aiWrapper = document.createElement('div');
+    aiWrapper.className = 'message-wrapper assistant';
+    aiWrapper.id = 'streaming-wrapper';
+    aiWrapper.innerHTML = `
+        <div class="message-bubble assistant" id="streaming-ai">
+            <div class="thinking-state">
+                <span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span>
+                <span style="margin-left:0.5rem; opacity:0.7; font-size:0.9rem;">${window.t('chat.thinking')}</span>
+            </div>
+            <div class="markdown-body"></div>
+        </div>
+    `;
+    container.appendChild(aiWrapper);
+    container.scrollTop = container.scrollHeight;
+
+    const res = await fetch('/chat/api/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: activeConvId, content: content })
+    });
+    if (!res.ok) throw new Error('Erreur réseau');
+    const data = await res.json();
+    _activeTaskId = data.task_id;
+    _streamPos = 0;
+    _streamAbort = new AbortController();
+    readStream(data.task_id, 0, _streamAbort.signal);
+}
+
 async function sendMessage() {
     const input = document.getElementById('chat-input');
     const content = input.value.trim();
@@ -488,11 +671,16 @@ async function sendMessage() {
 
     const container = document.getElementById('chat-messages');
     
-    // UI optimistic : ajouter la bulle utilisateur + la bulle IA en attente
-    container.innerHTML += `
-        <div class="message-bubble user">
-            <div class="markdown-body">${escapeHtml(content)}</div>
-        </div>
+    // Bulle utilisateur avec actions
+    const userWrapper = document.createElement('div');
+    userWrapper.innerHTML = buildMessageWrapper('user', content, null);
+    container.appendChild(userWrapper.firstElementChild);
+
+    // Bulle IA en attente (streaming)
+    const aiWrapper = document.createElement('div');
+    aiWrapper.className = 'message-wrapper assistant';
+    aiWrapper.id = 'streaming-wrapper';
+    aiWrapper.innerHTML = `
         <div class="message-bubble assistant" id="streaming-ai">
             <div class="thinking-state">
                 <span class="thinking-dot"></span>
@@ -503,8 +691,17 @@ async function sendMessage() {
             <div class="markdown-body"></div>
         </div>
     `;
+    container.appendChild(aiWrapper);
     input.value = '';
     input.style.height = 'auto';
+    // Quitter le mode édition
+    const inputWrapper = input.closest('.chat-input-wrapper');
+    if (inputWrapper) inputWrapper.classList.remove('editing');
+    if (_editMode) {
+        // Supprimer les 2 derniers messages (question originale + réponse) avant de renvoyer
+        try { await apiFetch(`/chat/api/messages/${activeConvId}?count=2`, { method: 'DELETE' }); } catch(_){}
+        _editMode = false;
+    }
     container.scrollTop = container.scrollHeight;
 
     try {
@@ -598,7 +795,16 @@ async function readStream(taskId, fromPos, signal) {
                         if (container) container.scrollTop = container.scrollHeight;
                     }
                     if (evt.done) {
-                        // Génération terminée
+                        // Génération terminée : finaliser la bulle avec boutons d'action
+                        const finalText = _streamFullText;
+                        const wrapper = document.getElementById('streaming-wrapper') || aiBubble.closest('.message-wrapper');
+                        if (wrapper) {
+                            wrapper.removeAttribute('id');
+                            // Injecter les actions après la bulle
+                            if (!wrapper.querySelector('.message-actions')) {
+                                wrapper.insertAdjacentHTML('beforeend', aiActionsHtml(finalText));
+                            }
+                        }
                         aiBubble.removeAttribute('id');
                         _activeTaskId = null;
                         _streamFullText = '';
