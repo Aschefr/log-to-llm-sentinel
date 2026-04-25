@@ -17,7 +17,7 @@ class OllamaService:
         prompt: str,
         url: str = "http://ollama:11434",
         model: str = "llama3",
-        timeout: int = 60,
+        timeout: int = 180,
         retries: int = 2,
         retry_delay_s: float = 2.0,
     ) -> str:

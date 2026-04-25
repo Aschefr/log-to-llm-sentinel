@@ -107,8 +107,8 @@ class Orchestrator:
                 "smtp_recipient": config.smtp_recipient if config else "",
                 "smtp_tls": config.smtp_tls if config else True,
                 "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
-                "ollama_url": config.ollama_url if config else "http://host.docker.internal:11434",
-                "ollama_model": config.ollama_model if config else "llama3",
+                "ollama_url": config.ollama_url if config and config.ollama_url else "http://ollama:11434",
+                "ollama_model": config.ollama_model if config and config.ollama_model else "gemma4:e4b",
                 "system_prompt": config.system_prompt if config else "",
                 "notification_method": config.notification_method if config else "smtp",
                 "apprise_url": config.apprise_url if config else "",
@@ -258,7 +258,7 @@ class Orchestrator:
                         prompt=summary_prompt,
                         url=config.get("ollama_url"),
                         model=config.get("ollama_model"),
-                        timeout=60,
+                        timeout=120,
                     )
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     logger.add_ollama_log(summary_prompt, summary, detection_id)

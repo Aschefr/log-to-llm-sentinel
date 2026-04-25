@@ -146,7 +146,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
             prompt=prompt,
             url=cfg.ollama_url,
             model=cfg.ollama_model,
-            timeout=120
+            timeout=300
         )
 
     # 4. Sauvegarder la réponse de l'IA
