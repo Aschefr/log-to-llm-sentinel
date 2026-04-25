@@ -20,6 +20,7 @@ class OllamaService:
         retries: int = 2,
         retry_delay_s: float = 2.0,
         options: Optional[dict] = None,
+        think: bool = True,
     ) -> str:
         """
         Envoie un prompt à Ollama et retourne la réponse (Synchrone).
@@ -31,6 +32,7 @@ class OllamaService:
             "model": model,
             "prompt": prompt,
             "stream": False,
+            "think": think,
         }
         if options:
             payload["options"] = options
@@ -79,6 +81,7 @@ class OllamaService:
         url: str = "http://ollama:11434",
         model: str = "gemma4:e4b",
         options: Optional[dict] = None,
+        think: bool = True,
     ) -> AsyncGenerator[dict, None]:
         """
         Génère une réponse en streaming via Ollama (Asynchrone).
@@ -89,6 +92,7 @@ class OllamaService:
             "model": model,
             "prompt": prompt,
             "stream": True,
+            "think": think,
         }
         if options:
             payload["options"] = options

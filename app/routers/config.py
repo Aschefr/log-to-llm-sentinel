@@ -54,6 +54,7 @@ class ConfigUpdate(BaseModel):
     ollama_model: Optional[str] = None
     ollama_temp: Optional[float] = None
     ollama_ctx: Optional[int] = None
+    ollama_think: Optional[bool] = None
     system_prompt: Optional[str] = None
     notification_method: Optional[str] = None
     apprise_url: Optional[str] = None
@@ -85,6 +86,7 @@ def get_config():
             "ollama_model": config.ollama_model,
             "ollama_temp": config.ollama_temp,
             "ollama_ctx": config.ollama_ctx,
+            "ollama_think": config.ollama_think,
             "system_prompt": config.system_prompt,
             "notification_method": config.notification_method,
             "apprise_url": config.apprise_url,
@@ -132,6 +134,8 @@ def update_config(config_data: ConfigUpdate):
             config.ollama_temp = config_data.ollama_temp
         if config_data.ollama_ctx is not None:
             config.ollama_ctx = config_data.ollama_ctx
+        if config_data.ollama_think is not None:
+            config.ollama_think = config_data.ollama_think
         if config_data.system_prompt is not None:
             config.system_prompt = config_data.system_prompt
         if config_data.notification_method is not None:

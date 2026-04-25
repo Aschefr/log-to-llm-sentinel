@@ -32,7 +32,7 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN monitor_log_lines INTEGER DEFAULT 60",
         "ALTER TABLE global_config ADD COLUMN ollama_temp FLOAT DEFAULT 0.1",
         "ALTER TABLE global_config ADD COLUMN ollama_ctx INTEGER DEFAULT 4096",
-        "ALTER TABLE global_config ADD COLUMN ollama_num_thread INTEGER DEFAULT 4",
+        "ALTER TABLE global_config ADD COLUMN ollama_think BOOLEAN DEFAULT 1",
     ]
     with engine.connect() as conn:
         for sql in migrations:

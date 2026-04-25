@@ -66,6 +66,7 @@ class GlobalConfig(Base):
     ollama_model = Column(String, default="gemma4:e4b")
     ollama_temp = Column(Float, default=0.1)
     ollama_ctx = Column(Integer, default=4096)
+    ollama_think = Column(Boolean, default=True)
     system_prompt = Column(Text, default="")
     notification_method = Column(String, default="smtp")
     apprise_url = Column(String, nullable=True)

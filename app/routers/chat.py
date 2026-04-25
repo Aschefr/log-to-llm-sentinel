@@ -139,6 +139,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     ollama_model = (cfg.ollama_model or "gemma4:e4b") if cfg else "gemma4:e4b"
     ollama_temp = cfg.ollama_temp if cfg else 0.1
     ollama_ctx = cfg.ollama_ctx if cfg else 4096
+    ollama_think = cfg.ollama_think if cfg else True
 
     async def event_generator():
         full_response = ""
@@ -154,6 +155,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
                     prompt=prompt,
                     url=ollama_url,
                     model=ollama_model,
+                    think=ollama_think,
                     options={
                         "temperature": ollama_temp,
                         "num_ctx": ollama_ctx

@@ -20,15 +20,15 @@ function applyProfile(type) {
     if (type === 'eco') {
         temp.value = 0.1;
         ctx.value = 2048;
-        threads.value = 4;
+        document.getElementById('ollama-think').checked = false;
     } else if (type === 'balanced') {
         temp.value = 0.4;
         ctx.value = 4096;
-        threads.value = 8;
+        document.getElementById('ollama-think').checked = true;
     } else if (type === 'gpu') {
         temp.value = 0.7;
         ctx.value = 8192;
-        threads.value = 16;
+        document.getElementById('ollama-think').checked = true;
     }
     
     // Déclencher l'auto-sauvegarde
@@ -136,7 +136,8 @@ async function loadConfig() {
         document.getElementById('monitor-log-lines').value = config.monitor_log_lines || 60;
         document.getElementById('ollama-temp').value = config.ollama_temp || 0.1;
         document.getElementById('ollama-ctx').value = config.ollama_ctx || 4096;
-        document.getElementById('ollama-threads').value = config.ollama_num_thread || 4;
+        const thinkEl = document.getElementById('ollama-think');
+        if (thinkEl) thinkEl.checked = config.ollama_think !== false;
         window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) {
@@ -484,7 +485,7 @@ async function saveConfig(messageEl, isAutoSave = false) {
         monitor_log_lines: parseInt(document.getElementById('monitor-log-lines').value) || 60,
         ollama_temp: parseFloat(document.getElementById('ollama-temp').value) || 0.1,
         ollama_ctx: parseInt(document.getElementById('ollama-ctx').value) || 4096,
-        ollama_num_thread: parseInt(document.getElementById('ollama-threads').value) || 4,
+        ollama_think: document.getElementById('ollama-think').checked,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
     };
 
