@@ -16,6 +16,7 @@
     --warning: #f59e0b;
     --danger: #ef4444;
     --border: rgba(255, 255, 255, 0.08);
+    color-scheme: dark;
 }
 
 body {
@@ -478,17 +479,24 @@ body {
 .form-group textarea {
     width: 100%;
     padding: 0.4rem 0.6rem;
-    background: rgba(0, 0, 0, 0.2);
+    background: #1e293b; /* Plus opaque et proche de var(--bg-primary) */
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     color: var(--text-primary);
     font-family: inherit;
     font-size: 0.85rem;
     transition: all 0.2s;
-    color-scheme: dark; /* Force le navigateur à utiliser le thème sombre pour le dropdown natif */
+    color-scheme: dark;
 }
 
-/* On retire le background custom sur les options pour laisser le navigateur faire (Chrome/Edge en dark mode) */
+.form-group select option {
+    background-color: #0f172a; /* Utilisation de var(--bg-primary) en dur pour compatibilité native */
+    color: var(--text-primary);
+}
+
+.form-group select:hover {
+    border-color: var(--accent);
+}
 
 .form-group input:focus,
 .form-group select:focus,
