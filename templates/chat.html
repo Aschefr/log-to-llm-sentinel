@@ -2,6 +2,13 @@
 
 {% block title %}Log Chat — Log to LLM Sentinel{% endblock %}
 
+{% block scripts %}
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+    body { font-family: 'Outfit', sans-serif !important; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="chat-page-container">
     <!-- Sidebar -->
@@ -56,11 +63,14 @@
 <style>
 .chat-page-container {
     display: flex;
-    height: calc(100vh - 100px);
-    margin: -1rem; /* Compensation du padding du container parent */
+    position: fixed;
+    top: 65px; /* Ajusté selon la hauteur de la navbar */
+    left: 0;
+    right: 0;
+    bottom: 0;
     background: var(--bg-secondary);
-    border-radius: 0 0 1rem 1rem;
     overflow: hidden;
+    z-index: 10;
 }
 
 .chat-sidebar {
@@ -91,12 +101,33 @@
 }
 
 .conv-item {
-    padding: 1rem;
+    padding: 0.75rem 1rem;
     border-radius: 0.5rem;
     cursor: pointer;
     transition: background 0.2s;
     margin-bottom: 0.5rem;
     border: 1px solid transparent;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    group: hover;
+}
+
+.conv-item .delete-chat-btn {
+    opacity: 0;
+    transition: opacity 0.2s;
+    padding: 4px;
+    border-radius: 4px;
+    color: var(--text-secondary);
+}
+
+.conv-item:hover .delete-chat-btn {
+    opacity: 1;
+}
+
+.delete-chat-btn:hover {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.1);
 }
 
 .conv-item:hover {
@@ -128,6 +159,7 @@
     flex-direction: column;
     background: var(--bg-primary);
     position: relative;
+    min-width: 0;
 }
 
 .chat-welcome {
@@ -149,6 +181,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    overflow: hidden;
 }
 
 .chat-header {
@@ -167,14 +200,16 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    min-height: 0;
 }
 
 .message-bubble {
-    max-width: 85%;
-    padding: 1rem 1.25rem;
-    border-radius: 1rem;
-    line-height: 1.5;
+    max-width: 92%;
+    padding: 1rem 1.5rem;
+    border-radius: 0.75rem;
+    line-height: 1.6;
     position: relative;
+    font-weight: 300; /* Police plus fine */
 }
 
 .message-bubble.user {
@@ -283,10 +318,30 @@ function renderConversationList() {
     }
     list.innerHTML = conversations.map(c => `
         <div class="conv-item ${c.id === activeConvId ? 'active' : ''}" onclick="selectConversation(${c.id})">
-            <div class="conv-title">${escapeHtml(c.title)}</div>
-            <div class="conv-date">${formatDate(c.created_at)}</div>
+            <div style="flex: 1; min-width: 0;">
+                <div class="conv-title">${escapeHtml(c.title)}</div>
+                <div class="conv-date">${formatDate(c.created_at)}</div>
+            </div>
+            <button class="btn-icon delete-chat-btn" onclick="event.stopPropagation(); deleteConversation(${c.id})" title="Supprimer">
+                <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
+            </button>
         </div>
     `).join('');
+}
+
+async function deleteConversation(id) {
+    if (!confirm('Supprimer cette conversation ?')) return;
+    try {
+        await apiFetch(\`/chat/api/delete/\${id}\`, { method: 'DELETE' });
+        if (activeConvId === id) {
+            activeConvId = null;
+            document.getElementById('chat-interface').classList.add('hidden');
+            document.getElementById('chat-welcome').classList.remove('hidden');
+        }
+        await loadConversations();
+    } catch (e) {
+        alert(e.message);
+    }
 }
 
 async function selectConversation(id) {

@@ -155,3 +155,13 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     db.commit()
 
     return {"status": "ok", "response": response}
+
+@router.delete("/api/delete/{conv_id}")
+async def delete_conversation(conv_id: int, db: Session = Depends(get_db)):
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation non trouvée")
+    
+    db.delete(conv)
+    db.commit()
+    return {"status": "ok"}
