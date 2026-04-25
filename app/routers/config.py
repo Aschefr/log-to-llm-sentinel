@@ -223,7 +223,7 @@ def test_ollama():
 
         # 2) generation (courte)
         prompt = "Réponds uniquement par 'OK'."
-        resp = OllamaService().analyze(prompt=prompt, url=base, model=model, timeout=30, retries=2)
+        resp = OllamaService().analyze(prompt=prompt, url=base, model=model, timeout=60, retries=2)
 
         if isinstance(resp, str) and resp.startswith("[Erreur Ollama]"):
             raise HTTPException(status_code=502, detail=resp)
