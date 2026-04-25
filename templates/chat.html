@@ -240,6 +240,30 @@
     overflow-y: auto;
 }
 
+/* Animations de réflexion */
+.thinking-state {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0;
+}
+
+.thinking-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-right: 4px;
+    animation: pulse 1.5s infinite ease-in-out;
+}
+
+.thinking-dot:nth-child(2) { animation-delay: 0.2s; }
+.thinking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes pulse {
+    0%, 100% { transform: scale(0.7); opacity: 0.3; }
+    50% { transform: scale(1.1); opacity: 1; }
+}
+
 .chat-footer {
     padding: 1.5rem 2rem;
     border-top: 1px solid var(--border);
@@ -419,6 +443,12 @@ async function sendMessage() {
             <div class="markdown-body">${escapeHtml(content)}</div>
         </div>
         <div class="message-bubble assistant" id="streaming-ai">
+            <div class="thinking-state">
+                <span class="thinking-dot"></span>
+                <span class="thinking-dot"></span>
+                <span class="thinking-dot"></span>
+                <span style="margin-left:0.5rem; opacity:0.7; font-size:0.9rem;">Ollama réfléchit...</span>
+            </div>
             <div class="markdown-body"></div>
         </div>
     `;
@@ -428,7 +458,9 @@ async function sendMessage() {
 
     const aiBubble = document.getElementById('streaming-ai');
     const aiContent = aiBubble.querySelector('.markdown-body');
+    const thinkingState = aiBubble.querySelector('.thinking-state');
     let fullText = "";
+    let isFirstToken = true;
 
     try {
         const response = await fetch('/chat/api/send', {
@@ -455,6 +487,10 @@ async function sendMessage() {
                         const data = JSON.parse(line.substring(6));
                         if (data.error) throw new Error(data.error);
                         if (data.text) {
+                            if (isFirstToken) {
+                                thinkingState.style.display = 'none';
+                                isFirstToken = false;
+                            }
                             fullText += data.text;
                             aiContent.innerHTML = marked.parse(fullText);
                             container.scrollTop = container.scrollHeight;

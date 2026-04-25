@@ -44,7 +44,6 @@ class OllamaService:
                     response.raise_for_status()
                     result = response.json()
                     answer = result.get("response", "Aucune réponse d'Ollama")
-                    logger.debug("OllamaService", f"Réponse reçue ({len(answer)} car.)")
                     return answer
 
             except httpx.HTTPStatusError as e:
