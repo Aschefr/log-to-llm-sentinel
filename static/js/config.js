@@ -119,6 +119,24 @@ function setupForm() {
         });
     }
 
+    const copyBtn = document.getElementById('copy-logs-btn');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', () => {
+            const logsEl = document.getElementById('debug-logs');
+            const text = logsEl.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const oldText = copyBtn.innerHTML;
+                copyBtn.innerHTML = '✅ Copié !';
+                setTimeout(() => {
+                    copyBtn.innerHTML = oldText;
+                }, 2000);
+            }).catch(err => {
+                console.error('Erreur copie:', err);
+                alert('Impossible de copier dans le presse-papier');
+            });
+        });
+    }
+
     // Auto-save logic
     const inputs = form.querySelectorAll('input, select, textarea');
     let modifiedInputs = new Set();

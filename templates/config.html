@@ -127,7 +127,10 @@
             <div id="debug-logs-container" class="debug-logs-container hidden">
                 <div class="debug-logs-header">
                     <span>Logs en direct</span>
-                    <button type="button" id="clear-logs-btn" class="btn btn-small">Effacer</button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" id="copy-logs-btn" class="btn btn-small">📋 Copier</button>
+                        <button type="button" id="clear-logs-btn" class="btn btn-small">Effacer</button>
+                    </div>
                 </div>
                 <div id="debug-logs" class="debug-logs"></div>
             </div>
