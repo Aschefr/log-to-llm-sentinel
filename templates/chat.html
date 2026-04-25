@@ -110,7 +110,6 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    group: hover;
 }
 
 .conv-item .delete-chat-btn {
@@ -282,31 +281,35 @@
 let activeConvId = {{ conversation_id if conversation_id else 'null' }};
 let conversations = [];
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadConversations();
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadConversations();
     if (activeConvId) {
         selectConversation(activeConvId);
     }
 
     const input = document.getElementById('chat-input');
-    input.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = (this.scrollHeight) + 'px';
-    });
-    input.addEventListener('keydown', e => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
-        }
-    });
+    if (input) {
+        input.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    }
 });
 
 async function loadConversations() {
+    const list = document.getElementById('conversation-list');
     try {
         conversations = await apiFetch('/chat/api/conversations');
         renderConversationList();
     } catch (e) {
         console.error(e);
+        if (list) list.innerHTML = `<div class="loading" style="color:var(--danger)">Erreur de chargement: ${e.message}</div>`;
     }
 }
 
