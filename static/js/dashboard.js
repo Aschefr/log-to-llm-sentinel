@@ -1,3 +1,5 @@
+let activeSeverityFilter = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     loadStats();
     loadRulesStatus();
@@ -9,6 +11,14 @@ document.addEventListener('DOMContentLoaded', () => {
         loadRulesStatus();
         loadRecentAnalyses();
     }, 30000);
+
+    // Filtres par sévérité
+    document.querySelectorAll('.severity-card.clickable').forEach(card => {
+        card.addEventListener('click', () => {
+            const sev = card.getAttribute('data-severity');
+            setSeverityFilter(sev);
+        });
+    });
 
     const clearAllBtn = document.getElementById('clear-all-analyses-btn');
     if (clearAllBtn) {
@@ -44,7 +54,11 @@ async function loadStats() {
 
 async function loadRecentAnalyses() {
     try {
-        const analyses = await apiFetch('/api/dashboard/recent');
+        let url = '/api/dashboard/recent?limit=20';
+        if (activeSeverityFilter) {
+            url += `&severity=${activeSeverityFilter}`;
+        }
+        const analyses = await apiFetch(url);
         const container = document.getElementById('recent-analyses');
         
         if (analyses.length === 0) {
@@ -126,6 +140,22 @@ async function retryAnalysis(analysisId, btn) {
         btn.disabled = false;
         btn.innerHTML = oldHtml;
     }
+}
+
+function setSeverityFilter(severity) {
+    activeSeverityFilter = severity;
+    
+    // UI Update
+    document.querySelectorAll('.severity-card').forEach(c => c.classList.remove('active'));
+    if (severity) {
+        document.querySelector(`.severity-card.${severity}`).classList.add('active');
+        document.getElementById('active-filter-label').classList.remove('hidden');
+        document.getElementById('filter-name').textContent = severity.toUpperCase();
+    } else {
+        document.getElementById('active-filter-label').classList.add('hidden');
+    }
+    
+    loadRecentAnalyses();
 }
 
 async function loadRulesStatus() {

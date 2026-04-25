@@ -1062,3 +1062,13 @@ body {
 .stat-item span:last-child { color: var(--accent); font-weight: 600; }
 
 @media (max-width: 900px) { .nav-stats { display: none; } }
+
+/* --- Dashboard Interactivity ------------------------------------------ */
+.severity-card.clickable { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; position: relative; }
+.severity-card.clickable:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+.severity-card.clickable:active { transform: translateY(-1px); }
+.severity-card.active { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+.filter-badge { background: rgba(59,130,246,0.1); color: var(--accent); border: 1px solid rgba(59,130,246,0.3); border-radius: 2rem; padding: 0.25rem 0.75rem; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+.filter-badge:hover { background: rgba(239,68,68,0.1); color: var(--danger); border-color: var(--danger); }
+.filter-badge span { text-transform: uppercase; margin: 0 0.25rem; }

@@ -70,7 +70,7 @@ def get_stats():
 
 
 @router.get("/recent")
-def get_recent_analyses(limit: int = 10, rule_id: int | None = None):
+def get_recent_analyses(limit: int = 10, rule_id: int | None = None, severity: str | None = None):
     db = SessionLocal()
     try:
         # Jointure explicite pour récupérer l'objet Analysis et le nom de la Règle associée
@@ -78,6 +78,8 @@ def get_recent_analyses(limit: int = 10, rule_id: int | None = None):
         
         if rule_id is not None:
             q = q.filter(Analysis.rule_id == rule_id)
+        if severity:
+            q = q.filter(Analysis.severity == severity)
 
         results = q.order_by(Analysis.analyzed_at.desc()).limit(limit).all()
         

@@ -26,15 +26,15 @@
     </div>
 
     <div class="severity-grid">
-        <div class="severity-card critical">
+        <div class="severity-card critical clickable" data-severity="critical">
             <div class="severity-value" id="critical-count">0</div>
             <div class="severity-label">Critiques</div>
         </div>
-        <div class="severity-card warning">
+        <div class="severity-card warning clickable" data-severity="warning">
             <div class="severity-value" id="warning-count">0</div>
             <div class="severity-label">Avertissements</div>
         </div>
-        <div class="severity-card info">
+        <div class="severity-card info clickable" data-severity="info">
             <div class="severity-value" id="info-count">0</div>
             <div class="severity-label">Infos</div>
         </div>
@@ -48,8 +48,11 @@
     </section>
  
     <section class="recent-section">
-        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-            <h2 style="margin: 0;">Analyses récentes</h2>
+        <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <div style="display: flex; align-items: baseline; gap: 1rem;">
+                <h2 style="margin: 0;">Analyses récentes</h2>
+                <span id="active-filter-label" class="filter-badge hidden" onclick="setSeverityFilter(null)">Filtre: <span id="filter-name">--</span> ✖</span>
+            </div>
             <button class="btn btn-secondary btn-sm" id="clear-all-analyses-btn">🗑️ Tout effacer</button>
         </div>
         <div id="recent-analyses" class="analyses-list">
