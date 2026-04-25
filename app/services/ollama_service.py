@@ -33,10 +33,9 @@ class OllamaService:
             "prompt": prompt,
             "stream": False,
         }
-        # On n'envoie 'think' que s'il est désactivé (pour optimiser)
-        # Si True, on laisse le comportement par défaut du modèle
-        if think is False:
-            payload["think"] = False
+        # Désactivé temporairement car peut causer des 500 sur certains modèles non-R1
+        # if think is False:
+        #    payload["think"] = False
 
         if options:
             payload["options"] = options
@@ -44,14 +43,15 @@ class OllamaService:
         attempts = max(1, int(retries) + 1)
         last_err: Optional[str] = None
 
-        logger.debug("OllamaService", f"Appel à {api_url} | modèle={model} | prompt={prompt[:100]}...")
+        logger.debug("OllamaService", f"Appel à {api_url} (Timeout {timeout}s) | modèle={model}")
 
         for attempt in range(1, attempts + 1):
             try:
-                with httpx.Client(timeout=timeout) as client:
+                # On force un timeout plus long pour éviter les coupures Sentinel
+                with httpx.Client(timeout=300) as client:
                     response = client.post(api_url, json=payload)
                     response.raise_for_status()
-                    logger.debug("OllamaService", f"Réponse HTTP {response.status_code} reçue")
+                    logger.debug("OllamaService", f"Réponse HTTP {response.status_code} reçue en {response.elapsed.total_seconds():.1f}s")
                     result = response.json()
                     answer = result.get("response", "Aucune réponse d'Ollama")
                     return answer
@@ -98,8 +98,8 @@ class OllamaService:
             "prompt": prompt,
             "stream": True,
         }
-        if think is False:
-            payload["think"] = False
+        # if think is False:
+        #    payload["think"] = False
             
         if options:
             payload["options"] = options
