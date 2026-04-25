@@ -364,8 +364,10 @@ async function onLineClick(el, ruleId) {
             <span class="detail-label">Réponse LLM</span>
             <div class="detail-value analysis-response markdown-body">${relatedAnalysis.ollama_response ? marked.parse(relatedAnalysis.ollama_response) : '—'}</div>
         </div>
-        <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+        
+        <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
             <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${relatedAnalysis.id}, this)">🔄 Ré-essayer l'analyse</button>
+            <button class="btn btn-primary btn-sm" onclick="openChat(${relatedAnalysis.id})">💬 Approfondir avec l'IA</button>
         </div>
         ` : `
         <div class="detail-row"><em>Aucune analyse automatique trouvée pour cette ligne.</em></div>
@@ -431,8 +433,9 @@ async function loadRuleAnalyses(ruleId) {
                 </div>
                 <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
-                <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">
+                <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
                     <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer</button>
+                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 Approfondir avec l'IA</button>
                 </div>
             </div>
         `).join('');
@@ -501,9 +504,11 @@ async function searchById() {
                 <div class="detail-row"><span class="detail-label">Analyse LLM</span>
                     <div class="detail-value analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : '—'}</div>
                 </div>
+
                 <div class="detail-row"><span class="detail-label">Notifié</span><span class="detail-value">${a.notified ? '✅ Oui' : '❌ Non'}</span></div>
-                <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
                     <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer l'analyse</button>
+                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 Approfondir avec l'IA</button>
                 </div>
             </div>
         `;
@@ -529,8 +534,13 @@ async function manualAnalyze(ruleId, btn) {
 
         if (res.status === 'ok') {
             const a = res.analysis;
+            const chatId = 'manual-' + Math.random().toString(36).substr(2, 9);
             const content = document.getElementById(`detail-panel-content-${ruleId}`);
             if (content) {
+                // On prépare les données de contexte pour le chat manuel
+                const safePrompt = res.analysis.original_prompt || ''; 
+                const safeResponse = res.analysis.ollama_response || '';
+
                 content.innerHTML += `
                     <div class="manual-analysis-result" style="margin-top: 1.5rem; border-top: 2px dashed var(--accent); padding-top: 1rem;">
                         <div class="detail-row">
@@ -538,6 +548,9 @@ async function manualAnalyze(ruleId, btn) {
                             <span class="severity-badge ${a.severity}">${a.severity}</span>
                         </div>
                         <div class="analysis-response markdown-body">${marked.parse(a.ollama_response)}</div>
+                        <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
+                            <button class="btn btn-primary btn-sm" onclick="openChat(null, \`${escapeHtml(selectedLineText).replace(/`/g, '\\`')}\`, \`${escapeHtml(a.ollama_response).replace(/`/g, '\\`')}\`)">💬 Approfondir avec l'IA</button>
+                        </div>
                     </div>
                 `;
             }

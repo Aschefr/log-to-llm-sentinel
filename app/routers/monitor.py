@@ -240,3 +240,51 @@ async def analyze_line(data: dict):
         }
     finally:
         db.close()
+@router.post("/chat")
+async def chat_analysis(data: dict):
+    """Continue la conversation sur une analyse."""
+    analysis_id = data.get("analysis_id")
+    question = data.get("question")
+    context_prompt = data.get("context_prompt")  # Pour les analyses manuelles non sauvegardées
+    context_response = data.get("context_response")
+    
+    if not question:
+        raise HTTPException(status_code=400, detail="Question manquante")
+        
+    db = SessionLocal()
+    try:
+        prompt = ""
+        if analysis_id and str(analysis_id).isdigit():
+            analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+            if not analysis:
+                raise HTTPException(status_code=404, detail="Analyse non trouvée")
+            rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
+            cfg = db.query(GlobalConfig).first()
+            
+            # Reconstruire le prompt original (ou le stocker en BDD ?)
+            # Ici on va construire un prompt de chat
+            base_prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, cfg.system_prompt if cfg else "")
+            prompt = f"{base_prompt}\n\nTa réponse précédente :\n{analysis.ollama_response}\n\nQuestion de l'utilisateur : {question}"
+        else:
+            # Mode manuel ou contextuel
+            prompt = f"Contexte de l'analyse :\n{context_prompt}\n\nRéponse précédente :\n{context_response}\n\nQuestion de l'utilisateur : {question}"
+
+        cfg = db.query(GlobalConfig).first()
+        if not cfg:
+            raise HTTPException(status_code=500, detail="Configuration non trouvée")
+
+        async with _orchestrator._ollama_semaphore:
+            response = await asyncio.to_thread(
+                _orchestrator.ollama.analyze,
+                prompt=prompt,
+                url=cfg.ollama_url,
+                model=cfg.ollama_model,
+                timeout=120  # Plus long pour le chat
+            )
+            
+        from app import logger
+        logger.add_ollama_log(f"CHAT: {question}", response, "CHAT")
+        
+        return {"status": "ok", "response": response}
+    finally:
+        db.close()

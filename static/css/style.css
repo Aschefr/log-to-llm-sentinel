@@ -1095,3 +1095,13 @@ body {
 
 .log-line.bundle-selected { background: rgba(59,130,246,0.1) !important; border-left: 3px solid var(--accent) !important; opacity: 1 !important; }
 
+
+.analysis-chat { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+.chat-input-group { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.chat-input { flex: 1; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.75rem; color: #fff; font-size: 0.85rem; }
+.chat-input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.chat-history { font-size: 0.85rem; margin-bottom: 0.75rem; }
+.chat-msg { margin-bottom: 0.5rem; padding: 0.5rem; border-radius: 4px; }
+.chat-msg.user { background: rgba(59,130,246,0.1); border-left: 3px solid var(--accent); }
+.chat-msg.ai { background: rgba(255,255,255,0.03); border-left: 3px solid #666; }
+

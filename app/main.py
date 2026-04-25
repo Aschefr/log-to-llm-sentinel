@@ -10,6 +10,7 @@ from app.database import init_db
 from app.routers import rules, config, dashboard
 from app.routers import files as files_router
 from app.routers import monitor as monitor_router
+from app.routers import chat as chat_router
 from app.services.log_watcher import LogWatcher
 from app.services.orchestrator import Orchestrator
 
@@ -30,8 +31,9 @@ async def lifespan(app: FastAPI):
     os.makedirs("/logs", exist_ok=True)
     os.makedirs("./data", exist_ok=True)
 
-    # Partager l'orchestrateur avec le router monitor (pour accès aux buffers)
+    # Partager l'orchestrateur avec les routers (pour accès aux buffers et Ollama)
     monitor_router.set_orchestrator(orchestrator)
+    chat_router.set_orchestrator(orchestrator)
 
     # Démarre le watcher en background
     watcher_task = asyncio.create_task(log_watcher.start())
@@ -65,6 +67,7 @@ app.include_router(config.router)
 app.include_router(dashboard.router)
 app.include_router(files_router.router)
 app.include_router(monitor_router.router)
+app.include_router(chat_router.router)
 
 
 # ── Pages ──

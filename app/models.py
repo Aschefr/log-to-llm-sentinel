@@ -71,3 +71,22 @@ class GlobalConfig(Base):
     monitor_log_lines = Column(Integer, default=60)
     debug_mode = Column(Boolean, default=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+class ChatConversation(Base):
+    __tablename__ = "chat_conversations"
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=True)
+    
+    messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("chat_conversations.id"))
+    role = Column(String) # user, assistant
+    content = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("ChatConversation", back_populates="messages")

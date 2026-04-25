@@ -114,3 +114,60 @@ function formatUptime(seconds) {
     const m = Math.floor((seconds % 3600) / 60);
     return `${h}h${m}m`;
 }
+
+async function openChat(analysisId, rawPrompt = null, rawResponse = null) {
+    try {
+        const res = await apiFetch('/chat/api/create', {
+            method: 'POST',
+            body: { 
+                analysis_id: analysisId,
+                raw_context_prompt: rawPrompt,
+                raw_context_response: rawResponse
+            }
+        });
+        if (res.id) {
+            window.location.href = `/chat?id=${res.id}`;
+        }
+    } catch (e) {
+        alert('Erreur lors de la création de la conversation: ' + e.message);
+    }
+}
+
+async function askQuestion(analysisId, inputEl, contextPrompt = null, contextResponse = null) {
+    const question = inputEl.value.trim();
+    if (!question) return;
+
+    const historyEl = document.getElementById(`chat-history-${analysisId}`);
+    if (!historyEl) return;
+
+    // Ajouter la question utilisateur
+    historyEl.innerHTML += `<div class="chat-msg user"><strong>Vous :</strong> ${escapeHtml(question)}</div>`;
+    inputEl.value = '';
+
+    const aiMsgEl = document.createElement('div');
+    aiMsgEl.className = 'chat-msg ai';
+    aiMsgEl.innerHTML = '<strong>Ollama :</strong> ⏳...';
+    historyEl.appendChild(aiMsgEl);
+    historyEl.scrollTop = historyEl.scrollHeight;
+
+    try {
+        const res = await apiFetch('/api/monitor/chat', {
+            method: 'POST',
+            body: {
+                analysis_id: analysisId,
+                question: question,
+                context_prompt: contextPrompt,
+                context_response: contextResponse
+            }
+        });
+
+        if (res.status === 'ok') {
+            aiMsgEl.innerHTML = `<strong>Ollama :</strong> ${marked.parse(res.response)}`;
+        } else {
+            aiMsgEl.innerHTML = `<strong>Ollama :</strong> ❌ Erreur : ${res.detail}`;
+        }
+    } catch (e) {
+        aiMsgEl.innerHTML = `<strong>Ollama :</strong> ❌ Erreur : ${e.message}`;
+    }
+    historyEl.scrollTop = historyEl.scrollHeight;
+}
