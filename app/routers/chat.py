@@ -98,7 +98,7 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
     }
 
 @router.post("/api/send")
-async def send_message(data: dict, db: Session = Depends(get_db)):
+async def send_message(data: dict, request: Request, db: Session = Depends(get_db)):
     conv_id = data.get("conversation_id")
     content = data.get("content")
     
@@ -163,11 +163,15 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
                         "num_ctx": ollama_ctx
                     }
                 ):
+                    if await request.is_disconnected():
+                        logger.info("ChatRouter", "Client déconnecté, arrêt immédiat du stream")
+                        return
+
                     if "error" in chunk:
                         yield f"data: {json.dumps({'error': chunk['error']})}\n\n"
                         return
 
-                    text = chunk.get("response", "")
+                    text = chunk.get("message", {}).get("content", "") or chunk.get("response", "")
                     if not text:
                         if chunk.get("done"): break
                         continue
