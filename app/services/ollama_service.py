@@ -75,6 +75,7 @@ class OllamaService:
         prompt: str,
         url: str = "http://ollama:11434",
         model: str = "gemma4:e4b",
+        options: Optional[dict] = None,
     ) -> AsyncGenerator[dict, None]:
         """
         Génère une réponse en streaming via Ollama (Asynchrone).
@@ -86,6 +87,8 @@ class OllamaService:
             "prompt": prompt,
             "stream": True,
         }
+        if options:
+            payload["options"] = options
 
         logger.debug("OllamaService", f"Streaming à {api_url} | modèle={model}")
         try:

@@ -52,6 +52,9 @@ class ConfigUpdate(BaseModel):
     smtp_ssl_mode: Optional[str] = None
     ollama_url: Optional[str] = None
     ollama_model: Optional[str] = None
+    ollama_temp: Optional[float] = None
+    ollama_ctx: Optional[int] = None
+    ollama_num_thread: Optional[int] = None
     system_prompt: Optional[str] = None
     notification_method: Optional[str] = None
     apprise_url: Optional[str] = None
@@ -81,6 +84,9 @@ def get_config():
             "smtp_ssl_mode": config.smtp_ssl_mode,
             "ollama_url": config.ollama_url,
             "ollama_model": config.ollama_model,
+            "ollama_temp": config.ollama_temp,
+            "ollama_ctx": config.ollama_ctx,
+            "ollama_num_thread": config.ollama_num_thread,
             "system_prompt": config.system_prompt,
             "notification_method": config.notification_method,
             "apprise_url": config.apprise_url,
@@ -124,6 +130,12 @@ def update_config(config_data: ConfigUpdate):
             config.ollama_url = config_data.ollama_url
         if config_data.ollama_model is not None:
             config.ollama_model = config_data.ollama_model
+        if config_data.ollama_temp is not None:
+            config.ollama_temp = config_data.ollama_temp
+        if config_data.ollama_ctx is not None:
+            config.ollama_ctx = config_data.ollama_ctx
+        if config_data.ollama_num_thread is not None:
+            config.ollama_num_thread = config_data.ollama_num_thread
         if config_data.system_prompt is not None:
             config.system_prompt = config_data.system_prompt
         if config_data.notification_method is not None:

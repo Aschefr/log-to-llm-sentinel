@@ -12,6 +12,31 @@ function setPullModel(name) {
     if (input) input.value = name;
 }
 
+function applyProfile(type) {
+    const temp = document.getElementById('ollama-temp');
+    const ctx = document.getElementById('ollama-ctx');
+    const threads = document.getElementById('ollama-threads');
+    
+    if (type === 'eco') {
+        temp.value = 0.1;
+        ctx.value = 2048;
+        threads.value = 4;
+    } else if (type === 'balanced') {
+        temp.value = 0.4;
+        ctx.value = 4096;
+        threads.value = 8;
+    } else if (type === 'gpu') {
+        temp.value = 0.7;
+        ctx.value = 8192;
+        threads.value = 16;
+    }
+    
+    // Déclencher l'auto-sauvegarde
+    temp.dispatchEvent(new Event('input'));
+    ctx.dispatchEvent(new Event('input'));
+    threads.dispatchEvent(new Event('input'));
+}
+
 function setupModelPulling() {
     const btn = document.getElementById('pull-model-btn');
     const input = document.getElementById('pull-model-name');
@@ -109,6 +134,9 @@ async function loadConfig() {
         document.getElementById('apprise-max-chars').value = config.apprise_max_chars || 1900;
         document.getElementById('max-log-chars').value = config.max_log_chars || 5000;
         document.getElementById('monitor-log-lines').value = config.monitor_log_lines || 60;
+        document.getElementById('ollama-temp').value = config.ollama_temp || 0.1;
+        document.getElementById('ollama-ctx').value = config.ollama_ctx || 4096;
+        document.getElementById('ollama-threads').value = config.ollama_num_thread || 4;
         window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) {
@@ -449,6 +477,9 @@ async function saveConfig(messageEl, isAutoSave = false) {
         apprise_max_chars: parseInt(document.getElementById('apprise-max-chars').value) || 1900,
         max_log_chars: parseInt(document.getElementById('max-log-chars').value) || 5000,
         monitor_log_lines: parseInt(document.getElementById('monitor-log-lines').value) || 60,
+        ollama_temp: parseFloat(document.getElementById('ollama-temp').value) || 0.1,
+        ollama_ctx: parseInt(document.getElementById('ollama-ctx').value) || 4096,
+        ollama_num_thread: parseInt(document.getElementById('ollama-threads').value) || 4,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
     };
 

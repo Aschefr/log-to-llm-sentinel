@@ -137,6 +137,9 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     cfg = db.query(GlobalConfig).first()
     ollama_url = (cfg.ollama_url or "http://ollama:11434") if cfg else "http://ollama:11434"
     ollama_model = (cfg.ollama_model or "gemma4:e4b") if cfg else "gemma4:e4b"
+    ollama_temp = cfg.ollama_temp if cfg else 0.1
+    ollama_ctx = cfg.ollama_ctx if cfg else 4096
+    ollama_num_thread = cfg.ollama_num_thread if cfg else 4
 
     async def event_generator():
         full_response = ""
@@ -151,7 +154,12 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
                 async for chunk in _orchestrator.ollama.generate_stream(
                     prompt=prompt,
                     url=ollama_url,
-                    model=ollama_model
+                    model=ollama_model,
+                    options={
+                        "temperature": ollama_temp,
+                        "num_ctx": ollama_ctx,
+                        "num_thread": ollama_num_thread
+                    }
                 ):
                     if "error" in chunk:
                         yield f"data: {json.dumps({'error': chunk['error']})}\n\n"

@@ -73,6 +73,34 @@
             <div id="ollama-test-message" class="message hidden"></div>
 
             <div class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
+                <h3>⚡ Réglages de performance</h3>
+                <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label for="ollama-temp">Température</label>
+                        <input type="number" id="ollama-temp" step="0.1" min="0" max="1">
+                        <div class="form-hint">Bas = direct, Haut = créatif.</div>
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label for="ollama-ctx">Contexte (tokens)</label>
+                        <input type="number" id="ollama-ctx" step="1024" min="1024" max="32768">
+                        <div class="form-hint">Taille de la mémoire.</div>
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 120px;">
+                        <label for="ollama-threads">Threads CPU</label>
+                        <input type="number" id="ollama-threads" min="1" max="64">
+                        <div class="form-hint">Cœurs alloués.</div>
+                    </div>
+                </div>
+
+                <div class="profile-selectors" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <span style="width: 100%; font-size: 0.85rem; margin-bottom: 0.25rem; opacity: 0.7;">Profils rapides :</span>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')">💻 Profil Éco (Petit CPU)</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')">⚖️ Profil Équilibré</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')">🚀 Profil GPU / Gamer</button>
+                </div>
+            </div>
+
+            <div class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
                 <h3>📦 Gestion des modèles</h3>
                 <div class="form-group">
                     <label>Télécharger un nouveau modèle</label>

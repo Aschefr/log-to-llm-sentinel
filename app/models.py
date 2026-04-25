@@ -62,8 +62,11 @@ class GlobalConfig(Base):
     smtp_recipient = Column(String, default="")
     smtp_tls = Column(Boolean, default=True)  # legacy
     smtp_ssl_mode = Column(String, default="starttls")  # 'ssl' | 'starttls' | 'none'
-    ollama_url = Column(String, default="http://host.docker.internal:11434")
-    ollama_model = Column(String, default="llama3")
+    ollama_url = Column(String, default="http://ollama:11434")
+    ollama_model = Column(String, default="gemma4:e4b")
+    ollama_temp = Column(Float, default=0.1)
+    ollama_ctx = Column(Integer, default=4096)
+    ollama_num_thread = Column(Integer, default=4)
     system_prompt = Column(Text, default="")
     notification_method = Column(String, default="smtp")
     apprise_url = Column(String, nullable=True)
