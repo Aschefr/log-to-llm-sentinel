@@ -141,7 +141,7 @@ async function toggleLiveLogs(ruleId, toggleElement, path) {
             try {
                 const res = await apiFetch(`/api/files/tail?path=${encodeURIComponent(path)}&lines=15`);
                 if (res.lines && res.lines.length > 0) {
-                    const newContent = res.lines.map(l => escapeHtml(l)).join('<br>');
+                    const newContent = res.lines.map(l => escapeHtml(typeof l === 'string' ? l : l.text)).join('<br>');
                     let pre = document.getElementById(`live-log-pre-${ruleId}`);
                     
                     if (!pre) {
@@ -657,7 +657,7 @@ async function fetchFilePreview(path) {
     try {
         const res = await apiFetch(`/api/files/tail?path=${encodeURIComponent(path)}&lines=10`);
         if (res.lines && res.lines.length > 0) {
-            content.innerHTML = res.lines.map(l => escapeHtml(l)).join('<br>');
+            content.innerHTML = res.lines.map(l => escapeHtml(typeof l === 'string' ? l : l.text)).join('<br>');
         } else {
             content.innerHTML = '<em>Fichier vide.</em>';
         }

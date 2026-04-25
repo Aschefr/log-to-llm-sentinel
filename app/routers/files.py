@@ -154,7 +154,8 @@ def browse(
 @router.get("/tail")
 def tail_file(
     path: str = Query(..., description="Chemin du fichier"),
-    lines: int = Query(10, description="Nombre de lignes à retourner")
+    lines: int = Query(10, description="Nombre de lignes à retourner"),
+    keywords: Optional[str] = Query(None, description="Mots-clés séparés par des virgules pour la colorisation")
 ):
     target = _resolve_under_roots(path)
     
@@ -164,12 +165,28 @@ def tail_file(
         raise HTTPException(status_code=400, detail="Le chemin doit être un fichier")
     if not os.access(str(target), os.R_OK):
         raise HTTPException(status_code=403, detail="Fichier illisible")
+
+    kw_list = [kw.strip().lower() for kw in keywords.split(",") if kw.strip()] if keywords else []
         
     try:
         import collections
         with open(target, 'r', encoding='utf-8', errors='ignore') as f:
-            tail_lines = collections.deque(f, lines)
-            return {"lines": [line.rstrip('\n') for line in tail_lines]}
+            tail_lines = list(collections.deque(f, lines))
+        
+        result = []
+        for line in tail_lines:
+            raw = line.rstrip('\n')
+            matched_kws = []
+            if kw_list:
+                matched_kws = [kw for kw in kw_list if kw in raw.lower()]
+            result.append({
+                "text": raw,
+                "matched": len(matched_kws) > 0,
+                "matched_keywords": matched_kws
+            })
+        return {"lines": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Log to LLM Sentinel{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=2">
+    <link rel="stylesheet" href="/static/css/style.css?v=4">
 </head>
 <body>
     <nav class="navbar">
@@ -12,6 +12,7 @@
         <div class="nav-links">
             <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
             <a href="/rules" class="{% if request.url.path == '/rules' %}active{% endif %}">Règles</a>
+            <a href="/monitor" class="{% if request.url.path == '/monitor' %}active{% endif %}">Monitor</a>
             <a href="/config" class="{% if request.url.path == '/config' %}active{% endif %}">Configuration</a>
         </div>
     </nav>

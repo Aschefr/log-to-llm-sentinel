@@ -9,6 +9,7 @@ import os
 from app.database import init_db
 from app.routers import rules, config, dashboard
 from app.routers import files as files_router
+from app.routers import monitor as monitor_router
 from app.services.log_watcher import LogWatcher
 from app.services.orchestrator import Orchestrator
 
@@ -28,6 +29,9 @@ async def lifespan(app: FastAPI):
     init_db()
     os.makedirs("/logs", exist_ok=True)
     os.makedirs("./data", exist_ok=True)
+
+    # Partager l'orchestrateur avec le router monitor (pour accès aux buffers)
+    monitor_router.set_orchestrator(orchestrator)
 
     # Démarre le watcher en background
     watcher_task = asyncio.create_task(log_watcher.start())
@@ -60,6 +64,7 @@ app.include_router(rules.router)
 app.include_router(config.router)
 app.include_router(dashboard.router)
 app.include_router(files_router.router)
+app.include_router(monitor_router.router)
 
 
 # ── Pages ──
@@ -76,3 +81,8 @@ def rules_page(request: Request):
 @app.get("/config")
 def config_page(request: Request):
     return templates.TemplateResponse("config.html", {"request": request})
+
+
+@app.get("/monitor")
+def monitor_page(request: Request):
+    return templates.TemplateResponse("monitor.html", {"request": request})

@@ -38,7 +38,9 @@ class Analysis(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     rule_id = Column(Integer, index=True)
+    detection_id = Column(String, index=True, nullable=True)  # UUID court de détection
     triggered_line = Column(Text, nullable=False)
+    matched_keywords_json = Column(Text, default="[]")  # mots-clés ayant déclenché la règle
     context_before_json = Column(Text, default="[]")
     context_after_json = Column(Text, default="[]")
     ollama_response = Column(Text)

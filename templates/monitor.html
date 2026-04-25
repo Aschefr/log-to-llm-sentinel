@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Monitor — Log to LLM Sentinel{% endblock %}
+
+{% block content %}
+<div class="monitor-page">
+    <div class="page-header">
+        <h1>🔬 Monitor</h1>
+        <div class="monitor-search-bar">
+            <input type="text" id="monitor-search-id" placeholder="🔍 Rechercher par ID de détection..." autocomplete="off">
+            <button class="btn btn-secondary btn-sm" id="monitor-search-btn">Rechercher</button>
+        </div>
+    </div>
+
+    <!-- Résultat de recherche par ID -->
+    <div id="search-result" class="search-result-panel hidden"></div>
+
+    <!-- Onglets par règle -->
+    <div class="monitor-tabs-wrapper">
+        <div class="monitor-tabs" id="monitor-tabs">
+            <div class="loading">Chargement des règles...</div>
+        </div>
+    </div>
+
+    <!-- Contenu de l'onglet actif -->
+    <div id="monitor-tab-content" class="monitor-tab-content"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/monitor.js?v=1"></script>
+{% endblock %}

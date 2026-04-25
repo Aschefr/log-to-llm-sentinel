@@ -1,4 +1,6 @@
 import asyncio
+import uuid
+import json
 from typing import List, Optional
 from datetime import datetime
 
@@ -22,7 +24,7 @@ class Orchestrator:
     def __init__(self):
         self.ollama = OllamaService()
         self.notifier = NotificationService()
-        self._buffers = {}  # rule_id -> {"lines": [], "task": None}
+        self._buffers = {}  # rule_id -> {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
         self._ollama_semaphore = asyncio.Semaphore(1)
 
     async def handle_new_lines(self, rule: Rule, lines: List[str]):
@@ -50,9 +52,20 @@ class Orchestrator:
 
         # Ajouter au buffer de cette règle
         if rule.id not in self._buffers:
-            self._buffers[rule.id] = {"lines": [], "task": None}
-            
+            self._buffers[rule.id] = {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
+
+        # Générer un detection_id unique si c'est la première détection de ce cycle
+        if self._buffers[rule.id]["detection_id"] is None:
+            self._buffers[rule.id]["detection_id"] = uuid.uuid4().hex[:8]
+            logger.debug("Orchestrator", f"Nouveau cycle de détection — ID: {self._buffers[rule.id]['detection_id']}")
+
         self._buffers[rule.id]["lines"].extend(matching_lines)
+
+        # Collecter les mots-clés matchés
+        for line in matching_lines:
+            for kw in keywords:
+                if kw.lower() in line.lower():
+                    self._buffers[rule.id]["matched_keywords"].add(kw)
 
         # Démarrer le timer anti-spam si pas déjà en cours
         if self._buffers[rule.id]["task"] is None:
@@ -72,7 +85,9 @@ class Orchestrator:
             await asyncio.sleep(buffer_delay)
 
             lines = self._buffers[rule_id]["lines"]
-            self._buffers[rule_id] = {"lines": [], "task": None}
+            detection_id = self._buffers[rule_id]["detection_id"]
+            matched_keywords = list(self._buffers[rule_id]["matched_keywords"])
+            self._buffers[rule_id] = {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
 
             if not lines:
                 return
@@ -112,7 +127,7 @@ class Orchestrator:
                     logger.warning("Orchestrator", f"Ligne trop longue ({len(line)} chars), troncature à {max_chars}")
                     line = line[:max_chars] + "... [TRONQUÉ]"
                 
-                await self._process_match(rule, line, config_dict, db)
+                await self._process_match(rule, line, config_dict, db, detection_id, matched_keywords)
             else:
                 # Regrouper les lignes
                 total_lines = len(lines)
@@ -131,13 +146,14 @@ class Orchestrator:
                     current_length += len(line_to_add)
                 
                 logger.info("Orchestrator", f"Envoi groupé pour '{rule.name}' : {total_lines} lignes ({len(bundled_text)} chars)")
-                await self._process_match(rule, bundled_text, config_dict, db)
+                await self._process_match(rule, bundled_text, config_dict, db, detection_id, matched_keywords)
         except Exception as e:
             logger.error("Orchestrator", f"Erreur lors du flush buffer : {e}")
         finally:
             db.close()
 
-    async def _process_match(self, rule: Rule, line: str, config: dict, db):
+    async def _process_match(self, rule: Rule, line: str, config: dict, db,
+                              detection_id: str = None, matched_keywords: list = None):
         """Traite une ligne correspondante."""
         # 1. Préparer le contexte
         context_before = []
@@ -166,8 +182,10 @@ class Orchestrator:
         # 5. Sauvegarder en BDD
         analysis = Analysis(
             rule_id=rule.id,
+            detection_id=detection_id,
             triggered_line=line,
-            context_before_json="[]",  # À implémenter si contexte disponible
+            matched_keywords_json=json.dumps(matched_keywords or []),
+            context_before_json="[]",
             context_after_json="[]",
             ollama_response=response,
             severity=severity,
@@ -189,12 +207,15 @@ class Orchestrator:
                 logger.debug("Orchestrator", f"Notification ignorée: la sévérité '{severity}' est inférieure au seuil '{rule.notify_severity_threshold}'.")
 
         if should_notify:
+            det_id_label = f" [ID: {detection_id}]" if detection_id else ""
             logger.debug("Orchestrator", f"Envoi notification via '{config.get('notification_method')}' pour règle '{rule.name}'")
-            subject = f"[Sentinel] Alerte {severity.upper()} : {rule.name}"
+            subject = f"[Sentinel] Alerte {severity.upper()} : {rule.name}{det_id_label}"
             
             body = f"""
             <h2>Alerte Log to LLM Sentinel</h2>
             <p><strong>Règle:</strong> {rule.name}</p>
+            <p><strong>ID de détection:</strong> <code>{detection_id or 'N/A'}</code></p>
+            <p><strong>Mots-clés déclencheurs:</strong> {', '.join(matched_keywords) if matched_keywords else 'N/A'}</p>
             <p><strong>Ligne déclenchante:</strong> <code>{line}</code></p>
             <p><strong>Analyse Ollama:</strong></p>
             <blockquote>{response}</blockquote>

@@ -27,6 +27,8 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN apprise_tags VARCHAR DEFAULT ''",
         "ALTER TABLE global_config ADD COLUMN apprise_max_chars INTEGER DEFAULT 1900",
         "ALTER TABLE global_config ADD COLUMN max_log_chars INTEGER DEFAULT 5000",
+        "ALTER TABLE analyses ADD COLUMN detection_id VARCHAR DEFAULT NULL",
+        "ALTER TABLE analyses ADD COLUMN matched_keywords_json TEXT DEFAULT '[]'",
     ]
     with engine.connect() as conn:
         for sql in migrations:
