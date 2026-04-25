@@ -3,10 +3,51 @@
 {% block title %}Configuration - Log to LLM Sentinel{% endblock %}
 
 {% block content %}
+<style>
+    .container {
+        max-width: 1600px !important; /* Full width pour cette page */
+    }
+    .config-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+        gap: 1.5rem;
+        align-items: start;
+        padding-bottom: 5rem; /* Espace pour le bouton sticky */
+    }
+    .config-section {
+        margin-bottom: 0 !important; /* Remplacé par le gap de la grille */
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .config-save-actions {
+        grid-column: 1 / -1;
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg-card);
+        padding: 1rem 2rem;
+        border-radius: 1rem;
+        border: 1px solid var(--border);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        width: 90%;
+        max-width: 800px;
+    }
+    .config-save-actions .btn {
+        width: 100%;
+        font-size: 1.1rem;
+        padding: 0.75rem;
+    }
+</style>
 <div class="config-page">
     <h1>Configuration Globale</h1>
 
-    <form id="config-form" class="config-form">
+    <form id="config-form" class="config-form config-grid">
         <section class="config-section">
             <h2>📧 Notification SMTP</h2>
             <div class="form-group">
@@ -211,8 +252,8 @@
             </div>
         </section>
 
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Sauvegarder</button>
+        <div class="form-actions config-save-actions">
+            <button type="submit" class="btn btn-primary" style="margin: 0;">💾 Sauvegarder la configuration</button>
         </div>
     </form>
 
