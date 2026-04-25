@@ -56,8 +56,7 @@ function selectTab(ruleId) {
     stopAllPolling();
     isFrozen = false;
     frozenContent = null;
-    selectedLineText = null;
-    activeKeywordFilter = null;
+    activeKeywordFilter = '__matches__'; // Par défaut: afficher uniquement les matches
     activeRuleId = ruleId;
 
     // Mettre à jour l'onglet actif
@@ -84,6 +83,8 @@ function renderTabContent(rule) {
                 <div>
                     <span class="info-label">🔑 Mots-clés (cliquer pour filtrer)</span>
                     <div class="kw-filter-badges" id="kw-filters-${rule.id}">
+                        <span class="log-kw-badge kw-filter-btn active" data-kw="__matches__" onclick="toggleKeywordFilter(this, ${rule.id})">Matches</span>
+                        <span class="log-kw-badge kw-filter-btn" data-kw="__all__" onclick="toggleKeywordFilter(this, ${rule.id})">Aucun (Tout voir)</span>
                         ${rule.keywords.map(kw =>
                             `<span class="log-kw-badge kw-filter-btn" data-kw="${encodeURIComponent(kw)}" onclick="toggleKeywordFilter(this, ${rule.id})">${escapeHtml(kw)}</span>`
                         ).join('')}
@@ -215,15 +216,14 @@ function toggleKeywordFilter(badgeEl, ruleId) {
     const kw = decodeURIComponent(badgeEl.dataset.kw || '');
     if (!kw) return;
 
-    if (activeKeywordFilter === kw) {
-        // Désactiver le filtre
-        activeKeywordFilter = null;
+    if (activeKeywordFilter === kw && kw !== '__matches__') {
+        // Revenir au mode matches par défaut si on reclique sur un filtre déjà actif
+        activeKeywordFilter = '__matches__';
     } else {
-        // Activer ce filtre
         activeKeywordFilter = kw;
     }
 
-    // Mettre à jour l'apparence de tous les badges de filtre
+    // Mettre à jour l'apparence
     document.querySelectorAll('.kw-filter-btn').forEach(b => {
         const bKw = decodeURIComponent(b.dataset.kw || '');
         b.classList.toggle('active', bKw === activeKeywordFilter);
@@ -238,10 +238,14 @@ function applyKeywordFilter(ruleId) {
     if (!viewer) return;
 
     viewer.querySelectorAll('.log-line').forEach(line => {
-        if (!activeKeywordFilter) {
+        if (activeKeywordFilter === '__all__') {
             line.style.display = '';
+        } else if (activeKeywordFilter === '__matches__') {
+            // Afficher seulement s'il y a au moins un badge mot-clé
+            const hasBadge = line.querySelector('.log-kw-badge') !== null;
+            line.style.display = hasBadge ? '' : 'none';
         } else {
-            // Vérifier si cette ligne a un badge correspondant au filtre actif
+            // Filtre par mot-clé spécifique
             const badges = Array.from(line.querySelectorAll('.log-kw-badge'))
                 .map(b => b.textContent.trim().toLowerCase());
             line.style.display = badges.includes(activeKeywordFilter.toLowerCase()) ? '' : 'none';
@@ -252,7 +256,14 @@ function applyKeywordFilter(ruleId) {
 function updateFilterLabel(ruleId) {
     const label = document.getElementById(`kw-filter-label-${ruleId}`);
     if (!label) return;
-    if (activeKeywordFilter) {
+    
+    if (activeKeywordFilter === '__matches__') {
+        label.textContent = ' — vue: matches uniquement';
+        label.classList.remove('hidden');
+    } else if (activeKeywordFilter === '__all__') {
+        label.textContent = ' — vue: log complet';
+        label.classList.remove('hidden');
+    } else if (activeKeywordFilter) {
         label.textContent = ` — filtre: "${activeKeywordFilter}"`;
         label.classList.remove('hidden');
     } else {

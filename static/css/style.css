@@ -1082,3 +1082,13 @@ body {
 .section-arrow { transition: transform 0.3s ease; opacity: 0.6; }
 .section-arrow.expanded { transform: rotate(90deg); opacity: 1; }
 
+
+.filter-badge.critical { background: rgba(239,68,68,0.15); color: #ef4444; border-color: rgba(239,68,68,0.4); }
+.filter-badge.warning { background: rgba(245,158,11,0.15); color: #f59e0b; border-color: rgba(245,158,11,0.4); }
+.filter-badge.info { background: rgba(59,130,246,0.15); color: #3b82f6; border-color: rgba(59,130,246,0.4); }
+
+
+.kw-filter-btn[data-kw='__matches__'] { background: rgba(59,130,246,0.1) !important; color: var(--accent) !important; border-color: var(--accent) !important; }
+.kw-filter-btn[data-kw='__all__'] { background: rgba(255,255,255,0.05) !important; color: #aaa !important; border-color: #444 !important; }
+.kw-filter-btn.active { outline: 2px solid #fff; outline-offset: 1px; opacity: 1 !important; }
+

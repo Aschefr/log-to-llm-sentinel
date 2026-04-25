@@ -148,12 +148,15 @@ function setSeverityFilter(severity) {
     
     // UI Update
     document.querySelectorAll('.severity-card').forEach(c => c.classList.remove('active'));
+    const badge = document.getElementById('active-filter-label');
+    
     if (severity) {
         document.querySelector(`.severity-card.${severity}`).classList.add('active');
-        document.getElementById('active-filter-label').classList.remove('hidden');
+        badge.classList.remove('hidden');
+        badge.className = `filter-badge ${severity}`; // Apply color class
         document.getElementById('filter-name').textContent = severity.toUpperCase();
     } else {
-        document.getElementById('active-filter-label').classList.add('hidden');
+        badge.classList.add('hidden');
     }
     
     loadRecentAnalyses();
