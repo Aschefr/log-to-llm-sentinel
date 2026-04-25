@@ -10,6 +10,7 @@ import json
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessage
 from app.services.orchestrator import Orchestrator
+from app.services.task_manager import task_manager, ChatTaskEntry
 from app import logger
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -98,7 +99,13 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
     }
 
 @router.post("/api/send")
-async def send_message(data: dict, request: Request, db: Session = Depends(get_db)):
+async def send_message(data: dict, db: Session = Depends(get_db)):
+    """
+    Démarre la génération d'une réponse chat en arrière-plan.
+    Retourne immédiatement un task_id. Le client se connecte ensuite
+    à /api/stream/{task_id} pour lire les tokens au fur et à mesure.
+    La génération continue même si le client se déconnecte.
+    """
     conv_id = data.get("conversation_id")
     content = data.get("content")
     
@@ -111,7 +118,7 @@ async def send_message(data: dict, request: Request, db: Session = Depends(get_d
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation non trouvée")
 
-    # 1. Sauvegarder le message de l'utilisateur
+    # 1. Sauvegarder le message utilisateur
     user_msg = ChatMessage(conversation_id=conv_id, role="user", content=content)
     db.add(user_msg)
     db.commit()
@@ -128,90 +135,164 @@ async def send_message(data: dict, request: Request, db: Session = Depends(get_d
             base_prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, cfg.system_prompt if cfg else "")
             prompt = f"{base_prompt}\n\nHistorique :\nAssistant (initial) : {analysis.ollama_response}\n"
 
-    # On ne prend que les 10 derniers messages pour ne pas exploser le contexte
     for m in history[-10:]:
         role_label = "Utilisateur" if m.role == "user" else "Assistant"
         prompt += f"{role_label} : {m.content}\n"
-    
     prompt += "Assistant : "
 
     cfg = db.query(GlobalConfig).first()
-    ollama_url = (cfg.ollama_url or "http://ollama:11434") if cfg else "http://ollama:11434"
-    ollama_model = (cfg.ollama_model or "gemma4:e4b") if cfg else "gemma4:e4b"
-    ollama_temp = cfg.ollama_temp if cfg else 0.1
-    ollama_ctx = cfg.ollama_ctx if cfg else 4096
-    ollama_think = cfg.ollama_think if cfg else True
+    ollama_url    = (cfg.ollama_url    or "http://ollama:11434") if cfg else "http://ollama:11434"
+    ollama_model  = (cfg.ollama_model  or "gemma4:e4b")         if cfg else "gemma4:e4b"
+    ollama_temp   = cfg.ollama_temp   if cfg else 0.1
+    ollama_ctx    = cfg.ollama_ctx    if cfg else 4096
+    ollama_think  = cfg.ollama_think  if cfg else True
 
-    async def event_generator():
-        full_response = ""
-        is_thinking = False
-        buffer = ""
-        logger.info("ChatRouter", f"Démarrage event_generator pour conv {conv_id}")
-        try:
-            if not _orchestrator:
-                yield f"data: {json.dumps({'error': 'Orchestrateur non initialisé'})}\n\n"
-                return
+    # 3. Créer une tâche en arrière-plan
+    entry = task_manager.create_chat_task(conv_id)
+    task_id = entry.task_id
 
-            async with _orchestrator._ollama_semaphore:
-                async for chunk in _orchestrator.ollama.generate_stream(
-                    prompt=prompt,
-                    url=ollama_url,
-                    model=ollama_model,
-                    think=ollama_think,
-                    options={
-                        "temperature": ollama_temp,
-                        "num_ctx": ollama_ctx
-                    }
-                ):
-                    if await request.is_disconnected():
-                        logger.info("ChatRouter", "Client déconnecté, arrêt immédiat du stream")
-                        return
+    # 4. Lancer la génération sans attendre (fire & forget)
+    asyncio.create_task(
+        _run_chat_generation(
+            entry=entry,
+            conv_id=conv_id,
+            prompt=prompt,
+            ollama_url=ollama_url,
+            ollama_model=ollama_model,
+            ollama_temp=ollama_temp,
+            ollama_ctx=ollama_ctx,
+            ollama_think=ollama_think,
+        )
+    )
 
-                    if "error" in chunk:
-                        yield f"data: {json.dumps({'error': chunk['error']})}\n\n"
-                        return
+    return {"status": "ok", "task_id": task_id}
 
-                    text = chunk.get("message", {}).get("content", "") or chunk.get("response", "")
-                    if not text:
-                        if chunk.get("done"): break
-                        continue
-                    
+
+async def _run_chat_generation(
+    entry: ChatTaskEntry,
+    conv_id: int,
+    prompt: str,
+    ollama_url: str,
+    ollama_model: str,
+    ollama_temp: float,
+    ollama_ctx: int,
+    ollama_think: bool,
+):
+    """
+    Coroutine arrière-plan : génère les tokens Ollama, les accémule dans le buffer
+    de l'entrée et sauvegarde la réponse complète en BDD à la fin.
+    S'exécute indépendamment de la connexion HTTP du client.
+    """
+    full_response = ""
+    is_thinking = False
+
+    try:
+        if not _orchestrator:
+            entry.error = "Orchestrateur non initialisé"
+            entry.status = "error"
+            return
+
+        async with _orchestrator._ollama_semaphore:
+            async for chunk in _orchestrator.ollama.generate_stream(
+                prompt=prompt,
+                url=ollama_url,
+                model=ollama_model,
+                think=ollama_think,
+                options={"temperature": ollama_temp, "num_ctx": ollama_ctx}
+            ):
+                if "error" in chunk:
+                    entry.error = chunk["error"]
+                    entry.status = "error"
+                    return
+
+                text = chunk.get("message", {}).get("content", "") or chunk.get("response", "")
+                if text:
                     if not is_thinking:
                         if "<think>" in text:
                             is_thinking = True
                             to_send = text.split("<think>", 1)[0]
                             if to_send:
                                 full_response += to_send
-                                yield f"data: {json.dumps({'text': to_send})}\n\n"
+                                task_manager.append_chat_token(entry, to_send)
                         else:
                             full_response += text
-                            yield f"data: {json.dumps({'text': text})}\n\n"
+                            task_manager.append_chat_token(entry, text)
                     else:
                         if "</think>" in text:
                             is_thinking = False
                             to_send = text.split("</think>", 1)[-1]
                             if to_send:
                                 full_response += to_send
-                                yield f"data: {json.dumps({'text': to_send})}\n\n"
-                    
-                    if chunk.get("done"):
-                        break
-            
-            # Sauvegarde BDD
-            new_db = SessionLocal()
-            try:
-                ai_msg = ChatMessage(conversation_id=conv_id, role="assistant", content=full_response)
-                new_db.add(ai_msg)
-                new_db.commit()
-                logger.info("ChatRouter", f"Réponse sauvegardée ({len(full_response)} car.)")
-            finally:
-                new_db.close()
-                
-        except Exception as e:
-            logger.error("ChatRouter", f"Erreur dans event_generator : {str(e)}")
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                                task_manager.append_chat_token(entry, to_send)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+                if chunk.get("done"):
+                    break
+
+        # Sauvegarde BDD
+        save_db = SessionLocal()
+        try:
+            ai_msg = ChatMessage(conversation_id=conv_id, role="assistant", content=full_response)
+            save_db.add(ai_msg)
+            save_db.commit()
+            logger.info("ChatRouter", f"Réponse sauvegardée ({len(full_response)} car.)")
+        finally:
+            save_db.close()
+
+        entry.status = "done"
+
+    except Exception as e:
+        logger.error("ChatRouter", f"Erreur génération arrière-plan : {str(e)}")
+        entry.error = str(e)
+        entry.status = "error"
+
+
+@router.get("/api/stream/{task_id}")
+async def stream_chat(task_id: str, from_pos: int = 0):
+    """
+    Endpoint SSE reconnectable : diffuse les tokens d'une tâche chat.
+    Le paramètre `from_pos` permet de reprendre là où le client s'est arrêté.
+    La connexion reste ouverte jusqu'à ce que la génération soit terminée.
+    """
+    entry = task_manager.get_chat_task(task_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Tâche non trouvée")
+
+    async def generator():
+        pos = from_pos
+        while True:
+            buf = entry.token_buffer
+            if pos < len(buf):
+                # Envoyer les tokens en attente (rattrapage ou nouveaux)
+                for token in buf[pos:]:
+                    pos += 1
+                    yield f"data: {json.dumps({'text': token, 'pos': pos})}\n\n"
+            elif entry.status == "done":
+                yield f"data: {json.dumps({'done': True})}\n\n"
+                break
+            elif entry.status == "error":
+                yield f"data: {json.dumps({'error': entry.error})}\n\n"
+                break
+            else:
+                # Attendre de nouveaux tokens (polling léger)
+                await task_manager.wait_for_token(entry, timeout=2.0)
+
+    return StreamingResponse(generator(), media_type="text/event-stream")
+
+
+@router.get("/api/pending/{conv_id}")
+async def get_pending_chat(conv_id: int):
+    """
+    Indique si une génération est en cours pour cette conversation.
+    Utilisé par le frontend lors du retour sur l'onglet (visibilitychange).
+    """
+    entry = task_manager.get_pending_chat_for_conv(conv_id)
+    if not entry:
+        return {"task_id": None}
+    return {
+        "task_id": entry.task_id,
+        "from_pos": len(entry.token_buffer),  # Le client reprend depuis la fin du buffer connu
+        "buffered_tokens": len(entry.token_buffer),
+    }
 
 @router.delete("/api/delete/{conv_id}")
 async def delete_conversation(conv_id: int, db: Session = Depends(get_db)):

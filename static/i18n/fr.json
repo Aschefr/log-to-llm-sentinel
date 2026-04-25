@@ -109,6 +109,7 @@
     "analyzing": "⏳ Analyse en cours...",
     "stop": "🛑 Arrêter",
     "manually_analyzed_badge": "Analysé manuellement",
+    "manual_analysis": "Analyse manuelle",
     "search_no_result": "Aucun résultat pour cet ID."
   },
   "chat": {
@@ -221,6 +222,7 @@
     "severity_info": "info",
     "notified_yes": "✅ Oui",
     "notified_no": "❌ Non",
-    "na": "N/A"
+    "na": "N/A",
+    "done": "Terminé"
   }
 }

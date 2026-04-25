@@ -437,7 +437,7 @@ async function sendMessage() {
 
     const container = document.getElementById('chat-messages');
     
-    // UI optimistic update
+    // UI optimistic : ajouter la bulle utilisateur + la bulle IA en attente
     container.innerHTML += `
         <div class="message-bubble user">
             <div class="markdown-body">${escapeHtml(content)}</div>
@@ -456,60 +456,152 @@ async function sendMessage() {
     input.style.height = 'auto';
     container.scrollTop = container.scrollHeight;
 
-    const aiBubble = document.getElementById('streaming-ai');
-    const aiContent = aiBubble.querySelector('.markdown-body');
-    const thinkingState = aiBubble.querySelector('.thinking-state');
-    let fullText = "";
-    let isFirstToken = true;
-
     try {
-        const response = await fetch('/chat/api/send', {
+        // 1. Envoyer le message — le serveur répond immédiatement avec un task_id
+        const res = await fetch('/chat/api/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ conversation_id: activeConvId, content: content })
         });
+        if (!res.ok) throw new Error(window.t('chat.error_network'));
+        const data = await res.json();
+        if (!data.task_id) throw new Error('Pas de task_id dans la réponse');
 
-        if (!response.ok) throw new Error('Erreur réseau');
+        // 2. Se connecter au stream SSE depuis la position 0
+        _activeTaskId = data.task_id;
+        _streamPos = 0;
+        _streamAbort = new AbortController();
+        readStream(data.task_id, 0, _streamAbort.signal);
+
+    } catch (e) {
+        const aiBubble = document.getElementById('streaming-ai');
+        if (aiBubble) {
+            aiBubble.querySelector('.markdown-body').innerHTML =
+                `<span style="color:var(--danger)">Erreur: ${escapeHtml(e.message)}</span>`;
+            aiBubble.removeAttribute('id');
+        }
+    }
+}
+
+// ── État du stream actif ──────────────────────────────────────────────────────
+let _activeTaskId = null;
+let _streamPos = 0;
+let _streamAbort = null;
+let _streamFullText = '';
+
+async function readStream(taskId, fromPos, signal) {
+    const container = document.getElementById('chat-messages');
+    
+    // Trouver ou recréer la bulle IA en cours
+    let aiBubble = document.getElementById('streaming-ai');
+    if (!aiBubble) {
+        // Reconnexion après changement d'onglet : la bulle a peut-être été supprimée
+        // On en crée une nouvelle à la fin du conteneur
+        aiBubble = document.createElement('div');
+        aiBubble.className = 'message-bubble assistant';
+        aiBubble.id = 'streaming-ai';
+        aiBubble.innerHTML = `
+            <div class="thinking-state" ${_streamFullText ? 'style="display:none"' : ''}>
+                <span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span>
+                <span style="margin-left:0.5rem; opacity:0.7; font-size:0.9rem;">${window.t('chat.thinking')}</span>
+            </div>
+            <div class="markdown-body">${_streamFullText ? marked.parse(_streamFullText) : ''}</div>
+        `;
+        if (container) container.appendChild(aiBubble);
+    }
+
+    const aiContent = aiBubble.querySelector('.markdown-body');
+    const thinkingState = aiBubble.querySelector('.thinking-state');
+
+    try {
+        const response = await fetch(`/chat/api/stream/${taskId}?from_pos=${fromPos}`, { signal });
+        if (!response.ok) throw new Error('Stream unavailable');
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
+        let buf = '';
 
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n\n');
-            
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const data = JSON.parse(line.substring(6));
-                        if (data.error) throw new Error(data.error);
-                        if (data.text) {
-                            if (isFirstToken) {
-                                thinkingState.style.display = 'none';
-                                isFirstToken = false;
-                            }
-                            fullText += data.text;
-                            aiContent.innerHTML = marked.parse(fullText);
-                            container.scrollTop = container.scrollHeight;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing stream chunk', e);
+            buf += decoder.decode(value, { stream: true });
+            const parts = buf.split('\n\n');
+            buf = parts.pop(); // garder le dernier fragment incomplet
+
+            for (const part of parts) {
+                if (!part.startsWith('data: ')) continue;
+                try {
+                    const evt = JSON.parse(part.substring(6));
+                    if (evt.error) {
+                        aiContent.innerHTML = `<span style="color:var(--danger)">Erreur: ${escapeHtml(evt.error)}</span>`;
+                        aiBubble.removeAttribute('id');
+                        _activeTaskId = null;
+                        return;
                     }
-                }
+                    if (evt.text) {
+                        if (thinkingState) thinkingState.style.display = 'none';
+                        _streamFullText += evt.text;
+                        _streamPos = evt.pos ?? (_streamPos + 1);
+                        aiContent.innerHTML = marked.parse(_streamFullText);
+                        if (container) container.scrollTop = container.scrollHeight;
+                    }
+                    if (evt.done) {
+                        // Génération terminée
+                        aiBubble.removeAttribute('id');
+                        _activeTaskId = null;
+                        _streamFullText = '';
+                        loadConversations();
+                        return;
+                    }
+                } catch (_) {}
             }
         }
-        
-        // Finalize
-        aiBubble.removeAttribute('id');
-        // Re-load sidebar for potential title updates or just consistency
-        loadConversations();
     } catch (e) {
-        aiContent.innerHTML = `<span style="color:var(--danger)">Erreur: ${e.message}</span>`;
+        if (e.name === 'AbortError') return; // Annulation volontaire (changement d'onglet)
+        // Erreur réseau : réessayer après un délai
+        console.warn('[Chat] Stream interrompu, retry dans 2s', e);
+        setTimeout(() => {
+            if (_activeTaskId === taskId) {
+                _streamAbort = new AbortController();
+                readStream(taskId, _streamPos, _streamAbort.signal);
+            }
+        }, 2000);
     }
 }
+
+// ── Reconnexion automatique au retour sur l'onglet ───────────────────────────
+document.addEventListener('visibilitychange', async () => {
+    if (document.hidden) {
+        // L'onglet perd le focus : annuler proprement le fetch SSE
+        // (le serveur continue de générer dans son asyncio.Task)
+        if (_streamAbort) _streamAbort.abort();
+        return;
+    }
+
+    // L'onglet reprend le focus
+    if (_activeTaskId) {
+        // Un stream était en cours : se reconnecter depuis la dernière position connue
+        _streamAbort = new AbortController();
+        readStream(_activeTaskId, _streamPos, _streamAbort.signal);
+    } else if (activeConvId) {
+        // Vérifier si une génération tourne en arrière-plan pour cette conversation
+        try {
+            const pending = await apiFetch(`/chat/api/pending/${activeConvId}`);
+            if (pending.task_id) {
+                _activeTaskId = pending.task_id;
+                _streamPos = 0;
+                _streamFullText = '';
+                _streamAbort = new AbortController();
+                // Montrer l'interface de streaming
+                const container = document.getElementById('chat-messages');
+                if (container && !document.getElementById('streaming-ai')) {
+                    readStream(pending.task_id, 0, _streamAbort.signal);
+                }
+            }
+        } catch (_) {}
+    }
+});
 
 async function createNewChat() {
     try {
@@ -520,5 +612,6 @@ async function createNewChat() {
         alert(e.message);
     }
 }
+
 </script>
 {% endblock %}

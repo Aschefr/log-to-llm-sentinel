@@ -14,6 +14,7 @@ from app.routers import chat as chat_router
 from app.routers import i18n as i18n_router
 from app.services.log_watcher import LogWatcher
 from app.services.orchestrator import Orchestrator
+from app.services.task_manager import task_manager
 
 # ── Instances globales ──
 orchestrator = Orchestrator()
@@ -41,6 +42,16 @@ async def lifespan(app: FastAPI):
     # Démarre le watcher en background
     watcher_task = asyncio.create_task(log_watcher.start())
     print("[Main] LogWatcher démarré en background")
+
+    # Nettoyage périodique des tâches d'arrière-plan (toutes les 30 min)
+    async def _cleanup_tasks():
+        while True:
+            await asyncio.sleep(1800)
+            removed = task_manager.cleanup_old_tasks(max_age_hours=2)
+            if removed:
+                print(f"[Main] Nettoyage tâches : {removed} entrée(s) supprimée(s)")
+
+    asyncio.create_task(_cleanup_tasks())
 
     yield
 

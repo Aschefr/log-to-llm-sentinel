@@ -455,50 +455,64 @@ async function loadRuleAnalyses(ruleId) {
 
 async function retryAnalysis(analysisId, btn) {
     const oldHtml = btn.innerHTML;
-    
-    const abortController = new AbortController();
-    const stopBtn = document.createElement('button');
-    stopBtn.className = 'btn btn-danger btn-sm';
-    stopBtn.style.marginLeft = '0.5rem';
-    stopBtn.innerHTML = '🛑 Arrêter';
-    stopBtn.onclick = () => abortController.abort();
-    
-    btn.parentNode.insertBefore(stopBtn, btn.nextSibling);
-    
     btn.disabled = true;
-    btn.innerHTML = '⏳...';
-    try {
-        const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { 
-            method: 'POST',
-            signal: abortController.signal
-        });
-        if (res.status === 'ok') {
-            // Re-cliquer sur la ligne sélectionnée pour rafraîchir le panneau
-            const selected = document.querySelector('.log-line.selected');
-            if (selected) {
-                // On simule un clic sur la ligne pour forcer la mise à jour des données du panneau
-                // sans avoir à réécrire toute la logique de onLineClick
-                onLineClick(selected, activeRuleId);
-            }
-            
-            // Rafraîchir aussi la liste des analyses récentes de l'onglet
-            if (activeRuleId) loadRuleAnalyses(activeRuleId);
+    btn.innerHTML = `🔄 ${window.t('common.analyzing')}`;
 
-            // Si on est dans la recherche
+    try {
+        const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { method: 'POST' });
+        if (!res.task_id) throw new Error('Réponse inattendue du serveur');
+
+        pollTask(res.task_id, btn, oldHtml, () => {
+            // Rafraîchir le panneau de détail si une ligne est sélectionnée
+            const selected = document.querySelector('.log-line.selected');
+            if (selected) onLineClick(selected, activeRuleId);
+            if (activeRuleId) loadRuleAnalyses(activeRuleId);
             const searchInput = document.getElementById('monitor-search-id');
             if (searchInput && searchInput.value) searchById();
-        }
+        });
     } catch (e) {
-        if (e.name === 'AbortError') {
-            alert("Nouvelle analyse annulée.");
-        } else {
-            alert('Erreur: ' + e.message);
-        }
-    } finally {
+        alert(window.t('common.error') + ': ' + e.message);
         btn.disabled = false;
         btn.innerHTML = oldHtml;
-        if (stopBtn.parentNode) stopBtn.parentNode.removeChild(stopBtn);
     }
+}
+
+/**
+ * Polling d'une tâche d'analyse en arrière-plan.
+ * Appelle GET /api/monitor/task/{taskId} toutes les 2s jusqu'à completion.
+ * @param {string} taskId
+ * @param {HTMLElement} btn - bouton à restaurer après
+ * @param {string} originalHtml - innerHTML original du bouton
+ * @param {function} onDone - callback appelé quand status === 'done'
+ */
+function pollTask(taskId, btn, originalHtml, onDone) {
+    const maxAttempts = 150; // 5 minutes max
+    let attempts = 0;
+
+    const interval = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts) {
+            clearInterval(interval);
+            btn.innerHTML = '⏰ Timeout';
+            setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 3000);
+            return;
+        }
+        try {
+            const res = await apiFetch(`/api/monitor/task/${taskId}`);
+            if (res.status === 'done') {
+                clearInterval(interval);
+                btn.innerHTML = '✅';
+                setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 2000);
+                if (onDone) onDone(res.analysis_id);
+            } else if (res.status === 'error') {
+                clearInterval(interval);
+                btn.innerHTML = '❌';
+                setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 3000);
+                alert(window.t('common.error') + ': ' + (res.error || 'Erreur inconnue'));
+            }
+            // status === 'running' → on continue le polling
+        } catch (_) { /* erreur réseau transitoire — on réessaie */ }
+    }, 2000);
 }
 
 // ─── Recherche par ID ──────────────────────────────────────────────────────
@@ -550,62 +564,44 @@ async function searchById() {
 async function manualAnalyze(ruleId, btn) {
     if (!selectedLineText) return;
     const oldHtml = btn.innerHTML;
-    
-    const abortController = new AbortController();
-    const stopBtn = document.createElement('button');
-    stopBtn.className = 'btn btn-danger btn-sm';
-    stopBtn.style.marginLeft = '0.5rem';
-    stopBtn.innerHTML = '🛑 Arrêter';
-    stopBtn.onclick = () => abortController.abort();
-    
-    btn.parentNode.insertBefore(stopBtn, btn.nextSibling);
-    
     btn.disabled = true;
-    btn.innerHTML = '⏳ Analyse en cours...';
+    btn.innerHTML = `⏳ ${window.t('common.analyzing')}`;
 
     try {
         const res = await apiFetch('/api/monitor/analyze-line', {
             method: 'POST',
-            body: {
-                line: selectedLineText,
-                rule_id: ruleId
-            },
-            signal: abortController.signal
+            body: { line: selectedLineText, rule_id: ruleId }
         });
+        if (!res.task_id) throw new Error('Réponse inattendue du serveur');
 
-        if (res.status === 'ok') {
-            const a = res.analysis;
-            const content = document.getElementById(`detail-panel-content-${ruleId}`);
-            if (content) {
-                content.innerHTML += `
-                    <div class="manual-analysis-result" style="margin-top: 1.5rem; border-top: 2px dashed var(--accent); padding-top: 1rem;">
-                        <div class="detail-row">
-                            <span class="detail-label">Analyse manuelle</span>
-                            <span class="severity-badge ${a.severity}">${a.severity}</span>
-                        </div>
-                        <div class="analysis-response markdown-body">${marked.parse(a.ollama_response)}</div>
-                        <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
-                            <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 Approfondir avec l'IA</button>
-                        </div>
-                    </div>
-                `;
+        pollTask(res.task_id, btn, oldHtml, (analysisId) => {
+            if (analysisId) {
+                // Charger et afficher le résultat dans le panneau de détail
+                apiFetch(`/api/monitor/analysis/${analysisId}`).then(data => {
+                    const a = data.analysis;
+                    if (!a) return;
+                    const content = document.getElementById(`detail-panel-content-${ruleId}`);
+                    if (content) {
+                        content.innerHTML += `
+                            <div class="manual-analysis-result" style="margin-top: 1.5rem; border-top: 2px dashed var(--accent); padding-top: 1rem;">
+                                <div class="detail-row">
+                                    <span class="detail-label">${window.t('monitor.manual_analysis')}</span>
+                                    <span class="severity-badge ${a.severity}">${a.severity}</span>
+                                </div>
+                                <div class="analysis-response markdown-body">${marked.parse(a.ollama_response)}</div>
+                                <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
+                                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">${window.t('monitor.deepen_with_ai')}</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }).catch(() => {});
             }
-            btn.innerHTML = '✅ Analyse terminée';
-        } else {
-            alert('Erreur: ' + res.detail);
-            btn.innerHTML = oldHtml;
-            btn.disabled = false;
-        }
+        });
     } catch (e) {
-        if (e.name === 'AbortError') {
-            alert("Analyse annulée.");
-        } else {
-            alert('Erreur: ' + e.message);
-        }
-        btn.innerHTML = oldHtml;
+        alert(window.t('common.error') + ': ' + e.message);
         btn.disabled = false;
-    } finally {
-        if (stopBtn.parentNode) stopBtn.parentNode.removeChild(stopBtn);
+        btn.innerHTML = oldHtml;
     }
 }
 

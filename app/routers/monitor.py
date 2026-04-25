@@ -7,6 +7,7 @@ from datetime import datetime
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
 from app.services.orchestrator import Orchestrator
+from app.services.task_manager import task_manager
 from app.utils.log_utils import clean_log_line
 
 router = APIRouter(prefix="/api/monitor", tags=["monitor"])
@@ -158,8 +159,11 @@ def search_by_detection_id(id: str = Query(..., description="ID de détection à
 
 
 @router.post("/retry/{analysis_id}")
-async def retry_analysis(analysis_id: int, request: Request):
-    """Relance une analyse Ollama échouée."""
+async def retry_analysis(analysis_id: int):
+    """
+    Relance une analyse Ollama en arrière-plan (fire & forget).
+    Retourne immédiatement un task_id. Le client pollingue GET /task/{task_id}.
+    """
     if _orchestrator is None:
         raise HTTPException(status_code=500, detail="Orchestrateur non initialisé")
 
@@ -180,59 +184,81 @@ async def retry_analysis(analysis_id: int, request: Request):
             raise HTTPException(status_code=500, detail="Configuration globale non trouvée")
             
         config = _get_config_dict(config_obj)
-
-        # On reconstruit le prompt en s'assurant que la ligne est nettoyée
         cleaned_line = clean_log_line(analysis.triggered_line)
         prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""))
 
-        # Appel Ollama (streaming asynchrone protégé)
-        from app.routers.utils import cancel_on_disconnect
-        async with _orchestrator._ollama_semaphore:
+        # Capturer les IDs nécessaires pour la tâche en arrière-plan
+        analysis_id_captured = analysis.id
+        detection_id = analysis.detection_id
+
+        # Créer l'entrée dans le gestionnaire de tâches
+        entry = task_manager.create_analysis_task()
+
+        async def _do_retry():
             try:
-                coro = _orchestrator.ollama.analyze_async(
-                    prompt=prompt,
-                    url=config.get("ollama_url"),
-                    model=config.get("ollama_model"),
-                    think=config.get("ollama_think", True),
-                    options={
-                        "temperature": config.get("ollama_temp", 0.1),
-                        "num_ctx": config.get("ollama_ctx", 4096)
-                    }
-                )
-                response = await cancel_on_disconnect(
-                    request,
-                    asyncio.wait_for(coro, timeout=300.0)
-                )
-            except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
+                async with _orchestrator._ollama_semaphore:
+                    try:
+                        response = await asyncio.wait_for(
+                            _orchestrator.ollama.analyze_async(
+                                prompt=prompt,
+                                url=config.get("ollama_url"),
+                                model=config.get("ollama_model"),
+                                think=config.get("ollama_think", True),
+                                options={
+                                    "temperature": config.get("ollama_temp", 0.1),
+                                    "num_ctx": config.get("ollama_ctx", 4096)
+                                }
+                            ),
+                            timeout=300.0
+                        )
+                    except asyncio.TimeoutError:
+                        response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
 
-        from app import logger
-        logger.add_ollama_log(prompt, response, analysis.detection_id)
+                from app import logger
+                logger.add_ollama_log(prompt, response, detection_id)
+                severity = _orchestrator._detect_severity(response)
 
-        severity = _orchestrator._detect_severity(response)
+                retry_db = SessionLocal()
+                try:
+                    a = retry_db.query(Analysis).filter(Analysis.id == analysis_id_captured).first()
+                    if a:
+                        a.ollama_response = response
+                        a.severity = severity
+                        a.analyzed_at = datetime.utcnow()
+                        retry_db.commit()
+                        entry.analysis_id = a.id
+                finally:
+                    retry_db.close()
 
-        # Mise à jour de l'analyse
-        analysis.ollama_response = response
-        analysis.severity = severity
-        analysis.analyzed_at = datetime.utcnow()
-        db.commit()
-        db.refresh(analysis)
+                entry.status = "done"
+            except Exception as e:
+                entry.error = str(e)
+                entry.status = "error"
 
-        return {
-            "status": "ok",
-            "analysis": {
-                "id": analysis.id,
-                "ollama_response": analysis.ollama_response,
-                "severity": analysis.severity,
-                "analyzed_at": analysis.analyzed_at.isoformat()
-            }
-        }
+        asyncio.create_task(_do_retry())
+        return {"status": "pending", "task_id": entry.task_id}
     finally:
         db.close()
+
+
+@router.get("/task/{task_id}")
+def get_task_status(task_id: str):
+    """Retourne le statut d'une tâche d'analyse en arrière-plan."""
+    entry = task_manager.get_analysis_task(task_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Tâche non trouvée")
+    return {
+        "status": entry.status,
+        "analysis_id": entry.analysis_id,
+        "error": entry.error,
+    }
         
 @router.post("/analyze-line")
-async def analyze_line(data: dict, request: Request):
-    """Effectue une analyse manuelle d'une ligne spécifique."""
+async def analyze_line(data: dict):
+    """
+    Effectue une analyse manuelle d'une ligne spécifique en arrière-plan.
+    Retourne immédiatement un task_id. Le client pollingue GET /task/{task_id}.
+    """
     line = data.get("line")
     rule_id = data.get("rule_id")
     
@@ -246,85 +272,76 @@ async def analyze_line(data: dict, request: Request):
     try:
         rule = db.query(Rule).filter(Rule.id == rule_id).first()
         if not rule:
+            db.close()
             raise HTTPException(status_code=404, detail="Règle non trouvée")
             
         cfg = db.query(GlobalConfig).first()
         config = {
-            "ollama_url": cfg.ollama_url if cfg else "http://ollama:11434",
+            "ollama_url":   cfg.ollama_url   if cfg else "http://ollama:11434",
             "ollama_model": cfg.ollama_model if cfg else "qwen3.5:0.8b",
-            "ollama_temp": cfg.ollama_temp if cfg else 0.1,
-            "ollama_ctx": cfg.ollama_ctx if cfg else 4096,
+            "ollama_temp":  cfg.ollama_temp  if cfg else 0.1,
+            "ollama_ctx":   cfg.ollama_ctx   if cfg else 4096,
             "ollama_think": cfg.ollama_think if cfg else True,
             "system_prompt": cfg.system_prompt if cfg else ""
         }
-        
-        # Nettoyage de la ligne (JSON -> Texte lisible)
+        rule_id_cap = rule.id
         cleaned_line = clean_log_line(line)
-        
-        # Simuler une détection pour construire le prompt
         prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""))
-        
-        # Appel Ollama (streaming asynchrone protégé)
-        from app.routers.utils import cancel_on_disconnect
-        async with _orchestrator._ollama_semaphore:
-            try:
-                coro = _orchestrator.ollama.analyze_async(
-                    prompt=prompt,
-                    url=config.get("ollama_url"),
-                    model=config.get("ollama_model"),
-                    think=config.get("ollama_think", True),
-                    options={
-                        "temperature": config.get("ollama_temp", 0.1),
-                        "num_ctx": config.get("ollama_ctx", 4096)
-                    }
-                )
-                response = await cancel_on_disconnect(
-                    request,
-                    asyncio.wait_for(coro, timeout=300.0)
-                )
-            except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
-            
-        from app import logger
-        logger.add_ollama_log(prompt, response, "MANUAL")
-        
-        severity = _orchestrator._detect_severity(response)
-        
-        # Enregistrer l'analyse manuelle en BDD pour persistance et chat
-        import uuid
-        det_id = f"MANUAL-{uuid.uuid4().hex[:8]}"
-        analysis = Analysis(
-            rule_id=rule.id,
-            detection_id=det_id,
-            triggered_line=line,
-            ollama_response=response,
-            severity=severity,
-            analyzed_at=datetime.utcnow(),
-        )
-        db.add(analysis)
-        db.commit()
-        db.refresh(analysis)
-        
-        return {
-            "status": "ok",
-            "analysis": {
-                "id": analysis.id,
-                "detection_id": analysis.detection_id,
-                "ollama_response": analysis.ollama_response,
-                "severity": analysis.severity,
-                "analyzed_at": analysis.analyzed_at.isoformat()
-            }
-        }
-    except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        import traceback
-        error_msg = f"Erreur Analyse Manuelle: {str(e)}\n{traceback.format_exc()}"
-        from app import logger
-        logger.error("MonitorRouter", error_msg)
-        raise HTTPException(status_code=500, detail=f"Erreur interne: {str(e)}")
     finally:
         db.close()
+
+    entry = task_manager.create_analysis_task()
+
+    async def _do_analyze():
+        try:
+            async with _orchestrator._ollama_semaphore:
+                try:
+                    response = await asyncio.wait_for(
+                        _orchestrator.ollama.analyze_async(
+                            prompt=prompt,
+                            url=config.get("ollama_url"),
+                            model=config.get("ollama_model"),
+                            think=config.get("ollama_think", True),
+                            options={
+                                "temperature": config.get("ollama_temp", 0.1),
+                                "num_ctx":    config.get("ollama_ctx", 4096)
+                            }
+                        ),
+                        timeout=300.0
+                    )
+                except asyncio.TimeoutError:
+                    response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
+
+            from app import logger
+            import uuid
+            logger.add_ollama_log(prompt, response, "MANUAL")
+            severity = _orchestrator._detect_severity(response)
+            det_id = f"MANUAL-{uuid.uuid4().hex[:8]}"
+
+            save_db = SessionLocal()
+            try:
+                analysis = Analysis(
+                    rule_id=rule_id_cap,
+                    detection_id=det_id,
+                    triggered_line=line,
+                    ollama_response=response,
+                    severity=severity,
+                    analyzed_at=datetime.utcnow(),
+                )
+                save_db.add(analysis)
+                save_db.commit()
+                save_db.refresh(analysis)
+                entry.analysis_id = analysis.id
+            finally:
+                save_db.close()
+
+            entry.status = "done"
+        except Exception as e:
+            entry.error = str(e)
+            entry.status = "error"
+
+    asyncio.create_task(_do_analyze())
+    return {"status": "pending", "task_id": entry.task_id}
 
 @router.post("/chat")
 async def chat_analysis(data: dict, request: Request):

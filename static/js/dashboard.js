@@ -138,19 +138,52 @@ function copyAnalysisText(btn) {
 async function retryAnalysis(analysisId, btn) {
     const oldHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = `${window.t('common.analyzing')}`;
+    btn.innerHTML = `🔄 ${window.t('common.analyzing')}`;
     try {
         const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { method: 'POST' });
-        if (res.status === 'ok') {
+        if (!res.task_id) throw new Error('Réponse inattendue du serveur');
+
+        pollTask(res.task_id, btn, oldHtml, () => {
             loadRecentAnalyses();
             loadStats();
-        }
+        });
     } catch (e) {
-        alert('Erreur: ' + e.message);
-    } finally {
+        alert(window.t('common.error') + ': ' + e.message);
         btn.disabled = false;
         btn.innerHTML = oldHtml;
     }
+}
+
+/**
+ * Polling d'une tâche d'analyse en arrière-plan.
+ * Appelle GET /api/monitor/task/{taskId} toutes les 2s jusqu'à completion.
+ */
+function pollTask(taskId, btn, originalHtml, onDone) {
+    const maxAttempts = 150;
+    let attempts = 0;
+    const interval = setInterval(async () => {
+        attempts++;
+        if (attempts > maxAttempts) {
+            clearInterval(interval);
+            btn.innerHTML = '⏰ Timeout';
+            setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 3000);
+            return;
+        }
+        try {
+            const res = await apiFetch(`/api/monitor/task/${taskId}`);
+            if (res.status === 'done') {
+                clearInterval(interval);
+                btn.innerHTML = '✅';
+                setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 2000);
+                if (onDone) onDone(res.analysis_id);
+            } else if (res.status === 'error') {
+                clearInterval(interval);
+                btn.innerHTML = '❌';
+                setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 3000);
+                alert(window.t('common.error') + ': ' + (res.error || 'Erreur inconnue'));
+            }
+        } catch (_) {}
+    }, 2000);
 }
 
 async function notifyAnalysis(analysisId, btn) {
