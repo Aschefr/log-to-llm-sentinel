@@ -24,6 +24,7 @@ async function loadConfig() {
         document.getElementById('notification-method').value = config.notification_method || 'smtp';
         document.getElementById('apprise-url').value = config.apprise_url || '';
         document.getElementById('apprise-max-chars').value = config.apprise_max_chars || 1900;
+        document.getElementById('max-log-chars').value = config.max_log_chars || 5000;
         window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) {
@@ -288,6 +289,7 @@ async function saveConfig(messageEl, isAutoSave = false) {
             ? document.getElementById('apprise-tags').value 
             : document.getElementById('apprise-tags-select').value,
         apprise_max_chars: parseInt(document.getElementById('apprise-max-chars').value) || 1900,
+        max_log_chars: parseInt(document.getElementById('max-log-chars').value) || 5000,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
     };
 

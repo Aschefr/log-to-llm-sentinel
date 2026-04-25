@@ -65,5 +65,6 @@ class GlobalConfig(Base):
     apprise_url = Column(String, nullable=True)
     apprise_tags = Column(String, nullable=True)
     apprise_max_chars = Column(Integer, default=1900)
+    max_log_chars = Column(Integer, default=5000)
     debug_mode = Column(Boolean, default=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

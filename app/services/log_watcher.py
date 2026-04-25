@@ -91,13 +91,31 @@ class LogWatcher:
                     await asyncio.sleep(2)
                     continue
 
+                # Vérifier si le fichier a été tronqué
+                file_size = os.path.getsize(filepath)
+                if file_size < position:
+                    logger.info("LogWatcher", f"Fichier {filepath} tronqué, remise à zéro de la position.")
+                    position = 0
+
                 with open(filepath, "r", errors="ignore") as f:
                     f.seek(position)
-                    new_lines = f.readlines()
+                    # Lire au plus 1 Mo à la fois pour éviter de saturer la mémoire
+                    chunk = f.read(1024 * 1024)
                     new_position = f.tell()
 
-                if new_lines:
-                    logger.debug("LogWatcher", f"{filepath} — {len(new_lines)} nouvelle(s) ligne(s) détectée(s) à pos {position}")
+                if chunk:
+                    # Diviser en lignes
+                    new_lines = chunk.splitlines()
+                    
+                    # Si le chunk s'arrête au milieu d'une ligne, on recule pour la lire entière au prochain tour
+                    # Sauf si on est à la fin du fichier
+                    if not chunk.endswith(('\n', '\r')) and new_position < file_size:
+                        last_line_len = len(new_lines[-1].encode('utf-8', errors='ignore'))
+                        new_position -= last_line_len
+                        new_lines = new_lines[:-1]
+
+                    if new_lines:
+                        logger.debug("LogWatcher", f"{filepath} — {len(new_lines)} nouvelle(s) ligne(s) détectée(s)")
                     # Mettre à jour la position
                     db = SessionLocal()
                     try:

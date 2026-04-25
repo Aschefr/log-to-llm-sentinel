@@ -20,6 +20,7 @@ class GlobalConfigCreate(BaseModel):
     apprise_url: str = ""
     apprise_tags: str = ""
     apprise_max_chars: int = 1900
+    max_log_chars: int = 5000
     debug_mode: bool = False
 
 

@@ -97,20 +97,39 @@ class Orchestrator:
                 "notification_method": config.notification_method if config else "smtp",
                 "apprise_url": config.apprise_url if config else "",
                 "apprise_tags": config.apprise_tags if config else "",
+                "apprise_max_chars": config.apprise_max_chars if config else 1900,
+                "max_log_chars": config.max_log_chars if config else 5000,
                 "debug_mode": config.debug_mode if config else False,
             }
 
+            max_chars = config_dict.get("max_log_chars", 5000)
+
             if len(lines) == 1:
-                await self._process_match(rule, lines[0], config_dict, db)
+                line = self._clean_log_line(lines[0])
+                # Si la ligne est trop longue, on la tronque
+                if len(line) > max_chars:
+                    logger.warning("Orchestrator", f"Ligne trop longue ({len(line)} chars), troncature à {max_chars}")
+                    line = line[:max_chars] + "... [TRONQUÉ]"
+                
+                await self._process_match(rule, line, config_dict, db)
             else:
                 # Regrouper les lignes
                 total_lines = len(lines)
                 # On limite à 30 lignes max dans le prompt pour ne pas exploser le contexte
-                recent_lines = lines[-30:]
-                bundled_text = f"Ces {total_lines} événements correspondants sont apparus dans les {buffer_delay} dernières secondes. Voici un extrait des plus récents :\n"
-                bundled_text += "\n".join(recent_lines)
+                recent_lines = [self._clean_log_line(l) for l in lines[-30:]]
                 
-                logger.info("Orchestrator", f"Envoi groupé pour '{rule.name}' : {total_lines} lignes")
+                bundled_text = f"Ces {total_lines} événements correspondants sont apparus dans les {buffer_delay} dernières secondes. Voici un extrait des plus récents :\n"
+                
+                current_length = len(bundled_text)
+                for line in reversed(recent_lines):
+                    line_to_add = f"\n{line}"
+                    if current_length + len(line_to_add) > max_chars:
+                        bundled_text += "\n... [Certaines lignes ont été omises car trop longues]"
+                        break
+                    bundled_text += line_to_add
+                    current_length += len(line_to_add)
+                
+                logger.info("Orchestrator", f"Envoi groupé pour '{rule.name}' : {total_lines} lignes ({len(bundled_text)} chars)")
                 await self._process_match(rule, bundled_text, config_dict, db)
         except Exception as e:
             logger.error("Orchestrator", f"Erreur lors du flush buffer : {e}")
@@ -206,6 +225,33 @@ class Orchestrator:
             await asyncio.to_thread(self.notifier.send, subject, notify_body, config)
             analysis.notified = True
             db.commit()
+
+    def _clean_log_line(self, line: str) -> str:
+        """Tente de nettoyer une ligne de log si elle est au format JSON (ex: Nextcloud)."""
+        import json
+        stripped = line.strip()
+        if not (stripped.startswith('{') and stripped.endswith('}')):
+            return line
+
+        try:
+            data = json.loads(stripped)
+            # Pour Nextcloud : extraire message, app, et éventuellement exception
+            msg = data.get("message", "")
+            app = data.get("app", "")
+            exc = data.get("exception", "") or data.get("data", {}).get("exception", "")
+            
+            if msg:
+                cleaned = f"[{app}] {msg}"
+                if exc:
+                    # On ne garde que le début de l'exception si elle est énorme
+                    exc_str = str(exc)
+                    if len(exc_str) > 1000:
+                        exc_str = exc_str[:1000] + "... [EXCEPTION TRONQUÉE]"
+                    cleaned += f" | Exception: {exc_str}"
+                return cleaned
+            return line # Fallback si pas de champ message
+        except:
+            return line
 
     def _build_prompt(self, rule: Rule, line: str, system_prompt: str, context_lines: list = None) -> str:
         """Construit le prompt pour Ollama."""

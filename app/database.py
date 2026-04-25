@@ -26,6 +26,7 @@ def init_db():
         "ALTER TABLE rules ADD COLUMN notify_severity_threshold VARCHAR DEFAULT 'info'",
         "ALTER TABLE global_config ADD COLUMN apprise_tags VARCHAR DEFAULT ''",
         "ALTER TABLE global_config ADD COLUMN apprise_max_chars INTEGER DEFAULT 1900",
+        "ALTER TABLE global_config ADD COLUMN max_log_chars INTEGER DEFAULT 5000",
     ]
     with engine.connect() as conn:
         for sql in migrations:
