@@ -11,6 +11,7 @@ from app.routers import rules, config, dashboard
 from app.routers import files as files_router
 from app.routers import monitor as monitor_router
 from app.routers import chat as chat_router
+from app.routers import i18n as i18n_router
 from app.services.log_watcher import LogWatcher
 from app.services.orchestrator import Orchestrator
 
@@ -70,6 +71,7 @@ app.include_router(dashboard.router)
 app.include_router(files_router.router)
 app.include_router(monitor_router.router)
 app.include_router(chat_router.router)
+app.include_router(i18n_router.router)
 
 
 # ── Pages ──

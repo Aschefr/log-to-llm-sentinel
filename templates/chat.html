@@ -14,11 +14,11 @@
     <!-- Sidebar -->
     <aside class="chat-sidebar">
         <div class="sidebar-header">
-            <h2>💬 Conversations</h2>
-            <button class="btn btn-secondary btn-sm" onclick="createNewChat()">+ Nouveau</button>
+            <h2 data-i18n="chat.conversations">💬 Conversations</h2>
+            <button class="btn btn-secondary btn-sm" onclick="createNewChat()" data-i18n="chat.new_conversation">+ Nouveau</button>
         </div>
         <div id="conversation-list" class="conversation-list">
-            <div class="loading">Chargement...</div>
+            <div class="loading" data-i18n="chat.loading">Chargement...</div>
         </div>
     </aside>
 
@@ -27,8 +27,8 @@
         <div id="chat-welcome" class="chat-welcome">
             <div class="welcome-content">
                 <div class="welcome-icon">🤖</div>
-                <h1>Centre d'Analyse IA</h1>
-                <p>Sélectionnez une conversation ou démarrez-en une nouvelle depuis le Dashboard ou le Monitor pour approfondir un diagnostic.</p>
+                <h1 data-i18n="chat.title">Centre d'Analyse IA</h1>
+                <p data-i18n="chat.welcome_text">Sélectionnez une conversation ou démarrez-en une nouvelle depuis le Dashboard ou le Monitor pour approfondir un diagnostic.</p>
             </div>
         </div>
 
@@ -51,10 +51,10 @@
 
             <footer class="chat-footer">
                 <div class="chat-input-wrapper">
-                    <textarea id="chat-input" placeholder="Posez votre question sur ce diagnostic..." rows="1"></textarea>
-                    <button id="send-btn" class="btn btn-primary" onclick="sendMessage()">Envoyer</button>
+                    <textarea id="chat-input" data-i18n-placeholder="chat.input_placeholder" placeholder="Posez votre question sur ce diagnostic..." rows="1"></textarea>
+                    <button id="send-btn" class="btn btn-primary" onclick="sendMessage()" data-i18n="chat.send">Envoyer</button>
                 </div>
-                <p class="chat-disclaimer">L'IA peut faire des erreurs. Vérifiez les informations critiques.</p>
+                <p class="chat-disclaimer" data-i18n="chat.disclaimer">L'IA peut faire des erreurs. Vérifiez les informations critiques.</p>
             </footer>
         </div>
     </main>
@@ -363,7 +363,7 @@ function renderConversationList() {
                 <div class="conv-title">${escapeHtml(c.title)}</div>
                 <div class="conv-date">${formatDate(c.created_at)}</div>
             </div>
-            <button class="btn-icon delete-chat-btn" onclick="event.stopPropagation(); deleteConversation(${c.id})" title="Supprimer">
+            <button class="btn-icon delete-chat-btn" onclick="event.stopPropagation(); deleteConversation(${c.id})" title="${window.t('chat.delete_btn_title')}">
                 <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
             </button>
         </div>
@@ -399,7 +399,7 @@ async function selectConversation(id) {
 
 async function loadHistory(id) {
     const container = document.getElementById('chat-messages');
-    container.innerHTML = '<div class="loading">Chargement de l\'histoire...</div>';
+    container.innerHTML = `<div class="loading">${window.t('chat.loading_history')}</div>`;
     
     try {
         const data = await apiFetch(`/chat/api/history/${id}`);
@@ -409,7 +409,7 @@ async function loadHistory(id) {
         if (data.analysis) {
             html += `
                 <div class="message-bubble context">
-                    <strong>Contexte de l'analyse #${data.analysis.detection_id || '...'}</strong><br>
+                    <strong>${window.t('chat.analysis_context')} #${data.analysis.detection_id || '...'}</strong><br>
                     <code style="display:block; margin-top:0.5rem; opacity:0.8; font-size:0.8rem;">${escapeHtml(data.analysis.triggered_line)}</code>
                     <hr style="opacity:0.1; margin:0.75rem 0;">
                     <div class="markdown-body" style="font-size:0.9rem;">${marked.parse(data.analysis.ollama_response)}</div>
@@ -447,7 +447,7 @@ async function sendMessage() {
                 <span class="thinking-dot"></span>
                 <span class="thinking-dot"></span>
                 <span class="thinking-dot"></span>
-                <span style="margin-left:0.5rem; opacity:0.7; font-size:0.9rem;">Ollama réfléchit...</span>
+                <span style="margin-left:0.5rem; opacity:0.7; font-size:0.9rem;">${window.t('chat.thinking')}</span>
             </div>
             <div class="markdown-body"></div>
         </div>

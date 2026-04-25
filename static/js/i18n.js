@@ -1,0 +1,216 @@
+/**
+ * i18n.js — Module d'internationalisation pour Log to LLM Sentinel
+ *
+ * Usage:
+ *   - Les éléments HTML statiques utilisent l'attribut data-i18n="section.key"
+ *     ou data-i18n-placeholder="section.key" pour les placeholders.
+ *   - Le JS dynamique utilise window.t('section.key') pour obtenir la traduction.
+ *   - Pour changer de langue: window.switchLanguage('en')
+ *
+ * Pour ajouter une nouvelle langue:
+ *   1. Copiez static/i18n/fr.json vers static/i18n/xx.json (xx = code ISO de la langue)
+ *   2. Modifiez le bloc "_meta" avec le nom et le drapeau de votre langue
+ *   3. Traduisez toutes les valeurs
+ *   L'application détectera automatiquement le nouveau fichier au redémarrage.
+ */
+
+(function () {
+    'use strict';
+
+    let _translations = {};
+    let _currentLang = 'fr';
+    let _availableLangs = [];
+    // Callbacks à appeler après chaque changement de langue (pour re-rendre le contenu dynamique)
+    const _reRenderCallbacks = [];
+
+    /**
+     * Résout une clé en chemin pointé ("section.key") dans l'objet de traductions.
+     * Retourne la clé elle-même si non trouvée (fail-safe visible).
+     */
+    function t(key) {
+        const parts = key.split('.');
+        let current = _translations;
+        for (const part of parts) {
+            if (current == null || typeof current !== 'object') return key;
+            current = current[part];
+        }
+        return (current != null && typeof current === 'string') ? current : key;
+    }
+
+    /**
+     * Applique les traductions à tous les éléments DOM avec data-i18n.
+     */
+    function applyTranslations() {
+        // Texte des éléments
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            const translated = t(key);
+            if (translated !== key) el.textContent = translated;
+        });
+
+        // Placeholders des inputs/textareas
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            const translated = t(key);
+            if (translated !== key) el.setAttribute('placeholder', translated);
+        });
+
+        // Titles (tooltips)
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            const key = el.getAttribute('data-i18n-title');
+            const translated = t(key);
+            if (translated !== key) el.setAttribute('title', translated);
+        });
+
+        // HTML (pour les éléments avec balisage interne)
+        document.querySelectorAll('[data-i18n-html]').forEach(el => {
+            const key = el.getAttribute('data-i18n-html');
+            const translated = t(key);
+            if (translated !== key) el.innerHTML = translated;
+        });
+
+        // Mettre à jour l'attribut lang du document
+        document.documentElement.setAttribute('lang', _currentLang);
+    }
+
+    /**
+     * Charge un fichier de langue et l'applique.
+     */
+    async function loadLanguage(lang) {
+        try {
+            const res = await fetch(`/static/i18n/${lang}.json?v=${Date.now()}`);
+            if (!res.ok) throw new Error(`Fichier de langue introuvable: ${lang}`);
+            _translations = await res.json();
+            _currentLang = lang;
+            localStorage.setItem('sentinel_lang', lang);
+            applyTranslations();
+            // Déclencher les callbacks de re-rendu (ex: re-render les listes dynamiques)
+            _reRenderCallbacks.forEach(cb => { try { cb(lang); } catch (e) { console.warn('i18n reRender callback error:', e); } });
+            updateLangSwitcherUI();
+        } catch (e) {
+            console.error('[i18n] Erreur chargement langue:', e);
+        }
+    }
+
+    /**
+     * Retourne la langue active.
+     */
+    function detectLanguage() {
+        return localStorage.getItem('sentinel_lang') || 'fr';
+    }
+
+    /**
+     * Charge les langues disponibles depuis le backend et construit le switcher.
+     */
+    async function initLangSwitcher() {
+        try {
+            _availableLangs = await (await fetch('/api/i18n/languages')).json();
+        } catch (e) {
+            // Fallback si le backend n'est pas disponible
+            _availableLangs = [
+                { code: 'fr', name: 'Français', flag: '🇫🇷' },
+                { code: 'en', name: 'English', flag: '🇬🇧' },
+            ];
+        }
+        buildSwitcherUI();
+    }
+
+    /**
+     * Construit le DOM du sélecteur de langue dans la navbar.
+     */
+    function buildSwitcherUI() {
+        const container = document.getElementById('lang-switcher');
+        if (!container || _availableLangs.length < 2) return;
+
+        const current = _availableLangs.find(l => l.code === _currentLang) || _availableLangs[0];
+        container.innerHTML = `
+            <div class="lang-switcher-wrapper">
+                <button class="lang-btn" id="lang-toggle-btn" aria-haspopup="true" aria-expanded="false">
+                    <span>${current.flag}</span>
+                    <span class="lang-code">${current.code.toUpperCase()}</span>
+                    <svg width="10" height="10" viewBox="0 0 10 10"><path fill="currentColor" d="M5 7L1 3h8z"/></svg>
+                </button>
+                <div class="lang-dropdown" id="lang-dropdown" role="menu">
+                    ${_availableLangs.map(l => `
+                        <button class="lang-option ${l.code === _currentLang ? 'active' : ''}"
+                                onclick="window.switchLanguage('${l.code}')"
+                                role="menuitem">
+                            <span>${l.flag}</span>
+                            <span>${l.name}</span>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        // Toggle dropdown
+        const btn = document.getElementById('lang-toggle-btn');
+        const dropdown = document.getElementById('lang-dropdown');
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = dropdown.classList.toggle('open');
+            btn.setAttribute('aria-expanded', open);
+        });
+        document.addEventListener('click', () => {
+            dropdown.classList.remove('open');
+            btn.setAttribute('aria-expanded', false);
+        });
+    }
+
+    /**
+     * Met à jour l'UI du switcher sans le reconstruire entièrement.
+     */
+    function updateLangSwitcherUI() {
+        // Mettre à jour le bouton principal
+        const current = _availableLangs.find(l => l.code === _currentLang);
+        const btn = document.getElementById('lang-toggle-btn');
+        if (btn && current) {
+            btn.innerHTML = `
+                <span>${current.flag}</span>
+                <span class="lang-code">${current.code.toUpperCase()}</span>
+                <svg width="10" height="10" viewBox="0 0 10 10"><path fill="currentColor" d="M5 7L1 3h8z"/></svg>
+            `;
+        }
+        // Mettre à jour les options actives
+        document.querySelectorAll('.lang-option').forEach(opt => {
+            const code = opt.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+            opt.classList.toggle('active', code === _currentLang);
+        });
+    }
+
+    /**
+     * Change la langue et re-applique toutes les traductions + re-rendu dynamique.
+     */
+    async function switchLanguage(lang) {
+        if (lang === _currentLang) return;
+        // Fermer le dropdown
+        document.getElementById('lang-dropdown')?.classList.remove('open');
+        await loadLanguage(lang);
+    }
+
+    /**
+     * Enregistre un callback à appeler après chaque changement de langue.
+     * Utilisé par les pages pour re-rendre leur contenu dynamique.
+     */
+    function onLanguageChange(callback) {
+        _reRenderCallbacks.push(callback);
+    }
+
+    // ── API publique ──
+    window.t = t;
+    window.switchLanguage = switchLanguage;
+    window.i18n = {
+        t,
+        switchLanguage,
+        onLanguageChange,
+        applyTranslations,
+        getCurrentLang: () => _currentLang,
+    };
+
+    // ── Initialisation ──
+    document.addEventListener('DOMContentLoaded', async () => {
+        const lang = detectLanguage();
+        await initLangSwitcher();
+        await loadLanguage(lang);
+    });
+})();

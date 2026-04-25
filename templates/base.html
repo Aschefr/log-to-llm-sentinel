@@ -5,16 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Log to LLM Sentinel{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css?v=4">
+    <style>
+        /* ── Language Switcher ── */
+        .lang-switcher-wrapper { position: relative; }
+        .lang-btn {
+            display: flex; align-items: center; gap: 0.35rem;
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-secondary); border-radius: 0.4rem;
+            padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.8rem;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .lang-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+        .lang-code { font-weight: 600; letter-spacing: 0.05em; }
+        .lang-dropdown {
+            display: none; position: absolute; top: calc(100% + 6px); right: 0;
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 0.5rem; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            min-width: 140px; z-index: 1000; overflow: hidden;
+        }
+        .lang-dropdown.open { display: block; }
+        .lang-option {
+            display: flex; align-items: center; gap: 0.5rem;
+            width: 100%; padding: 0.6rem 1rem; background: transparent;
+            border: none; color: var(--text-secondary); cursor: pointer;
+            font-size: 0.85rem; transition: background 0.15s, color 0.15s;
+            text-align: left;
+        }
+        .lang-option:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
+        .lang-option.active { color: var(--accent); font-weight: 600; }
+    </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand">🔍 Log to LLM Sentinel</div>
         <div class="nav-links">
-            <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
-            <a href="/rules" class="{% if request.url.path == '/rules' %}active{% endif %}">Règles</a>
-            <a href="/monitor" class="{% if request.url.path == '/monitor' %}active{% endif %}">Monitor</a>
-            <a href="/chat" class="{% if request.url.path == '/chat' %}active{% endif %}">Log Chat</a>
-            <a href="/config" class="{% if request.url.path == '/config' %}active{% endif %}">Configuration</a>
+            <a href="/" data-i18n="nav.dashboard" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
+            <a href="/rules" data-i18n="nav.rules" class="{% if request.url.path == '/rules' %}active{% endif %}">Règles</a>
+            <a href="/monitor" data-i18n="nav.monitor" class="{% if request.url.path == '/monitor' %}active{% endif %}">Monitor</a>
+            <a href="/chat" data-i18n="nav.chat" class="{% if request.url.path == '/chat' %}active{% endif %}">Log Chat</a>
+            <a href="/config" data-i18n="nav.config" class="{% if request.url.path == '/config' %}active{% endif %}">Configuration</a>
         </div>
         <div class="nav-stats" id="nav-system-stats">
             <div class="stat-item" title="Utilisation CPU (App / Système)">
@@ -29,12 +58,14 @@
                 <span class="stat-icon">⏱️</span>
                 <span id="stat-uptime">--</span>
             </div>
+            <div id="lang-switcher"></div>
         </div>
     </nav>
     <main class="container">
         {% block content %}{% endblock %}
     </main>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="/static/js/i18n.js?v=1"></script>
     <script src="/static/js/common.js?v=3"></script>
     {% block scripts %}{% endblock %}
 </body>

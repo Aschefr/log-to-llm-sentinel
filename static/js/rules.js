@@ -3,6 +3,11 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModal();
     setupKeywordSuggestions();
     loadAnalyses();
+
+    window.i18n?.onLanguageChange(() => {
+        loadRules();
+        loadAnalyses();
+    });
 });
 
 const TYPICAL_KEYWORDS = [

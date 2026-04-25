@@ -4,54 +4,54 @@
 
 {% block content %}
 <div class="dashboard">
-    <h1>Dashboard</h1>
+    <h1 data-i18n="dashboard.title">Dashboard</h1>
 
     <div class="stats-grid">
         <div class="stat-card">
             <div class="stat-value" id="total-rules">0</div>
-            <div class="stat-label">Règles totales</div>
+            <div class="stat-label" data-i18n="dashboard.total_rules">Règles totales</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="active-rules">0</div>
-            <div class="stat-label">Règles actives</div>
+            <div class="stat-label" data-i18n="dashboard.active_rules">Règles actives</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="total-analyses">0</div>
-            <div class="stat-label">Analyses totales</div>
+            <div class="stat-label" data-i18n="dashboard.total_analyses">Analyses totales</div>
         </div>
         <div class="stat-card">
             <div class="stat-value" id="today-analyses">0</div>
-            <div class="stat-label">Analyses aujourd'hui</div>
+            <div class="stat-label" data-i18n="dashboard.today_analyses">Analyses aujourd'hui</div>
         </div>
     </div>
 
     <div class="severity-grid">
         <div class="severity-card critical clickable" data-severity="critical">
             <div class="severity-value" id="critical-count">0</div>
-            <div class="severity-label">Critiques</div>
+            <div class="severity-label" data-i18n="dashboard.critical">Critiques</div>
         </div>
         <div class="severity-card warning clickable" data-severity="warning">
             <div class="severity-value" id="warning-count">0</div>
-            <div class="severity-label">Avertissements</div>
+            <div class="severity-label" data-i18n="dashboard.warning">Avertissements</div>
         </div>
         <div class="severity-card info clickable" data-severity="info">
             <div class="severity-value" id="info-count">0</div>
-            <div class="severity-label">Infos</div>
+            <div class="severity-label" data-i18n="dashboard.info">Infos</div>
         </div>
     </div>
     
     <!-- État des fichiers logs -->
     <section class="collapsible-section" style="margin-bottom: 2rem;">
         <div class="section-header clickable" onclick="toggleSection('rules-status-container', 'rules-status-arrow')">
-            <h2 style="margin: 0;">État des fichiers logs</h2>
+            <h2 style="margin: 0;" data-i18n="dashboard.log_files_status">État des fichiers logs</h2>
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <span class="text-secondary" style="font-size: 0.8rem;">Monitoring des fichiers</span>
+                <span class="text-secondary" style="font-size: 0.8rem;" data-i18n="dashboard.monitoring_files">Monitoring des fichiers</span>
                 <svg id="rules-status-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
             </div>
         </div>
         <div id="rules-status-container" class="hidden">
             <div id="rules-status-list" class="rules-list" style="margin-top: 1rem;">
-                <div class="loading">Chargement de l'état des logs...</div>
+                <div class="loading" data-i18n="dashboard.loading_logs">Chargement de l'état des logs...</div>
             </div>
         </div>
     </section>
@@ -60,17 +60,17 @@
     <section class="collapsible-section recent-section">
         <div class="section-header clickable" onclick="toggleSection('recent-analyses-container', 'recent-analyses-arrow')">
             <div style="display: flex; align-items: baseline; gap: 1rem;">
-                <h2 style="margin: 0;">Analyses récentes</h2>
-                <span id="active-filter-label" class="filter-badge hidden" onclick="event.stopPropagation(); setSeverityFilter(null)">Filtre: <span id="filter-name">--</span> ✖</span>
+                <h2 style="margin: 0;" data-i18n="dashboard.recent_analyses">Analyses récentes</h2>
+                <span id="active-filter-label" class="filter-badge hidden" onclick="event.stopPropagation(); setSeverityFilter(null)"><span data-i18n="dashboard.filter_label">Filtre:</span> <span id="filter-name">--</span> ✖</span>
             </div>
             <div style="display: flex; align-items: center; gap: 1rem;">
-                <button class="btn btn-secondary btn-sm" id="clear-all-analyses-btn" onclick="event.stopPropagation()">🗑️ Tout effacer</button>
+                <button class="btn btn-secondary btn-sm" id="clear-all-analyses-btn" onclick="event.stopPropagation()" data-i18n="dashboard.clear_all">🗑️ Tout effacer</button>
                 <svg id="recent-analyses-arrow" class="section-arrow expanded" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
             </div>
         </div>
         <div id="recent-analyses-container">
             <div id="recent-analyses" class="analyses-list" style="margin-top: 1rem;">
-                <div class="loading">Chargement...</div>
+                <div class="loading" data-i18n="dashboard.loading">Chargement...</div>
             </div>
         </div>
     </section>

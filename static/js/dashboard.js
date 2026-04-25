@@ -5,6 +5,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loadRulesStatus();
     loadRecentAnalyses();
 
+    // Re-render dynamic content on language change
+    window.i18n?.onLanguageChange(() => {
+        loadRecentAnalyses();
+        loadRulesStatus();
+    });
+
     // Auto-refresh toutes les 30 secondes
     setInterval(() => {
         loadStats();
@@ -62,7 +68,7 @@ async function loadRecentAnalyses() {
         const container = document.getElementById('recent-analyses');
         
         if (analyses.length === 0) {
-            container.innerHTML = '<div class="loading">Aucune analyse récente</div>';
+            container.innerHTML = `<div class="loading">${window.t('dashboard.no_recent_analysis')}</div>`;
             return;
         }
 
@@ -88,16 +94,16 @@ async function loadRecentAnalyses() {
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
                 <div class="analysis-footer" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 Ré-essayer</button>
-                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 Envoyer la notification</button>
+                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">${window.t('common.retry')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">${window.t('common.notify')}</button>
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 Approfondir avec l'IA</button>
+                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">${window.t('common.deepen')}</button>
                 </div>
             </div>
         `).join('');
     } catch (error) {
         console.error('Erreur chargement analyses récentes:', error);
-        document.getElementById('recent-analyses').innerHTML = '<div class="loading">Erreur de chargement</div>';
+        document.getElementById('recent-analyses').innerHTML = `<div class="loading">${window.t('dashboard.loading_error')}</div>`;
     }
 }
 
@@ -132,7 +138,7 @@ function copyAnalysisText(btn) {
 async function retryAnalysis(analysisId, btn) {
     const oldHtml = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '⏳...';
+    btn.innerHTML = `${window.t('common.analyzing')}`;
     try {
         const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { method: 'POST' });
         if (res.status === 'ok') {
@@ -150,7 +156,7 @@ async function retryAnalysis(analysisId, btn) {
 async function notifyAnalysis(analysisId, btn) {
     const oldHtml = btn.innerHTML;
     try {
-        btn.innerHTML = `⏳ Envoi...`;
+        btn.innerHTML = window.t('common.sending');
         btn.disabled = true;
 
         const res = await apiFetch(`/api/monitor/notify/${analysisId}`, {
@@ -158,18 +164,18 @@ async function notifyAnalysis(analysisId, btn) {
         });
 
         if (res.status === 'ok') {
-            btn.innerHTML = `✅ Envoyée`;
+            btn.innerHTML = window.t('common.sent');
             setTimeout(() => {
                 btn.innerHTML = oldHtml;
                 btn.disabled = false;
             }, 2000);
         } else {
-            alert("Erreur: " + res.detail);
+            alert(window.t('common.error') + ": " + res.detail);
             btn.innerHTML = oldHtml;
             btn.disabled = false;
         }
     } catch (e) {
-        alert("Erreur API : " + e.message);
+        alert(window.t('common.error') + ": " + e.message);
         btn.innerHTML = oldHtml;
         btn.disabled = false;
     }
@@ -201,9 +207,8 @@ async function loadRulesStatus() {
         console.log("Règles reçues:", rules);
         const container = document.getElementById('rules-status-list');
         
-        if (!container) return;
         if (rules.length === 0) {
-            container.innerHTML = '<div class="loading">Aucune règle configurée</div>';
+            container.innerHTML = `<div class="loading">${window.t('dashboard.no_rule')}</div>`;
             return;
         }
 
@@ -213,9 +218,9 @@ async function loadRulesStatus() {
                     <h3 style="margin: 0; font-size: 1rem;">${escapeHtml(rule.name)}</h3>
                     <p style="margin-bottom: 0.5rem; font-size: 0.8rem; opacity: 0.8;">📁 ${escapeHtml(rule.log_file_path)}</p>
                     <div class="rule-last-line" style="margin-bottom: 0;">
-                        <strong>Dernière détection :</strong>
-                        ${rule.last_detection_id ? `<span class="detection-id-badge" style="font-size: 0.7rem; vertical-align: middle;">#${escapeHtml(rule.last_detection_id)}</span>` : '<span style="font-size: 0.75rem; opacity: 0.6;">Aucune</span>'}
-                        <div class="last-line-content" style="font-size: 0.75rem; margin-top: 0.25rem;">${escapeHtml(rule.last_log_line || 'Aucune ligne trouvée ou fichier inaccessible')}</div>
+                        <strong data-i18n="dashboard.last_detection">${window.t('dashboard.last_detection')}</strong>
+                        ${rule.last_detection_id ? `<span class="detection-id-badge" style="font-size: 0.7rem; vertical-align: middle;">#${escapeHtml(rule.last_detection_id)}</span>` : `<span style="font-size: 0.75rem; opacity: 0.6;">${window.t('dashboard.no_detection')}</span>`}
+                        <div class="last-line-content" style="font-size: 0.75rem; margin-top: 0.25rem;">${escapeHtml(rule.last_log_line || window.t('dashboard.no_line_found'))}</div>
                     </div>
                 </div>
             </div>
