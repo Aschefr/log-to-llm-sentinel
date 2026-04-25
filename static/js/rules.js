@@ -684,7 +684,7 @@ function applyTemplate(type) {
         },
         'journald': {
             name: 'Journald (Relais Docker)',
-            path: '/system-logs/journald.log',
+            path: '/logs/host_system_journal.log',
             keywords: 'error, fatal, panic, critical, failed',
             context: 'Relais des journaux binaires Systemd (journalctl) vers un fichier texte lisible.'
         }
