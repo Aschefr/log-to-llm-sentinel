@@ -1229,13 +1229,60 @@ body {
 .filter-badge span { text-transform: uppercase; margin: 0 0.25rem; }
 
 /* --- Collapsible Sections ------------------------------------------- */
-.collapsible-section .section-header { cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.25rem; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--border); transition: background 0.2s; }
-.collapsible-section .section-header:hover { background: rgba(255,255,255,0.06); }
-.collapsible-section #rules-status-arrow { font-size: 0.8rem; margin-left: 10px; opacity: 0.5; transition: transform 0.2s; }
-
+.collapsible-section {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    transition: all 0.3s ease;
+}
+.collapsible-section .section-header { 
+    cursor: pointer; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    padding: 1rem 1.25rem; 
+    background: rgba(255, 255, 255, 0.03); 
+    border: none; 
+    transition: background 0.2s; 
+}
+.collapsible-section .section-header:hover { background: rgba(255, 255, 255, 0.06); }
+.collapsible-section .config-subsection {
+    padding: 1.5rem;
+    background: rgba(0, 0, 0, 0.15);
+    border-top: 1px solid var(--border);
+    animation: fadeIn 0.3s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .section-arrow { transition: transform 0.3s ease; opacity: 0.6; }
 .section-arrow.expanded { transform: rotate(90deg); opacity: 1; }
+
+
+
+.message {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    padding: 1rem 1.5rem;
+    border-radius: 0.75rem;
+    z-index: 2000;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: 400px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+@keyframes slideUp { from { transform: translateY(2rem); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.message.success { background: #064e3b; color: #6ee7b7; border: 1px solid #065f46; }
+.message.success::before { content: '✅'; }
+.message.error { background: #7f1d1d; color: #fca5a5; border: 1px solid #991b1b; }
+.message.error::before { content: '❌'; }
+.message.info { background: #1e3a8a; color: #93c5fd; border: 1px solid #1e40af; }
+.message.info::before { content: 'ℹ️'; }
 
 
 .filter-badge.critical { background: rgba(239,68,68,0.15); color: #ef4444; border-color: rgba(239,68,68,0.4); }
