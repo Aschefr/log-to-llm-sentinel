@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import Optional
 import json
 import asyncio
@@ -127,7 +127,7 @@ def search_by_detection_id(id: str = Query(..., description="ID de détection à
 
 
 @router.post("/retry/{analysis_id}")
-async def retry_analysis(analysis_id: int):
+async def retry_analysis(analysis_id: int, request: Request):
     """Relance une analyse Ollama échouée."""
     if _orchestrator is None:
         raise HTTPException(status_code=500, detail="Orchestrateur non initialisé")
@@ -152,20 +152,22 @@ async def retry_analysis(analysis_id: int):
         prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""))
 
         # Appel Ollama (streaming asynchrone protégé)
+        from app.routers.utils import cancel_on_disconnect
         async with _orchestrator._ollama_semaphore:
             try:
-                response = await asyncio.wait_for(
-                    _orchestrator.ollama.analyze_async(
-                        prompt=prompt,
-                        url=config.get("ollama_url"),
-                        model=config.get("ollama_model"),
-                        think=config.get("ollama_think", True),
-                        options={
-                            "temperature": config.get("ollama_temp", 0.1),
-                            "num_ctx": config.get("ollama_ctx", 4096)
-                        }
-                    ),
-                    timeout=300.0
+                coro = _orchestrator.ollama.analyze_async(
+                    prompt=prompt,
+                    url=config.get("ollama_url"),
+                    model=config.get("ollama_model"),
+                    think=config.get("ollama_think", True),
+                    options={
+                        "temperature": config.get("ollama_temp", 0.1),
+                        "num_ctx": config.get("ollama_ctx", 4096)
+                    }
+                )
+                response = await cancel_on_disconnect(
+                    request,
+                    asyncio.wait_for(coro, timeout=300.0)
                 )
             except asyncio.TimeoutError:
                 response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
@@ -193,8 +195,9 @@ async def retry_analysis(analysis_id: int):
         }
     finally:
         db.close()
+        
 @router.post("/analyze-line")
-async def analyze_line(data: dict):
+async def analyze_line(data: dict, request: Request):
     """Effectue une analyse manuelle d'une ligne spécifique."""
     line = data.get("line")
     rule_id = data.get("rule_id")
@@ -228,20 +231,22 @@ async def analyze_line(data: dict):
         prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""))
         
         # Appel Ollama (streaming asynchrone protégé)
+        from app.routers.utils import cancel_on_disconnect
         async with _orchestrator._ollama_semaphore:
             try:
-                response = await asyncio.wait_for(
-                    _orchestrator.ollama.analyze_async(
-                        prompt=prompt,
-                        url=config.get("ollama_url"),
-                        model=config.get("ollama_model"),
-                        think=config.get("ollama_think", True),
-                        options={
-                            "temperature": config.get("ollama_temp", 0.1),
-                            "num_ctx": config.get("ollama_ctx", 4096)
-                        }
-                    ),
-                    timeout=300.0
+                coro = _orchestrator.ollama.analyze_async(
+                    prompt=prompt,
+                    url=config.get("ollama_url"),
+                    model=config.get("ollama_model"),
+                    think=config.get("ollama_think", True),
+                    options={
+                        "temperature": config.get("ollama_temp", 0.1),
+                        "num_ctx": config.get("ollama_ctx", 4096)
+                    }
+                )
+                response = await cancel_on_disconnect(
+                    request,
+                    asyncio.wait_for(coro, timeout=300.0)
                 )
             except asyncio.TimeoutError:
                 response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
@@ -277,6 +282,8 @@ async def analyze_line(data: dict):
             }
         }
     except Exception as e:
+        if isinstance(e, HTTPException):
+            raise e
         import traceback
         error_msg = f"Erreur Analyse Manuelle: {str(e)}\n{traceback.format_exc()}"
         from app import logger
@@ -286,7 +293,7 @@ async def analyze_line(data: dict):
         db.close()
 
 @router.post("/chat")
-async def chat_analysis(data: dict):
+async def chat_analysis(data: dict, request: Request):
     """Continue la conversation sur une analyse."""
     analysis_id = data.get("analysis_id")
     question = data.get("question")
@@ -318,20 +325,22 @@ async def chat_analysis(data: dict):
         if not cfg:
             raise HTTPException(status_code=500, detail="Configuration non trouvée")
 
+        from app.routers.utils import cancel_on_disconnect
         async with _orchestrator._ollama_semaphore:
             try:
-                response = await asyncio.wait_for(
-                    _orchestrator.ollama.analyze_async(
-                        prompt=prompt,
-                        url=cfg.ollama_url,
-                        model=cfg.ollama_model,
-                        think=cfg.ollama_think if hasattr(cfg, 'ollama_think') else True,
-                        options={
-                            "temperature": cfg.ollama_temp if hasattr(cfg, 'ollama_temp') else 0.1,
-                            "num_ctx": cfg.ollama_ctx if hasattr(cfg, 'ollama_ctx') else 4096
-                        }
-                    ),
-                    timeout=300.0
+                coro = _orchestrator.ollama.analyze_async(
+                    prompt=prompt,
+                    url=cfg.ollama_url,
+                    model=cfg.ollama_model,
+                    think=cfg.ollama_think if hasattr(cfg, 'ollama_think') else True,
+                    options={
+                        "temperature": cfg.ollama_temp if hasattr(cfg, 'ollama_temp') else 0.1,
+                        "num_ctx": cfg.ollama_ctx if hasattr(cfg, 'ollama_ctx') else 4096
+                    }
+                )
+                response = await cancel_on_disconnect(
+                    request,
+                    asyncio.wait_for(coro, timeout=300.0)
                 )
             except asyncio.TimeoutError:
                 response = "[Erreur Ollama] Délai d'attente dépassé (300s)"

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
 
@@ -199,8 +199,10 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
 
 
 @router.post("/test/ollama")
-async def test_ollama():
+async def test_ollama(request: Request):
     from app.services.ollama_service import OllamaService
+    from app.routers.utils import cancel_on_disconnect
+    
     ollama = OllamaService()
     db = SessionLocal()
     try:
@@ -244,18 +246,19 @@ async def test_ollama():
                 sem = _orchestrator._ollama_semaphore if _orchestrator else asyncio.Semaphore(1)
                 async with sem:
                     try:
-                        resp = await asyncio.wait_for(
-                            ollama.analyze_async(
-                                prompt=prompt, 
-                                url=url, 
-                                model=model,
-                                think=cfg.get("ollama_think", True),
-                                options={
-                                    "temperature": cfg.get("ollama_temp", 0.1),
-                                    "num_ctx": cfg.get("ollama_ctx", 4096)
-                                }
-                            ),
-                            timeout=300.0
+                        coro = ollama.analyze_async(
+                            prompt=prompt, 
+                            url=url, 
+                            model=model,
+                            think=cfg.get("ollama_think", True),
+                            options={
+                                "temperature": cfg.get("ollama_temp", 0.1),
+                                "num_ctx": cfg.get("ollama_ctx", 4096)
+                            }
+                        )
+                        resp = await cancel_on_disconnect(
+                            request,
+                            asyncio.wait_for(coro, timeout=300.0)
                         )
                     except asyncio.TimeoutError:
                         resp = "[Erreur Ollama] Délai d'attente dépassé (300s)"

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
@@ -201,7 +201,7 @@ def _read_last_lines(path: str, n: int = 5, max_bytes: int = 65536) -> List[str]
 
 
 @router.post("/{rule_id}/test")
-async def test_rule(rule_id: int):
+async def test_rule(rule_id: int, request: Request):
     """
     Envoie les dernières lignes du fichier log de la règle pour analyse,
     sauvegarde l'analyse en BDD, envoie une notification, et renvoie le résultat.
@@ -251,20 +251,22 @@ async def test_rule(rule_id: int):
         prompt = orchestrator._build_prompt(rule, cleaned_last_line, config_dict.get("system_prompt", ""), context_lines=cleaned_context)
         logger.debug("TestRule", f"Envoi à Ollama (via stream) — modèle={config_dict.get('ollama_model')}")
 
+        from app.routers.utils import cancel_on_disconnect
         async with orchestrator._ollama_semaphore:
             try:
-                response = await asyncio.wait_for(
-                    orchestrator.ollama.analyze_async(
-                        prompt=prompt,
-                        url=config_dict.get("ollama_url"),
-                        model=config_dict.get("ollama_model"),
-                        think=config_dict.get("ollama_think", True),
-                        options={
-                            "temperature": config_dict.get("ollama_temp", 0.1),
-                            "num_ctx": config_dict.get("ollama_ctx", 4096)
-                        }
-                    ),
-                    timeout=300.0
+                coro = orchestrator.ollama.analyze_async(
+                    prompt=prompt,
+                    url=config_dict.get("ollama_url"),
+                    model=config_dict.get("ollama_model"),
+                    think=config_dict.get("ollama_think", True),
+                    options={
+                        "temperature": config_dict.get("ollama_temp", 0.1),
+                        "num_ctx": config_dict.get("ollama_ctx", 4096)
+                    }
+                )
+                response = await cancel_on_disconnect(
+                    request,
+                    asyncio.wait_for(coro, timeout=300.0)
                 )
             except asyncio.TimeoutError:
                 response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
@@ -327,13 +329,14 @@ async def test_rule(rule_id: int):
                 summary_prompt = f"Résume cette analyse de log :\n{response}"
                 async with orchestrator._ollama_semaphore:
                     try:
-                        summary = await asyncio.wait_for(
-                            orchestrator.ollama.analyze_async(
-                                prompt=summary_prompt,
-                                url=config_dict.get("ollama_url"),
-                                model=config_dict.get("ollama_model")
-                            ),
-                            timeout=60.0
+                        coro = orchestrator.ollama.analyze_async(
+                            prompt=summary_prompt,
+                            url=config_dict.get("ollama_url"),
+                            model=config_dict.get("ollama_model")
+                        )
+                        summary = await cancel_on_disconnect(
+                            request,
+                            asyncio.wait_for(coro, timeout=60.0)
                         )
                     except asyncio.TimeoutError:
                         summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (60s)"
