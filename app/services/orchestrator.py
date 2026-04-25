@@ -140,7 +140,7 @@ class Orchestrator:
                 for line in reversed(recent_lines):
                     line_to_add = f"\n{line}"
                     if current_length + len(line_to_add) > max_chars:
-                        bundled_text += "\n... [Certaines lignes ont été omises car trop longues]"
+                        bundled_text += f"\n... [Tronqué : limite de {max_chars} caractères atteinte ({total_lines} événements détectés)]"
                         break
                     bundled_text += line_to_add
                     current_length += len(line_to_add)
