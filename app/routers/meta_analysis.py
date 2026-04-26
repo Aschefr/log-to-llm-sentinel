@@ -5,7 +5,7 @@ from typing import List, Optional
 import json
 
 from app.database import SessionLocal
-from app.models import MetaAnalysisConfig, MetaAnalysisResult
+from app.models import MetaAnalysisConfig, MetaAnalysisResult, GlobalConfig
 from app.services.meta_service import MetaAnalysisService
 
 router = APIRouter(prefix="/api/meta-analysis", tags=["meta-analysis"])
@@ -79,6 +79,9 @@ async def update_config(config_id: int, data: dict, db: Session = Depends(get_db
         if "context_size" in data: config.context_size = int(data["context_size"])
         if "system_prompt" in data: config.system_prompt = data["system_prompt"]
         if "max_analyses" in data: config.max_analyses = int(data["max_analyses"])
+        if "last_run_at" in data and data["last_run_at"]:
+            from datetime import datetime as dt
+            config.last_run_at = dt.fromisoformat(data["last_run_at"].replace('Z', '+00:00')).replace(tzinfo=None)
 
         db.commit()
         return {"status": "ok"}
@@ -150,6 +153,29 @@ async def list_results(config_id: Optional[int] = None, limit: int = 20, db: Ses
         "analyses_count": r.MetaAnalysisResult.analyses_count,
         "detection_ids": json.loads(r.MetaAnalysisResult.detection_ids_json) if getattr(r.MetaAnalysisResult, 'detection_ids_json', None) else [],
         "matched_keywords": json.loads(r.MetaAnalysisResult.matched_keywords_json) if getattr(r.MetaAnalysisResult, 'matched_keywords_json', None) else [],
+        "context_sent": getattr(r.MetaAnalysisResult, 'context_sent', None),
         "ollama_response": r.MetaAnalysisResult.ollama_response,
         "created_at": r.MetaAnalysisResult.created_at.isoformat()
     } for r in results]
+
+@router.delete("/results/{result_id}")
+async def delete_result(result_id: int, db: Session = Depends(get_db)):
+    result = db.query(MetaAnalysisResult).filter(MetaAnalysisResult.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=404, detail="Résultat introuvable")
+    db.delete(result)
+    db.commit()
+    return {"status": "ok"}
+
+@router.post("/results/{result_id}/notify")
+async def notify_result(result_id: int, db: Session = Depends(get_db)):
+    result = db.query(MetaAnalysisResult).filter(MetaAnalysisResult.id == result_id).first()
+    if not result:
+        raise HTTPException(status_code=404, detail="Résultat introuvable")
+    config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == result.config_id).first()
+    global_cfg = db.query(GlobalConfig).first()
+    if not global_cfg:
+        raise HTTPException(status_code=400, detail="Configuration globale introuvable")
+    from app.main import meta_service
+    await meta_service._send_notification(result, config, global_cfg)
+    return {"status": "ok"}

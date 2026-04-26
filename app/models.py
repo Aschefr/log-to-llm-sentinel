@@ -121,5 +121,6 @@ class MetaAnalysisResult(Base):
     analyses_count = Column(Integer, default=0)
     detection_ids_json = Column(Text, default="[]")  # List of detection IDs included
     matched_keywords_json = Column(Text, default="[]")  # List of all keywords matched across all included analyses
+    context_sent = Column(Text, nullable=True)  # Prompt exact envoyé au LLM
     ollama_response = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)

@@ -65,20 +65,52 @@ class MetaAnalysisService:
             config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == config_id).first()
             if not config: return {'status': 'error', 'message': 'Config introuvable'}
 
+            now = datetime.utcnow()
+            # Déterminer la fenêtre de temps
+            # Pour une nouvelle config (last_run_at = maintenant), on utilise une fenêtre par défaut basée sur le type de planification
+            if config.last_run_at is None:
+                default_delta = timedelta(days=1)
+            else:
+                delta_since_creation = now - config.last_run_at
+                if delta_since_creation < timedelta(minutes=2):  # Créé il y a moins de 2 min = nouvelle config
+                    if config.schedule_type == 'daily':
+                        default_delta = timedelta(days=1)
+                    elif config.schedule_type == 'weekly':
+                        default_delta = timedelta(weeks=1)
+                    elif config.schedule_type == 'monthly':
+                        default_delta = timedelta(days=30)
+                    else:
+                        default_delta = timedelta(days=1)
+                    period_start = now - default_delta
+                else:
+                    period_start = config.last_run_at
+
+            if config.last_run_at is None:
+                period_start = now - default_delta
+            period_end = now
+
             rule_ids = []
             if config.rule_ids_json:
                 try: rule_ids = json.loads(config.rule_ids_json)
                 except: pass
 
-            # Récupère les N dernières analyses, sans filtre de date
-            # pour donner une préview utile même après une création récente
-            query = db.query(Analysis, Rule).outerjoin(Rule, Analysis.rule_id == Rule.id)
+            query = db.query(Analysis, Rule).outerjoin(Rule, Analysis.rule_id == Rule.id).filter(
+                Analysis.analyzed_at >= period_start,
+                Analysis.analyzed_at <= period_end
+            )
             if rule_ids:
                 query = query.filter(Analysis.rule_id.in_(rule_ids))
 
             results = query.order_by(desc(Analysis.analyzed_at)).limit(config.max_analyses).all()
             if not results:
-                return {'status': 'ok', 'rules_context': [], 'analyses_count': 0, 'matched_keywords': []}
+                return {
+                    'status': 'ok',
+                    'rules_context': [],
+                    'analyses_count': 0,
+                    'matched_keywords': [],
+                    'period_start': period_start.isoformat(),
+                    'period_end': period_end.isoformat()
+                }
 
             # Grouper par règle
             by_rule = {}
@@ -106,7 +138,9 @@ class MetaAnalysisService:
                 'status': 'ok',
                 'rules_context': list(by_rule.values()),
                 'analyses_count': len(results),
-                'matched_keywords': list(all_kws)
+                'matched_keywords': list(all_kws),
+                'period_start': period_start.isoformat(),
+                'period_end': period_end.isoformat()
             }
         finally:
             db.close()
@@ -206,6 +240,7 @@ class MetaAnalysisService:
                 analyses_count=analyses_count,
                 detection_ids_json=json.dumps(detection_ids),
                 matched_keywords_json=json.dumps(list(all_matched_keywords)),
+                context_sent=prompt,
                 ollama_response=response_text
             )
             db.add(meta_result)

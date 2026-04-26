@@ -16,6 +16,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         opt.value = i; opt.textContent = i;
         daySelect.appendChild(opt);
     }
+
+    // Re-rendre le contenu dynamique lors d'un changement de langue
+    window.i18n?.onLanguageChange(() => {
+        loadConfigs();
+    });
 });
 
 function updateScheduleUI() {
@@ -146,13 +151,19 @@ function toggleAccordion(id, headerEl) {
     
     if (isOpen) {
         el.classList.remove('open');
-        headerEl.querySelector('.icon').textContent = '▼';
+        headerEl.querySelector('.icon').textContent = '\u25bc';
     } else {
         el.classList.add('open');
-        headerEl.querySelector('.icon').textContent = '▲';
+        headerEl.querySelector('.icon').textContent = '\u25b2';
         
         if (id.startsWith('preview-')) {
-            loadPreview(id.split('-')[1]);
+            const configId = id.split('-')[1];
+            // Si les données sont déjà en cache, on re-rend sans refetch (préserve les éditions)
+            if (_previewData[configId]) {
+                _renderPreview(configId);
+            } else {
+                loadPreview(configId);
+            }
         } else if (id.startsWith('results-')) {
             loadResultsForConfig(id.split('-')[1]);
         }
@@ -166,12 +177,24 @@ function _renderPreview(configId) {
     const container = document.getElementById(`preview-rules-${configId}`);
     if (!container) return;
     const data = _previewData[configId];
+    
+    // En-tête avec la période couverte
+    let periodHeader = '';
+    if (data && data.period_start && data.period_end) {
+        const ps = new Date(data.period_start).toLocaleString();
+        const pe = new Date(data.period_end).toLocaleString();
+        periodHeader = `<div style="font-size:0.82rem; color:var(--text-secondary); background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:4px; padding:0.4rem 0.75rem; margin-bottom:0.75rem;">
+            📅 Période couverte : <strong>${ps}</strong> → <strong>${pe}</strong>
+            &nbsp;&nbsp;•&nbsp;&nbsp; ${data.analyses_count || 0} événement(s)
+        </div>`;
+    }
+    
     if (!data || !data.rules_context || data.rules_context.length === 0) {
         container.innerHTML = `<p style="color:var(--text-secondary);">Aucune analyse disponible pour ces r\u00e8gles.</p>`;
         return;
     }
 
-    container.innerHTML = data.rules_context.map((ruleCtx, ruleIdx) => {
+    container.innerHTML = periodHeader + data.rules_context.map((ruleCtx, ruleIdx) => {
         const entriesHtml = ruleCtx.entries.map((e, entryIdx) => {
             const sevColor = e.severity === 'CRITICAL' ? 'var(--danger)' : e.severity === 'WARNING' ? 'var(--warning)' : 'var(--info)';
             const kwBadges = e.keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('');
@@ -250,9 +273,11 @@ async function loadResultsForConfig(configId) {
             return;
         }
 
-        container.innerHTML = results.map(r => {
+        container.innerHTML = results.map((r, idx) => {
             const start = new Date(r.period_start).toLocaleString();
             const end = new Date(r.period_end).toLocaleString();
+            const created = new Date(r.created_at).toLocaleString();
+            const resultCardId = `meta-ctx-${configId}-${idx}`;
             
             let idsHtml = '';
             if (r.detection_ids && r.detection_ids.length > 0) {
@@ -270,10 +295,29 @@ async function loadResultsForConfig(configId) {
                 </div>`;
             }
 
+            const ctxHtml = r.context_sent ? `
+                <div style="margin-top:0.75rem;">
+                    <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.ctx-icon').textContent = this.nextElementSibling.classList.contains('open') ? '\u25b2' : '\u25bc';" style="border-radius:4px; border-top:none; background:rgba(255,255,255,0.03); border:1px solid var(--border);">
+                        <span style="font-size:0.85rem;">📜 ${window.t('meta.context_sent_title') || 'Contexte envoyé au LLM'}</span>
+                        <span class="ctx-icon">▼</span>
+                    </div>
+                    <div class="accordion-content" style="border:1px solid var(--border); border-top:none; border-radius:0 0 4px 4px; padding:0.75rem;">
+                        <pre style="font-family:monospace; font-size:0.75rem; white-space:pre-wrap; word-break:break-all; color:var(--text-secondary); margin:0; max-height:400px; overflow-y:auto;">${escapeHtml(r.context_sent)}</pre>
+                    </div>
+                </div>` : '';
+
             return `
-            <div class="card meta-result-card" style="padding: 1.5rem; margin-bottom:1rem; border: 1px solid var(--border);">
-                <div style="margin-bottom: 1rem; font-size: 0.9rem; background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 4px;">
-                    <strong>Période :</strong> ${start} - ${end}<br>
+            <div class="card meta-result-card" id="${resultCardId}" style="padding: 1.25rem; margin-bottom:1rem; border: 1px solid var(--border);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
+                    <span style="font-size:0.85rem; color:var(--text-secondary);">${created}</span>
+                    <div style="display:flex; gap:0.4rem; flex-wrap:wrap; justify-content:flex-end;">
+                        <button class="btn btn-secondary btn-sm" onclick="metaResultDeepen(${r.id}, ${r.config_id})" title="${window.t('monitor.deepen_with_ai')}">💬 ${window.t('common.deepen')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="metaResultNotify(${r.id})" title="${window.t('monitor.notify')}">🔔 ${window.t('monitor.notify')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="metaResultDelete(${r.id}, ${configId})" title="${window.t('common.delete')}" style="color:var(--danger); border-color:var(--danger);">🗑️ ${window.t('common.delete')}</button>
+                    </div>
+                </div>
+                <div style="margin-bottom: 0.75rem; font-size: 0.9rem; background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 4px;">
+                    <strong>Période :</strong> ${start} → ${end}<br>
                     <strong>Événements analysés :</strong> ${r.analyses_count}
                     ${kwHtml}
                     ${idsHtml}
@@ -281,6 +325,7 @@ async function loadResultsForConfig(configId) {
                 <div class="markdown-body" style="font-size: 0.95rem; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 4px;">
                     ${marked.parse(r.ollama_response || '')}
                 </div>
+                ${ctxHtml}
             </div>
             `;
         }).join('');
@@ -296,6 +341,47 @@ async function loadResultsForConfig(configId) {
         }, 10);
     } catch(e) {
         container.innerHTML = `<div style="color:var(--danger)">Erreur: ${e.message}</div>`;
+    }
+}
+
+async function metaResultDeepen(resultId, configId) {
+    // Ouvrir le chat avec le contexte de la méta-analyse
+    // On récupère d'abord le texte du résultat depuis le DOM
+    try {
+        const results = await apiFetch(`/api/meta-analysis/results?config_id=${configId}&limit=50`);
+        const r = results.find(x => x.id === resultId);
+        if (!r) return alert('Résultat introuvable.');
+        // Créer une conversation chat avec ce résultat comme contexte
+        const conv = await apiFetch('/api/chat/conversations', {
+            method: 'POST',
+            body: { title: `Méta-Analyse #${resultId}`, analysis_context: r.ollama_response }
+        });
+        if (conv && conv.id) window.location.href = `/chat?conv=${conv.id}`;
+    } catch(e) {
+        alert('Erreur: ' + e.message);
+    }
+}
+
+async function metaResultNotify(resultId) {
+    try {
+        const btn = event.target;
+        btn.textContent = window.t('common.sending') || '⏳ Envoi...';
+        await apiFetch(`/api/meta-analysis/results/${resultId}/notify`, { method: 'POST' });
+        btn.textContent = window.t('common.sent') || '✅ Envoyé';
+        setTimeout(() => btn.textContent = `🔔 ${window.t('monitor.notify')}`, 3000);
+    } catch(e) {
+        alert('Erreur: ' + e.message);
+    }
+}
+
+async function metaResultDelete(resultId, configId) {
+    if (!confirm(window.t('common.confirm_delete_analysis'))) return;
+    try {
+        await apiFetch(`/api/meta-analysis/results/${resultId}`, { method: 'DELETE' });
+        // Recharger les résultats
+        loadResultsForConfig(configId);
+    } catch(e) {
+        alert('Erreur: ' + e.message);
     }
 }
 
@@ -340,6 +426,10 @@ function openConfigModal() {
     const ctxKeys = ['ctx_quick', 'ctx_standard', 'ctx_large', 'ctx_xlarge', 'ctx_massive'];
     ctxKeys.forEach((k, i) => { if (ctxSelect.options[i]) ctxSelect.options[i].text = window.t(`meta.${k}`); });
     
+    // Cacher le champ période (uniquement utile en édition)
+    document.getElementById('period-start-group').style.display = 'none';
+    document.getElementById('config-period-start').value = '';
+    
     updateScheduleUI();
     
     document.getElementById('modal-title').textContent = window.t('meta.modal_title_new') || 'Nouvelle Configuration';
@@ -356,10 +446,21 @@ function editConfig(config) {
     document.getElementById('config-id').value = config.id;
     document.getElementById('config-name').value = config.name;
     
+    // Mettre à jour les options de planification selon la langue
+    const typeSelect = document.getElementById('config-schedule-type');
+    typeSelect.options[0].text = window.t('meta.schedule_daily');
+    typeSelect.options[1].text = window.t('meta.schedule_weekly');
+    typeSelect.options[2].text = window.t('meta.schedule_monthly');
+
     document.getElementById('config-schedule-type').value = config.schedule_type || 'daily';
     updateScheduleUI();
     document.getElementById('config-schedule-day').value = config.schedule_day || 1;
     document.getElementById('config-schedule-time').value = config.schedule_time || '00:00';
+    
+    // Mettre à jour les options de contexte selon la langue
+    const ctxSelect = document.getElementById('config-context');
+    const ctxKeys = ['ctx_quick', 'ctx_standard', 'ctx_large', 'ctx_xlarge', 'ctx_massive'];
+    ctxKeys.forEach((k, i) => { if (ctxSelect.options[i]) ctxSelect.options[i].text = window.t(`meta.${k}`); });
     
     document.getElementById('config-context').value = config.context_size;
     document.getElementById('config-max').value = config.max_analyses;
@@ -367,18 +468,32 @@ function editConfig(config) {
     document.getElementById('config-enabled').checked = config.enabled;
     document.getElementById('config-notify').checked = config.notify_enabled;
 
+    // Remplir la période de début
+    if (config.last_run_at) {
+        const dt = new Date(config.last_run_at);
+        const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        document.getElementById('config-period-start').value = local;
+    } else {
+        document.getElementById('config-period-start').value = '';
+    }
+
     const ruleIds = config.rule_ids_json || [];
     document.querySelectorAll('.rule-chk').forEach(chk => {
         chk.checked = ruleIds.includes(parseInt(chk.value));
     });
 
-    document.getElementById('modal-title').textContent = window.t ? window.t('meta.modal_title_edit') || 'Modifier Configuration' : 'Modifier Configuration';
+    // Afficher le champ période en mode édition
+    document.getElementById('period-start-group').style.display = 'block';
+    
+    document.getElementById('modal-title').textContent = window.t('meta.modal_title_edit') || 'Modifier la configuration';
+    document.getElementById('config-modal').classList.remove('hidden');
     document.getElementById('config-modal').style.display = 'flex';
 }
 
 async function saveConfig() {
     const id = document.getElementById('config-id').value;
     const ruleIds = Array.from(document.querySelectorAll('.rule-chk:checked')).map(chk => parseInt(chk.value));
+    const periodStart = document.getElementById('config-period-start').value;
 
     const payload = {
         name: document.getElementById('config-name').value,
@@ -392,6 +507,11 @@ async function saveConfig() {
         enabled: document.getElementById('config-enabled').checked,
         notify_enabled: document.getElementById('config-notify').checked
     };
+    
+    // Appliquer la modification de la période si renseignée
+    if (periodStart) {
+        payload.last_run_at = new Date(periodStart).toISOString();
+    }
 
     try {
         const url = id ? `/api/meta-analysis/configs/${id}` : '/api/meta-analysis/configs';
@@ -399,6 +519,8 @@ async function saveConfig() {
         
         await apiFetch(url, { method, body: payload });
         closeConfigModal();
+        // Invalider le cache de preview pour cette config
+        if (id) delete _previewData[id];
         await loadConfigs();
     } catch (e) {
         alert('Erreur: ' + e.message);

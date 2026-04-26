@@ -255,7 +255,7 @@
     "filter_all": "-- All configurations --",
     "modal_title": "New Meta-Analysis",
     "modal_title_new": "New Meta-Analysis",
-    "modal_title_edit": "Edit Configuration",
+    "modal_title_edit": "Edit configuration",
     "name": "Configuration Name",
     "rules": "Target Rules (Leave empty to include all rules)",
     "rules_help": "Hold Ctrl/Cmd to select multiple rules.",
@@ -302,6 +302,9 @@
     "max_analyses_label": "Max included analyses",
     "context_size_label": "Context size (tokens)",
     "placeholder_name": "e.g. Daily Production Summary",
-    "default_prompt": "You are a DevOps expert. Analyze these events and provide a global synthesis of the service situation."
+    "default_prompt": "You are a DevOps expert. Analyze these events and provide a global synthesis of the service situation.",
+    "context_sent_title": "Exact context sent to LLM",
+    "period_start_label": "Next analysis period start",
+    "period_start_hint": "Defines the start of the time window for the next scheduled run and preview."
   }
 }
