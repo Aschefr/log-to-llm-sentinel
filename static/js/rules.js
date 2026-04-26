@@ -2,11 +2,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadRules();
     setupModal();
     setupKeywordSuggestions();
-    loadAnalyses();
 
     window.i18n?.onLanguageChange(() => {
         loadRules();
-        loadAnalyses();
     });
 });
 
@@ -119,40 +117,6 @@ async function loadRules() {
 }
 
 
-
-async function clearLiveLogs(ruleId) {
-    const pre = document.getElementById(`live-log-pre-${ruleId}`);
-    if (pre) pre.innerHTML = '';
-
-async function deleteAnalysisInRules(id, ruleId, btnElement) {
-    showInlineConfirm(btnElement, 'Supprimer cette analyse ?', async () => {
-        try {
-            await apiFetch(`/api/dashboard/analyses/${id}`, { method: 'DELETE' });
-            // Recharger l'historique (on referme/rouvre ou on appelle juste le contenu)
-            const container = document.getElementById(`rule-history-${ruleId}`);
-            container.classList.add('hidden'); // Hack simple pour forcer le re-toggle
-            await toggleRuleHistory(ruleId);
-        } catch (error) {
-            console.error('Erreur suppression:', error);
-            alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
-        }
-    });
-}
-
-async function clearRuleHistory(ruleId, btnElement) {
-    showInlineConfirm(btnElement, 'Effacer TOUT l\'historique d\'analyses pour cette règle ?', async () => {
-        try {
-            await apiFetch(`/api/dashboard/analyses/rule/${ruleId}`, { method: 'DELETE' });
-            const container = document.getElementById(`rule-history-${ruleId}`);
-            container.classList.add('hidden');
-            await toggleRuleHistory(ruleId);
-        } catch (error) {
-            console.error('Erreur suppression:', error);
-            alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
-        }
-    });
-}
-
 async function testRule(id) {
     const btn = document.getElementById(`test-btn-${id}`);
     const originalText = btn ? btn.innerHTML : '🧪 Tester';
@@ -179,15 +143,7 @@ async function testRule(id) {
             signal: abortController.signal
         });
         
-        // S'assurer que le container est visible pour voir le résultat du test
-        const container = document.getElementById(`rule-history-${id}`);
-        if (container && container.classList.contains('hidden')) {
-            await toggleRuleHistory(id);
-        } else if (container) {
-            // Si déjà ouvert, on referme et on rouvre pour recharger
-            await toggleRuleHistory(id);
-            await toggleRuleHistory(id);
-        }
+        // On pourrait notifier l'utilisateur de se rendre dans le Monitor pour voir le résultat.
 
         if (btn) {
             btn.innerHTML = '✅ Terminé';

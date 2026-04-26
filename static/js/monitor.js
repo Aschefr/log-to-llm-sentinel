@@ -127,11 +127,11 @@ function renderTabContent(rule) {
                 <div><span class="info-label">🔔 Seuil</span>${rule.notify_severity_threshold}</div>
                 <div>
                     <span class="info-label">📊 Statistiques (Filtrer)</span>
-                    <div style="display:flex; gap:0.25rem; flex-wrap:wrap; margin-top:0.2rem;">
-                        <span class="badge" style="cursor:pointer; background:rgba(255,255,255,0.1);" onclick="loadMonitorAnalyses(${rule.id}, null)" title="Toutes les analyses">Total: ${rule.stats?.total || 0}</span>
-                        <span class="badge badge-critical" style="cursor:pointer;" onclick="loadMonitorAnalyses(${rule.id}, 'critical')">Critique: ${rule.stats?.critical || 0}</span>
-                        <span class="badge badge-warning" style="cursor:pointer;" onclick="loadMonitorAnalyses(${rule.id}, 'warning')">Warning: ${rule.stats?.warning || 0}</span>
-                        <span class="badge badge-info" style="cursor:pointer;" onclick="loadMonitorAnalyses(${rule.id}, 'info')">Info: ${rule.stats?.info || 0}</span>
+                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.35rem;">
+                        <span class="filter-badge" onclick="loadMonitorAnalyses(${rule.id}, null)" title="Toutes les analyses">Total: ${rule.stats?.total || 0}</span>
+                        <span class="filter-badge critical" onclick="loadMonitorAnalyses(${rule.id}, 'critical')">Critique: ${rule.stats?.critical || 0}</span>
+                        <span class="filter-badge warning" onclick="loadMonitorAnalyses(${rule.id}, 'warning')">Warning: ${rule.stats?.warning || 0}</span>
+                        <span class="filter-badge info" onclick="loadMonitorAnalyses(${rule.id}, 'info')">Info: ${rule.stats?.info || 0}</span>
                     </div>
                 </div>
             </div>
