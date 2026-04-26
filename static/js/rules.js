@@ -195,6 +195,8 @@ async function toggleLiveLogs(ruleId, toggleElement, path) {
     }
 }
 
+const ruleHistoryIntervals = {};
+
 async function toggleRuleHistory(ruleId, toggleElement) {
     const container = document.getElementById(`rule-history-${ruleId}`);
     if (!container) return;
@@ -203,7 +205,6 @@ async function toggleRuleHistory(ruleId, toggleElement) {
     if (toggleElement) {
         icon = toggleElement.querySelector('.toggle-icon');
     } else {
-        // Fallback for programmatic open
         const card = container.closest('.rule-card');
         if (card) {
             icon = card.querySelector('.toggle-icon');
@@ -211,55 +212,71 @@ async function toggleRuleHistory(ruleId, toggleElement) {
     }
 
     if (container.classList.contains('hidden')) {
-        // Afficher l'historique
         container.classList.remove('hidden');
         if (icon) icon.textContent = '▼';
         
-        // Toujours recharger quand on ouvre
         container.innerHTML = '<div class="loading">Chargement de l\'historique...</div>';
-        try {
-            const url = `/api/dashboard/recent?limit=10&rule_id=${ruleId}`;
-            const analyses = await apiFetch(url);
+        
+        const fetchHistory = async () => {
+            if (container.classList.contains('hidden')) return; // Stop if closed
+            try {
+                const url = `/api/dashboard/recent?limit=10&rule_id=${ruleId}`;
+                const analyses = await apiFetch(url);
 
-            const header = `
-                <div class="history-actions" style="margin-bottom: 0.5rem; display: flex; justify-content: flex-end;">
-                    <button class="btn btn-secondary btn-sm" onclick="clearRuleHistory(${ruleId}, this)">🗑️ Effacer tout l'historique</button>
-                </div>
-            `;
-
-            if (!analyses || analyses.length === 0) {
-                container.innerHTML = header + '<div class="loading">Aucune analyse pour cette règle</div>';
-                return;
-            }
-
-            container.innerHTML = header + analyses.map(a => `
-                <div class="analysis-card inline-history-card">
-                    <div class="analysis-header">
-                        <div>
-                            <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
-                        </div>
-                        <div class="analysis-actions">
-                            <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
-                            <button class="btn-icon" onclick="copyAnalysisText(this)" title="${window.t('common.copy_analysis')}">
-                                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
-                            </button>
-                            <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysisInRules(${a.id}, ${ruleId}, this)" title="${window.t('common.delete_analysis')}">
-                                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
-                            </button>
-                        </div>
+                const header = `
+                    <div class="history-actions" style="margin-bottom: 0.5rem; display: flex; justify-content: flex-end;">
+                        <button class="btn btn-secondary btn-sm" onclick="clearRuleHistory(${ruleId}, this)">🗑️ Effacer tout l'historique</button>
                     </div>
-                    <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
-                    <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
-                </div>
-            `).join('');
-        } catch (e) {
-            console.error('Erreur analyses:', e);
-            container.innerHTML = `<div class="loading">${window.t ? window.t('common.error') : 'Erreur'}: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
-        }
+                `;
+
+                if (!analyses || analyses.length === 0) {
+                    const newHtml = header + '<div class="loading">Aucune analyse pour cette règle</div>';
+                    if (container.innerHTML !== newHtml) container.innerHTML = newHtml;
+                    return;
+                }
+
+                const newHtml = header + analyses.map(a => `
+                    <div class="analysis-card inline-history-card">
+                        <div class="analysis-header">
+                            <div>
+                                <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
+                            </div>
+                            <div class="analysis-actions">
+                                <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                                <button class="btn-icon" onclick="copyAnalysisText(this)" title="${window.t && window.t('common.copy_analysis') ? window.t('common.copy_analysis') : 'Copier l\'analyse'}">
+                                    <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+                                </button>
+                                <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysisInRules(${a.id}, ${ruleId}, this)" title="${window.t && window.t('common.delete_analysis') ? window.t('common.delete_analysis') : 'Supprimer'}">
+                                    <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
+                        <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
+                    </div>
+                `).join('');
+                
+                // Anti-flicker: Update only if changed
+                if (container.innerHTML !== newHtml) {
+                    container.innerHTML = newHtml;
+                }
+            } catch (e) {
+                console.error('Erreur analyses:', e);
+                const errHtml = `<div class="loading">${window.t ? window.t('common.error') : 'Erreur'}: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
+                if (container.innerHTML !== errHtml) container.innerHTML = errHtml;
+            }
+        };
+
+        await fetchHistory();
+        ruleHistoryIntervals[ruleId] = setInterval(fetchHistory, 10000); // 10 secondes
+
     } else {
-        // Masquer l'historique
         container.classList.add('hidden');
         if (icon) icon.textContent = '▶';
+        if (ruleHistoryIntervals[ruleId]) {
+            clearInterval(ruleHistoryIntervals[ruleId]);
+            delete ruleHistoryIntervals[ruleId];
+        }
     }
 }
 

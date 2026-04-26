@@ -181,15 +181,18 @@ async function setupOllamaModelSelect() {
         customGroup.classList.toggle('hidden', !on);
     }
 
-    select.addEventListener('change', () => {
-        const v = select.value;
-        if (v === '__custom__') {
-            setCustomVisible(true);
-            customInput.focus();
-        } else {
-            setCustomVisible(false);
-        }
-    });
+    if (!select.dataset.listenerAdded) {
+        select.addEventListener('change', () => {
+            const v = select.value;
+            if (v === '__custom__') {
+                setCustomVisible(true);
+                customInput.focus();
+            } else {
+                setCustomVisible(false);
+            }
+        });
+        select.dataset.listenerAdded = 'true';
+    }
 
     // Populate list
     try {
@@ -314,6 +317,16 @@ function setupForm() {
             inputsToGlow.forEach(input => {
                 input.classList.add('save-success-glow');
                 setTimeout(() => input.classList.remove('save-success-glow'), 1500);
+                
+                // Si l'URL Ollama a changé, on rafraîchit automatiquement la liste des modèles
+                if (input.id === 'ollama-url') {
+                    setupOllamaModelSelect();
+                }
+                
+                // Si l'URL Apprise a changé, on rafraîchit la liste des tags disponibles
+                if (input.id === 'apprise-url') {
+                    setupAppriseTags();
+                }
             });
         }
     }, 1000);
@@ -579,9 +592,12 @@ async function setupAppriseTags() {
     const customInput = document.getElementById('apprise-tags');
     if (!select || !customGroup || !customInput) return;
 
-    select.addEventListener('change', () => {
-        customGroup.classList.toggle('hidden', select.value !== '__custom__');
-    });
+    if (!select.dataset.listenerAdded) {
+        select.addEventListener('change', () => {
+            customGroup.classList.toggle('hidden', select.value !== '__custom__');
+        });
+        select.dataset.listenerAdded = 'true';
+    }
 
     try {
         const res = await apiFetch('/api/config/apprise/tags');
