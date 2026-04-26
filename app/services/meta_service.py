@@ -66,26 +66,30 @@ class MetaAnalysisService:
             db.close()
 
 
-    async def get_pending_context(self, config_id: int):
+    async def get_pending_context(self, config_id: int,
+                                   forced_period_start: datetime = None,
+                                   forced_period_end: datetime = None):
         db = SessionLocal()
         try:
             config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == config_id).first()
             if not config: return {'status': 'error', 'message': 'Config introuvable'}
 
             now = datetime.utcnow()
-            period_end = now
 
-            if config.last_run_at is not None:
-                # Config déjà exécutée → fenêtre depuis le dernier run
-                period_start = config.last_run_at
+            if forced_period_start and forced_period_end:
+                period_start = forced_period_start
+                period_end = forced_period_end
             else:
-                # Jamais exécutée → fenêtre par défaut selon le type de planification
-                if config.schedule_type == 'weekly':
-                    period_start = now - timedelta(weeks=1)
-                elif config.schedule_type == 'monthly':
-                    period_start = now - timedelta(days=30)
-                else:  # daily
-                    period_start = now - timedelta(days=1)
+                period_end = now
+                if config.last_run_at is not None:
+                    period_start = config.last_run_at
+                else:
+                    if config.schedule_type == 'weekly':
+                        period_start = now - timedelta(weeks=1)
+                    elif config.schedule_type == 'monthly':
+                        period_start = now - timedelta(days=30)
+                    else:
+                        period_start = now - timedelta(days=1)
 
             rule_ids = []
             if config.rule_ids_json:

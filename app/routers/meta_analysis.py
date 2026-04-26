@@ -108,15 +108,38 @@ async def delete_config(config_id: int, db: Session = Depends(get_db)):
 # ---- TRIGGER ----
 
 @router.get("/trigger/preview/{config_id}")
-async def preview_meta_analysis(config_id: int, db: Session = Depends(get_db)):
+async def preview_meta_analysis(
+    config_id: int,
+    period_start: Optional[str] = None,
+    period_end: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
     """
     Retourne le contexte exact en attente d'envoi.
+    Accepte optionnellement period_start et period_end (ISO datetime) pour surcharger la fenêtre.
     """
     from app.main import meta_service
-    result = await meta_service.get_pending_context(config_id)
+    forced_start = None
+    forced_end = None
+    if period_start:
+        try:
+            forced_start = datetime.fromisoformat(period_start.replace('Z', '+00:00')).replace(tzinfo=None)
+        except Exception:
+            pass
+    if period_end:
+        try:
+            forced_end = datetime.fromisoformat(period_end.replace('Z', '+00:00')).replace(tzinfo=None)
+        except Exception:
+            pass
+    result = await meta_service.get_pending_context(
+        config_id,
+        forced_period_start=forced_start,
+        forced_period_end=forced_end
+    )
     if result["status"] != "ok":
         raise HTTPException(status_code=400, detail=result.get("message"))
     return result
+
 
 
 @router.post("/trigger/{config_id}")

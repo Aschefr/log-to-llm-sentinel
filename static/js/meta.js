@@ -258,9 +258,29 @@ function _renderPreview(configId) {
     if (data && data.period_start && data.period_end) {
         const ps = new Date(data.period_start).toLocaleString();
         const pe = new Date(data.period_end).toLocaleString();
-        periodHeader = `<div style="font-size:0.82rem; color:var(--text-secondary); background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:4px; padding:0.4rem 0.75rem; margin-bottom:0.75rem;">
-            📅 ${window.t('meta.preview_period')} : <strong>${ps}</strong> → <strong>${pe}</strong>
-            &nbsp;&nbsp;•&nbsp;&nbsp; ${data.analyses_count || 0} ${window.t('meta.events_count')}
+        // Convert ISO to datetime-local format (YYYY-MM-DDTHH:MM)
+        const toLocalInput = iso => {
+            const d = new Date(iso);
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+        const startVal = toLocalInput(data.period_start);
+        const endVal = toLocalInput(data.period_end);
+        periodHeader = `<div style="font-size:0.82rem; color:var(--text-secondary); background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:4px; padding:0.5rem 0.75rem; margin-bottom:0.75rem; display:flex; flex-wrap:wrap; align-items:center; gap:0.75rem;">
+            <span style="white-space:nowrap;">📅 ${window.t('meta.preview_period')} :</span>
+            <label style="display:flex; align-items:center; gap:0.3rem; white-space:nowrap;">
+                <span style="opacity:0.7;">${window.t ? window.t('meta.period_from') : 'From'}</span>
+                <input type="datetime-local" id="meta-period-start-${configId}" value="${startVal}"
+                    style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); border-radius:4px; padding:0.2rem 0.4rem; font-size:0.78rem;"
+                    onchange="_onMetaPeriodChange(${configId})">
+            </label>
+            <label style="display:flex; align-items:center; gap:0.3rem; white-space:nowrap;">
+                <span style="opacity:0.7;">${window.t ? window.t('meta.period_to') : 'To'}</span>
+                <input type="datetime-local" id="meta-period-end-${configId}" value="${endVal}"
+                    style="background:var(--bg-secondary); border:1px solid var(--border); color:var(--text-primary); border-radius:4px; padding:0.2rem 0.4rem; font-size:0.78rem;"
+                    onchange="_onMetaPeriodChange(${configId})">
+            </label>
+            <span style="margin-left:auto; white-space:nowrap;">• ${data.analyses_count || 0} ${window.t('meta.events_count')}</span>
         </div>`;
     }
     
@@ -341,6 +361,25 @@ function _savePreviewState(configId) {
     sessionStorage.setItem(`sentinel_meta_state_${configId}`, JSON.stringify(state));
 }
 
+// Debounce timer per configId
+const _periodChangeTimers = {};
+
+function _onMetaPeriodChange(configId) {
+    clearTimeout(_periodChangeTimers[configId]);
+    _periodChangeTimers[configId] = setTimeout(() => {
+        const startEl = document.getElementById(`meta-period-start-${configId}`);
+        const endEl = document.getElementById(`meta-period-end-${configId}`);
+        if (!startEl || !endEl || !startEl.value || !endEl.value) return;
+        // Convert datetime-local (local time) to ISO string for the API
+        const toISO = val => new Date(val).toISOString();
+        const customStart = toISO(startEl.value);
+        const customEnd = toISO(endEl.value);
+        // Invalidate cache so we fetch fresh data
+        delete _previewData[configId];
+        loadPreview(configId, customStart, customEnd);
+    }, 600);
+}
+
 function _deletePreviewEntry(configId, ruleIdx, entryIdx) {
     if (_previewData[configId]) {
         _previewData[configId].rules_context[ruleIdx].entries[entryIdx]._excluded = true;
@@ -365,12 +404,18 @@ function _updateAnnotation(el) {
     }
 }
 
-async function loadPreview(configId) {
+async function loadPreview(configId, customStart = null, customEnd = null) {
     const container = document.getElementById(`preview-rules-${configId}`);
     if (!container) return;
     container.innerHTML = `<div class="loading">${window.t('common.loading')}</div>`;
     try {
-        const res = await apiFetch(`/api/meta-analysis/trigger/preview/${configId}`);
+        let url = `/api/meta-analysis/trigger/preview/${configId}`;
+        const params = [];
+        if (customStart) params.push(`period_start=${encodeURIComponent(customStart)}`);
+        if (customEnd) params.push(`period_end=${encodeURIComponent(customEnd)}`);
+        if (params.length) url += '?' + params.join('&');
+
+        const res = await apiFetch(url);
         
         // Restaurer l'état (annotations/exclusions) si existant dans la session
         try {

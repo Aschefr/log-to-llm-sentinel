@@ -398,6 +398,8 @@
     "no_context_trigger": "No context available.",
     "all_excluded": "All entries have been excluded.",
     "analysis_cancelled": "Analysis cancelled.",
-    "rule_block_label": "Rule:"
+    "rule_block_label": "Rule:",
+    "period_from": "From",
+    "period_to": "To"
   }
 }
