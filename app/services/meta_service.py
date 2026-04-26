@@ -125,7 +125,7 @@ class MetaAnalysisService:
                 if analysis.matched_keywords_json:
                     try: all_kws.update(json.loads(analysis.matched_keywords_json))
                     except: pass
-                date_str = analysis.analyzed_at.strftime('%Y-%m-%d %H:%M:%S')
+                date_str = analysis.analyzed_at.strftime('%Y-%m-%dT%H:%M:%SZ')
                 short_ia = analysis.ollama_response.split('\n\n')[0][:200] + '...' if analysis.ollama_response else 'N/A'
                 by_rule[rule_id]['entries'].append({
                     'date': date_str,

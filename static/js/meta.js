@@ -301,7 +301,7 @@ function _renderPreview(configId) {
             return `
             <div id="entry-${configId}-${ruleIdx}-${entryIdx}" style="padding:0.6rem; border:1px solid rgba(255,255,255,0.06); border-radius:5px; background:rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.35rem;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-                    <span style="font-size:0.75rem; color:var(--text-secondary);">${e.date}</span>
+                    <span style="font-size:0.75rem; color:var(--text-secondary);">${new Date(e.date).toLocaleString()}</span>
                     <span style="font-size:0.75rem; font-weight:600; color:${sevColor};">${e.severity}</span>
                     <a href="/monitor?search=${encodeURIComponent(e.detection_id)}" class="btn btn-secondary btn-sm" style="padding:0.1rem 0.4rem; font-size:0.7rem;">🔍 ${e.detection_id}</a>
                     <button type="button" onclick="_deletePreviewEntry(${configId},${ruleIdx},${entryIdx})" title="${window.t('meta.exclude_btn')}" style="margin-left:auto; background:none; border:1px solid var(--danger); color:var(--danger); border-radius:3px; padding:0.1rem 0.4rem; font-size:0.75rem; cursor:pointer; line-height:1;">× ${window.t('meta.exclude_btn')}</button>
