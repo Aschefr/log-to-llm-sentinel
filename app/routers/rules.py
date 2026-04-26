@@ -63,6 +63,7 @@ def get_rules():
                 "anti_spam_delay": r.anti_spam_delay or 60,
                 "notify_severity_threshold": r.notify_severity_threshold or "info",
                 "last_log_line": last_line,
+                "last_learning_session_id": r.last_learning_session_id,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
                 "last_detection_id": None,
                 "last_analysis_severity": None,

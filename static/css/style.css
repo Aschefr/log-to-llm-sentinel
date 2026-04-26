@@ -1805,3 +1805,19 @@ mark.kw-highlight {
     gap: 0.5rem;
     align-items: center;
 }
+
+/* Learning progress panel inside rule card */
+.kw-card-panel {
+    background: rgba(99, 102, 241, 0.06);
+    border: 1px solid rgba(99, 102, 241, 0.18);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.55rem 0.75rem;
+    margin-top: 0.25rem;
+}
+.kw-card-status {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.15rem;
+}

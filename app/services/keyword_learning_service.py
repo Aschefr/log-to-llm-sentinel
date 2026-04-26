@@ -332,6 +332,17 @@ async def _run_session(session_id: int):
 
         _db_update(session_id, status='scanning')
 
+        # Vérification rapide : le fichier est-il lisible ?
+        import os
+        if not os.path.isfile(log_path):
+            _db_update(session_id, status='error',
+                       error_message=f"Fichier introuvable sur le serveur : {log_path}")
+            return
+        if not os.access(log_path, os.R_OK):
+            _db_update(session_id, status='error',
+                       error_message=f"Fichier non lisible (permissions insuffisantes) : {log_path}")
+            return
+
         has_ts = _detect_timestamps(log_path)
         all_raw: list[str] = []
         log_entries = []

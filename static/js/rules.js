@@ -85,11 +85,11 @@ async function loadRules() {
         }
 
         container.innerHTML = rules.map(rule => `
-            <div class="rule-card">
+            <div class="rule-card" id="rule-card-${rule.id}">
                 <div class="rule-info">
                     <h3>${escapeHtml(rule.name)}</h3>
                     <p>📁 ${escapeHtml(rule.log_file_path)}</p>
-                    <p>🔑 ${rule.keywords.join(', ')}</p>
+                    <p>🔑 ${rule.keywords.join(', ') || '<em style="opacity:.5">Aucun mot-clé (apprentissage en cours…)</em>'}</p>
                     ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}
                     <p>${rule.enabled ? `✅ ${window.t ? window.t('rules.enabled_status') : 'Enabled'}` : `❌ ${window.t ? window.t('rules.disabled_status') : 'Disabled'}`} | 🔔 ${rule.notify_on_match ? `${window.t ? window.t('rules.notification_threshold') : 'Threshold:'} ${rule.notify_severity_threshold || 'info'}` : (window.t ? window.t('rules.notifications_disabled') : 'Notifications disabled')}</p>
                 </div>
@@ -98,8 +98,8 @@ async function loadRules() {
                     <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">${window.t ? window.t('rules.edit') : '✏️ Edit'}</button>
                     <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id}, this)">${window.t ? window.t('rules.delete') : '🗑️ Delete'}</button>
                 </div>
-                <div class="rule-toggles" style="display: flex; flex-direction: column; gap: 0.5rem; flex-basis: 100%;">
-                    <div class="rule-last-line" style="display:flex; justify-content:space-between; align-items:center;">
+                <div class="rule-toggles" style="display:flex;flex-direction:column;gap:.5rem;flex-basis:100%">
+                    <div class="rule-last-line" style="display:flex;justify-content:space-between;align-items:center">
                         <div>
                             <strong>${window.t ? window.t('rules.last_detected_line') : 'Last detected line:'}</strong>
                             <div class="last-line-content">${escapeHtml(rule.last_log_line || (window.t ? window.t('dashboard.no_line_found') : 'No line found or file inaccessible'))}</div>
@@ -108,12 +108,92 @@ async function loadRules() {
                             🔍 ${window.t ? window.t('rules.view_in_monitor') || 'Voir dans Monitor' : 'Voir dans Monitor'}
                         </button>
                     </div>
+                    ${rule.last_learning_session_id ? `
+                    <div class="kw-card-panel" id="rule-learning-${rule.id}">
+                        <span class="kw-hint" style="opacity:.6">⏳ Chargement de la session d'apprentissage…</span>
+                    </div>` : ''}
                 </div>
             </div>
         `).join('');
+
+        // Fetch and render any active learning sessions
+        const activeSessions = rules.filter(r => r.last_learning_session_id);
+        if (activeSessions.length) _pollAllLearningSessions(activeSessions);
+
     } catch (error) {
         console.error('Erreur chargement règles:', error);
     }
+}
+
+let _ruleSessionTimers = {};
+
+function _pollAllLearningSessions(rules) {
+    rules.forEach(rule => {
+        // Clear existing timer for this rule
+        if (_ruleSessionTimers[rule.id]) {
+            clearInterval(_ruleSessionTimers[rule.id]);
+            delete _ruleSessionTimers[rule.id];
+        }
+        // Fetch once immediately
+        _fetchAndApplySession(rule.id, rule.last_learning_session_id);
+        // Then poll every 3s
+        _ruleSessionTimers[rule.id] = setInterval(async () => {
+            const done = await _fetchAndApplySession(rule.id, rule.last_learning_session_id);
+            if (done) {
+                clearInterval(_ruleSessionTimers[rule.id]);
+                delete _ruleSessionTimers[rule.id];
+                loadRules(); // refresh card with final keywords
+            }
+        }, 3000);
+    });
+}
+
+async function _fetchAndApplySession(ruleId, sessionId) {
+    try {
+        const data = await fetch(`/api/keyword-learning/${sessionId}/status`).then(r => r.json());
+        const card = document.getElementById(`rule-learning-${ruleId}`);
+        if (!card) return true;
+
+        const pct = data.total_packets > 0
+            ? Math.round((data.completed_packets / data.total_packets) * 100) : 0;
+
+        const STATUS = {
+            pending:   `⏳ En attente de démarrage…`,
+            scanning:  `🔍 Scan — ${data.completed_packets}/${data.total_packets} paquets (${pct}%)`,
+            refining:  `🧠 Raffinement IA en cours…`,
+            validated: `✅ Apprentissage terminé`,
+            reverted:  `↩️ Annulé — mots-clés restaurés`,
+            error:     `⚠️ Erreur : ${data.error_message || 'Inconnue'}`,
+        };
+
+        const isActive = ['pending', 'scanning', 'refining'].includes(data.status);
+        const isDone   = ['validated', 'reverted', 'error'].includes(data.status);
+
+        card.innerHTML = `
+            <div class="kw-card-status">${STATUS[data.status] || data.status}</div>
+            ${data.status === 'scanning' ? `
+                <div class="kw-progress-bar-track" style="margin:.3rem 0 .4rem">
+                    <div class="kw-progress-bar" style="width:${pct}%"></div>
+                </div>
+                ${data.raw_keywords && data.raw_keywords.length ? `
+                <div class="kw-tags-row" style="margin-top:.25rem">
+                    ${data.raw_keywords.slice(0, 10).map(k => `<span class="kw-tag kw-tag--raw">${escapeHtml(k)}</span>`).join('')}
+                    ${data.raw_keywords.length > 10 ? `<span class="kw-hint" style="align-self:center">+${data.raw_keywords.length - 10}</span>` : ''}
+                </div>` : ''}
+            ` : ''}
+            ${data.status === 'validated' && data.final_keywords && data.final_keywords.length ? `
+                <div class="kw-tags-row" style="margin:.3rem 0">
+                    ${data.final_keywords.map(k => `<span class="kw-tag">${escapeHtml(k)}</span>`).join('')}
+                </div>
+            ` : ''}
+            <div class="kw-actions" style="margin-top:.4rem">
+                ${isActive ? `<button type="button" class="btn btn-danger btn-sm" onclick="kwStopSession(${sessionId})">⏹ Arrêter</button>` : ''}
+                ${data.status === 'validated' ? `<button type="button" class="btn btn-secondary btn-sm" onclick="kwRevertSession(${sessionId})">↩️ Annuler les changements</button>` : ''}
+            </div>
+        `;
+
+        return isDone;
+    } catch { return false; }
 }
 
 
