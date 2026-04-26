@@ -173,7 +173,7 @@ async function loadConfigs() {
                     ${nextRunHtml}
                     <div style="display: flex; gap: 0.5rem; margin-top:0.75rem;">
                         <button class="btn btn-secondary btn-sm" onclick='editConfig(${JSON.stringify(c).replace(/'/g, "&#39;")})'>${window.t('common.edit') || 'Modifier'}</button>
-                        <button class="btn btn-secondary btn-sm" style="color:var(--danger); border-color:var(--danger);" onclick="deleteConfig(${c.id})">${window.t('common.delete')}</button>
+                        <button class="btn btn-secondary btn-sm" style="color:var(--danger); border-color:var(--danger);" onclick="deleteConfig(${c.id}, this)">${window.t('common.delete')}</button>
                     </div>
                 </div>
                 
@@ -442,7 +442,7 @@ async function loadResultsForConfig(configId) {
                     <div style="display:flex; gap:0.4rem; flex-wrap:wrap; justify-content:flex-end;">
                         <button class="btn btn-primary btn-sm" onclick="metaResultDeepen(${r.id}, ${r.config_id})">${window.t('monitor.deepen_with_ai')}</button>
                         <button class="btn btn-secondary btn-sm" onclick="metaResultNotify(${r.id})">${window.t('monitor.notify')}</button>
-                        <button class="btn btn-secondary btn-sm" onclick="metaResultDelete(${r.id}, ${configId})" style="color:var(--danger); border-color:var(--danger);">🗑️ ${window.t('common.delete')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="metaResultDelete(${r.id}, ${configId}, this)" style="color:var(--danger); border-color:var(--danger);">🗑️ ${window.t('common.delete')}</button>
                     </div>
                 </div>
                 <div style="margin-bottom: 0.75rem; font-size: 0.9rem; background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 4px;">
@@ -503,26 +503,20 @@ async function metaResultNotify(resultId) {
     }
 }
 
-async function metaResultDelete(resultId, configId) {
-    if (!confirm(window.t('common.confirm_delete_analysis'))) return;
-    try {
-        await apiFetch(`/api/meta-analysis/results/${resultId}`, { method: 'DELETE' });
-        // Recharger les résultats
-        loadResultsForConfig(configId);
-        
-        // La suppression du dernier résultat fait reculer le pointeur de temps (last_run_at)
-        // Il faut donc vider le cache de l'aperçu et le recharger si le panneau est ouvert
-        delete _previewData[configId];
-        const previewEl = document.getElementById(`preview-${configId}`);
-        if (previewEl && previewEl.classList.contains('open')) {
-            loadPreview(configId);
+async function metaResultDelete(resultId, configId, btnElement) {
+    showInlineConfirm(btnElement, window.t('common.confirm_delete_analysis'), async () => {
+        try {
+            await apiFetch(`/api/meta-analysis/results/${resultId}`, { method: 'DELETE' });
+            loadResultsForConfig(configId);
+            delete _previewData[configId];
+            const previewEl = document.getElementById(`preview-${configId}`);
+            if (previewEl && previewEl.classList.contains('open')) {
+                loadPreview(configId);
+            }
+        } catch(e) {
+            alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
         }
-        
-        // (Optionnel) on pourrait aussi recharger la ligne de configuration pour 
-        // mettre à jour le texte "Dernier run" mais on évite de reconstruire tout le DOM
-    } catch(e) {
-        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
-    }
+    });
 }
 
 function highlightDOMText(element, keywords) {
@@ -643,14 +637,15 @@ async function saveConfig() {
     }
 }
 
-async function deleteConfig(id) {
-    if (!confirm('Voulez-vous vraiment supprimer cette configuration ?')) return;
-    try {
-        await apiFetch(`/api/meta-analysis/configs/${id}`, { method: 'DELETE' });
-        await loadConfigs();
-    } catch (e) {
-        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
-    }
+async function deleteConfig(id, btnElement) {
+    showInlineConfirm(btnElement, 'Voulez-vous vraiment supprimer cette configuration ?', async () => {
+        try {
+            await apiFetch(`/api/meta-analysis/configs/${id}`, { method: 'DELETE' });
+            await loadConfigs();
+        } catch (e) {
+            alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
+        }
+    });
 }
 
 // Map des AbortControllers actifs par configId

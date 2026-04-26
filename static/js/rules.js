@@ -98,7 +98,7 @@ async function loadRules() {
                 <div class="rule-actions">
                     <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
                     <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id})">🗑️ Supprimer</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id}, this)">🗑️ Supprimer</button>
                 </div>
                 <div class="rule-toggles" style="display: flex; flex-direction: column; gap: 0.5rem; flex-basis: 100%;">
                     <div class="rule-last-line">
@@ -223,7 +223,7 @@ async function toggleRuleHistory(ruleId, toggleElement) {
 
             const header = `
                 <div class="history-actions" style="margin-bottom: 0.5rem; display: flex; justify-content: flex-end;">
-                    <button class="btn btn-secondary btn-sm" onclick="clearRuleHistory(${ruleId})">🗑️ Effacer tout l'historique</button>
+                    <button class="btn btn-secondary btn-sm" onclick="clearRuleHistory(${ruleId}, this)">🗑️ Effacer tout l'historique</button>
                 </div>
             `;
 
@@ -243,7 +243,7 @@ async function toggleRuleHistory(ruleId, toggleElement) {
                             <button class="btn-icon" onclick="copyAnalysisText(this)" title="${window.t('common.copy_analysis')}">
                                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
                             </button>
-                            <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysisInRules(${a.id}, ${ruleId})" title="${window.t('common.delete_analysis')}">
+                            <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysisInRules(${a.id}, ${ruleId}, this)" title="${window.t('common.delete_analysis')}">
                                 <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
                             </button>
                         </div>
@@ -295,31 +295,33 @@ function copyAnalysisText(btn) {
     });
 }
 
-async function deleteAnalysisInRules(id, ruleId) {
-    if (!confirm('Supprimer cette analyse ?')) return;
-    try {
-        await apiFetch(`/api/dashboard/analyses/${id}`, { method: 'DELETE' });
-        // Recharger l'historique (on referme/rouvre ou on appelle juste le contenu)
-        const container = document.getElementById(`rule-history-${ruleId}`);
-        container.classList.add('hidden'); // Hack simple pour forcer le re-toggle
-        await toggleRuleHistory(ruleId);
-    } catch (error) {
-        console.error('Erreur suppression:', error);
-        alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
-    }
+async function deleteAnalysisInRules(id, ruleId, btnElement) {
+    showInlineConfirm(btnElement, 'Supprimer cette analyse ?', async () => {
+        try {
+            await apiFetch(`/api/dashboard/analyses/${id}`, { method: 'DELETE' });
+            // Recharger l'historique (on referme/rouvre ou on appelle juste le contenu)
+            const container = document.getElementById(`rule-history-${ruleId}`);
+            container.classList.add('hidden'); // Hack simple pour forcer le re-toggle
+            await toggleRuleHistory(ruleId);
+        } catch (error) {
+            console.error('Erreur suppression:', error);
+            alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
+        }
+    });
 }
 
-async function clearRuleHistory(ruleId) {
-    if (!confirm('Effacer TOUT l\'historique d\'analyses pour cette règle ?')) return;
-    try {
-        await apiFetch(`/api/dashboard/analyses/rule/${ruleId}`, { method: 'DELETE' });
-        const container = document.getElementById(`rule-history-${ruleId}`);
-        container.classList.add('hidden');
-        await toggleRuleHistory(ruleId);
-    } catch (error) {
-        console.error('Erreur suppression:', error);
-        alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
-    }
+async function clearRuleHistory(ruleId, btnElement) {
+    showInlineConfirm(btnElement, 'Effacer TOUT l\'historique d\'analyses pour cette règle ?', async () => {
+        try {
+            await apiFetch(`/api/dashboard/analyses/rule/${ruleId}`, { method: 'DELETE' });
+            const container = document.getElementById(`rule-history-${ruleId}`);
+            container.classList.add('hidden');
+            await toggleRuleHistory(ruleId);
+        } catch (error) {
+            console.error('Erreur suppression:', error);
+            alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
+        }
+    });
 }
 
 async function testRule(id) {
@@ -647,18 +649,18 @@ async function editRule(id) {
     }
 }
 
-async function deleteRule(id) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette règle ?')) return;
-
-    try {
-        await apiFetch(`/api/rules/${id}`, {
-            method: 'DELETE',
-        });
-        loadRules();
-    } catch (error) {
-        console.error('Erreur suppression règle:', error);
-        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + error.message);
-    }
+async function deleteRule(id, btnElement) {
+    showInlineConfirm(btnElement, 'Êtes-vous sûr de vouloir supprimer cette règle ?', async () => {
+        try {
+            await apiFetch(`/api/rules/${id}`, {
+                method: 'DELETE',
+            });
+            loadRules();
+        } catch (error) {
+            console.error('Erreur suppression règle:', error);
+            alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + error.message);
+        }
+    });
 }
 
 function escapeHtml(text) {

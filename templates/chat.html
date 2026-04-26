@@ -524,26 +524,27 @@ function renderConversationList() {
                 <div class="conv-title">${escapeHtml(c.title)}</div>
                 <div class="conv-date">${formatDate(c.created_at)}</div>
             </div>
-            <button class="btn-icon delete-chat-btn" onclick="event.stopPropagation(); deleteConversation(${c.id})" title="${window.t('chat.delete_btn_title')}">
+            <button class="btn-icon delete-chat-btn" onclick="event.stopPropagation(); deleteConversation(${c.id}, this)" title="${window.t ? window.t('chat.delete_btn_title') : 'Supprimer'}">
                 <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
             </button>
         </div>
     `).join('');
 }
 
-async function deleteConversation(id) {
-    if (!confirm(window.t ? window.t('chat.delete_conversation') : 'Supprimer cette conversation ?')) return;
-    try {
-        await apiFetch(`/chat/api/delete/${id}`, { method: 'DELETE' });
-        if (activeConvId === id) {
-            activeConvId = null;
-            document.getElementById('chat-interface').classList.add('hidden');
-            document.getElementById('chat-welcome').classList.remove('hidden');
+async function deleteConversation(id, btnElement) {
+    showInlineConfirm(btnElement, window.t ? window.t('chat.delete_conversation') : 'Supprimer cette conversation ?', async () => {
+        try {
+            await apiFetch(`/chat/api/delete/${id}`, { method: 'DELETE' });
+            if (activeConvId === id) {
+                activeConvId = null;
+                document.getElementById('chat-interface').classList.add('hidden');
+                document.getElementById('chat-welcome').classList.remove('hidden');
+            }
+            await loadConversations();
+        } catch (e) {
+            alert(e.message);
         }
-        await loadConversations();
-    } catch (e) {
-        alert(e.message);
-    }
+    });
 }
 
 async function selectConversation(id) {

@@ -28,16 +28,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const clearAllBtn = document.getElementById('clear-all-analyses-btn');
     if (clearAllBtn) {
-        clearAllBtn.addEventListener('click', async () => {
-            if (!confirm('Voulez-vous vraiment effacer TOUTES les analyses du système ?')) return;
-            try {
-                await apiFetch('/api/dashboard/analyses/all/confirm', { method: 'DELETE' });
-                loadStats();
-                loadRecentAnalyses();
-            } catch (error) {
-                console.error('Erreur suppression:', error);
-                alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
-            }
+        clearAllBtn.addEventListener('click', async (e) => {
+            showInlineConfirm(clearAllBtn, 'Voulez-vous vraiment effacer TOUTES les analyses du système ?', async () => {
+                try {
+                    await apiFetch('/api/dashboard/analyses/all/confirm', { method: 'DELETE' });
+                    loadStats();
+                    loadRecentAnalyses();
+                } catch (error) {
+                    console.error('Erreur suppression:', error);
+                    alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
+                }
+            });
         });
     }
 });
@@ -85,7 +86,7 @@ async function loadRecentAnalyses() {
                         <button class="btn-icon" onclick="copyAnalysisText(this)" title="${window.t('common.copy_analysis')}">
                             <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
                         </button>
-                        <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysis(${a.id})" title="${window.t('common.delete_analysis')}">
+                        <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysis(${a.id}, this)" title="${window.t('common.delete_analysis')}">
                             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
                         </button>
                     </div>
@@ -113,16 +114,17 @@ async function loadRecentAnalyses() {
     }
 }
 
-async function deleteAnalysis(id) {
-    if (!confirm('Supprimer cette analyse ?')) return;
-    try {
-        await apiFetch(`/api/dashboard/analyses/${id}`, { method: 'DELETE' });
-        loadStats();
-        loadRecentAnalyses();
-    } catch (error) {
-        console.error('Erreur suppression:', error);
-        alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
-    }
+async function deleteAnalysis(id, btnElement) {
+    showInlineConfirm(btnElement, 'Supprimer cette analyse ?', async () => {
+        try {
+            await apiFetch(`/api/dashboard/analyses/${id}`, { method: 'DELETE' });
+            loadStats();
+            loadRecentAnalyses();
+        } catch (error) {
+            console.error('Erreur suppression:', error);
+            alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
+        }
+    });
 }
 
 function copyAnalysisText(btn) {

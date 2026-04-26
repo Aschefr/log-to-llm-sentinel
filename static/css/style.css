@@ -1350,3 +1350,34 @@ mark.kw-highlight {
 
 .hidden { display: none !important; }
 
+/* Inline Confirm Popover */
+.inline-confirm-popup {
+    position: absolute;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+    padding: 1rem;
+    z-index: 9999;
+    min-width: 250px;
+    animation: inlineConfirmFadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    backdrop-filter: blur(10px);
+}
+@keyframes inlineConfirmFadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.inline-confirm-msg {
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    text-align: center;
+}
+.inline-confirm-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+}
+.inline-confirm-actions .btn {
+    flex: 1;
+}
