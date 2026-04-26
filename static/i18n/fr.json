@@ -16,7 +16,8 @@
     "uptime": "En ligne",
     "tooltip_cpu": "Utilisation CPU (App / Système)",
     "tooltip_ram": "Utilisation RAM (App)",
-    "tooltip_uptime": "Temps de fonctionnement"
+    "tooltip_uptime": "Temps de fonctionnement",
+    "meta": "Méta-Analyse"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -243,7 +244,8 @@
     "confirm": "Valider",
     "copy_analysis": "Copier l'analyse",
     "delete_analysis": "Supprimer cette analyse",
-    "view_in_monitor": "Voir dans Monitor"
+    "view_in_monitor": "Voir dans Monitor",
+    "save": "Enregistrer"
   },
   "meta": {
     "title": "Méta-Analyse",
@@ -262,7 +264,44 @@
     "max_analyses": "Limite d'analyses",
     "system_prompt": "Prompt Système IA",
     "enabled": "Activé",
-    "notify": "Notifier à la fin"
+    "notify": "Notifier à la fin",
+    "schedule_type": "Fréquence",
+    "schedule_daily": "Tous les jours",
+    "schedule_weekly": "Toutes les semaines",
+    "schedule_monthly": "Tous les mois",
+    "schedule_hour": "Heure",
+    "schedule_day": "Jour",
+    "schedule_weekday": "Jour de la semaine",
+    "schedule_monthday": "Jour du mois",
+    "weekday_mon": "Lundi",
+    "weekday_tue": "Mardi",
+    "weekday_wed": "Mercredi",
+    "weekday_thu": "Jeudi",
+    "weekday_fri": "Vendredi",
+    "weekday_sat": "Samedi",
+    "weekday_sun": "Dimanche",
+    "ctx_quick": "2048 (Résumé rapide)",
+    "ctx_standard": "4096 (Standard)",
+    "ctx_large": "8192 (Contexte large)",
+    "ctx_xlarge": "16384 (Très large)",
+    "ctx_massive": "32768 (Massif - Attention RAM)",
+    "accordion_preview": "Aperçu des données en attente",
+    "accordion_results": "Résultats Historiques",
+    "preview_help": "Vous pouvez visualiser, annoter ou supprimer des lignes du contexte avant de lancer l’analyse manuellement.",
+    "run_custom": "Lancer avec ce contexte édité",
+    "no_configs": "Aucune configuration.",
+    "no_results": "Aucun résultat historique.",
+    "all_rules": "Toutes les règles",
+    "status_active": "Actif",
+    "status_disabled": "Désactivé",
+    "last_run": "Dernier run :",
+    "never": "Jamais",
+    "sources": "Analyses sources :",
+    "keywords_label": "Mots-clés déclencheurs :",
+    "schedule_planning": "Planification",
+    "max_analyses_label": "Limite d’analyses incluses",
+    "context_size_label": "Taille du contexte (tokens)",
+    "placeholder_name": "Ex : Synthèse Journalière Production",
+    "default_prompt": "Tu es un expert DevOps. Analyse ces événements et fais une synthèse globale de la situation du service."
   }
 }
-

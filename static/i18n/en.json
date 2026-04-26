@@ -16,7 +16,8 @@
     "uptime": "Uptime",
     "tooltip_cpu": "CPU Usage (App / System)",
     "tooltip_ram": "RAM Usage (App)",
-    "tooltip_uptime": "Uptime"
+    "tooltip_uptime": "Uptime",
+    "meta": "Meta-Analysis"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -243,7 +244,8 @@
     "confirm": "Confirm",
     "copy_analysis": "Copy Analysis",
     "delete_analysis": "Delete this analysis",
-    "view_in_monitor": "View in Monitor"
+    "view_in_monitor": "View in Monitor",
+    "save": "Save"
   },
   "meta": {
     "title": "Meta-Analysis",
@@ -262,6 +264,44 @@
     "max_analyses": "Analyses Limit",
     "system_prompt": "AI System Prompt",
     "enabled": "Enabled",
-    "notify": "Notify on completion"
+    "notify": "Notify on completion",
+    "schedule_type": "Frequency",
+    "schedule_daily": "Every day",
+    "schedule_weekly": "Every week",
+    "schedule_monthly": "Every month",
+    "schedule_hour": "Time",
+    "schedule_day": "Day",
+    "schedule_weekday": "Day of week",
+    "schedule_monthday": "Day of month",
+    "weekday_mon": "Monday",
+    "weekday_tue": "Tuesday",
+    "weekday_wed": "Wednesday",
+    "weekday_thu": "Thursday",
+    "weekday_fri": "Friday",
+    "weekday_sat": "Saturday",
+    "weekday_sun": "Sunday",
+    "ctx_quick": "2048 (Quick summary)",
+    "ctx_standard": "4096 (Standard)",
+    "ctx_large": "8192 (Large context)",
+    "ctx_xlarge": "16384 (Very large)",
+    "ctx_massive": "32768 (Massive - RAM warning)",
+    "accordion_preview": "Preview of pending data",
+    "accordion_results": "Historical Results",
+    "preview_help": "You can view, annotate, or delete lines from the context before launching the analysis manually.",
+    "run_custom": "Run with this edited context",
+    "no_configs": "No configurations.",
+    "no_results": "No historical results.",
+    "all_rules": "All rules",
+    "status_active": "Active",
+    "status_disabled": "Disabled",
+    "last_run": "Last run:",
+    "never": "Never",
+    "sources": "Source analyses:",
+    "keywords_label": "Trigger keywords:",
+    "schedule_planning": "Schedule",
+    "max_analyses_label": "Max included analyses",
+    "context_size_label": "Context size (tokens)",
+    "placeholder_name": "e.g. Daily Production Summary",
+    "default_prompt": "You are a DevOps expert. Analyze these events and provide a global synthesis of the service situation."
   }
 }

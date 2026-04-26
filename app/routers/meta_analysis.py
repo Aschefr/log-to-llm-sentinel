@@ -26,7 +26,9 @@ async def list_configs(db: Session = Depends(get_db)):
         "id": c.id,
         "name": c.name,
         "rule_ids_json": json.loads(c.rule_ids_json) if c.rule_ids_json else [],
-        "interval_hours": c.interval_hours,
+        "schedule_type": c.schedule_type,
+        "schedule_time": c.schedule_time,
+        "schedule_day": c.schedule_day,
         "enabled": c.enabled,
         "notify_enabled": c.notify_enabled,
         "context_size": c.context_size,
@@ -39,15 +41,19 @@ async def list_configs(db: Session = Depends(get_db)):
 async def create_config(data: dict, db: Session = Depends(get_db)):
     try:
         rule_ids = data.get("rule_ids", [])
+        from datetime import datetime
         config = MetaAnalysisConfig(
             name=data.get("name", "Nouvelle Méta-Analyse"),
             rule_ids_json=json.dumps(rule_ids),
-            interval_hours=int(data.get("interval_hours", 24)),
+            schedule_type=data.get("schedule_type", "daily"),
+            schedule_time=data.get("schedule_time", "00:00"),
+            schedule_day=int(data.get("schedule_day", 1)),
             enabled=data.get("enabled", True),
             notify_enabled=data.get("notify_enabled", True),
-            context_size=int(data.get("context_size", 16000)),
+            context_size=int(data.get("context_size", 16384)),
             system_prompt=data.get("system_prompt", "Tu es un expert DevOps. Analyse ces événements et fais une synthèse globale de la situation du service."),
-            max_analyses=int(data.get("max_analyses", 50))
+            max_analyses=int(data.get("max_analyses", 50)),
+            last_run_at=datetime.utcnow() # N'envoie pas la méta analyse tout de suite
         )
         db.add(config)
         db.commit()
@@ -65,7 +71,9 @@ async def update_config(config_id: int, data: dict, db: Session = Depends(get_db
     try:
         if "name" in data: config.name = data["name"]
         if "rule_ids" in data: config.rule_ids_json = json.dumps(data["rule_ids"])
-        if "interval_hours" in data: config.interval_hours = int(data["interval_hours"])
+        if "schedule_type" in data: config.schedule_type = data["schedule_type"]
+        if "schedule_time" in data: config.schedule_time = data["schedule_time"]
+        if "schedule_day" in data: config.schedule_day = int(data["schedule_day"])
         if "enabled" in data: config.enabled = bool(data["enabled"])
         if "notify_enabled" in data: config.notify_enabled = bool(data["notify_enabled"])
         if "context_size" in data: config.context_size = int(data["context_size"])
@@ -89,16 +97,31 @@ async def delete_config(config_id: int, db: Session = Depends(get_db)):
 
 # ---- TRIGGER ----
 
+@router.get("/trigger/preview/{config_id}")
+async def preview_meta_analysis(config_id: int, db: Session = Depends(get_db)):
+    """
+    Retourne le contexte exact en attente d'envoi.
+    """
+    from app.main import meta_service
+    result = await meta_service.get_pending_context(config_id)
+    if result["status"] != "ok":
+        raise HTTPException(status_code=400, detail=result.get("message"))
+    return result
+
+
 @router.post("/trigger/{config_id}")
-async def trigger_meta_analysis(config_id: int, background_tasks: BackgroundTasks):
+async def trigger_meta_analysis(config_id: int, background_tasks: BackgroundTasks, data: dict = None):
     """
     Déclenche une exécution manuelle d'une méta-analyse en arrière-plan.
+    Accepte optionnellement un custom_context dans le payload JSON.
     """
     from app.main import meta_service # Import lazy pour éviter ImportError ciculaire
     
+    custom_context = data.get("custom_context") if data else None
+
     # On exécute de manière asynchrone pour ne pas bloquer la requête
     async def task_runner():
-        await meta_service.execute_meta_analysis(config_id)
+        await meta_service.execute_meta_analysis(config_id, custom_context=custom_context)
         
     background_tasks.add_task(task_runner)
     return {"status": "ok", "message": "Méta-analyse lancée en arrière-plan"}

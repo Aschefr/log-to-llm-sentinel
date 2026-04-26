@@ -101,7 +101,9 @@ class MetaAnalysisConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     rule_ids_json = Column(Text, default="[]")  # List of rule IDs to include. Empty means all rules.
     name = Column(String, nullable=False)
-    interval_hours = Column(Integer, default=24)
+    schedule_type = Column(String, default="daily") # 'daily', 'weekly', 'monthly'
+    schedule_time = Column(String, default="00:00") # 'HH:MM'
+    schedule_day = Column(Integer, default=1)       # 1-7 for weekly, 1-31 for monthly
     enabled = Column(Boolean, default=True)
     notify_enabled = Column(Boolean, default=True)
     context_size = Column(Integer, default=16000)
