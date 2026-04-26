@@ -84,12 +84,23 @@ class MetaAnalysisService:
                 if config.last_run_at is not None:
                     period_start = config.last_run_at
                 else:
-                    if config.schedule_type == 'weekly':
-                        period_start = now - timedelta(weeks=1)
-                    elif config.schedule_type == 'monthly':
-                        period_start = now - timedelta(days=30)
-                    else:
-                        period_start = now - timedelta(days=1)
+                    # Jamais exécuté : period_start = dernier slot planifié écoulé
+                    # (identique à la logique du run planifié)
+                    try:
+                        h, m = map(int, (config.schedule_time or '00:00').split(':'))
+                        # Dernier slot UTC passé
+                        slot = now.replace(hour=h, minute=m, second=0, microsecond=0)
+                        if slot > now:
+                            slot -= timedelta(days=1)
+                        period_start = slot
+                    except Exception:
+                        # Fallback sécurisé
+                        if config.schedule_type == 'weekly':
+                            period_start = now - timedelta(weeks=1)
+                        elif config.schedule_type == 'monthly':
+                            period_start = now - timedelta(days=30)
+                        else:
+                            period_start = now - timedelta(days=1)
 
             rule_ids = []
             if config.rule_ids_json:
