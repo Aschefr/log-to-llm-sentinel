@@ -88,24 +88,40 @@ def _parse_line_ts(line: str) -> Optional[datetime]:
 
 
 def _extract_json_list(text: str) -> list:
-    """Try to extract a JSON array from LLM response."""
+    """Try to extract a JSON array from LLM response.
+    Handles: direct JSON, markdown code blocks, embedded arrays anywhere in the text.
+    """
     text = text.strip()
-    # Try direct parse
+
+    # 1. Strip markdown code fences: ```json [...] ``` or ``` [...] ```
+    code_block = re.search(r'```(?:json)?\s*(\[.*?\])\s*```', text, re.DOTALL | re.IGNORECASE)
+    if code_block:
+        try:
+            val = json.loads(code_block.group(1))
+            if isinstance(val, list):
+                return [str(k) for k in val if k]
+        except Exception:
+            pass
+
+    # 2. Direct parse (LLM returned ONLY the JSON)
     try:
         val = json.loads(text)
         if isinstance(val, list):
-            return [str(k) for k in val]
+            return [str(k) for k in val if k]
     except Exception:
         pass
-    # Find first [...] block
-    m = re.search(r'\[([^\[\]]+)\]', text, re.DOTALL)
-    if m:
+
+    # 3. Find ALL [...] blocks and try each one
+    #    Use greedy match to capture the largest possible array
+    for m in re.finditer(r'(\[(?:[^\[\]]*|\[[^\[\]]*\])*\])', text, re.DOTALL):
+        candidate = m.group(1).strip()
         try:
-            val = json.loads('[' + m.group(1) + ']')
-            if isinstance(val, list):
-                return [str(k) for k in val]
+            val = json.loads(candidate)
+            if isinstance(val, list) and val and isinstance(val[0], str):
+                return [str(k) for k in val if isinstance(k, str) and k.strip()]
         except Exception:
-            pass
+            continue
+
     return []
 
 
@@ -425,7 +441,17 @@ async def _run_session(session_id: int):
             except asyncio.TimeoutError:
                 response = '[]'
 
+            # Log raw response for debugging (visible in Config > Debug with KeywordLearning filter)
+            app_logger.debug(
+                'KeywordLearning',
+                f'Session {session_id} paquet {packet_idx+1} — réponse brute ({len(response)} car.) : '
+                f'{response[:300].replace(chr(10), " ")}{"…" if len(response) > 300 else ""}'
+            )
             packet_kws = _extract_json_list(response)
+            app_logger.debug(
+                'KeywordLearning',
+                f'Session {session_id} paquet {packet_idx+1} — {len(packet_kws)} mot(s)-clé(s) extraits : {packet_kws}'
+            )
 
             # Accumulate unique keywords
             for kw in packet_kws:

@@ -355,6 +355,7 @@ function toggleLogsContainer(visible) {
 
     if (visible) {
         startLogPolling();
+        _initDebugLogFilters();
     } else {
         stopLogPolling();
     }
@@ -396,11 +397,16 @@ async function fetchLogs() {
 function renderLogs(logs) {
     const container = document.getElementById('debug-logs');
     if (!container) return;
-    
+
     const wasAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 20;
 
-    container.innerHTML = logs.map(l => `
-        <div class="log-entry">
+    // Get active filter
+    const activeFilter = (document.querySelector('.dbg-filter-btn.dbg-filter-active') || {}).dataset?.filter ?? '';
+
+    container.innerHTML = logs
+        .filter(l => !activeFilter || l.tag === activeFilter)
+        .map(l => `
+        <div class="log-entry" data-tag="${escapeHtml(l.tag)}">
             <span class="log-time">${l.timestamp}</span>
             <span class="log-level ${l.level}">${l.level}</span>
             <span class="log-tag">[${l.tag}]</span>
@@ -411,6 +417,16 @@ function renderLogs(logs) {
     if (wasAtBottom) {
         container.scrollTop = container.scrollHeight;
     }
+}
+
+function _initDebugLogFilters() {
+    document.querySelectorAll('.dbg-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.dbg-filter-btn').forEach(b => b.classList.remove('dbg-filter-active'));
+            btn.classList.add('dbg-filter-active');
+            fetchLogs(); // re-render with new filter
+        });
+    });
 }
 
 async function fetchOllamaLogs() {

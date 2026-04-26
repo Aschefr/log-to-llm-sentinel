@@ -244,6 +244,15 @@
             <div id="debug-logs-container" class="debug-logs-container hidden">
                 <div class="debug-logs-header">
                     <span>Logs en direct</span>
+                    <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">
+                        <span style="font-size:.72rem;color:var(--text-dim);">Filtrer :</span>
+                        <button type="button" class="chip dbg-filter-btn dbg-filter-active" data-filter="">Tous</button>
+                        <button type="button" class="chip dbg-filter-btn" data-filter="KeywordLearning">🤖 KeywordLearning</button>
+                        <button type="button" class="chip dbg-filter-btn" data-filter="Orchestrator">⚙️ Orchestrator</button>
+                        <button type="button" class="chip dbg-filter-btn" data-filter="LogWatcher">👁 LogWatcher</button>
+                        <button type="button" class="chip dbg-filter-btn" data-filter="OllamaService">🧠 OllamaService</button>
+                        <button type="button" class="chip dbg-filter-btn" data-filter="NotificationService">🔔 Notification</button>
+                    </div>
                     <div style="display: flex; gap: 0.5rem;">
                         <button type="button" id="copy-logs-btn" class="btn btn-small">📋 Copier</button>
                         <button type="button" id="clear-logs-btn" class="btn btn-small">Effacer</button>
