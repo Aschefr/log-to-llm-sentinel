@@ -202,6 +202,15 @@ async def delete_result(result_id: int, db: Session = Depends(get_db)):
     result = db.query(MetaAnalysisResult).filter(MetaAnalysisResult.id == result_id).first()
     if not result:
         raise HTTPException(status_code=404, detail="Résultat introuvable")
+        
+    # Restauration du pointeur de temps si on supprime la dernière analyse
+    config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == result.config_id).first()
+    if config and config.last_run_at and result.period_end and result.period_start:
+        # Si le dernier run correspond à la fin de la période de l'analyse qu'on supprime
+        # on recule le last_run_at au début de cette période pour remettre les logs dans la file d'attente
+        if config.last_run_at == result.period_end:
+            config.last_run_at = result.period_start
+
     db.delete(result)
     db.commit()
     return {"status": "ok"}

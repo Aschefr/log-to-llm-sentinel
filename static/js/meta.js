@@ -509,6 +509,17 @@ async function metaResultDelete(resultId, configId) {
         await apiFetch(`/api/meta-analysis/results/${resultId}`, { method: 'DELETE' });
         // Recharger les résultats
         loadResultsForConfig(configId);
+        
+        // La suppression du dernier résultat fait reculer le pointeur de temps (last_run_at)
+        // Il faut donc vider le cache de l'aperçu et le recharger si le panneau est ouvert
+        delete _previewData[configId];
+        const previewEl = document.getElementById(`preview-${configId}`);
+        if (previewEl && previewEl.classList.contains('open')) {
+            loadPreview(configId);
+        }
+        
+        // (Optionnel) on pourrait aussi recharger la ligne de configuration pour 
+        // mettre à jour le texte "Dernier run" mais on évite de reconstruire tout le DOM
     } catch(e) {
         alert('Erreur: ' + e.message);
     }
