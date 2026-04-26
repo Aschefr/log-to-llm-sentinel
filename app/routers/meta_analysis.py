@@ -90,6 +90,8 @@ async def delete_config(config_id: int, db: Session = Depends(get_db)):
     config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == config_id).first()
     if not config:
         raise HTTPException(status_code=404, detail="Config non trouvée")
+    # SQLite n'applique pas les FKs par défaut — on supprime manuellement les résultats liés
+    db.query(MetaAnalysisResult).filter(MetaAnalysisResult.config_id == config_id).delete()
     db.delete(config)
     db.commit()
     return {"status": "ok"}
