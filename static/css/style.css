@@ -1603,3 +1603,205 @@ mark.kw-highlight {
 .inline-confirm-actions .btn {
     flex: 1;
 }
+
+/* ═══════════════════════════════════════════════
+   Keyword Auto-Learning Wizard
+   ═══════════════════════════════════════════════ */
+
+.kw-wizard {
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    background: rgba(99, 102, 241, 0.05);
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-left-width: 3px;
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.25s ease;
+}
+.kw-wizard--hidden { display: none !important; }
+
+.kw-wizard-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 0.85rem;
+    background: rgba(99, 102, 241, 0.12);
+    font-size: 0.82rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--accent);
+}
+.kw-wizard-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 0 0.25rem;
+    transition: color 0.2s;
+}
+.kw-wizard-close:hover { color: var(--danger); }
+
+.kw-wizard-body {
+    padding: 0.75rem 0.9rem 0.85rem;
+}
+
+/* Phase step indicator */
+.kw-phase-steps {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-bottom: 0.8rem;
+    font-size: 0.7rem;
+}
+.kw-step {
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.05);
+    color: var(--text-dim);
+    border: 1px solid rgba(255,255,255,0.08);
+    white-space: nowrap;
+}
+.kw-step--active {
+    background: rgba(99,102,241,0.2);
+    color: var(--accent);
+    border-color: rgba(99,102,241,0.4);
+    font-weight: 600;
+}
+.kw-step--done {
+    background: rgba(16,185,129,0.12);
+    color: #10b981;
+    border-color: rgba(16,185,129,0.3);
+}
+.kw-step-sep { color: var(--text-dim); font-size: 0.8rem; }
+
+/* Config form elements */
+.kw-config-grid { display: flex; flex-direction: column; gap: 0.2rem; }
+.kw-label { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
+.kw-hint  { font-size: 0.72rem; color: var(--text-dim); }
+.kw-input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 0.35rem 0.55rem;
+    font-size: 0.8rem;
+    width: 100%;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+.kw-input:focus { border-color: var(--accent); outline: none; }
+.kw-period-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.kw-period-row .kw-input { flex: 1; min-width: 180px; }
+
+/* Progress bar */
+.kw-progress-bar-track {
+    height: 6px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.kw-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), #818cf8);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+/* Log scroll zone */
+.kw-log-scroll {
+    max-height: 130px;
+    overflow-y: auto;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 5px;
+    padding: 0.4rem 0.55rem;
+    font-family: monospace;
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 80%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 10%, black 80%, transparent 100%);
+}
+.kw-log-scroll::-webkit-scrollbar { width: 4px; }
+.kw-log-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+
+/* Keyword tags */
+.kw-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    min-height: 1.8rem;
+}
+.kw-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(99,102,241,0.15);
+    border: 1px solid rgba(99,102,241,0.35);
+    border-radius: 4px;
+    padding: 0.1rem 0.45rem;
+    font-size: 0.72rem;
+    color: var(--accent);
+    font-family: monospace;
+    transition: background 0.15s;
+}
+.kw-tag:hover { background: rgba(99,102,241,0.25); }
+.kw-tag--raw {
+    background: rgba(255,255,255,0.06);
+    border-color: rgba(255,255,255,0.12);
+    color: var(--text-secondary);
+}
+.kw-tag-remove {
+    cursor: pointer;
+    opacity: 0.5;
+    font-size: 0.9rem;
+    line-height: 1;
+    transition: opacity 0.15s, color 0.15s;
+}
+.kw-tag-remove:hover { opacity: 1; color: var(--danger); }
+
+/* Rationale rows (phase 2) */
+.kw-rationale-table { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.5rem; }
+.kw-rationale-row {
+    display: grid;
+    grid-template-columns: 1.2rem 7rem 1fr;
+    align-items: baseline;
+    gap: 0.5rem;
+    font-size: 0.74rem;
+}
+.kw-rationale-icon { font-size: 0.8rem; }
+.kw-rationale-kw { font-family: monospace; font-weight: 600; }
+.kw-kept    { color: #10b981; }
+.kw-removed { color: var(--text-dim); text-decoration: line-through; }
+.kw-rationale-reason { color: var(--text-dim); }
+
+/* Validated state banner */
+.kw-status-validated {
+    background: rgba(16,185,129,0.12);
+    border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 6px;
+    padding: 0.45rem 0.7rem;
+    font-size: 0.8rem;
+    color: #10b981;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* Action row */
+.kw-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+.kw-add-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}

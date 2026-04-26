@@ -69,7 +69,18 @@
                     <input type="text" id="rule-keywords" list="keywords-suggestions" data-i18n-placeholder="rules.placeholder_keywords" placeholder="error, exception, fatal">
                     <datalist id="keywords-suggestions"></datalist>
                     <div class="keyword-chips" id="keyword-chips"></div>
-                    <div class="form-hint" data-i18n="rules.keywords_hint">Clique sur une suggestion pour l'ajouter, ou écris librement.</div>
+                    <div style="display:flex;align-items:center;gap:.6rem;margin-top:.4rem">
+                        <div class="form-hint" data-i18n="rules.keywords_hint" style="margin:0">Clique sur une suggestion pour l'ajouter, ou écris librement.</div>
+                        <button type="button" id="kw-autolearn-btn" class="btn btn-secondary btn-sm" style="white-space:nowrap;flex-shrink:0" onclick="kwWizardOpen()">🤖 Auto-apprendre</button>
+                    </div>
+                    <!-- Keyword auto-learning wizard (inline, hidden by default) -->
+                    <div id="kw-wizard" class="kw-wizard kw-wizard--hidden" style="margin-top:.75rem">
+                        <div class="kw-wizard-header">
+                            <span>🤖 Auto-apprentissage des mots-clés</span>
+                            <button type="button" class="kw-wizard-close" onclick="kwWizardClose()">×</button>
+                        </div>
+                        <div id="kw-wizard-body" class="kw-wizard-body"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="rule-context" data-i18n="rules.label_context">Contexte applicatif (optionnel)</label>
@@ -116,4 +127,5 @@
 
 {% block scripts %}
 <script src="/static/js/rules.js"></script>
+<script src="/static/js/keyword_wizard.js"></script>
 {% endblock %}

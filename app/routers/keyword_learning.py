@@ -1,0 +1,115 @@
+"""
+Router: /api/keyword-learning/*
+Exposes keyword auto-learning session management.
+"""
+from datetime import datetime, timezone
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+import app.services.keyword_learning_service as kls
+
+router = APIRouter(prefix="/api/keyword-learning", tags=["keyword-learning"])
+
+
+class StartRequest(BaseModel):
+    rule_id: Optional[int] = None
+    log_file_path: str
+    period_start: str   # ISO 8601 local time — caller converts to UTC before sending
+    period_end: str     # ISO 8601 local time — same
+    granularity_s: int  # seconds per packet
+
+
+class RevaluateRequest(BaseModel):
+    keywords: list[str]
+
+
+class ValidateRequest(BaseModel):
+    keywords: list[str]
+
+
+def _parse_dt(s: str) -> datetime:
+    """Parse ISO datetime string to UTC-naive datetime."""
+    s = s.replace('Z', '+00:00')
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid datetime: {s}")
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+@router.post("/start")
+async def start_session(body: StartRequest):
+    period_start = _parse_dt(body.period_start)
+    period_end   = _parse_dt(body.period_end)
+    if period_end <= period_start:
+        raise HTTPException(status_code=400, detail="period_end must be after period_start")
+    if body.granularity_s < 60:
+        raise HTTPException(status_code=400, detail="granularity_s must be >= 60")
+
+    session_id = await kls.start_session(
+        rule_id=body.rule_id,
+        log_path=body.log_file_path,
+        period_start=period_start,
+        period_end=period_end,
+        granularity_s=body.granularity_s,
+    )
+    return {"session_id": session_id, "status": "pending"}
+
+
+@router.get("/{session_id}/status")
+def get_status(session_id: int):
+    data = kls.get_session_status(session_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+    return data
+
+
+@router.post("/{session_id}/revaluate")
+async def revaluate(session_id: int, body: RevaluateRequest):
+    data = kls.get_session_status(session_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+    import asyncio
+    asyncio.create_task(kls.revaluate_session(session_id, body.keywords))
+    return {"status": "refining"}
+
+
+@router.post("/{session_id}/validate")
+async def validate(session_id: int, body: ValidateRequest):
+    data = kls.get_session_status(session_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+    await kls.validate_session(session_id, body.keywords)
+    return {"status": "validated", "keywords": body.keywords}
+
+
+@router.post("/{session_id}/revert")
+async def revert(session_id: int):
+    data = kls.get_session_status(session_id)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Session introuvable")
+    prev = await kls.revert_session(session_id)
+    return {"status": "reverted", "keywords": prev}
+
+
+@router.delete("/{session_id}")
+def cancel_session(session_id: int):
+    """Mark session as cancelled (the background task checks status before each packet)."""
+    from app.database import SessionLocal
+    from app.models import KeywordLearningSession
+    db = SessionLocal()
+    try:
+        s = db.query(KeywordLearningSession).filter(
+            KeywordLearningSession.id == session_id).first()
+        if not s:
+            raise HTTPException(status_code=404, detail="Session introuvable")
+        s.status = 'error'
+        s.error_message = 'Annulé par l\'utilisateur'
+        db.commit()
+    finally:
+        db.close()
+    return {"status": "cancelled"}

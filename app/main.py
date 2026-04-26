@@ -88,6 +88,7 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 from app.routers import chat as chat_router
 from app.routers import i18n as i18n_router
 from app.routers import meta_analysis as meta_router
+from app.routers import keyword_learning as kw_learning_router
 
 app.include_router(rules.router)
 app.include_router(config.router)
@@ -97,6 +98,7 @@ app.include_router(monitor_router.router)
 app.include_router(chat_router.router)
 app.include_router(i18n_router.router)
 app.include_router(meta_router.router)
+app.include_router(kw_learning_router.router)
 
 
 # ── Pages ──

@@ -20,6 +20,7 @@ class Rule(Base):
     anti_spam_delay = Column(Integer, default=60)
     notify_severity_threshold = Column(String, default="info")
     last_position = Column(Float, default=0.0)
+    last_learning_session_id = Column(Integer, nullable=True)  # dernière session d'auto-apprentissage
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -124,3 +125,25 @@ class MetaAnalysisResult(Base):
     context_sent = Column(Text, nullable=True)  # Prompt exact envoyé au LLM
     ollama_response = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class KeywordLearningSession(Base):
+    __tablename__ = "keyword_learning_sessions"
+    id                     = Column(Integer, primary_key=True, index=True)
+    rule_id                = Column(Integer, nullable=True)          # null avant création de la règle
+    log_file_path          = Column(String)
+    period_start           = Column(DateTime)                        # UTC
+    period_end             = Column(DateTime)                        # UTC
+    granularity_s          = Column(Integer)                         # secondes par paquet
+    max_chars_per_packet   = Column(Integer, default=5000)
+    status                 = Column(String, default="pending")       # pending|scanning|refining|validated|reverted|error
+    total_packets          = Column(Integer, default=0)
+    completed_packets      = Column(Integer, default=0)
+    raw_keywords_json      = Column(Text, default="[]")              # candidats bruts accumulés
+    final_keywords_json    = Column(Text, default="[]")              # après raffinement
+    previous_keywords_json = Column(Text, default="[]")             # keywords avant learning (revert)
+    refine_rationale_json  = Column(Text, default="{}")             # {keyword: raison}
+    ollama_log_json        = Column(Text, default="[]")              # [{packet_idx, window, chars, keywords}]
+    error_message          = Column(Text, nullable=True)
+    created_at             = Column(DateTime, default=datetime.utcnow)
+    validated_at           = Column(DateTime, nullable=True)

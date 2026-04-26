@@ -238,6 +238,8 @@ function resetForm() {
         previewContainer.classList.add('hidden');
         document.getElementById('file-preview-content').innerHTML = '';
     }
+    // Reset the keyword learning wizard if open
+    if (typeof kwWizardClose === 'function') kwWizardClose();
 }
 
 let _fileRootsCache = null;
