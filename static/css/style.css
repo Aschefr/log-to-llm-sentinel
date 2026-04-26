@@ -1649,7 +1649,7 @@ mark.kw-highlight {
     border: 1px solid rgba(99, 102, 241, 0.2);
     border-left-width: 3px;
     border-radius: 8px;
-    overflow: hidden;
+    /* No overflow:hidden — would clip native <select> dropdown */
     transition: all 0.25s ease;
 }
 
@@ -1663,6 +1663,7 @@ mark.kw-highlight {
     font-weight: 600;
     letter-spacing: 0.02em;
     color: var(--accent);
+    border-radius: 8px 8px 0 0; /* top corners for header */
 }
 .kw-wizard-close {
     background: none;
@@ -1678,6 +1679,7 @@ mark.kw-highlight {
 
 .kw-wizard-body {
     padding: 0.75rem 0.9rem 0.85rem;
+    border-radius: 0 0 8px 8px; /* bottom corners for body */
 }
 
 /* Phase step indicator */

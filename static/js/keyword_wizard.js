@@ -11,10 +11,11 @@
  */
 
 /* ── State ─────────────────────────────────────────────────────────────── */
-let _wizardSessionId    = null;
-let _wizardPollTimer    = null;
-let _wizardCardTimer    = null;
+let _wizardSessionId     = null;
+let _wizardPollTimer     = null;
+let _wizardCardTimer     = null;
 let _wizardFinalKeywords = [];
+let _wizardGranularity   = null; // null = not yet chosen by user
 
 /* ── Granularity options ────────────────────────────────────────────────── */
 const GRANULARITY_OPTIONS = [
@@ -109,6 +110,7 @@ function kwWizardReset() {
 function _wizardReset() {
     _wizardSessionId     = null;
     _wizardFinalKeywords = [];
+    _wizardGranularity   = null;
     _stopAllPolling();
 }
 
@@ -185,7 +187,10 @@ function _renderConfigPhase() {
     const refresh    = () => { _refreshGranularitySelect(); _updateEstimate(); };
     startInput.addEventListener('change', refresh);
     endInput.addEventListener('change', refresh);
-    granSel.addEventListener('change', _updateEstimate);
+    granSel.addEventListener('change', () => {
+        _wizardGranularity = parseInt(granSel.value) || null;
+        _updateEstimate();
+    });
 
     _refreshGranularitySelect();
     _fetchMaxChars();
@@ -212,11 +217,11 @@ function _refreshGranularitySelect() {
         .map(o => `<option value="${o.value}">${o.label}${o.value === suggested ? ' ★' : ''}</option>`)
         .join('');
 
-    if (current && [...sel.options].some(o => parseInt(o.value) === current)) {
-        sel.value = current;
-    } else {
-        sel.value = suggested;
-    }
+    // Preserve explicit user choice only if still in allowed list;
+    // otherwise (first render or out-of-range) always use the suggestion.
+    const keepCurrent = _wizardGranularity !== null &&
+        [...sel.options].some(o => parseInt(o.value) === _wizardGranularity);
+    sel.value = keepCurrent ? _wizardGranularity : suggested;
 
     const hint = document.getElementById('kw-granularity-hint');
     if (hint) {
