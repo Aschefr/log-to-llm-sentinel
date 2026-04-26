@@ -104,7 +104,7 @@ async function loadRules() {
                             <strong>Dernière ligne détectée :</strong>
                             <div class="last-line-content">${escapeHtml(rule.last_log_line || 'Aucune ligne trouvée ou fichier inaccessible')}</div>
                         </div>
-                        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?rule=${rule.id}'">
+                        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?rule=${rule.id}&line=${encodeURIComponent(rule.last_log_line || '')}'" data-i18n="rules.view_in_monitor">
                             🔍 ${window.t ? window.t('rules.view_in_monitor') || 'Voir dans Monitor' : 'Voir dans Monitor'}
                         </button>
                     </div>

@@ -11,6 +11,7 @@ let isFrozen = false;
 let frozenContent = null;
 let selectedLineText = null;
 let activeKeywordFilter = null;
+let autoOpenLine = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadMonitorRules();
@@ -87,7 +88,22 @@ function selectTab(ruleId) {
     stopAllPolling();
     isFrozen = false;
     frozenContent = null;
-    activeKeywordFilter = '__matches__'; // Par défaut: afficher uniquement les matches
+    const urlParams = new URLSearchParams(window.location.search);
+    const lineParam = urlParams.get('line');
+    
+    if (lineParam) {
+        activeKeywordFilter = '__all__';
+        selectedLineText = lineParam;
+        autoOpenLine = true;
+        
+        // Nettoyer l'URL
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('line');
+        window.history.replaceState({}, document.title, newUrl.toString());
+    } else {
+        activeKeywordFilter = '__matches__'; // Par défaut
+    }
+    
     activeRuleId = ruleId;
 
     // Mettre à jour l'onglet actif
@@ -116,8 +132,8 @@ function renderTabContent(rule) {
                 <div>
                     <span class="info-label">🔑 Mots-clés (cliquer pour filtrer)</span>
                     <div class="kw-filter-badges" id="kw-filters-${rule.id}">
-                        <span class="log-kw-badge kw-filter-btn active" data-kw="__matches__" onclick="toggleKeywordFilter(this, ${rule.id})">Matches</span>
-                        <span class="log-kw-badge kw-filter-btn" data-kw="__all__" onclick="toggleKeywordFilter(this, ${rule.id})">Aucun (Tout voir)</span>
+                        <span class="log-kw-badge kw-filter-btn ${activeKeywordFilter === '__matches__' ? 'active' : ''}" data-kw="__matches__" onclick="toggleKeywordFilter(this, ${rule.id})">Matches</span>
+                        <span class="log-kw-badge kw-filter-btn ${activeKeywordFilter === '__all__' ? 'active' : ''}" data-kw="__all__" onclick="toggleKeywordFilter(this, ${rule.id})">Aucun (Tout voir)</span>
                         ${rule.keywords.map(kw =>
                             `<span class="log-kw-badge kw-filter-btn" data-kw="${encodeURIComponent(kw)}" onclick="toggleKeywordFilter(this, ${rule.id})">${escapeHtml(kw)}</span>`
                         ).join('')}
@@ -241,7 +257,20 @@ async function fetchLogs(rule) {
         const lc = document.getElementById(`linecount-${rule.id}`);
         if (lc) lc.textContent = `(${res.lines.length} lignes, ${matched} matchées)`;
 
-        if (isAtBottom) viewer.scrollTop = viewer.scrollHeight;
+        if (autoOpenLine && selectedLineText) {
+            const selectedEl = viewer.querySelector('.log-line.selected');
+            if (selectedEl) {
+                selectedEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Ouvrir le panneau de détail si pas déjà ouvert
+                const panel = document.getElementById(`detail-panel-${rule.id}`);
+                if (panel && panel.classList.contains('hidden')) {
+                    onLineClick(selectedEl, rule.id);
+                }
+                autoOpenLine = false; // Ne le faire qu'une fois
+            }
+        } else if (isAtBottom) {
+            viewer.scrollTop = viewer.scrollHeight;
+        }
 
         // Réappliquer le filtre mot-clé actif
         applyKeywordFilter(rule.id);
