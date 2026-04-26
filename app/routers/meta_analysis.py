@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Optional
+from datetime import datetime
 import json
 
 from app.database import SessionLocal
@@ -127,13 +128,28 @@ async def trigger_meta_analysis(config_id: int, background_tasks: BackgroundTask
     from app.main import meta_service # Import lazy pour éviter ImportError ciculaire
     
     custom_context = data.get("custom_context") if data else None
+    forced_period_start = None
+    forced_period_end = None
+    if data:
+        try:
+            if data.get("period_start"):
+                forced_period_start = datetime.fromisoformat(data["period_start"].replace('Z', '+00:00')).replace(tzinfo=None)
+            if data.get("period_end"):
+                forced_period_end = datetime.fromisoformat(data["period_end"].replace('Z', '+00:00')).replace(tzinfo=None)
+        except Exception:
+            pass
 
     # On exécute de manière asynchrone pour ne pas bloquer la requête
     async def task_runner():
         _running_configs.add(config_id)
         _cancel_requests.discard(config_id)
         try:
-            await meta_service.execute_meta_analysis(config_id, custom_context=custom_context)
+            await meta_service.execute_meta_analysis(
+                config_id,
+                custom_context=custom_context,
+                forced_period_start=forced_period_start,
+                forced_period_end=forced_period_end
+            )
         finally:
             _running_configs.discard(config_id)
             _cancel_requests.discard(config_id)

@@ -657,7 +657,11 @@ async function triggerCustomMeta(id) {
     try {
         await apiFetch(`/api/meta-analysis/trigger/${id}`, {
             method: 'POST',
-            body: { custom_context: lines.join('\n\n') },
+            body: {
+                custom_context: lines.join('\n\n'),
+                period_start: data.period_start,  // ISO+Z depuis le preview, évite la race condition avec le scheduleur
+                period_end: data.period_end
+            },
             signal: abortController.signal
         });
         _setTriggerStatus(id, `✅ ${lines.length} entrée(s) envoyée(s). Résultat bientôt dans les Historiques.`, false);

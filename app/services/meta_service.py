@@ -26,20 +26,22 @@ class MetaAnalysisService:
             h, m = map(int, config.schedule_time.split(':'))
         except:
             return False
-            
+
+        # Si déjà exécuté aujourd'hui (UTC) → ne pas relancer
         if config.last_run_at and config.last_run_at.date() == now.date():
             return False
-            
+
+        # Pas encore l'heure de déclenchement
         if now.hour < h or (now.hour == h and now.minute < m):
             return False
-            
+
         if config.schedule_type == 'daily':
             return True
         elif config.schedule_type == 'weekly':
             return now.weekday() == (config.schedule_day - 1)
         elif config.schedule_type == 'monthly':
             return now.day == config.schedule_day
-            
+
         return False
 
     async def run_scheduled_analyses(self):
@@ -50,6 +52,11 @@ class MetaAnalysisService:
 
             for config in configs:
                 if self._should_run_schedule(config, now):
+                    # Vérifier qu'une exécution manuelle n'est pas déjà en cours (éviter double résultat)
+                    from app.routers.meta_analysis import _running_configs
+                    if config.id in _running_configs:
+                        logger.info('MetaAnalysisService', f'Analyse {config.name} déjà en cours (manuel), scheduleur ignoré')
+                        continue
                     logger.info('MetaAnalysisService', f'Déclenchement calendaire de la méta-analyse {config.name}')
                     await self.execute_meta_analysis(config.id, now)
 
@@ -136,7 +143,10 @@ class MetaAnalysisService:
         finally:
             db.close()
 
-    async def execute_meta_analysis(self, config_id: int, trigger_time: datetime = None, custom_context: str = None):
+    async def execute_meta_analysis(self, config_id: int, trigger_time: datetime = None,
+                                     custom_context: str = None,
+                                     forced_period_start: datetime = None,
+                                     forced_period_end: datetime = None):
 
         """
         Exécute la méta-analyse : récupération, compression, appel LLM, sauvegarde et notification.
@@ -151,35 +161,44 @@ class MetaAnalysisService:
                 return {"status": "error", "message": "Config introuvable"}
 
             global_cfg = db.query(GlobalConfig).first()
-            
-            # Période : period_start = last_run_at (ou window par défaut si jamais exécuté)
-            # period_end = heure planifiée du jour (déclenchement auto) OU maintenant (déclenchement manuel)
+
             is_manual = custom_context is not None
 
-            if is_manual:
-                # Déclenchement manuel : la fenêtre se termine exactement maintenant
+            # Période: priorité aux valeurs explicites (envoyées depuis le frontend lors d'un déclenchement manuel)
+            if forced_period_start and forced_period_end:
+                period_start = forced_period_start
+                period_end = forced_period_end
+            elif is_manual:
+                # Déclenchement manuel sans période explicite : fenêtre jusqu'à maintenant
                 period_end = trigger_time
+                if config.last_run_at:
+                    period_start = config.last_run_at
+                else:
+                    if config.schedule_type == 'weekly':
+                        period_start = period_end - timedelta(weeks=1)
+                    elif config.schedule_type == 'monthly':
+                        period_start = period_end - timedelta(days=30)
+                    else:
+                        period_start = period_end - timedelta(days=1)
             else:
-                # Déclenchement planifié : la fenêtre se termine à l'heure de schedule, pas à l'heure d'exécution
+                # Déclenchement planifié : la fenêtre se termine à l'heure de schedule
                 try:
                     h, m = config.schedule_time.split(':') if config.schedule_time else ('0', '0')
                     period_end = trigger_time.replace(hour=int(h), minute=int(m), second=0, microsecond=0)
-                    # Si l'heure planifiée est dans le futur (ex. 23:00 et on est à 00:05), on recule d'un jour
                     if period_end > trigger_time:
                         period_end = period_end - timedelta(days=1)
                 except Exception:
                     period_end = trigger_time
 
-            if config.last_run_at:
-                period_start = config.last_run_at
-            else:
-                # Première exécution : fenêtre basée sur le type de planification
-                if config.schedule_type == 'weekly':
-                    period_start = period_end - timedelta(weeks=1)
-                elif config.schedule_type == 'monthly':
-                    period_start = period_end - timedelta(days=30)
-                else:  # daily
-                    period_start = period_end - timedelta(days=1)
+                if config.last_run_at:
+                    period_start = config.last_run_at
+                else:
+                    if config.schedule_type == 'weekly':
+                        period_start = period_end - timedelta(weeks=1)
+                    elif config.schedule_type == 'monthly':
+                        period_start = period_end - timedelta(days=30)
+                    else:
+                        period_start = period_end - timedelta(days=1)
             
             prompt = ""
             analyses_count = 0
@@ -188,8 +207,14 @@ class MetaAnalysisService:
 
             if custom_context:
                 prompt = custom_context
-                # Dans ce cas on ne re-récupère pas les analyses
-                logger.info("MetaAnalysisService", f"Exécution avec contexte édité manuellement pour {config.name}")
+                # Compter les blocs d'événements dans le contexte personnalisé
+                # Chaque événement est séparé par une ligne vide ("\n\n") dans le format attendu
+                blocks = [b.strip() for b in custom_context.split('\n\n') if b.strip() and '[SEVERITY:' in b]
+                analyses_count = len(blocks)
+                # Extraire les IDs de détection présents dans le contexte
+                import re
+                detection_ids = re.findall(r'\[ID: ([a-f0-9]+)\]', custom_context)
+                logger.info("MetaAnalysisService", f"Exécution avec contexte édité manuellement pour {config.name} ({analyses_count} événements)")
             else:
                 rule_ids = []
                 if config.rule_ids_json:
@@ -261,8 +286,11 @@ class MetaAnalysisService:
                 ollama_response=response_text
             )
             db.add(meta_result)
-            
-            config.last_run_at = trigger_time
+
+            # On enregistre period_end (et non trigger_time) comme dernière exécution :
+            # la prochaine fenêtre démarrera exactement là où celle-ci s'est terminée (borne du schedule),
+            # pas à l'heure réelle d'exécution — garantit des fenêtres contiguës et alignées sur le schedule.
+            config.last_run_at = period_end
             db.commit()
 
             # Notification
