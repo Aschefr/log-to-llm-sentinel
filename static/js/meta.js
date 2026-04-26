@@ -728,6 +728,14 @@ async function triggerCustomMeta(id) {
                     loadResultsForConfig(id);
                 }
             }
+            
+            // Rafraîchir également le panneau d'aperçu pour le vider
+            const previewEl = document.getElementById(`preview-${id}`);
+            if (previewEl && previewEl.classList.contains('open')) {
+                loadPreview(id);
+            } else {
+                delete _previewData[id];
+            }
         }
     } catch (e) {
         if (e.name === 'AbortError') {
