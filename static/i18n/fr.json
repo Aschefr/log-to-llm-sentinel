@@ -41,6 +41,9 @@
     "last_detection": "Dernière détection :",
     "no_detection": "Aucune",
     "no_line_found": "Aucune ligne trouvée ou fichier inaccessible",
+    "live_log_line": "Log en direct :",
+    "last_trigger": "Dernier déclenchement :",
+    "view_in_monitor": "Voir dans Monitor",
     "confirm_clear_all": "Voulez-vous vraiment effacer TOUTES les analyses du système ?",
     "rule_label": "Règle:"
   },

@@ -41,6 +41,9 @@
     "last_detection": "Last detection:",
     "no_detection": "None",
     "no_line_found": "No line found or file inaccessible",
+    "live_log_line": "Live log:",
+    "last_trigger": "Last trigger:",
+    "view_in_monitor": "View in Monitor",
     "confirm_clear_all": "Are you sure you want to delete ALL analyses from the system?",
     "rule_label": "Rule:"
   },

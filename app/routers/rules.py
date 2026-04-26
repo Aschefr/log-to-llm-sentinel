@@ -72,6 +72,8 @@ def get_rules():
             if last_analysis:
                 rule_item["last_detection_id"] = last_analysis.detection_id
                 rule_item["last_analysis_severity"] = last_analysis.severity
+                rule_item["last_triggered_line"] = last_analysis.triggered_line
+                rule_item["last_analysis_at"] = last_analysis.analyzed_at.strftime('%Y-%m-%dT%H:%M:%SZ') if last_analysis.analyzed_at else None
 
             result.append(rule_item)
         return result
