@@ -34,7 +34,7 @@ async def list_configs(db: Session = Depends(get_db)):
         "context_size": c.context_size,
         "system_prompt": c.system_prompt,
         "max_analyses": c.max_analyses,
-        "last_run_at": c.last_run_at.isoformat() if c.last_run_at else None
+        "last_run_at": c.last_run_at.isoformat() + 'Z' if c.last_run_at else None
     } for c in configs]
 
 @router.post("/configs")
@@ -148,14 +148,14 @@ async def list_results(config_id: Optional[int] = None, limit: int = 20, db: Ses
         "id": r.MetaAnalysisResult.id,
         "config_id": r.MetaAnalysisResult.config_id,
         "config_name": r.name,
-        "period_start": r.MetaAnalysisResult.period_start.isoformat(),
-        "period_end": r.MetaAnalysisResult.period_end.isoformat(),
+        "period_start": r.MetaAnalysisResult.period_start.isoformat() + 'Z',
+        "period_end": r.MetaAnalysisResult.period_end.isoformat() + 'Z',
         "analyses_count": r.MetaAnalysisResult.analyses_count,
         "detection_ids": json.loads(r.MetaAnalysisResult.detection_ids_json) if getattr(r.MetaAnalysisResult, 'detection_ids_json', None) else [],
         "matched_keywords": json.loads(r.MetaAnalysisResult.matched_keywords_json) if getattr(r.MetaAnalysisResult, 'matched_keywords_json', None) else [],
         "context_sent": getattr(r.MetaAnalysisResult, 'context_sent', None),
         "ollama_response": r.MetaAnalysisResult.ollama_response,
-        "created_at": r.MetaAnalysisResult.created_at.isoformat()
+        "created_at": r.MetaAnalysisResult.created_at.isoformat() + 'Z'
     } for r in results]
 
 @router.delete("/results/{result_id}")

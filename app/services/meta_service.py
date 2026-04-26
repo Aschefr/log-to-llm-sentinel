@@ -139,8 +139,8 @@ class MetaAnalysisService:
                 'rules_context': list(by_rule.values()),
                 'analyses_count': len(results),
                 'matched_keywords': list(all_kws),
-                'period_start': period_start.isoformat(),
-                'period_end': period_end.isoformat()
+                'period_start': period_start.isoformat() + 'Z',
+                'period_end': period_end.isoformat() + 'Z'
             }
         finally:
             db.close()
@@ -161,8 +161,34 @@ class MetaAnalysisService:
 
             global_cfg = db.query(GlobalConfig).first()
             
-            period_start = config.last_run_at if config.last_run_at else (trigger_time - timedelta(days=1))
-            period_end = trigger_time
+            # Période : period_start = last_run_at (ou window par défaut si jamais exécuté)
+            # period_end = heure planifiée du jour (déclenchement auto) OU maintenant (déclenchement manuel)
+            is_manual = custom_context is not None
+
+            if is_manual:
+                # Déclenchement manuel : la fenêtre se termine exactement maintenant
+                period_end = trigger_time
+            else:
+                # Déclenchement planifié : la fenêtre se termine à l'heure de schedule, pas à l'heure d'exécution
+                try:
+                    h, m = config.schedule_time.split(':') if config.schedule_time else ('0', '0')
+                    period_end = trigger_time.replace(hour=int(h), minute=int(m), second=0, microsecond=0)
+                    # Si l'heure planifiée est dans le futur (ex. 23:00 et on est à 00:05), on recule d'un jour
+                    if period_end > trigger_time:
+                        period_end = period_end - timedelta(days=1)
+                except Exception:
+                    period_end = trigger_time
+
+            if config.last_run_at:
+                period_start = config.last_run_at
+            else:
+                # Première exécution : fenêtre basée sur le type de planification
+                if config.schedule_type == 'weekly':
+                    period_start = period_end - timedelta(weeks=1)
+                elif config.schedule_type == 'monthly':
+                    period_start = period_end - timedelta(days=30)
+                else:  # daily
+                    period_start = period_end - timedelta(days=1)
             
             prompt = ""
             analyses_count = 0

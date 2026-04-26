@@ -188,13 +188,6 @@
                 </label>
             </div>
 
-            <!-- Champ modification de période (visible uniquement en mode édition) -->
-            <div id="period-start-group" class="form-group" style="display:none; background:rgba(255,200,0,0.06); border:1px solid rgba(255,200,0,0.2); border-radius:6px; padding:0.75rem 1rem;">
-                <label data-i18n="meta.period_start_label" style="color:var(--warning); font-weight:500;">Début de la prochaine période d’analyse</label>
-                <input type="datetime-local" id="config-period-start" class="form-control" style="margin-top:0.35rem;">
-                <div class="form-hint" data-i18n="meta.period_start_hint">Modifiez cette date pour définir le début de la fenêtre de la prochaine exécution.</div>
-            </div>
-
             <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
                 <button type="button" class="btn btn-secondary" onclick="closeConfigModal()" data-i18n="common.cancel">Annuler</button>
                 <button type="submit" class="btn btn-primary" data-i18n="common.save">Enregistrer</button>

@@ -245,7 +245,8 @@
     "copy_analysis": "Copier l'analyse",
     "delete_analysis": "Supprimer cette analyse",
     "view_in_monitor": "Voir dans Monitor",
-    "save": "Enregistrer"
+    "save": "Enregistrer",
+    "edit": "Modifier"
   },
   "meta": {
     "title": "Méta-Analyse",
@@ -305,6 +306,10 @@
     "default_prompt": "Tu es un expert DevOps. Analyse ces événements et fais une synthèse globale de la situation du service.",
     "context_sent_title": "Contexte exact envoyé au LLM",
     "period_start_label": "Début de la prochaine période d'analyse",
-    "period_start_hint": "Définit le début de la fenêtre de temps pour la prochaine exécution automatique et l'aperçu."
+    "period_start_hint": "Définit le début de la fenêtre de temps pour la prochaine exécution automatique et l'aperçu.",
+    "excluded_one": "retiré du contexte",
+    "excluded_many": "retirés du contexte",
+    "next_run_label": "Prochaine analyse",
+    "next_period_label": "Période prévue"
   }
 }

@@ -245,7 +245,8 @@
     "copy_analysis": "Copy Analysis",
     "delete_analysis": "Delete this analysis",
     "view_in_monitor": "View in Monitor",
-    "save": "Save"
+    "save": "Save",
+    "edit": "Edit"
   },
   "meta": {
     "title": "Meta-Analysis",
@@ -305,6 +306,10 @@
     "default_prompt": "You are a DevOps expert. Analyze these events and provide a global synthesis of the service situation.",
     "context_sent_title": "Exact context sent to LLM",
     "period_start_label": "Next analysis period start",
-    "period_start_hint": "Defines the start of the time window for the next scheduled run and preview."
+    "period_start_hint": "Defines the start of the time window for the next scheduled run and preview.",
+    "excluded_one": "removed from context",
+    "excluded_many": "removed from context",
+    "next_run_label": "Next analysis",
+    "next_period_label": "Expected period"
   }
 }

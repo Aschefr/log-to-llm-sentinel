@@ -69,6 +69,56 @@ async function loadRules() {
     }
 }
 
+/**
+ * Calcule la prochaine ex\u00e9cution planifi\u00e9e et la plage temporelle correspondante.
+ * Retourne { nextRun: Date, periodStart: Date, periodEnd: Date }
+ */
+function _computeNextRun(c) {
+    const now = new Date();
+    const [h, m] = (c.schedule_time || '00:00').split(':').map(Number);
+
+    let nextRun;
+
+    if (c.schedule_type === 'daily') {
+        nextRun = new Date(now);
+        nextRun.setHours(h, m, 0, 0);
+        if (nextRun <= now) nextRun.setDate(nextRun.getDate() + 1);
+
+    } else if (c.schedule_type === 'weekly') {
+        // schedule_day : 1=lundi \u2026 7=dimanche (ISO)
+        const targetDow = ((c.schedule_day || 1) % 7); // JS: 0=dim, 1=lun...
+        nextRun = new Date(now);
+        nextRun.setHours(h, m, 0, 0);
+        const curDow = now.getDay(); // 0=dim
+        let diff = targetDow - curDow;
+        if (diff < 0 || (diff === 0 && nextRun <= now)) diff += 7;
+        nextRun.setDate(nextRun.getDate() + diff);
+
+    } else { // monthly
+        const targetDay = c.schedule_day || 1;
+        nextRun = new Date(now.getFullYear(), now.getMonth(), targetDay, h, m, 0, 0);
+        if (nextRun <= now) {
+            nextRun = new Date(now.getFullYear(), now.getMonth() + 1, targetDay, h, m, 0, 0);
+        }
+    }
+
+    // period_end = l'heure planifi\u00e9e de nextRun (au :00 pr\u00e8s)
+    const periodEnd = new Date(nextRun);
+
+    // period_start = last_run_at, ou nextRun - delta par d\u00e9faut
+    let periodStart;
+    if (c.last_run_at) {
+        periodStart = new Date(c.last_run_at);
+    } else {
+        periodStart = new Date(periodEnd);
+        if (c.schedule_type === 'weekly') periodStart.setDate(periodStart.getDate() - 7);
+        else if (c.schedule_type === 'monthly') periodStart.setDate(periodStart.getDate() - 30);
+        else periodStart.setDate(periodStart.getDate() - 1);
+    }
+
+    return { nextRun, periodStart, periodEnd };
+}
+
 async function loadConfigs() {
     const container = document.getElementById('configs-container');
     container.innerHTML = '<div class="loading">Chargement...</div>';
@@ -97,6 +147,16 @@ async function loadConfigs() {
             if (c.schedule_type === 'daily') scheduleText = `${window.t('meta.schedule_daily')} ${window.t('meta.schedule_hour').toLowerCase()} ${c.schedule_time}`;
             else if (c.schedule_type === 'weekly') scheduleText = `${window.t('meta.schedule_weekly')} (${window.t('meta.schedule_weekday')} ${c.schedule_day}) ${window.t('meta.schedule_hour').toLowerCase()} ${c.schedule_time}`;
             else if (c.schedule_type === 'monthly') scheduleText = `${window.t('meta.schedule_monthly')} ${window.t('meta.schedule_monthday').toLowerCase()} ${c.schedule_day} ${window.t('meta.schedule_hour').toLowerCase()} ${c.schedule_time}`;
+            
+            // Calcul prochaine exécution (heure locale du navigateur)
+            const _nr = c.enabled ? _computeNextRun(c) : null;
+            const _fmtDt = d => d.toLocaleString(undefined, {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+            const nextRunHtml = _nr ? `
+                <div style="margin-top:0.75rem; font-size:0.82rem; background:rgba(99,102,241,0.08); border:1px solid rgba(99,102,241,0.3); border-radius:6px; padding:0.5rem 0.75rem; display:flex; flex-wrap:wrap; gap:0.75rem; align-items:center;">
+                    <span>⏰ <strong>${window.t('meta.next_run_label') || 'Prochaine analyse'} :</strong> ${_fmtDt(_nr.nextRun)}</span>
+                    <span style="color:var(--text-secondary);">|</span>
+                    <span>📅 <strong>${window.t('meta.next_period_label') || 'Période prévue'} :</strong> ${_fmtDt(_nr.periodStart)} → ${_fmtDt(_nr.periodEnd)}</span>
+                </div>` : '';
 
             html += `
             <div class="card" style="border-left: 4px solid var(${c.enabled ? '--accent' : '--border'}); margin-bottom: 1rem;">
@@ -105,14 +165,15 @@ async function loadConfigs() {
                         <h3 style="margin: 0; font-size: 1.2rem;">${escapeHtml(c.name)}</h3>
                         <div>${status}</div>
                     </div>
-                    <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem; display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <div style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 0.5rem; display: flex; gap: 1rem; flex-wrap: wrap;">
                         <div>⏱ ${scheduleText}</div>
                         <div>📝 ${rulesText}</div>
                         <div>🕒 ${lastRunLabel} ${lastRun}</div>
                     </div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-secondary btn-sm" onclick='editConfig(${JSON.stringify(c).replace(/'/g, "&#39;")})'>Modifier</button>
-                        <button class="btn btn-secondary btn-sm" style="color:var(--danger); border-color:var(--danger);" onclick="deleteConfig(${c.id})">Supprimer</button>
+                    ${nextRunHtml}
+                    <div style="display: flex; gap: 0.5rem; margin-top:0.75rem;">
+                        <button class="btn btn-secondary btn-sm" onclick='editConfig(${JSON.stringify(c).replace(/'/g, "&#39;")})'>${window.t('common.edit') || 'Modifier'}</button>
+                        <button class="btn btn-secondary btn-sm" style="color:var(--danger); border-color:var(--danger);" onclick="deleteConfig(${c.id})">${window.t('common.delete')}</button>
                     </div>
                 </div>
                 
@@ -222,7 +283,12 @@ function _renderPreview(configId) {
             </div>`;
         }).join('');
 
-        const excludedBadge = excludedCount > 0 ? `<span style="font-size:0.75rem; color:var(--danger); margin-left:0.5rem;">(${excludedCount} exclué(s))</span>` : '';
+        const excludedBadge = excludedCount > 0
+            ? (() => {
+                const word = excludedCount > 1 ? window.t('meta.excluded_many') : window.t('meta.excluded_one');
+                return `<span style="font-size:0.75rem; color:var(--danger); margin-left:0.5rem;">(${excludedCount} ${word})</span>`;
+            })()
+            : '';
         return `
         <div class="card" style="padding:1rem; border-left:3px solid var(--accent);">
             <div style="font-weight:600; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
@@ -320,9 +386,9 @@ async function loadResultsForConfig(configId) {
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
                     <span style="font-size:0.85rem; color:var(--text-secondary);">${created}</span>
                     <div style="display:flex; gap:0.4rem; flex-wrap:wrap; justify-content:flex-end;">
-                        <button class="btn btn-secondary btn-sm" onclick="metaResultDeepen(${r.id}, ${r.config_id})" title="${window.t('monitor.deepen_with_ai')}">💬 ${window.t('common.deepen')}</button>
-                        <button class="btn btn-secondary btn-sm" onclick="metaResultNotify(${r.id})" title="${window.t('monitor.notify')}">🔔 ${window.t('monitor.notify')}</button>
-                        <button class="btn btn-secondary btn-sm" onclick="metaResultDelete(${r.id}, ${configId})" title="${window.t('common.delete')}" style="color:var(--danger); border-color:var(--danger);">🗑️ ${window.t('common.delete')}</button>
+                        <button class="btn btn-primary btn-sm" onclick="metaResultDeepen(${r.id}, ${r.config_id})">${window.t('monitor.deepen_with_ai')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="metaResultNotify(${r.id})">${window.t('monitor.notify')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="metaResultDelete(${r.id}, ${configId})" style="color:var(--danger); border-color:var(--danger);">🗑️ ${window.t('common.delete')}</button>
                     </div>
                 </div>
                 <div style="margin-bottom: 0.75rem; font-size: 0.9rem; background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 4px;">
@@ -435,10 +501,6 @@ function openConfigModal() {
     const ctxKeys = ['ctx_quick', 'ctx_standard', 'ctx_large', 'ctx_xlarge', 'ctx_massive'];
     ctxKeys.forEach((k, i) => { if (ctxSelect.options[i]) ctxSelect.options[i].text = window.t(`meta.${k}`); });
     
-    // Cacher le champ période (uniquement utile en édition)
-    document.getElementById('period-start-group').style.display = 'none';
-    document.getElementById('config-period-start').value = '';
-    
     updateScheduleUI();
     
     document.getElementById('modal-title').textContent = window.t('meta.modal_title_new') || 'Nouvelle Configuration';
@@ -477,23 +539,11 @@ function editConfig(config) {
     document.getElementById('config-enabled').checked = config.enabled;
     document.getElementById('config-notify').checked = config.notify_enabled;
 
-    // Remplir la période de début
-    if (config.last_run_at) {
-        const dt = new Date(config.last_run_at);
-        const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-        document.getElementById('config-period-start').value = local;
-    } else {
-        document.getElementById('config-period-start').value = '';
-    }
-
     const ruleIds = config.rule_ids_json || [];
     document.querySelectorAll('.rule-chk').forEach(chk => {
         chk.checked = ruleIds.includes(parseInt(chk.value));
     });
 
-    // Afficher le champ période en mode édition
-    document.getElementById('period-start-group').style.display = 'block';
-    
     document.getElementById('modal-title').textContent = window.t('meta.modal_title_edit') || 'Modifier la configuration';
     document.getElementById('config-modal').classList.remove('hidden');
     document.getElementById('config-modal').style.display = 'flex';
@@ -502,7 +552,6 @@ function editConfig(config) {
 async function saveConfig() {
     const id = document.getElementById('config-id').value;
     const ruleIds = Array.from(document.querySelectorAll('.rule-chk:checked')).map(chk => parseInt(chk.value));
-    const periodStart = document.getElementById('config-period-start').value;
 
     const payload = {
         name: document.getElementById('config-name').value,
@@ -516,19 +565,12 @@ async function saveConfig() {
         enabled: document.getElementById('config-enabled').checked,
         notify_enabled: document.getElementById('config-notify').checked
     };
-    
-    // Appliquer la modification de la période si renseignée
-    if (periodStart) {
-        payload.last_run_at = new Date(periodStart).toISOString();
-    }
 
     try {
         const url = id ? `/api/meta-analysis/configs/${id}` : '/api/meta-analysis/configs';
         const method = id ? 'PUT' : 'POST';
-        
         await apiFetch(url, { method, body: payload });
         closeConfigModal();
-        // Invalider le cache de preview pour cette config
         if (id) delete _previewData[id];
         await loadConfigs();
     } catch (e) {
