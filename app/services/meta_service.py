@@ -66,28 +66,19 @@ class MetaAnalysisService:
             if not config: return {'status': 'error', 'message': 'Config introuvable'}
 
             now = datetime.utcnow()
-            # Déterminer la fenêtre de temps
-            # Pour une nouvelle config (last_run_at = maintenant), on utilise une fenêtre par défaut basée sur le type de planification
-            if config.last_run_at is None:
-                default_delta = timedelta(days=1)
-            else:
-                delta_since_creation = now - config.last_run_at
-                if delta_since_creation < timedelta(minutes=2):  # Créé il y a moins de 2 min = nouvelle config
-                    if config.schedule_type == 'daily':
-                        default_delta = timedelta(days=1)
-                    elif config.schedule_type == 'weekly':
-                        default_delta = timedelta(weeks=1)
-                    elif config.schedule_type == 'monthly':
-                        default_delta = timedelta(days=30)
-                    else:
-                        default_delta = timedelta(days=1)
-                    period_start = now - default_delta
-                else:
-                    period_start = config.last_run_at
-
-            if config.last_run_at is None:
-                period_start = now - default_delta
             period_end = now
+
+            if config.last_run_at is not None:
+                # Config déjà exécutée → fenêtre depuis le dernier run
+                period_start = config.last_run_at
+            else:
+                # Jamais exécutée → fenêtre par défaut selon le type de planification
+                if config.schedule_type == 'weekly':
+                    period_start = now - timedelta(weeks=1)
+                elif config.schedule_type == 'monthly':
+                    period_start = now - timedelta(days=30)
+                else:  # daily
+                    period_start = now - timedelta(days=1)
 
             rule_ids = []
             if config.rule_ids_json:
