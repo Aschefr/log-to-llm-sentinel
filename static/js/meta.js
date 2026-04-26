@@ -706,6 +706,17 @@ async function triggerCustomMeta(id) {
         if (!abortController.signal.aborted) {
             _setTriggerStatus(id, `✅ ${window.t('meta.run_done') || 'Analyse terminée. Résultat disponible dans les Historiques.'}`, false);
             setTimeout(() => _setTriggerStatus(id, null, false), 5000);
+
+            // Rendre l'interface auto-réactive : on recharge/ouvre le panneau des résultats historiques
+            const resultsEl = document.getElementById(`results-${id}`);
+            if (resultsEl) {
+                if (!resultsEl.classList.contains('open')) {
+                    const headerEl = resultsEl.previousElementSibling;
+                    if (headerEl) toggleAccordion(`results-${id}`, headerEl);
+                } else {
+                    loadResultsForConfig(id);
+                }
+            }
         }
     } catch (e) {
         if (e.name === 'AbortError') {
