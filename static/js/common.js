@@ -233,3 +233,61 @@ function highlightKeywords(text, keywords) {
         return escapeHtml(part);
     }).join('');
 }
+
+function showInlineConfirm(btnElement, message, onConfirmCallback) {
+    // 1. Fermer toute popup de confirmation existante
+    document.querySelectorAll('.inline-confirm-popup').forEach(el => el.remove());
+    
+    // 2. Créer la popup
+    const popup = document.createElement('div');
+    popup.className = 'inline-confirm-popup';
+    
+    popup.innerHTML = `
+        <div class="inline-confirm-msg">${escapeHtml(message)}</div>
+        <div class="inline-confirm-actions">
+            <button class="btn btn-primary btn-sm confirm-btn">${window.t ? window.t('common.confirm') : 'OK'}</button>
+            <button class="btn btn-secondary btn-sm cancel-btn">${window.t ? window.t('common.cancel') : 'Annuler'}</button>
+        </div>
+    `;
+    
+    document.body.appendChild(popup);
+    
+    // 3. Positionnement par rapport au bouton
+    const rect = btnElement.getBoundingClientRect();
+    popup.style.top = `${rect.bottom + window.scrollY + 8}px`;
+    
+    let leftPos = rect.left + window.scrollX + (rect.width / 2) - (popup.offsetWidth / 2);
+    if (leftPos < 10) leftPos = 10;
+    if (leftPos + popup.offsetWidth > window.innerWidth - 10) {
+        leftPos = window.innerWidth - popup.offsetWidth - 10;
+    }
+    popup.style.left = `${leftPos}px`;
+    
+    // 4. Événements
+    const confirmBtn = popup.querySelector('.confirm-btn');
+    const cancelBtn = popup.querySelector('.cancel-btn');
+    
+    const closePopup = () => popup.remove();
+    
+    confirmBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closePopup();
+        onConfirmCallback();
+    });
+    
+    cancelBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closePopup();
+    });
+    
+    // Fermer si on clique ailleurs
+    setTimeout(() => {
+        const outsideClickListener = (e) => {
+            if (!popup.contains(e.target) && e.target !== btnElement && !btnElement.contains(e.target)) {
+                closePopup();
+                document.removeEventListener('click', outsideClickListener);
+            }
+        };
+        document.addEventListener('click', outsideClickListener);
+    }, 10);
+}
