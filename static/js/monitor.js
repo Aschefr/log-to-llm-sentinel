@@ -543,6 +543,16 @@ async function loadMonitorAnalyses(ruleId, severityFilter = null) {
     const container = document.getElementById(`monitor-analyses-${ruleId}`);
     if (!container) return;
 
+    // Update active badge state
+    const tabContent = document.getElementById('monitor-tab-content');
+    const allBadges = tabContent ? tabContent.querySelectorAll('.filter-badge') : [];
+    allBadges.forEach(b => b.classList.remove('active'));
+    const activeBadge = Array.from(allBadges).find(b => {
+        const oc = b.getAttribute('onclick') || '';
+        return severityFilter === null ? oc.includes(', null)') : oc.includes(`'${severityFilter}'`);
+    });
+    if (activeBadge) activeBadge.classList.add('active');
+
     try {
         let url = `/api/dashboard/recent?limit=20&rule_id=${ruleId}`;
         if (severityFilter) {

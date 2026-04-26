@@ -1547,6 +1547,15 @@ mark.kw-highlight {
 .filter-badge.critical { background: rgba(239,68,68,0.15); color: #ef4444; border-color: rgba(239,68,68,0.4); }
 .filter-badge.warning { background: rgba(245,158,11,0.15); color: #f59e0b; border-color: rgba(245,158,11,0.4); }
 .filter-badge.info { background: rgba(59,130,246,0.15); color: #3b82f6; border-color: rgba(59,130,246,0.4); }
+.filter-badge.critical.active { background: rgba(239,68,68,0.35); box-shadow: 0 0 0 2px #ef4444, 0 0 12px rgba(239,68,68,0.4); }
+.filter-badge.warning.active { background: rgba(245,158,11,0.35); box-shadow: 0 0 0 2px #f59e0b, 0 0 12px rgba(245,158,11,0.4); }
+.filter-badge.info.active { background: rgba(59,130,246,0.35); box-shadow: 0 0 0 2px #3b82f6, 0 0 12px rgba(59,130,246,0.4); }
+.filter-badge { transition: background 0.2s, box-shadow 0.2s, transform 0.15s; }
+.filter-badge.active { transform: scale(1.08); box-shadow: 0 0 0 2px currentColor, 0 0 10px rgba(255,255,255,0.1); font-weight: 700; }
+.filter-badge:not(.critical):not(.warning):not(.info).active { box-shadow: 0 0 0 2px var(--accent), 0 0 10px rgba(59,130,246,0.3); }
+.filter-badge.critical.active { background: rgba(239,68,68,0.35); box-shadow: 0 0 0 2px #ef4444, 0 0 12px rgba(239,68,68,0.4); }
+.filter-badge.warning.active { background: rgba(245,158,11,0.35); box-shadow: 0 0 0 2px #f59e0b, 0 0 12px rgba(245,158,11,0.4); }
+.filter-badge.info.active { background: rgba(59,130,246,0.35); box-shadow: 0 0 0 2px #3b82f6, 0 0 12px rgba(59,130,246,0.4); }
 
 
 .kw-filter-btn[data-kw='__matches__'] { background: rgba(59,130,246,0.1) !important; color: var(--accent) !important; border-color: var(--accent) !important; }
