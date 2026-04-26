@@ -66,14 +66,14 @@ function setupModelPulling() {
     btn.addEventListener('click', async () => {
         const model = input.value.trim();
         if (!model) {
-            alert('Veuillez saisir un nom de modèle');
+            alert(window.t ? window.t('config.enter_model_name') : 'Please enter a model name');
             return;
         }
 
         btn.disabled = true;
         progressContainer.classList.remove('hidden');
         progressBar.style.width = '0%';
-        statusText.textContent = `Démarrage du téléchargement de ${model}...`;
+        statusText.textContent = `${window.t ? window.t('config.model_download_start') : 'Starting download of'} ${model}...`;
 
         try {
             const response = await fetch('/api/config/pull-model', {
@@ -112,8 +112,8 @@ function setupModelPulling() {
                                 }
                                 if (data.status === 'success') {
                                     progressBar.style.width = '100%';
-                                    statusText.textContent = '✅ Modèle téléchargé avec succès !';
-                                    setTimeout(() => setupOllamaModelSelect(), 2000); // Rafraîchir la liste
+                                    statusText.textContent = window.t ? window.t('config.model_download_success') : '✅ Model downloaded successfully!';
+                                    setTimeout(() => setupOllamaModelSelect(), 2000);
                                 }
                             }
                         } catch (e) {
@@ -199,10 +199,10 @@ async function setupOllamaModelSelect() {
 
         const options = [];
         if (models.length === 0) {
-            options.push(`<option value="__custom__">Autre…</option>`);
+            options.push(`<option value="__custom__">${window.t ? window.t('config.autre_option') : 'Other\u2026'}</option>`);
         } else {
             options.push(...models.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`));
-            options.push(`<option value="__custom__">Autre…</option>`);
+            options.push(`<option value="__custom__">${window.t ? window.t('config.autre_option') : 'Other\u2026'}</option>`);
         }
         select.innerHTML = options.join('');
 
@@ -216,8 +216,8 @@ async function setupOllamaModelSelect() {
         }
     } catch (e) {
         // Fallback avec message d'erreur visible
-        const errMsg = e && e.message ? e.message : 'Ollama injoignable';
-        select.innerHTML = `<option value="__custom__">Autre… (${escapeHtml(errMsg)})</option>`;
+        const errMsg = e && e.message ? e.message : 'Ollama unreachable';
+        select.innerHTML = `<option value="__custom__">${window.t ? window.t('config.autre_option') : 'Other\u2026'} (${escapeHtml(errMsg)})</option>`;
         select.value = '__custom__';
         customInput.value = window.__desiredOllamaModel || 'llama3';
         setCustomVisible(true);
@@ -272,13 +272,13 @@ function setupForm() {
             
             copyToClipboard(text).then(() => {
                 const oldText = copyBtn.innerHTML;
-                copyBtn.innerHTML = '✅ Copié !';
+                copyBtn.innerHTML = window.t ? window.t('config.copy_success') : '✅ Copied!';
                 setTimeout(() => {
                     copyBtn.innerHTML = oldText;
                 }, 2000);
             }).catch(err => {
-                console.error('Erreur copie:', err);
-                alert('Impossible de copier dans le presse-papier. Vérifiez les permissions de votre navigateur.');
+                console.error('Copy error:', err);
+                alert(window.t ? window.t('config.clipboard_error') : 'Cannot copy to clipboard. Check your browser permissions.');
             });
         });
     }
@@ -290,11 +290,11 @@ function setupForm() {
             const text = logsEl.innerText;
             copyToClipboard(text).then(() => {
                 const oldText = copyOllamaBtn.innerHTML;
-                copyOllamaBtn.innerHTML = '\u2705 Copié !';
+            copyOllamaBtn.innerHTML = '\u2705 ' + (window.t ? window.t('common.copied') : 'Copied!');
                 setTimeout(() => { copyOllamaBtn.innerHTML = oldText; }, 2000);
             }).catch(err => {
-                console.error('Erreur copie Ollama:', err);
-                alert('Impossible de copier dans le presse-papier. Vérifiez les permissions de votre navigateur.');
+                console.error('Ollama copy error:', err);
+                alert(window.t ? window.t('config.clipboard_error') : 'Cannot copy to clipboard. Check your browser permissions.');
             });
         });
     }
@@ -446,11 +446,11 @@ function renderOllamaLogs(logs) {
                 ${l.detection_id ? `<span class="detection-id-badge" style="margin-left: 10px;">#${escapeHtml(l.detection_id)}</span>` : ''}
             </div>
             <div class="ollama-debug-block">
-                <strong>PROMPT :</strong>
+            <strong>${window.t ? window.t('config.prompt_label') : 'PROMPT:'}</strong>
                 <pre>${escapeHtml(l.prompt)}</pre>
             </div>
             <div class="ollama-debug-block">
-                <strong>RÉPONSE :</strong>
+            <strong>${window.t ? window.t('config.response_label') : 'RESPONSE:'}</strong>
                 <pre>${escapeHtml(l.response)}</pre>
             </div>
         </div>
@@ -490,13 +490,13 @@ function setupTests() {
 async function runTest(url, messageEl, buttonEl) {
     const oldText = buttonEl.textContent;
     buttonEl.disabled = true;
-    buttonEl.textContent = 'Test en cours...';
+    buttonEl.textContent = window.t ? window.t('config.test_in_progress') : 'Testing...';
     
     const abortController = new AbortController();
     const stopBtn = document.createElement('button');
     stopBtn.className = 'btn btn-danger btn-sm';
     stopBtn.style.marginLeft = '0.5rem';
-    stopBtn.innerHTML = '🛑 Arrêter';
+    stopBtn.innerHTML = window.t ? window.t('config.stop_btn') : '🛑 Stop';
     stopBtn.onclick = () => abortController.abort();
     
     buttonEl.parentNode.insertBefore(stopBtn, buttonEl.nextSibling);
@@ -510,10 +510,10 @@ async function runTest(url, messageEl, buttonEl) {
         showMessage(messageEl, detail, 'success');
     } catch (error) {
         if (error.name === 'AbortError') {
-            showMessage(messageEl, 'Test annulé', 'error');
+            showMessage(messageEl, window.t ? window.t('config.test_cancelled') : 'Test cancelled', 'error');
         } else {
-            console.error('Erreur test:', error);
-            showMessage(messageEl, 'Erreur: ' + (error.message || 'inconnue'), 'error');
+            console.error('Test error:', error);
+            showMessage(messageEl, (window.t ? window.t('common.error') : 'Error') + ': ' + (error.message || 'unknown'), 'error');
         }
     } finally {
         buttonEl.disabled = false;
@@ -528,7 +528,7 @@ async function saveConfig(messageEl, isAutoSave = false) {
         return false;
     }
     if (isAutoSave) {
-        messageEl.textContent = 'Auto-sauvegarde...';
+        messageEl.textContent = window.t ? window.t('config.auto_saving') : 'Auto-saving...';
         messageEl.className = 'message info';
         messageEl.classList.remove('hidden');
     }
@@ -570,7 +570,7 @@ async function saveConfig(messageEl, isAutoSave = false) {
             method: 'PUT',
             body: data,
         });
-        const successMsg = isAutoSave ? 'Auto-sauvegardé' : 'Configuration sauvegardée avec succès';
+        const successMsg = isAutoSave ? (window.t ? window.t('config.auto_saved') : 'Auto-saved') : (window.t ? window.t('config.save_success') : 'Configuration saved successfully');
         showMessage(messageEl, successMsg, 'success');
         return true;
     } catch (error) {
@@ -602,7 +602,7 @@ async function setupAppriseTags() {
         if (tags.length > 0) {
             options.push(...tags.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`));
         }
-        options.push('<option value="__custom__">Autre (saisie manuelle)…</option>');
+        options.push(`<option value="__custom__">${window.t ? window.t('config.other_manual') : 'Other (manual entry)\u2026'}</option>`);
         select.innerHTML = options.join('');
 
         if (desired && tags.includes(desired)) {
@@ -614,7 +614,7 @@ async function setupAppriseTags() {
             customGroup.classList.remove('hidden');
         }
     } catch (e) {
-        select.innerHTML = '<option value="__custom__">Autre (saisie manuelle)…</option>';
+        select.innerHTML = `<option value="__custom__">${window.t ? window.t('config.other_manual') : 'Other (manual entry)\u2026'}</option>`;
         select.value = '__custom__';
         customInput.value = window.__desiredAppriseTags || '';
         customGroup.classList.remove('hidden');

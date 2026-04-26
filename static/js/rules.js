@@ -80,7 +80,7 @@ async function loadRules() {
         const container = document.getElementById('rules-list');
 
         if (rules.length === 0) {
-            container.innerHTML = '<div class="loading">Aucune règle configurée</div>';
+            container.innerHTML = `<div class="loading">${window.t ? window.t('rules.no_rules') : 'No rules configured'}</div>`;
             return;
         }
 
@@ -91,18 +91,18 @@ async function loadRules() {
                     <p>📁 ${escapeHtml(rule.log_file_path)}</p>
                     <p>🔑 ${rule.keywords.join(', ')}</p>
                     ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}
-                    <p>${rule.enabled ? '✅ Activée' : '❌ Désactivée'} | 🔔 ${rule.notify_on_match ? `Seuil: ${rule.notify_severity_threshold || 'info'}` : 'Notifications désactivées'}</p>
+                    <p>${rule.enabled ? `✅ ${window.t ? window.t('rules.enabled_status') : 'Enabled'}` : `❌ ${window.t ? window.t('rules.disabled_status') : 'Disabled'}`} | 🔔 ${rule.notify_on_match ? `${window.t ? window.t('rules.notification_threshold') : 'Threshold:'} ${rule.notify_severity_threshold || 'info'}` : (window.t ? window.t('rules.notifications_disabled') : 'Notifications disabled')}</p>
                 </div>
                 <div class="rule-actions">
-                    <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 Tester</button>
-                    <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ Éditer</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id}, this)">🗑️ Supprimer</button>
+                    <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">${window.t ? window.t('rules.test_rule') : '🧪 Test'}</button>
+                    <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">${window.t ? window.t('rules.edit') : '✏️ Edit'}</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id}, this)">${window.t ? window.t('rules.delete') : '🗑️ Delete'}</button>
                 </div>
                 <div class="rule-toggles" style="display: flex; flex-direction: column; gap: 0.5rem; flex-basis: 100%;">
                     <div class="rule-last-line" style="display:flex; justify-content:space-between; align-items:center;">
                         <div>
-                            <strong>Dernière ligne détectée :</strong>
-                            <div class="last-line-content">${escapeHtml(rule.last_log_line || 'Aucune ligne trouvée ou fichier inaccessible')}</div>
+                            <strong>${window.t ? window.t('rules.last_detected_line') : 'Last detected line:'}</strong>
+                            <div class="last-line-content">${escapeHtml(rule.last_log_line || (window.t ? window.t('dashboard.no_line_found') : 'No line found or file inaccessible'))}</div>
                         </div>
                         <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?rule=${rule.id}&line=${encodeURIComponent(rule.last_log_line || '')}'" data-i18n="rules.view_in_monitor">
                             🔍 ${window.t ? window.t('rules.view_in_monitor') || 'Voir dans Monitor' : 'Voir dans Monitor'}
@@ -119,20 +119,20 @@ async function loadRules() {
 
 async function testRule(id) {
     const btn = document.getElementById(`test-btn-${id}`);
-    const originalText = btn ? btn.innerHTML : '🧪 Tester';
+    const originalText = btn ? btn.innerHTML : (window.t ? window.t('rules.test_rule') : '🧪 Test');
     
     const abortController = new AbortController();
     let stopBtn = null;
     
     if (btn) {
         btn.disabled = true;
-        btn.innerHTML = '⏳ Test en cours...';
+        btn.innerHTML = window.t ? window.t('rules.test_in_progress') : 'Testing...';
         btn.classList.add('pulse-animation');
         
         stopBtn = document.createElement('button');
         stopBtn.className = 'btn btn-danger btn-sm';
         stopBtn.style.marginLeft = '0.5rem';
-        stopBtn.innerHTML = '🛑 Arrêter';
+        stopBtn.innerHTML = window.t ? window.t('rules.stop_test') : '🛑 Stop';
         stopBtn.onclick = () => abortController.abort();
         btn.parentNode.insertBefore(stopBtn, btn.nextSibling);
     }
@@ -146,7 +146,7 @@ async function testRule(id) {
         // On pourrait notifier l'utilisateur de se rendre dans le Monitor pour voir le résultat.
 
         if (btn) {
-            btn.innerHTML = '✅ Terminé';
+            btn.innerHTML = window.t ? window.t('rules.test_done') : '✅ Done';
             btn.classList.remove('pulse-animation');
             btn.classList.add('btn-success-temporary');
             setTimeout(() => {
@@ -162,10 +162,10 @@ async function testRule(id) {
             btn.classList.remove('pulse-animation');
             btn.classList.add('btn-danger');
             if (e.name === 'AbortError') {
-                btn.innerHTML = '❌ Annulé';
+                btn.innerHTML = window.t ? window.t('rules.test_cancelled') : '❌ Cancelled';
             } else {
-                console.error('Erreur test règle:', e);
-                btn.innerHTML = '❌ Erreur';
+                console.error('Erreur test rule:', e);
+                btn.innerHTML = window.t ? window.t('rules.test_error_btn') : '❌ Error';
             }
             setTimeout(() => {
                 if (document.getElementById(`test-btn-${id}`)) {
@@ -230,7 +230,7 @@ function resetForm() {
     document.getElementById('rule-context-lines').value = '5';
     document.getElementById('rule-anti-spam').value = '60';
     document.getElementById('rule-severity-threshold').value = 'info';
-    document.getElementById('modal-title').textContent = 'Nouvelle règle';
+    document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_new_title') : 'New rule';
     closeFileBrowser();
     
     const previewContainer = document.getElementById('file-preview-container');
@@ -354,7 +354,7 @@ async function browsePath(path) {
             rows.push(renderBrowserRow(e, false));
         }
 
-        list.innerHTML = rows.join('') || '<div class="loading">Dossier vide</div>';
+        list.innerHTML = rows.join('') || `<div class="loading">${window.t ? window.t('rules.folder_empty') : 'Empty folder'}</div>`;
     } catch (error) {
         console.error('Erreur browse:', error);
         list.innerHTML = `<div class="loading">${window.t ? window.t('common.error') : 'Erreur'}: ${escapeHtml(error.message || 'Impossible de lister ce dossier')}</div>`;
@@ -363,7 +363,7 @@ async function browsePath(path) {
 
 function renderBrowserRow(entry, isParent) {
     const icon = entry.is_dir ? '📁' : '📄';
-    const meta = entry.is_dir ? 'Dossier' : 'Fichier';
+    const meta = entry.is_dir ? (window.t ? window.t('rules.folder') : 'Folder') : (window.t ? window.t('rules.file') : 'File');
     const disabled = entry.readable === false ? 'opacity:0.6; pointer-events:none;' : '';
     const name = isParent ? entry.name : entry.name;
     return `
@@ -372,7 +372,7 @@ function renderBrowserRow(entry, isParent) {
                 <span>${icon}</span>
                 <span class="name">${escapeHtml(name)}</span>
             </div>
-            <div class="meta">${meta}${entry.readable === false ? ' • illisible' : ''}</div>
+            <div class="meta">${meta}${entry.readable === false ? ` • ${window.t ? window.t('rules.unreadable') : 'unreadable'}` : ''}</div>
         </div>
     `;
 }
@@ -425,7 +425,7 @@ async function editRule(id) {
         document.getElementById('rule-context-lines').value = rule.context_lines || 5;
         document.getElementById('rule-anti-spam').value = rule.anti_spam_delay || 60;
         document.getElementById('rule-severity-threshold').value = rule.notify_severity_threshold || 'info';
-        document.getElementById('modal-title').textContent = 'Éditer la règle';
+        document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_edit_title') : 'Edit rule';
         document.getElementById('rule-modal').classList.remove('hidden');
         closeFileBrowser();
         fetchFilePreview(rule.log_file_path);
@@ -435,7 +435,7 @@ async function editRule(id) {
 }
 
 async function deleteRule(id, btnElement) {
-    showInlineConfirm(btnElement, 'Êtes-vous sûr de vouloir supprimer cette règle ?', async () => {
+    showInlineConfirm(btnElement, window.t ? window.t('rules.delete_confirm') : 'Are you sure you want to delete this rule?', async () => {
         try {
             await apiFetch(`/api/rules/${id}`, {
                 method: 'DELETE',
@@ -465,18 +465,18 @@ async function fetchFilePreview(path) {
     }
 
     container.classList.remove('hidden');
-    content.innerHTML = '<em>Chargement de l\'aperçu...</em>';
+    content.innerHTML = `<em>${window.t ? window.t('rules.loading_preview') : 'Loading preview...'}</em>`;
     
     try {
         const res = await apiFetch(`/api/files/tail?path=${encodeURIComponent(path)}&lines=10`);
         if (res.lines && res.lines.length > 0) {
             content.innerHTML = res.lines.map(l => escapeHtml(typeof l === 'string' ? l : l.text)).join('<br>');
         } else {
-            content.innerHTML = '<em>Fichier vide.</em>';
+            content.innerHTML = `<em>${window.t ? window.t('rules.file_empty_preview') : 'Empty file.'}</em>`;
         }
         content.scrollTop = content.scrollHeight;
     } catch (e) {
-        content.innerHTML = `<em style="color: var(--danger)">Aperçu non disponible : ${escapeHtml(e.message)}</em>`;
+        content.innerHTML = `<em style="color: var(--danger)">${window.t ? window.t('rules.preview_unavailable') : 'Preview unavailable:'} ${escapeHtml(e.message)}</em>`;
     }
 }
 
@@ -484,22 +484,22 @@ function applyTemplate(type) {
     resetForm();
     const templates = {
         'auth': {
-            name: 'Sécurité SSH / Connexions',
+            name: window.t ? window.t('rules.template_auth').replace('🛡️ ', '') : 'Security SSH / Connections',
             path: '/system-logs/auth.log',
             keywords: 'failed, Accepted, invalid user, authentication failure, sudo',
-            context: 'Surveillance des tentatives de connexion SSH et de l\'utilisation de sudo sur Ubuntu.'
+            context: 'SSH login and sudo usage monitoring on Ubuntu.'
         },
         'syslog': {
-            name: 'Stabilité Système',
+            name: window.t ? window.t('rules.template_syslog').replace('⚙️ ', '') : 'System Stability',
             path: '/system-logs/syslog',
             keywords: 'error, failed, fatal, critical, oom-killer, stopped',
-            context: 'Journaux système généraux d\'Ubuntu. Surveille les plantages de services et les erreurs système.'
+            context: 'General Ubuntu system logs. Monitors service crashes and system errors.'
         },
         'journald': {
-            name: 'Journald (Relais Docker)',
+            name: window.t ? window.t('rules.template_journald').replace('📜 ', '') : 'Journald (Docker Relay)',
             path: '/logs/host_system_journal.log',
             keywords: 'error, fatal, panic, critical, failed',
-            context: 'Relais des journaux binaires Systemd (journalctl) vers un fichier texte lisible.'
+            context: 'Relay of Systemd binary logs (journalctl) to a readable text file.'
         }
     };
 
@@ -512,7 +512,7 @@ function applyTemplate(type) {
         
         // Ouvrir la modal
         document.getElementById('rule-modal').classList.remove('hidden');
-        document.getElementById('modal-title').textContent = 'Nouvelle règle (Modèle)';
+        document.getElementById('modal-title').textContent = window.t ? window.t('rules.new_rule_from_template') : 'New rule (Template)';
         
         // Déclencher l'aperçu si possible
         fetchFilePreview(t.path);

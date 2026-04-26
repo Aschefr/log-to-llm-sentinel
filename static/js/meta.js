@@ -185,7 +185,7 @@ async function loadConfigs() {
                 <div id="preview-${c.id}" class="accordion-content">
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top:0;">${window.t('meta.preview_help')}</p>
                     <div id="preview-rules-${c.id}" style="display:flex; flex-direction:column; gap:0.75rem;">
-                        <div class="loading" data-i18n="common.loading">Chargement...</div>
+                        <div class="loading" data-i18n="common.loading">${window.t ? window.t('common.loading') : 'Loading...'}</div>
                     </div>
                     <div style="display:flex; align-items:center; gap:0.5rem; margin-top:1rem; flex-wrap:wrap;">
                         <button id="trigger-btn-${c.id}" class="btn btn-primary btn-sm" onclick="triggerCustomMeta(${c.id})">${window.t('meta.run_custom')}</button>
@@ -199,7 +199,7 @@ async function loadConfigs() {
                     <span class="icon">▼</span>
                 </div>
                 <div id="results-${c.id}" class="accordion-content" style="background: rgba(0,0,0,0.2);">
-                    <div class="loading">Dépliez pour charger...</div>
+                    <div class="loading">${window.t ? window.t('meta.unfold_to_load') : 'Expand to load...'}</div>
                 </div>
             </div>
             `;
@@ -446,8 +446,8 @@ async function loadResultsForConfig(configId) {
                     </div>
                 </div>
                 <div style="margin-bottom: 0.75rem; font-size: 0.9rem; background: rgba(255,255,255,0.05); padding: 0.5rem; border-radius: 4px;">
-                    <strong>Période :</strong> ${start} → ${end}<br>
-                    <strong>Événements analysés :</strong> ${r.analyses_count}
+                    <strong>${window.t ? window.t('meta.periode_label') : 'Period:'}</strong> ${start} → ${end}<br>
+                    <strong>${window.t ? window.t('meta.events_analyzed') : 'Events analyzed:'}</strong> ${r.analyses_count}
                     ${kwHtml}
                     ${idsHtml}
                 </div>
@@ -479,7 +479,7 @@ async function metaResultDeepen(resultId, configId) {
     try {
         const results = await apiFetch(`/api/meta-analysis/results?config_id=${configId}&limit=50`);
         const r = results.find(x => x.id === resultId);
-        if (!r) return alert('Résultat introuvable.');
+        if (!r) return alert(window.t ? window.t('meta.result_not_found') : 'Result not found.');
         // Créer une conversation chat avec ce résultat comme contexte
         const conv = await apiFetch('/api/chat/conversations', {
             method: 'POST',
@@ -638,7 +638,7 @@ async function saveConfig() {
 }
 
 async function deleteConfig(id, btnElement) {
-    showInlineConfirm(btnElement, 'Voulez-vous vraiment supprimer cette configuration ?', async () => {
+    showInlineConfirm(btnElement, window.t ? window.t('meta.delete_config_confirm') : 'Are you sure you want to delete this configuration?', async () => {
         try {
             await apiFetch(`/api/meta-analysis/configs/${id}`, { method: 'DELETE' });
             await loadConfigs();
@@ -665,7 +665,7 @@ async function triggerCustomMeta(id) {
 
     const data = _previewData[id];
     if (!data || !data.rules_context || data.rules_context.length === 0) {
-        _setTriggerStatus(id, '❌ Aucun contexte disponible.', false);
+        _setTriggerStatus(id, `❌ ${window.t ? window.t('meta.no_context_trigger') : 'No context available.'}`, false);
         return;
     }
 
@@ -683,7 +683,7 @@ async function triggerCustomMeta(id) {
     });
 
     if (lines.length === 0) {
-        _setTriggerStatus(id, '❌ Toutes les entrées ont été exclues.', false);
+        _setTriggerStatus(id, `❌ ${window.t ? window.t('meta.all_excluded') : 'All entries have been excluded.'}`, false);
         return;
     }
 
@@ -710,7 +710,7 @@ async function triggerCustomMeta(id) {
         await _pollUntilDone(id, abortController);
 
         if (!abortController.signal.aborted) {
-            _setTriggerStatus(id, `✅ ${window.t('meta.run_done') || 'Analyse terminée. Résultat disponible dans les Historiques.'}`, false);
+            _setTriggerStatus(id, `✅ ${window.t('meta.run_done') || 'Analysis complete. Result available in History.'}`, false);
             setTimeout(() => _setTriggerStatus(id, null, false), 5000);
 
             // Rendre l'interface auto-réactive : on recharge/ouvre le panneau des résultats historiques
@@ -734,7 +734,7 @@ async function triggerCustomMeta(id) {
         }
     } catch (e) {
         if (e.name === 'AbortError') {
-            _setTriggerStatus(id, '⏹ Analyse annulée.', false);
+            _setTriggerStatus(id, `⏹ ${window.t ? window.t('meta.analysis_cancelled') : 'Analysis cancelled.'}`, false);
         } else {
             _setTriggerStatus(id, `${window.t ? window.t('common.error') : 'Erreur'} : ${e.message}`, false);
         }

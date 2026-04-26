@@ -66,7 +66,7 @@ async function loadMonitorRules() {
             selectTab(ruleToSelect);
         } else {
             document.getElementById('monitor-tab-content').innerHTML =
-                '<div class="loading">Aucune règle active. <a href="/rules">Créer une règle</a></div>';
+                `<div class="loading">${window.t ? window.t('monitor.no_active_rules') : 'No active rules.'} <a href="/rules">${window.t ? window.t('monitor.create_rule') : 'Create a rule'}</a></div>`;
         }
     } catch (e) {
         document.getElementById('monitor-tabs').innerHTML =
@@ -123,31 +123,31 @@ function selectTab(ruleId) {
 // ─── Rendu du contenu de l'onglet ─────────────────────────────────────────
 
 function renderTabContent(rule) {
-    const kwList = rule.keywords.join(', ') || 'Aucun';
+    const kwList = rule.keywords.join(', ') || window.t('common.na');
     document.getElementById('monitor-tab-content').innerHTML = `
         <!-- Paramètres de la règle -->
         <div class="monitor-rule-info">
             <div class="rule-info-grid">
-                <div><span class="info-label">📁 Fichier</span><code>${escapeHtml(rule.log_file_path)}</code></div>
+                <div><span class="info-label">📁 ${window.t ? window.t('monitor.file_label') : 'File'}</span><code>${escapeHtml(rule.log_file_path)}</code></div>
                 <div>
-                    <span class="info-label">🔑 Mots-clés (cliquer pour filtrer)</span>
+                    <span class="info-label">🔑 ${window.t('monitor.keywords')}</span>
                     <div class="kw-filter-badges" id="kw-filters-${rule.id}">
                         <span class="log-kw-badge kw-filter-btn ${activeKeywordFilter === '__matches__' ? 'active' : ''}" data-kw="__matches__" onclick="toggleKeywordFilter(this, ${rule.id})">Matches</span>
-                        <span class="log-kw-badge kw-filter-btn ${activeKeywordFilter === '__all__' ? 'active' : ''}" data-kw="__all__" onclick="toggleKeywordFilter(this, ${rule.id})">Aucun (Tout voir)</span>
+                        <span class="log-kw-badge kw-filter-btn ${activeKeywordFilter === '__all__' ? 'active' : ''}" data-kw="__all__" onclick="toggleKeywordFilter(this, ${rule.id})">${window.t ? window.t('monitor.all_filter') : 'All'}</span>
                         ${rule.keywords.map(kw =>
                             `<span class="log-kw-badge kw-filter-btn" data-kw="${encodeURIComponent(kw)}" onclick="toggleKeywordFilter(this, ${rule.id})">${escapeHtml(kw)}</span>`
                         ).join('')}
                     </div>
                 </div>
                 <div><span class="info-label">⏱ Anti-spam</span>${rule.anti_spam_delay}s</div>
-                <div><span class="info-label">🔔 Seuil</span>${rule.notify_severity_threshold}</div>
+                <div><span class="info-label">🔔 ${window.t('monitor.severity')}</span>${rule.notify_severity_threshold}</div>
                 <div>
-                    <span class="info-label">📊 Statistiques (Filtrer)</span>
+                    <span class="info-label">📊 ${window.t ? window.t('monitor.statistics_filter') : 'Statistics (Filter)'}</span>
                     <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.35rem;">
-                        <span class="filter-badge" onclick="loadMonitorAnalyses(${rule.id}, null)" title="Toutes les analyses">Total: ${rule.stats?.total || 0}</span>
-                        <span class="filter-badge critical" onclick="loadMonitorAnalyses(${rule.id}, 'critical')">Critique: ${rule.stats?.critical || 0}</span>
-                        <span class="filter-badge warning" onclick="loadMonitorAnalyses(${rule.id}, 'warning')">Warning: ${rule.stats?.warning || 0}</span>
-                        <span class="filter-badge info" onclick="loadMonitorAnalyses(${rule.id}, 'info')">Info: ${rule.stats?.info || 0}</span>
+                        <span class="filter-badge" onclick="loadMonitorAnalyses(${rule.id}, null)" title="Total">Total: ${rule.stats?.total || 0}</span>
+                        <span class="filter-badge critical" onclick="loadMonitorAnalyses(${rule.id}, 'critical')">${window.t('dashboard.critical')}: ${rule.stats?.critical || 0}</span>
+                        <span class="filter-badge warning" onclick="loadMonitorAnalyses(${rule.id}, 'warning')">${window.t('dashboard.warning')}: ${rule.stats?.warning || 0}</span>
+                        <span class="filter-badge info" onclick="loadMonitorAnalyses(${rule.id}, 'info')">${window.t('dashboard.info')}: ${rule.stats?.info || 0}</span>
                     </div>
                 </div>
             </div>
@@ -156,30 +156,30 @@ function renderTabContent(rule) {
         <!-- Buffer anti-spam -->
         <div class="monitor-buffer-status" id="buffer-status-${rule.id}">
             <span class="buffer-dot idle" id="buffer-dot-${rule.id}"></span>
-            <span id="buffer-label-${rule.id}">Buffer inactif</span>
+            <span id="buffer-label-${rule.id}">${window.t ? window.t('monitor.buffer_inactive') : 'Inactive buffer'}</span>
         </div>
 
         <!-- Visionneuse de logs -->
         <div class="monitor-viewer-header" onclick="toggleLogViewer(${rule.id})">
             <span class="viewer-title">
                 <span class="viewer-toggle-icon">▼</span>
-                📄 Log en direct 
+                📄 ${window.t ? window.t('monitor.live_log') : 'Live log'}
                 <span class="viewer-linecount" id="linecount-${rule.id}"></span>
                 <span class="kw-filter-label hidden" id="kw-filter-label-${rule.id}"></span>
             </span>
             <div class="viewer-actions" onclick="event.stopPropagation()">
-                <button class="btn btn-secondary btn-sm" id="freeze-btn-${rule.id}" onclick="toggleFreeze(${rule.id})">❄️ Figer</button>
-                <button class="btn btn-secondary btn-sm" onclick="copyViewerContent(${rule.id})">📋 Copier</button>
+                <button class="btn btn-secondary btn-sm" id="freeze-btn-${rule.id}" onclick="toggleFreeze(${rule.id})">${window.t ? window.t('monitor.freeze') : '❄️ Freeze'}</button>
+                <button class="btn btn-secondary btn-sm" onclick="copyViewerContent(${rule.id})">${window.t ? window.t('common.copy') : 'Copy'}</button>
             </div>
         </div>
         <div class="monitor-log-viewer" id="log-viewer-${rule.id}">
-            <div class="loading">Chargement des logs...</div>
+            <div class="loading">${window.t ? window.t('common.loading') : 'Loading...'}</div>
         </div>
 
         <!-- Panneau de détail -->
         <div class="monitor-detail-panel hidden" id="detail-panel-${rule.id}">
             <div class="detail-panel-header">
-                <strong>🔍 Détails de la ligne</strong>
+                <strong>🔍 ${window.t ? window.t('monitor.detail_line_text') : 'Line Details'}</strong>
                 <button class="btn-icon" onclick="closeDetailPanel(${rule.id})">✕</button>
             </div>
             <div id="detail-panel-content-${rule.id}"></div>
@@ -189,11 +189,11 @@ function renderTabContent(rule) {
         <div class="monitor-analyses-header" onclick="toggleAnalysesSection(${rule.id})">
             <span class="viewer-title">
                 <span class="viewer-toggle-icon" id="analyses-toggle-icon-${rule.id}">▼</span>
-                <strong>📊 Analyses récentes (LLM)</strong>
+                <strong>📊 ${window.t ? window.t('monitor.recent_analyses_llm') : 'Recent Analyses (LLM)'}</strong>
             </span>
         </div>
         <div id="monitor-analyses-${rule.id}" class="monitor-analyses-list">
-            <div class="loading">Chargement...</div>
+            <div class="loading">${window.t ? window.t('monitor.loading_analyses') : 'Loading...'}</div>
         </div>
     `;
 
@@ -261,7 +261,7 @@ async function fetchLogs(rule) {
         );
 
         if (!res.lines || res.lines.length === 0) {
-            viewer.innerHTML = '<em class="no-logs">Fichier vide ou inaccessible.</em>';
+            viewer.innerHTML = `<em class="no-logs">${window.t ? window.t('monitor.file_empty') : 'File empty or inaccessible.'}</em>`;
             return;
         }
 
@@ -285,7 +285,7 @@ async function fetchLogs(rule) {
         // Mettre à jour le compteur
         const matched = res.lines.filter(l => l.matched).length;
         const lc = document.getElementById(`linecount-${rule.id}`);
-        if (lc) lc.textContent = `(${res.lines.length} lignes, ${matched} matchées)`;
+        if (lc) lc.textContent = `(${res.lines.length} ${window.t ? window.t('monitor.lines_label') : 'lines'}, ${matched} ${window.t ? window.t('monitor.matched_label') : 'matched'})`;
 
         if (autoOpenLine && selectedLineText) {
             const selectedEl = viewer.querySelector('.log-line.selected');
@@ -376,7 +376,7 @@ function applyKeywordFilter(ruleId) {
         }
         const filterName = activeKeywordFilter === '__matches__' ? 'matches' :
                            activeKeywordFilter === '__all__'    ? 'tout' : `"${activeKeywordFilter}"`;
-        emptyEl.textContent = window.t ? window.t('monitor.no_logs_filter') : `Aucune ligne à afficher pour le filtre : ${filterName}`;
+        emptyEl.textContent = window.t ? window.t('monitor.no_logs_filter') : `No lines to display for filter: ${filterName}`;
     } else if (emptyEl) {
         emptyEl.remove();
     }
@@ -387,13 +387,13 @@ function updateFilterLabel(ruleId) {
     if (!label) return;
     
     if (activeKeywordFilter === '__matches__') {
-        label.textContent = ' — vue: matches uniquement';
+        label.textContent = ` — ${window.t ? window.t('monitor.view_matches_only') : 'view: matches only'}`;
         label.classList.remove('hidden');
     } else if (activeKeywordFilter === '__all__') {
-        label.textContent = ' — vue: log complet';
+        label.textContent = ` — ${window.t ? window.t('monitor.view_full_log') : 'view: full log'}`;
         label.classList.remove('hidden');
     } else if (activeKeywordFilter) {
-        label.textContent = ` — filtre: "${activeKeywordFilter}"`;
+        label.textContent = ` — ${window.t ? window.t('monitor.filter_keyword') : 'filter:'} "${activeKeywordFilter}"`;
         label.classList.remove('hidden');
     } else {
         label.textContent = '';
@@ -412,12 +412,12 @@ async function fetchBufferStatus(ruleId) {
         if (buf.active) {
             dot.className = 'buffer-dot active';
             const kwStr = buf.matched_keywords.length > 0
-                ? ` — mots-clés: <strong>${buf.matched_keywords.map(k => escapeHtml(k)).join(', ')}</strong>`
+                ? ` — ${window.t ? window.t('monitor.buffer_keywords') : 'keywords'}: <strong>${buf.matched_keywords.map(k => escapeHtml(k)).join(', ')}</strong>`
                 : '';
-            label.innerHTML = `⏳ Buffer actif <span class="detection-id-badge" style="font-size: 0.7rem; vertical-align: middle;">#${escapeHtml(buf.detection_id || '...')}</span> — ${buf.line_count} ligne(s) en attente${kwStr}`;
+            label.innerHTML = `⏳ ${window.t ? window.t('monitor.buffer_active') : 'Active buffer'} <span class="detection-id-badge" style="font-size: 0.7rem; vertical-align: middle;">#${escapeHtml(buf.detection_id || '...')}</span> — ${buf.line_count} ${window.t ? window.t('monitor.buffer_lines_pending') : 'line(s) pending'}${kwStr}`;
         } else {
             dot.className = 'buffer-dot idle';
-            label.textContent = 'Buffer inactif';
+            label.textContent = window.t ? window.t('monitor.buffer_inactive') : 'Inactive buffer';
         }
     } catch (e) {}
 }
@@ -463,32 +463,32 @@ async function onLineClick(el, ruleId) {
     const matchedKws = el.querySelectorAll('.log-kw-badge');
     const kwList = matchedKws.length > 0
         ? Array.from(matchedKws).map(b => b.textContent).join(', ')
-        : 'Aucun (ligne non matchée)';
+        : window.t ? window.t('monitor.detail_none_matched') : 'None (unmatched line)';
 
     content.innerHTML = `
         <div class="detail-row">
-            <span class="detail-label">Texte de la ligne</span>
+            <span class="detail-label">${window.t ? window.t('monitor.detail_line_text') : 'Line text'}</span>
             <code class="detail-value">${escapeHtml(text)}</code>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Mots-clés détectés</span>
-            <span class="detail-value">${matchedKws.length > 0 ? kwList : '<em>Aucun (ligne non filtrée)</em>'}</span>
+            <span class="detail-label">${window.t ? window.t('monitor.detail_detected_kw') : 'Detected keywords'}</span>
+            <span class="detail-value">${matchedKws.length > 0 ? kwList : `<em>${window.t ? window.t('monitor.detail_none_filtered') : 'None (unfiltered line)'}</em>`}</span>
         </div>
         ${relatedAnalysis ? `
         <div class="detail-row">
-            <span class="detail-label">ID de détection</span>
+            <span class="detail-label">${window.t ? window.t('monitor.detection_id') : 'Detection ID'}</span>
             <code class="detail-value detection-id-badge">#${escapeHtml(relatedAnalysis.detection_id || 'N/A')}</code>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Sévérité</span>
+            <span class="detail-label">${window.t ? window.t('monitor.severity') : 'Severity'}</span>
             <span class="severity-badge ${escapeHtml(relatedAnalysis.severity)}">${escapeHtml(relatedAnalysis.severity)}</span>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Analysé le</span>
+            <span class="detail-label">${window.t ? window.t('monitor.analyzed_at') : 'Analyzed at'}</span>
             <span class="detail-value">${relatedAnalysis.analyzed_at ? formatDate(relatedAnalysis.analyzed_at) : '—'}</span>
         </div>
         <div class="detail-row">
-            <span class="detail-label">Réponse LLM</span>
+            <span class="detail-label">${window.t ? window.t('monitor.llm_response') : 'LLM Response'}</span>
             <div class="detail-value analysis-response markdown-body">${relatedAnalysis.ollama_response ? marked.parse(relatedAnalysis.ollama_response) : '—'}</div>
         </div>
         <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
@@ -499,7 +499,7 @@ async function onLineClick(el, ruleId) {
             <button class="btn btn-primary btn-sm" onclick="openChat(${relatedAnalysis.id})">${window.t('monitor.deepen_with_ai')}</button>
         </div>
         ` : `
-        <div class="detail-row"><em>Aucune analyse automatique trouvée pour cette ligne.</em></div>
+        <div class="detail-row"><em>${window.t ? window.t('monitor.no_auto_analysis') : 'No automatic analysis found for this line.'}</em></div>
         <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
             <button class="btn btn-primary btn-sm" onclick="manualAnalyze(${ruleId}, this)">${window.t('monitor.analyze_with_ollama')}</button>
         </div>
@@ -523,7 +523,7 @@ function toggleFreeze(ruleId) {
     isFrozen = !isFrozen;
     const btn = document.getElementById(`freeze-btn-${ruleId}`);
     if (btn) {
-        btn.textContent = isFrozen ? '▶️ Reprendre' : '❄️ Figer';
+        btn.textContent = isFrozen ? (window.t ? window.t('monitor.resume') : '▶️ Resume') : (window.t ? window.t('monitor.freeze') : '❄️ Freeze');
         btn.classList.toggle('active', isFrozen);
     }
 }
@@ -534,7 +534,7 @@ function copyViewerContent(ruleId) {
     const text = Array.from(viewer.querySelectorAll('.log-line'))
         .map(el => el.querySelector('.log-text')?.textContent || '')
         .join('\n');
-    copyToClipboard(text).then(() => alert('Logs copiés !')).catch(() => {});
+    copyToClipboard(text).then(() => alert(window.t ? window.t('monitor.logs_copied') : 'Logs copied!')).catch(() => {});
 }
 
 // ─── Analyses récentes ─────────────────────────────────────────────────────
@@ -551,7 +551,7 @@ async function loadMonitorAnalyses(ruleId, severityFilter = null) {
         
         const analyses = await apiFetch(url);
         if (analyses.length === 0) {
-            container.innerHTML = `<div class="no-logs">Aucune analyse récente ${severityFilter ? `de niveau ${severityFilter}` : ''}</div>`;
+            container.innerHTML = `<div class="no-logs">${window.t ? window.t('monitor.no_recent_analyses') : 'No recent analyses'}${severityFilter ? ` (${severityFilter})` : ''}</div>`;
             return;
         }
 
@@ -563,7 +563,7 @@ async function loadMonitorAnalyses(ruleId, severityFilter = null) {
                     <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
                 </div>
                 <div class="monitor-analysis-keywords">
-                    Mots-clés: ${a.matched_keywords.length > 0
+                    ${window.t ? window.t('monitor.kw_label') : 'Keywords:'} ${a.matched_keywords.length > 0
                         ? a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')
                         : '<em>N/A</em>'}
                 </div>
@@ -590,7 +590,7 @@ async function retryAnalysis(analysisId, btn) {
 
     try {
         const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { method: 'POST' });
-        if (!res.task_id) throw new Error('Réponse inattendue du serveur');
+        if (!res.task_id) throw new Error(window.t ? window.t('monitor.unexpected_server_response') : 'Unexpected server response');
 
         pollTask(res.task_id, btn, oldHtml, () => {
             // Rafraîchir le panneau de détail si une ligne est sélectionnée
@@ -638,7 +638,7 @@ function pollTask(taskId, btn, originalHtml, onDone) {
                 clearInterval(interval);
                 btn.innerHTML = '❌';
                 setTimeout(() => { btn.innerHTML = originalHtml; btn.disabled = false; }, 3000);
-                alert(window.t('common.error') + ': ' + (res.error || 'Erreur inconnue'));
+                alert(window.t('common.error') + ': ' + (res.error || (window.t ? window.t('monitor.unknown_error') : 'Unknown error')));
             }
             // status === 'running' → on continue le polling
         } catch (_) { /* erreur réseau transitoire — on réessaie */ }
@@ -654,29 +654,29 @@ async function searchById() {
     if (!id) return;
 
     resultPanel.classList.remove('hidden');
-    resultPanel.innerHTML = '<div class="loading">Recherche en cours...</div>';
+    resultPanel.innerHTML = `<div class="loading">${window.t ? window.t('monitor.search_in_progress') : 'Searching...'}</div>`;
 
     try {
         const res = await apiFetch(`/api/monitor/search?id=${encodeURIComponent(id)}`);
         if (!res.found) {
-            resultPanel.innerHTML = `<div class="search-result-empty">Aucune analyse trouvée pour l'ID <code>${escapeHtml(id)}</code>.</div>`;
+            resultPanel.innerHTML = `<div class="search-result-empty">${window.t ? window.t('monitor.no_analysis_found_id') : 'No analysis found for ID'} <code>${escapeHtml(id)}</code>.</div>`;
             return;
         }
         const a = res.analysis;
         resultPanel.innerHTML = `
             <div class="search-result-card">
                 <div class="search-result-close" onclick="document.getElementById('search-result').classList.add('hidden')">✕</div>
-                <h3>Résultat pour <code class="detection-id-badge">${escapeHtml(a.detection_id)}</code></h3>
-                <div class="detail-row"><span class="detail-label">Règle</span><span class="detail-value">${escapeHtml(a.rule_name)}</span></div>
-                <div class="detail-row"><span class="detail-label">Analysé le</span><span class="detail-value">${a.analyzed_at ? formatDate(a.analyzed_at) : '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">Sévérité</span><span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span></div>
-                <div class="detail-row"><span class="detail-label">Mots-clés</span><span class="detail-value">${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ') || '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">Ligne</span><code class="detail-value">${escapeHtml(a.triggered_line || '')}</code></div>
-                <div class="detail-row"><span class="detail-label">Analyse LLM</span>
+                <h3>${window.t ? window.t('monitor.result_for') : 'Result for'} <code class="detection-id-badge">${escapeHtml(a.detection_id)}</code></h3>
+                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.rule_label') : 'Rule'}</span><span class="detail-value">${escapeHtml(a.rule_name)}</span></div>
+                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.analyzed_at') : 'Analyzed at'}</span><span class="detail-value">${a.analyzed_at ? formatDate(a.analyzed_at) : '—'}</span></div>
+                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.severity') : 'Severity'}</span><span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span></div>
+                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.keywords') : 'Keywords'}</span><span class="detail-value">${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ') || '—'}</span></div>
+                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.detail_line_label') : 'Line'}</span><code class="detail-value">${escapeHtml(a.triggered_line || '')}</code></div>
+                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.detail_llm_analysis') : 'LLM Analysis'}</span>
                     <div class="detail-value analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : '—'}</div>
                 </div>
 
-                <div class="detail-row"><span class="detail-label">Notifié</span><span class="detail-value">${a.notified ? '✅ Oui' : '❌ Non'}</span></div>
+                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.notified') : 'Notified'}</span><span class="detail-value">${a.notified ? window.t('monitor.yes') : window.t('monitor.no')}</span></div>
                 <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; gap: 0.5rem;">
                         <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">${window.t('monitor.retry_analysis')}</button>
@@ -702,7 +702,7 @@ async function manualAnalyze(ruleId, btn) {
             method: 'POST',
             body: { line: selectedLineText, rule_id: ruleId }
         });
-        if (!res.task_id) throw new Error('Réponse inattendue du serveur');
+        if (!res.task_id) throw new Error(window.t ? window.t('monitor.unexpected_server_response') : 'Unexpected server response');
 
         pollTask(res.task_id, btn, oldHtml, (analysisId) => {
             if (analysisId) {

@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const clearAllBtn = document.getElementById('clear-all-analyses-btn');
     if (clearAllBtn) {
         clearAllBtn.addEventListener('click', async (e) => {
-            showInlineConfirm(clearAllBtn, 'Voulez-vous vraiment effacer TOUTES les analyses du système ?', async () => {
+            showInlineConfirm(clearAllBtn, window.t ? window.t('dashboard.confirm_clear_all') : 'Are you sure you want to delete ALL analyses?', async () => {
                 try {
                     await apiFetch('/api/dashboard/analyses/all/confirm', { method: 'DELETE' });
                     loadStats();
@@ -77,7 +77,7 @@ async function loadRecentAnalyses() {
             <div class="analysis-card">
                 <div class="analysis-header">
                     <div>
-                        <strong>Règle: ${escapeHtml(a.rule_name || 'Règle #' + a.rule_id)}</strong>
+                        <strong>${window.t ? window.t('dashboard.rule_label') : 'Rule:'} ${escapeHtml(a.rule_name || '#' + a.rule_id)}</strong>
                         ${a.detection_id ? `<span class="detection-id-badge" style="margin-left: 0.75rem;">#${escapeHtml(a.detection_id)}</span>` : ''}
                         <span class="analysis-time">${formatDate(a.analyzed_at)}</span>
                     </div>
@@ -149,7 +149,7 @@ async function retryAnalysis(analysisId, btn) {
     btn.innerHTML = `🔄 ${window.t('common.analyzing')}`;
     try {
         const res = await apiFetch(`/api/monitor/retry/${analysisId}`, { method: 'POST' });
-        if (!res.task_id) throw new Error('Réponse inattendue du serveur');
+        if (!res.task_id) throw new Error(window.t ? window.t('monitor.unexpected_server_response') : 'Unexpected server response');
 
         pollTask(res.task_id, btn, oldHtml, () => {
             loadRecentAnalyses();
