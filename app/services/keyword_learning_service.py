@@ -37,13 +37,21 @@ performance, problèmes de sécurité — immédiats ou à long terme.
 
 Fenêtre temporelle analysée : {window}
 
-Analyse ces lignes de log et retourne UNIQUEMENT une liste JSON de mots-clés \
-pertinents pour détecter des anomalies dans ce système :
-["mot1", "mot2", ...]
+Analyse ces lignes de log et retourne UNIQUEMENT une liste JSON de mots-clés COURTS \
+pour détecter des anomalies dans ce système.
 
-Règles : sois précis, 15 mots-clés maximum, évite les termes trop génériques \
-(info, log, time, started, stopping...).
+RÈGLES STRICTES :
+- Maximum 15 mots-clés
+- Chaque mot-clé : 1 à 4 mots MAX (pas de phrases complètes)
+- Les mots-clés doivent être GÉNÉRIQUES : ils doivent matcher les futures occurrences \
+du même type d'événement, même si les numéros ou valeurs changent
+- Supprime les chiffres variables (compteurs, PID, timestamps, IDs)
+- Évite les termes trop génériques : info, log, time, started, stopping, message, repeated...
+- Exemples VALIDES : "restart counter", "job worker", "stop_after", "background worker", "out of memory"
+- Exemples INVALIDES : "restart counter is at 2361", "Background job worker will stop at 14:32"
+
 Retourne UNIQUEMENT le JSON brut, sans texte autour.
+Format : ["mot-clé1", "mot-clé2", ...]
 
 --- LIGNES ---
 {lines}
