@@ -118,8 +118,10 @@ async function loadConfigs() {
                 </div>
                 <div id="preview-${c.id}" class="accordion-content">
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top:0;">${window.t('meta.preview_help')}</p>
-                    <div id="txt-preview-${c.id}" class="context-preview-box" contenteditable="true" spellcheck="false">Chargement...</div>
-                    <button class="btn btn-primary btn-sm" style="margin-top:0.5rem;" onclick="triggerCustomMeta(${c.id})">${window.t('meta.run_custom')}</button>
+                    <div id="preview-rules-${c.id}" style="display:flex; flex-direction:column; gap:0.75rem;">
+                        <div class="loading" data-i18n="common.loading">Chargement...</div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" style="margin-top:1rem;" onclick="triggerCustomMeta(${c.id})">${window.t('meta.run_custom')}</button>
                 </div>
 
                 <div class="accordion-header" onclick="toggleAccordion('results-${c.id}', this)">
@@ -157,17 +159,55 @@ function toggleAccordion(id, headerEl) {
     }
 }
 
+// Store per-config structured context data
+const _previewData = {};
+
 async function loadPreview(configId) {
-    const txt = document.getElementById(`txt-preview-${configId}`);
-    txt.textContent = 'Chargement des événements...';
+    const container = document.getElementById(`preview-rules-${configId}`);
+    if (!container) return;
+    container.innerHTML = `<div class="loading">${window.t('common.loading')}</div>`;
     try {
         const res = await apiFetch(`/api/meta-analysis/trigger/preview/${configId}`);
-        txt.textContent = res.context;
+        _previewData[configId] = res;
+        
+        if (!res.rules_context || res.rules_context.length === 0) {
+            container.innerHTML = `<p style="color:var(--text-secondary);">Aucune analyse disponible pour ces r\u00e8gles.</p>`;
+            return;
+        }
+
+        container.innerHTML = res.rules_context.map(ruleCtx => {
+            const entriesHtml = ruleCtx.entries.map(e => {
+                const sevColor = e.severity === 'CRITICAL' ? 'var(--danger)' : e.severity === 'WARNING' ? 'var(--warning)' : 'var(--info)';
+                const kwBadges = e.keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('');
+                return `
+                <div style="padding:0.5rem 0; border-bottom:1px solid rgba(255,255,255,0.05);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.3rem;">
+                        <span style="font-size:0.75rem; color:var(--text-secondary);">${e.date}</span>
+                        <span style="font-size:0.75rem; font-weight:600; color:${sevColor};">${e.severity}</span>
+                        <a href="/monitor?search=${encodeURIComponent(e.detection_id)}" class="btn btn-secondary btn-sm" style="padding:0.1rem 0.4rem; font-size:0.7rem;">🔍 ${e.detection_id}</a>
+                    </div>
+                    <div class="preview-line" style="font-family:monospace; font-size:0.78rem; background:rgba(0,0,0,0.3); padding:0.3rem 0.5rem; border-radius:3px; margin-bottom:0.3rem; white-space:pre-wrap; word-break:break-all;">${escapeHtml(e.triggered_line)}</div>
+                    <div style="font-size:0.78rem; color:var(--text-secondary); font-style:italic; margin-bottom:0.3rem;">IA : ${escapeHtml(e.short_ia)}</div>
+                    ${kwBadges ? `<div style="display:flex; flex-wrap:wrap; gap:0.25rem;">${kwBadges}</div>` : ''}
+                </div>`;
+            }).join('');
+
+            return `
+            <div class="card" style="padding:1rem; border-left:3px solid var(--accent);">
+                <div style="font-weight:600; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
+                    <span>📌 ${escapeHtml(ruleCtx.rule_name)}</span>
+                    <span style="font-size:0.8rem; color:var(--text-secondary);">${ruleCtx.entries.length} entrée(s)</span>
+                </div>
+                ${entriesHtml}
+            </div>`;
+        }).join('');
+
+        // Surlignage mots-clés
         if (res.matched_keywords && res.matched_keywords.length > 0) {
-            highlightDOMText(txt, res.matched_keywords);
+            setTimeout(() => highlightDOMText(container, res.matched_keywords), 10);
         }
     } catch (e) {
-        txt.textContent = 'Erreur: ' + e.message;
+        container.innerHTML = `<div style="color:var(--danger)">Erreur: ${e.message}</div>`;
     }
 }
 
@@ -348,11 +388,27 @@ async function deleteConfig(id) {
 
 async function triggerCustomMeta(id) {
     if (!confirm("Lancer la méta-analyse avec ce contexte ? (S'exécute en arrière-plan)")) return;
-    const txt = document.getElementById(`txt-preview-${id}`).innerText;
+    
+    // Reconstruire le contexte texte depuis les données structurées
+    let contextText = '';
+    const data = _previewData[id];
+    if (data && data.rules_context && data.rules_context.length > 0) {
+        const lines = [];
+        data.rules_context.forEach(ruleCtx => {
+            ruleCtx.entries.forEach(e => {
+                lines.push(`[${e.date}] [SEVERITY: ${e.severity}] [R\u00e8gle: ${ruleCtx.rule_name}] [ID: ${e.detection_id}]\nLigne: ${e.triggered_line}\nIA unitaire: ${e.short_ia}`);
+            });
+        });
+        contextText = lines.join('\n\n');
+    } else {
+        alert('Aucun contexte disponible. Ouvrez d\'abord l\'aper\u00e7u.');
+        return;
+    }
+    
     try {
         await apiFetch(`/api/meta-analysis/trigger/${id}`, { 
             method: 'POST',
-            body: { custom_context: txt }
+            body: { custom_context: contextText }
         });
         alert('Méta-analyse lancée. Le résultat apparaîtra dans les historiques bientôt (rechargez le résultat).');
     } catch (e) {

@@ -65,42 +65,49 @@ class MetaAnalysisService:
             config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == config_id).first()
             if not config: return {'status': 'error', 'message': 'Config introuvable'}
 
-            now = datetime.utcnow()
-            period_start = config.last_run_at if config.last_run_at else (now - timedelta(days=1))
-            period_end = now
-
             rule_ids = []
             if config.rule_ids_json:
                 try: rule_ids = json.loads(config.rule_ids_json)
                 except: pass
 
-            query = db.query(Analysis, Rule).outerjoin(Rule, Analysis.rule_id == Rule.id).filter(
-                Analysis.analyzed_at >= period_start,
-                Analysis.analyzed_at <= period_end
-            )
+            # Récupère les N dernières analyses, sans filtre de date
+            # pour donner une préview utile même après une création récente
+            query = db.query(Analysis, Rule).outerjoin(Rule, Analysis.rule_id == Rule.id)
             if rule_ids:
                 query = query.filter(Analysis.rule_id.in_(rule_ids))
 
             results = query.order_by(desc(Analysis.analyzed_at)).limit(config.max_analyses).all()
-            if not results: return {'status': 'ok', 'context': 'Aucun événement en attente dans cette période.', 'analyses_count': 0, 'matched_keywords': []}
+            if not results:
+                return {'status': 'ok', 'rules_context': [], 'analyses_count': 0, 'matched_keywords': []}
 
-            results.reverse()
-            compressed_data = []
+            # Grouper par règle
+            by_rule = {}
             all_kws = set()
             for analysis, rule in results:
+                rule_name = rule.name if rule else 'Inconnue'
+                rule_id = rule.id if rule else 0
+                if rule_id not in by_rule:
+                    by_rule[rule_id] = {'rule_name': rule_name, 'entries': []}
                 if analysis.matched_keywords_json:
                     try: all_kws.update(json.loads(analysis.matched_keywords_json))
                     except: pass
-                rule_name = rule.name if rule else 'Inconnue'
                 date_str = analysis.analyzed_at.strftime('%Y-%m-%d %H:%M:%S')
                 short_ia = analysis.ollama_response.split('\n\n')[0][:200] + '...' if analysis.ollama_response else 'N/A'
-                block = f"[{date_str}] [SEVERITY: {analysis.severity.upper()}] [Règle: {rule_name}] [ID: {analysis.detection_id}]\nLigne: {analysis.triggered_line[:500]}\nIA unitaire: {short_ia}"
-                compressed_data.append(block)
+                by_rule[rule_id]['entries'].append({
+                    'date': date_str,
+                    'severity': analysis.severity.upper(),
+                    'detection_id': analysis.detection_id,
+                    'triggered_line': analysis.triggered_line[:500],
+                    'short_ia': short_ia,
+                    'keywords': json.loads(analysis.matched_keywords_json) if analysis.matched_keywords_json else []
+                })
 
-            events_text = '\n\n'.join(compressed_data)
-            prompt = f"{config.system_prompt}\n\nVoici les {len(results)} événements (limité aux plus récents) survenus entre {period_start.strftime('%Y-%m-%d %H:%M')} et {period_end.strftime('%Y-%m-%d %H:%M')}:\n----------------------------------------\n{events_text}\n----------------------------------------\nRéalise une synthèse experte de cette situation globale, croise les informations si plusieurs services sont touchés, et propose des recommandations générales."
-
-            return {'status': 'ok', 'context': prompt, 'analyses_count': len(results), 'matched_keywords': list(all_kws)}
+            return {
+                'status': 'ok',
+                'rules_context': list(by_rule.values()),
+                'analyses_count': len(results),
+                'matched_keywords': list(all_kws)
+            }
         finally:
             db.close()
 
