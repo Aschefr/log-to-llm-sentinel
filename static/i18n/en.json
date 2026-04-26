@@ -318,6 +318,7 @@
     "annotation_placeholder": "Annotation (optional)...",
     "restore_btn": "Restore",
     "no_context_available": "No analysis available for these rules.",
-    "unfold_to_load": "Expand to load..."
+    "unfold_to_load": "Expand to load...",
+    "run_done": "Analysis complete. Result available in History."
   }
 }

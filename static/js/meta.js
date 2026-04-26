@@ -659,13 +659,19 @@ async function triggerCustomMeta(id) {
             method: 'POST',
             body: {
                 custom_context: lines.join('\n\n'),
-                period_start: data.period_start,  // ISO+Z depuis le preview, évite la race condition avec le scheduleur
+                period_start: data.period_start,
                 period_end: data.period_end
             },
             signal: abortController.signal
         });
-        _setTriggerStatus(id, `✅ ${lines.length} entrée(s) envoyée(s). Résultat bientôt dans les Historiques.`, false);
-        setTimeout(() => _setTriggerStatus(id, null, false), 5000);
+        // Le POST retourne immédiatement (background_task).
+        // On poll /running toutes les 2s pour maintenir le bouton Stop tant que l'analyse tourne réellement.
+        await _pollUntilDone(id, abortController);
+
+        if (!abortController.signal.aborted) {
+            _setTriggerStatus(id, `✅ ${window.t('meta.run_done') || 'Analyse terminée. Résultat disponible dans les Historiques.'}`, false);
+            setTimeout(() => _setTriggerStatus(id, null, false), 5000);
+        }
     } catch (e) {
         if (e.name === 'AbortError') {
             _setTriggerStatus(id, '⏹ Analyse annulée.', false);
@@ -675,6 +681,24 @@ async function triggerCustomMeta(id) {
         setTimeout(() => _setTriggerStatus(id, null, false), 4000);
     } finally {
         delete _metaAbortControllers[id];
+    }
+}
+
+/**
+ * Interroge /running toutes les 2s jusqu'à ce que configId ne soit plus en cours.
+ * Respecte l'annulation via abortController.
+ */
+async function _pollUntilDone(configId, abortController) {
+    while (true) {
+        if (abortController && abortController.signal.aborted) break;
+        await new Promise(r => setTimeout(r, 2000));
+        if (abortController && abortController.signal.aborted) break;
+        try {
+            const res = await apiFetch('/api/meta-analysis/running');
+            if (!res.running || !res.running.map(Number).includes(Number(configId))) break;
+        } catch (_) {
+            break; // En cas d'erreur réseau, on arrête d'attendre
+        }
     }
 }
 
