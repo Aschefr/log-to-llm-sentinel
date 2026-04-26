@@ -334,7 +334,47 @@ class MetaAnalysisService:
 """
             max_chars = global_cfg.apprise_max_chars or 1900
             if len(notify_body) > max_chars:
-                notify_body = notify_body[:max_chars-100] + "\n\n... [TRONQUÉ]"
+                logger.debug("MetaAnalysisService", f"Synthèse trop longue ({len(notify_body)} chars), demande de résumé simplifié à Ollama...")
+                summary_prompt = (
+                    f"Résume la méta-analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\n"
+                    f"Conserve les tendances principales et les points critiques.\n"
+                    f"Utilise des puces (bullet points).\n"
+                    f"Limite-toi à {max_chars - 500} caractères maximum.\n\n"
+                    f"Analyse à résumer :\n{result.ollama_response}"
+                )
+                
+                ollama = OllamaService()
+                try:
+                    summary = await asyncio.wait_for(
+                        ollama.analyze_async(
+                            prompt=summary_prompt,
+                            url=global_cfg.ollama_url,
+                            model=global_cfg.ollama_model,
+                            think=False,
+                            options={
+                                "temperature": 0.1,
+                                "num_ctx": 2048,
+                            }
+                        ),
+                        timeout=60.0
+                    )
+                except asyncio.TimeoutError:
+                    summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (60s)"
+                except Exception as e:
+                    summary = f"[Erreur Ollama] {str(e)}"
+                    
+                if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
+                    notify_body = f"""### 📊 Méta-Analyse (Résumé) : {config.name}
+**Période:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
+**Événements:** {result.analyses_count}
+
+**Résumé de la synthèse:**
+{summary}
+
+*(Synthèse complète dans l'interface)*
+"""
+                else:
+                    notify_body = notify_body[:max_chars-100] + "\n\n... [TRONQUÉ]"
 
         # Send via thread to not block asyncio
         await asyncio.to_thread(notifier.send, subject, notify_body, {
