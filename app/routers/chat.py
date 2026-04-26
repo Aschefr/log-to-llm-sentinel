@@ -413,18 +413,13 @@ async def auto_title_conversation(conv_id: int, db: Session = Depends(get_db)):
     try:
         if _orchestrator:
             async with _orchestrator._ollama_semaphore:
-                async for chunk in _orchestrator.ollama.generate_stream(
+                generated_title = await _orchestrator.ollama.analyze_async(
                     prompt=title_prompt,
                     url=ollama_url,
                     model=ollama_model,
-                    think=False,  # Pas de réflexion pour un titre
-                    options={"temperature": 0.3, "num_ctx": 512}
-                ):
-                    text = chunk.get("message", {}).get("content", "") or chunk.get("response", "")
-                    if text:
-                        generated_title += text
-                    if chunk.get("done"):
-                        break
+                    options={"temperature": 0.3, "num_ctx": 512},
+                    think=True  # Laisse le modèle réfléchir si besoin, analyze_async nettoiera les balises <think>
+                )
     except Exception as e:
         logger.error("ChatRouter", f"Auto-title error: {e}")
         return {"title": conv.title}
