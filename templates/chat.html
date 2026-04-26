@@ -240,6 +240,7 @@
     max-height: 50vh; /* Espace respirant pour le contexte */
     overflow-y: auto;
     border-radius: 0.5rem;
+    flex-shrink: 0;
 }
 
 /* Animations de réflexion */
@@ -580,7 +581,7 @@ async function loadHistory(id) {
                     ${detectionId ? `
                     <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid rgba(255,255,255,0.08); display:flex; justify-content:flex-end;">
                         <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?search=${encodeURIComponent(detectionId)}'" title="${window.t ? window.t('chat.show_in_monitor') : 'Afficher dans Monitor'}">
-                            🔍 ${window.t ? window.t('chat.show_in_monitor') : 'Afficher dans Monitor'}
+                            ${window.t ? window.t('chat.show_in_monitor') : '🔍 Afficher dans Monitor'}
                         </button>
                     </div>` : ''}
                 </div>
