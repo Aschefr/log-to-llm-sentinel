@@ -374,6 +374,29 @@ async def _run_session(session_id: int):
             window_label = (f'{t_start.strftime("%Y-%m-%d %H:%M")} → '
                             f'{t_end.strftime("%H:%M")} UTC')
 
+            # ⏳ Wait for this packet's window to elapse if it's in the future
+            now_utc = datetime.utcnow()
+            if t_end > now_utc:
+                wait_secs = (t_end - now_utc).total_seconds()
+                app_logger.info(
+                    'KeywordLearning',
+                    f'Session {session_id} — paquet {packet_idx+1}/{n_packets}: '
+                    f'attente de {wait_secs:.0f}s jusqu\'à {t_end.strftime("%H:%M")} UTC'
+                )
+                _db_update(session_id,
+                           current_window=f'En attente… {window_label}')
+                slept = 0.0
+                while slept < wait_secs:
+                    interval = min(30.0, wait_secs - slept)
+                    await asyncio.sleep(interval)
+                    slept += interval
+                    # Cancellation check during wait
+                    current_status = _db_session_get_status(session_id)
+                    if current_status in ('error', 'reverted'):
+                        return
+
+            _db_update(session_id, current_window=window_label)
+
             text, fallback_offset = _read_window(
                 log_path, t_start, t_end, max_chars, has_ts, fallback_offset)
 
@@ -438,7 +461,20 @@ async def _run_session(session_id: int):
             f'<p>{", ".join(all_raw)}</p>'
         )
 
-        # ── Phase 2: refine ────────────────────────────────────────────────────
+        # Guard: if no candidates at all, don't hallucinate — abort cleanly
+        if not all_raw:
+            _db_update(
+                session_id,
+                status='error',
+                error_message=(
+                    'Aucun mot-clé candidat trouvé sur l\'ensemble de la période. '
+                    'Vérifiez que le fichier contient bien des logs sur cette période '
+                    'et que les timestamps sont lisibles.'
+                )
+            )
+            return
+
+        # ── Phase 2: refine ──────────────────────────────────────────────────────
         _db_update(session_id, status='refining')
 
         sample = _read_sample(log_path, max_chars)
