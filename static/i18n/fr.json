@@ -270,6 +270,8 @@
     "debug_mode": "Activer le mode debug (logs verbeux dans la console serveur)",
     "debug_mode_hint": "Affiche le détail de chaque étape : détection, appel Ollama, envoi de notification. À désactiver en production.",
     "live_logs": "Logs en direct",
+    "filter_label": "Filtrer :",
+    "filter_all": "Tous",
     "copy_logs": "📋 Copier",
     "clear_logs": "Effacer",
     "ollama_call_detail": "Détail des appels Ollama (Prompt/Réponse)",

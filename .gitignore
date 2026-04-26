@@ -1,0 +1,3 @@
+docker-compose.override.yml
+data/sentinel.db
+logs/host_system_journal.log

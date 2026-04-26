@@ -270,6 +270,8 @@
     "debug_mode": "Enable debug mode (verbose logs in server console)",
     "debug_mode_hint": "Shows the details of each step: detection, Ollama call, notification send. Disable in production.",
     "live_logs": "Live logs",
+    "filter_label": "Filter:",
+    "filter_all": "All",
     "copy_logs": "📋 Copy",
     "clear_logs": "Clear",
     "ollama_call_detail": "Ollama call details (Prompt/Response)",

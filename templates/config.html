@@ -35,16 +35,16 @@
     }
 </style>
 <div class="config-page">
-    <h1>Configuration Globale</h1>
+    <h1 data-i18n="config.title">Configuration Globale</h1>
 
     <form id="config-form" class="config-form config-grid">
         <section class="config-section">
-            <h2>🔔 Notifications & Alertes</h2>
+            <h2 data-i18n="config.notifications_title">🔔 Notifications &amp; Alertes</h2>
             <div class="form-group">
-                <label for="notification-method">Méthode de notification principale</label>
+                <label for="notification-method" data-i18n="config.notification_method_label">Méthode de notification principale</label>
                 <select id="notification-method">
-                    <option value="smtp">Email (SMTP)</option>
-                    <option value="apprise">Apprise (Discord, Telegram, Slack...)</option>
+                    <option value="smtp" data-i18n="config.method_smtp">Email (SMTP)</option>
+                    <option value="apprise" data-i18n="config.method_apprise">Apprise (Discord, Telegram, Slack...)</option>
                 </select>
             </div>
 
@@ -52,36 +52,36 @@
                 <h3 data-i18n="config.smtp_title">📧 Configuration SMTP</h3>
                 <div class="panel-grid-2">
                     <div class="form-group panel-grid-full">
-                        <label for="smtp-host">Hôte SMTP</label>
-                        <input type="text" id="smtp-host" placeholder="smtp.gmail.com">
+                        <label for="smtp-host" data-i18n="config.smtp_host">Hôte SMTP</label>
+                        <input type="text" id="smtp-host" data-i18n-placeholder="config.smtp_host_placeholder" placeholder="smtp.gmail.com">
                     </div>
                     <div class="form-group">
-                        <label for="smtp-port">Port SMTP</label>
+                        <label for="smtp-port" data-i18n="config.smtp_port">Port SMTP</label>
                         <input type="number" id="smtp-port" value="587">
                     </div>
                     <div class="form-group">
-                        <label for="smtp-ssl-mode">Mode de chiffrement</label>
+                        <label for="smtp-ssl-mode" data-i18n="config.smtp_ssl_mode">Mode de chiffrement</label>
                         <select id="smtp-ssl-mode">
-                            <option value="starttls" selected>TLS / STARTTLS (Port 587)</option>
-                            <option value="ssl">SSL / TLS (Port 465)</option>
-                            <option value="none">Aucun chiffrement (non recommandé)</option>
+                            <option value="starttls" selected data-i18n="config.ssl_starttls">TLS / STARTTLS (Port 587)</option>
+                            <option value="ssl" data-i18n="config.ssl_ssl">SSL / TLS (Port 465)</option>
+                            <option value="none" data-i18n="config.ssl_none">Aucun chiffrement (non recommandé)</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="smtp-user">Utilisateur</label>
-                        <input type="text" id="smtp-user" placeholder="email@example.com">
+                        <label for="smtp-user" data-i18n="config.smtp_user">Utilisateur</label>
+                        <input type="text" id="smtp-user" data-i18n-placeholder="config.smtp_user_placeholder" placeholder="email@example.com">
                     </div>
                     <div class="form-group">
-                        <label for="smtp-password">Mot de passe</label>
+                        <label for="smtp-password" data-i18n="config.smtp_password">Mot de passe</label>
                         <input type="password" id="smtp-password" placeholder="••••••••">
                     </div>
                     <div class="form-group panel-grid-full">
-                        <label for="smtp-recipient">Destinataire</label>
-                        <input type="text" id="smtp-recipient" placeholder="destinataire@example.com">
+                        <label for="smtp-recipient" data-i18n="config.smtp_recipient">Destinataire</label>
+                        <input type="text" id="smtp-recipient" data-i18n-placeholder="config.smtp_recipient_placeholder" placeholder="destinataire@example.com">
                     </div>
                 </div>
                 <div class="form-actions" style="margin-top: 0.5rem;">
-                    <button type="button" id="test-smtp-btn" class="btn btn-secondary btn-sm">Tester SMTP</button>
+                    <button type="button" id="test-smtp-btn" class="btn btn-secondary btn-sm" data-i18n="config.test_smtp">Tester SMTP</button>
                 </div>
                 <div id="smtp-test-message" class="message hidden"></div>
             </div>
@@ -89,24 +89,24 @@
             <div id="apprise-section" class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
                 <h3 data-i18n="config.apprise_title">🚀 Configuration Apprise</h3>
                 <div class="form-group">
-                    <label for="apprise-url">URL Apprise (endpoint notify)</label>
-                    <input type="text" id="apprise-url" placeholder="http://192.168.1.100:8780/notify/apprise">
-                    <div class="form-hint">L'URL de base vers votre API Apprise.</div>
+                    <label for="apprise-url" data-i18n="config.apprise_url">URL Apprise (endpoint notify)</label>
+                    <input type="text" id="apprise-url" data-i18n-placeholder="config.apprise_url_placeholder" placeholder="http://192.168.1.100:8780/notify/apprise">
+                    <div class="form-hint" data-i18n="config.apprise_url_hint">L'URL de base vers votre API Apprise.</div>
                 </div>
                 <div class="panel-grid-2">
                     <div class="form-group">
-                        <label for="apprise-tags-select">Tags Apprise</label>
+                        <label for="apprise-tags-select" data-i18n="config.apprise_tags">Tags Apprise</label>
                         <select id="apprise-tags-select"></select>
                     </div>
                     <div class="form-group hidden" id="apprise-tags-custom-group">
-                        <label for="apprise-tags">Tags personnalisés</label>
-                        <input type="text" id="apprise-tags" placeholder="tag1, tag2">
+                        <label for="apprise-tags" data-i18n="config.apprise_tags_custom">Tags personnalisés</label>
+                        <input type="text" id="apprise-tags" data-i18n-placeholder="config.apprise_tags_placeholder" placeholder="tag1, tag2">
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="apprise-max-chars">Limite de caractères (Résumé IA)</label>
+                    <label for="apprise-max-chars" data-i18n="config.apprise_max_chars">Limite de caractères (Résumé IA)</label>
                     <input type="number" id="apprise-max-chars" value="1900" min="100" max="10000">
-                    <div class="form-hint" style="margin-bottom: 0.5rem;">Tronque le message si trop long pour Discord/Telegram.</div>
+                    <div class="form-hint" style="margin-bottom: 0.5rem;" data-i18n="config.apprise_max_chars_hint">Tronque le message si trop long pour Discord/Telegram.</div>
                     <div class="preset-chips">
                         <button type="button" class="chip" onclick="setAppriseMax(2000)">Discord</button>
                         <button type="button" class="chip" onclick="setAppriseMax(4096)">Telegram</button>
@@ -114,62 +114,62 @@
                     </div>
                 </div>
                 <div class="form-actions" style="margin-top: 0.5rem;">
-                    <button type="button" id="test-apprise-btn" class="btn btn-secondary btn-sm">Tester Apprise</button>
+                    <button type="button" id="test-apprise-btn" class="btn btn-secondary btn-sm" data-i18n="config.test_apprise">Tester Apprise</button>
                 </div>
                 <div id="apprise-test-message" class="message hidden"></div>
             </div>
         </section>
 
         <section class="config-section">
-            <h2>🤖 Ollama</h2>
+            <h2 data-i18n="config.ollama_title">🤖 Ollama</h2>
             <div class="panel-grid-2">
                 <div class="form-group">
-                    <label for="ollama-url">URL Ollama</label>
-                    <input type="text" id="ollama-url" placeholder="http://host.docker.internal:11434">
+                    <label for="ollama-url" data-i18n="config.ollama_url">URL Ollama</label>
+                    <input type="text" id="ollama-url" data-i18n-placeholder="config.ollama_url_placeholder" placeholder="http://host.docker.internal:11434">
                 </div>
                 <div>
                     <div class="form-group">
-                        <label for="ollama-model">Modèle</label>
+                        <label for="ollama-model" data-i18n="config.ollama_model">Modèle</label>
                         <select id="ollama-model"></select>
-                        <div class="form-hint">La liste est récupérée depuis Ollama.</div>
+                        <div class="form-hint" data-i18n="config.ollama_model_hint">La liste est récupérée depuis Ollama.</div>
                     </div>
                     <div class="form-group hidden" id="ollama-model-custom-group">
-                        <label for="ollama-model-custom">Modèle (manuel)</label>
-                        <input type="text" id="ollama-model-custom" placeholder="ex: llama3:latest">
+                        <label for="ollama-model-custom" data-i18n="config.ollama_model_manual">Modèle (manuel)</label>
+                        <input type="text" id="ollama-model-custom" data-i18n-placeholder="config.ollama_model_manual_placeholder" placeholder="ex: llama3:latest">
                     </div>
                 </div>
             </div>
             
             <div class="form-group">
-                <label for="system-prompt">Prompt système</label>
-                <textarea id="system-prompt" rows="5" placeholder="Instructions système pour l'analyse..."></textarea>
+                <label for="system-prompt" data-i18n="config.system_prompt">Prompt système</label>
+                <textarea id="system-prompt" rows="5" data-i18n-placeholder="config.system_prompt_placeholder" placeholder="Instructions système pour l'analyse..."></textarea>
             </div>
             <div class="form-group">
-                <label for="max-log-chars">Limite de caractères par log</label>
+                <label for="max-log-chars" data-i18n="config.max_log_chars">Limite de caractères par log</label>
                 <input type="number" id="max-log-chars" value="5000" min="500" max="50000">
-                <div class="form-hint">Évite de saturer le serveur avec des logs massifs.</div>
+                <div class="form-hint" data-i18n="config.max_log_chars_hint">Évite de saturer le serveur avec des logs massifs.</div>
             </div>
             <div class="form-actions" style="margin-top: 0.5rem;">
-                <button type="button" id="test-ollama-btn" class="btn btn-secondary">Tester Ollama</button>
+                <button type="button" id="test-ollama-btn" class="btn btn-secondary" data-i18n="config.test_ollama">Tester Ollama</button>
             </div>
             <div id="ollama-test-message" class="message hidden"></div>
 
             <div class="collapsible-section" style="margin-top: 1.5rem;">
                 <div class="section-header" onclick="toggleSection('performance-settings-container', 'performance-arrow')">
-                    <h3 style="margin: 0;">⚡ Réglages de performance</h3>
+                    <h3 style="margin: 0;" data-i18n="config.performance_title">⚡ Réglages de performance</h3>
                     <svg id="performance-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
                 </div>
                 <div id="performance-settings-container" class="config-subsection hidden">
                     <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
                         <div class="form-group" style="flex: 1; min-width: 120px;">
-                            <label for="ollama-temp">Température</label>
+                            <label for="ollama-temp" data-i18n="config.temperature">Température</label>
                             <input type="number" id="ollama-temp" step="0.1" min="0" max="1">
-                            <div class="form-hint">Bas = direct, Haut = créatif.</div>
+                            <div class="form-hint" data-i18n="config.temperature_hint">Bas = direct, Haut = créatif.</div>
                         </div>
                         <div class="form-group" style="flex: 1; min-width: 120px;">
-                            <label for="ollama-ctx">Contexte (tokens)</label>
+                            <label for="ollama-ctx" data-i18n="config.context_tokens">Contexte (tokens)</label>
                             <input type="number" id="ollama-ctx" step="1024" min="1024" max="32768">
-                            <div class="form-hint" style="margin-bottom:0.5rem">Taille de la mémoire contextuelle.</div>
+                            <div class="form-hint" style="margin-bottom:0.5rem" data-i18n="config.context_hint">Taille de la mémoire contextuelle.</div>
                             <div class="preset-chips">
                                 <button type="button" class="chip" onclick="setOllamaCtx(2048)">2K</button>
                                 <button type="button" class="chip" onclick="setOllamaCtx(4096)">4K</button>
@@ -181,27 +181,27 @@
                     </div>
 
                     <div class="profile-selectors" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <span class="config-hint-label">Profils rapides :</span>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')">💻 Profil Éco (Petit CPU)</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')">⚖️ Profil Équilibré</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')">🚀 Profil GPU / Gamer</button>
+                        <span class="config-hint-label" data-i18n="config.quick_profiles">Profils rapides :</span>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')" data-i18n="config.profile_eco">💻 Profil Éco (Petit CPU)</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')" data-i18n="config.profile_balanced">⚖️ Profil Équilibré</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')" data-i18n="config.profile_gpu">🚀 Profil GPU / Gamer</button>
                     </div>
                 </div>
             </div>
 
             <div class="collapsible-section" style="margin-top: 1.5rem;">
                 <div class="section-header" onclick="toggleSection('model-management-container', 'model-management-arrow')">
-                    <h3 style="margin: 0;">📦 Gestion des modèles</h3>
+                    <h3 style="margin: 0;" data-i18n="config.models_title">📦 Gestion des modèles</h3>
                     <svg id="model-management-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
                 </div>
                 <div id="model-management-container" class="config-subsection hidden">
                     <div class="form-group">
-                        <label>Télécharger un nouveau modèle</label>
+                        <label data-i18n="config.download_model">Télécharger un nouveau modèle</label>
                         <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            <input type="text" id="pull-model-name" placeholder="ex: llama3.2" style="flex: 1;">
-                            <button type="button" id="pull-model-btn" class="btn btn-primary">Télécharger</button>
+                            <input type="text" id="pull-model-name" data-i18n-placeholder="config.download_placeholder" placeholder="ex: llama3.2" style="flex: 1;">
+                            <button type="button" id="pull-model-btn" class="btn btn-primary" data-i18n="config.download_btn">Télécharger</button>
                         </div>
-                        <div class="form-hint" style="margin-bottom: 0.75rem;">
+                        <div class="form-hint" style="margin-bottom: 0.75rem;" data-i18n-html="config.download_hint">
                             Plus le modèle est gros, plus il nécessite de VRAM (GPU) ou de RAM système disponible, mais plus ses réponses seront pertinentes et précises. Les modèles <strong>Gemma 4</strong> sont recommandés pour leur excellent rapport performance/taille.
                         </div>
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -222,31 +222,31 @@
         </section>
 
         <section class="config-section">
-            <h2>🖥️ Interface & Monitor</h2>
+            <h2 data-i18n="config.interface_title">🖥️ Interface &amp; Monitor</h2>
             <div class="form-group">
-                <label for="monitor-log-lines">Nombre de lignes (Monitor)</label>
+                <label for="monitor-log-lines" data-i18n="config.monitor_lines">Nombre de lignes (Monitor)</label>
                 <input type="number" id="monitor-log-lines" value="60" min="10" max="1000">
-                <div class="form-hint">Définit le nombre de lignes à afficher en temps réel dans la page Monitor.</div>
+                <div class="form-hint" data-i18n="config.monitor_lines_hint">Définit le nombre de lignes à afficher en temps réel dans la page Monitor.</div>
             </div>
         </section>
 
         <section class="config-section config-section-full">
-            <h2>🛠️ Debug</h2>
+            <h2 data-i18n="config.debug_title">🛠️ Debug</h2>
             <div class="form-group checkbox-group">
                     <label class="toggle-switch">
                         <input type="checkbox" id="debug-mode">
                         <span class="toggle-slider"></span>
-                        <span class="toggle-label">Activer le mode debug (logs verbeux dans la console serveur)</span>
+                        <span class="toggle-label" data-i18n="config.debug_mode">Activer le mode debug (logs verbeux dans la console serveur)</span>
                     </label>
-                <div class="form-hint">Affiche le détail de chaque étape : détection, appel Ollama, envoi de notification. À désactiver en production.</div>
+                <div class="form-hint" data-i18n="config.debug_mode_hint">Affiche le détail de chaque étape : détection, appel Ollama, envoi de notification. À désactiver en production.</div>
             </div>
             
             <div id="debug-logs-container" class="debug-logs-container hidden">
                 <div class="debug-logs-header">
-                    <span>Logs en direct</span>
+                    <span data-i18n="config.live_logs">Logs en direct</span>
                     <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">
-                        <span style="font-size:.72rem;color:var(--text-dim);">Filtrer :</span>
-                        <button type="button" class="chip dbg-filter-btn dbg-filter-active" data-filter="">Tous</button>
+                        <span style="font-size:.72rem;color:var(--text-dim);" data-i18n="config.filter_label">Filtrer :</span>
+                        <button type="button" class="chip dbg-filter-btn dbg-filter-active" data-filter="" data-i18n="config.filter_all">Tous</button>
                         <button type="button" class="chip dbg-filter-btn" data-filter="KeywordLearning">🤖 KeywordLearning</button>
                         <button type="button" class="chip dbg-filter-btn" data-filter="Orchestrator">⚙️ Orchestrator</button>
                         <button type="button" class="chip dbg-filter-btn" data-filter="LogWatcher">👁 LogWatcher</button>
@@ -254,8 +254,8 @@
                         <button type="button" class="chip dbg-filter-btn" data-filter="NotificationService">🔔 Notification</button>
                     </div>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" id="copy-logs-btn" class="btn btn-small">📋 Copier</button>
-                        <button type="button" id="clear-logs-btn" class="btn btn-small">Effacer</button>
+                        <button type="button" id="copy-logs-btn" class="btn btn-small" data-i18n="config.copy_logs">📋 Copier</button>
+                        <button type="button" id="clear-logs-btn" class="btn btn-small" data-i18n="config.clear_logs">Effacer</button>
                     </div>
                 </div>
                 <div id="debug-logs" class="debug-logs"></div>
