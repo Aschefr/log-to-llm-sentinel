@@ -173,13 +173,13 @@ async function askQuestion(analysisId, inputEl, contextPrompt = null, contextRes
         if (res.status === 'ok') {
             contentSpan.innerHTML = marked.parse(res.response);
         } else {
-            contentSpan.innerHTML = `❌ Erreur : ${res.detail}`;
+            contentSpan.innerHTML = `${window.t ? window.t('common.error') : 'Erreur'} : ${res.detail}`;
         }
     } catch (e) {
         if (e.name === 'AbortError') {
             contentSpan.innerHTML = `❌ Génération annulée.`;
         } else {
-            contentSpan.innerHTML = `❌ Erreur : ${e.message}`;
+            contentSpan.innerHTML = `${window.t ? window.t('common.error') : 'Erreur'} : ${e.message}`;
         }
     } finally {
         if (stopBtn && stopBtn.parentNode) {

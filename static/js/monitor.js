@@ -56,7 +56,7 @@ async function loadMonitorRules() {
         }
     } catch (e) {
         document.getElementById('monitor-tabs').innerHTML =
-            `<div class="loading" style="color:var(--danger)">Erreur : ${escapeHtml(e.message)}</div>`;
+            `<div class="loading" style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</div>`;
     }
 }
 
@@ -224,7 +224,7 @@ async function fetchLogs(rule) {
         updateFilterLabel(rule.id);
 
     } catch (e) {
-        viewer.innerHTML = `<em class="no-logs" style="color:var(--danger)">Erreur : ${escapeHtml(e.message)}</em>`;
+        viewer.innerHTML = `<em class="no-logs" style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</em>`;
     }
 }
 
@@ -483,7 +483,7 @@ async function loadRuleAnalyses(ruleId) {
             </div>
         `).join('');
     } catch (e) {
-        container.innerHTML = `<div class="loading" style="color:var(--danger)">Erreur : ${escapeHtml(e.message)}</div>`;
+        container.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</div>`;
     }
 }
 
@@ -591,7 +591,7 @@ async function searchById() {
             </div>
         `;
     } catch (e) {
-        resultPanel.innerHTML = `<div class="loading" style="color:var(--danger)">Erreur : ${escapeHtml(e.message)}</div>`;
+        resultPanel.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</div>`;
     }
 }
 

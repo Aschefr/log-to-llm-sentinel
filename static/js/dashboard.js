@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 loadRecentAnalyses();
             } catch (error) {
                 console.error('Erreur suppression:', error);
-                alert('Erreur lors de la suppression');
+                alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
             }
         });
     }
@@ -121,7 +121,7 @@ async function deleteAnalysis(id) {
         loadRecentAnalyses();
     } catch (error) {
         console.error('Erreur suppression:', error);
-        alert('Erreur lors de la suppression');
+        alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
     }
 }
 
@@ -268,7 +268,7 @@ async function loadRulesStatus() {
         console.error('Erreur chargement état des logs:', error);
         const container = document.getElementById('rules-status-list');
         if (container) {
-            container.innerHTML = `<div class="loading" style="color: var(--danger)">Erreur : ${escapeHtml(error.message)}</div>`;
+            container.innerHTML = `<div class="loading" style="color: var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(error.message)}</div>`;
         }
     }
 }

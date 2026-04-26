@@ -126,7 +126,7 @@ function setupModelPulling() {
                 }
             }
         } catch (e) {
-            statusText.textContent = `❌ Erreur : ${e.message}`;
+            statusText.textContent = `${window.t ? window.t('common.error') : 'Erreur'} : ${e.message}`;
             statusText.style.color = 'var(--danger)';
         } finally {
             btn.disabled = false;

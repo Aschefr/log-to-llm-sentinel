@@ -121,7 +121,7 @@ function _computeNextRun(c) {
 
 async function loadConfigs() {
     const container = document.getElementById('configs-container');
-    container.innerHTML = '<div class="loading">Chargement...</div>';
+    container.innerHTML = `<div class="loading">${window.t ? window.t('common.loading') : 'Chargement...'}</div>`;
 
     try {
         const configs = await apiFetch('/api/meta-analysis/configs');
@@ -216,7 +216,7 @@ async function loadConfigs() {
             }
         } catch (_) { /* silencieux */ }
     } catch (e) {
-        container.innerHTML = `<div style="color:var(--danger)">Erreur: ${e.message}</div>`;
+        container.innerHTML = `<div style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'}: ${e.message}</div>`;
     }
 }
 
@@ -388,13 +388,13 @@ async function loadPreview(configId) {
         _previewData[configId] = res;
         _renderPreview(configId);
     } catch (e) {
-        container.innerHTML = `<div style="color:var(--danger)">Erreur: ${e.message}</div>`;
+        container.innerHTML = `<div style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'}: ${e.message}</div>`;
     }
 }
 
 async function loadResultsForConfig(configId) {
     const container = document.getElementById(`results-${configId}`);
-    container.innerHTML = '<div class="loading">Chargement...</div>';
+    container.innerHTML = `<div class="loading">${window.t ? window.t('common.loading') : 'Chargement...'}</div>`;
     try {
         const results = await apiFetch(`/api/meta-analysis/results?config_id=${configId}`);
         if (results.length === 0) {
@@ -469,7 +469,7 @@ async function loadResultsForConfig(configId) {
             });
         }, 10);
     } catch(e) {
-        container.innerHTML = `<div style="color:var(--danger)">Erreur: ${e.message}</div>`;
+        container.innerHTML = `<div style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'}: ${e.message}</div>`;
     }
 }
 
@@ -487,7 +487,7 @@ async function metaResultDeepen(resultId, configId) {
         });
         if (conv && conv.id) window.location.href = `/chat?conv=${conv.id}`;
     } catch(e) {
-        alert('Erreur: ' + e.message);
+        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
     }
 }
 
@@ -499,7 +499,7 @@ async function metaResultNotify(resultId) {
         btn.textContent = window.t('common.sent') || '✅ Envoyé';
         setTimeout(() => btn.textContent = `🔔 ${window.t('monitor.notify')}`, 3000);
     } catch(e) {
-        alert('Erreur: ' + e.message);
+        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
     }
 }
 
@@ -521,7 +521,7 @@ async function metaResultDelete(resultId, configId) {
         // (Optionnel) on pourrait aussi recharger la ligne de configuration pour 
         // mettre à jour le texte "Dernier run" mais on évite de reconstruire tout le DOM
     } catch(e) {
-        alert('Erreur: ' + e.message);
+        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
     }
 }
 
@@ -639,7 +639,7 @@ async function saveConfig() {
         if (id) delete _previewData[id];
         await loadConfigs();
     } catch (e) {
-        alert('Erreur: ' + e.message);
+        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
     }
 }
 
@@ -649,7 +649,7 @@ async function deleteConfig(id) {
         await apiFetch(`/api/meta-analysis/configs/${id}`, { method: 'DELETE' });
         await loadConfigs();
     } catch (e) {
-        alert('Erreur: ' + e.message);
+        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
     }
 }
 
@@ -741,7 +741,7 @@ async function triggerCustomMeta(id) {
         if (e.name === 'AbortError') {
             _setTriggerStatus(id, '⏹ Analyse annulée.', false);
         } else {
-            _setTriggerStatus(id, `❌ Erreur : ${e.message}`, false);
+            _setTriggerStatus(id, `${window.t ? window.t('common.error') : 'Erreur'} : ${e.message}`, false);
         }
         setTimeout(() => _setTriggerStatus(id, null, false), 4000);
     } finally {

@@ -179,7 +179,7 @@ async function toggleLiveLogs(ruleId, toggleElement, path) {
                     container.innerHTML = '<em>Fichier vide ou illisible.</em>';
                 }
             } catch (e) {
-                container.innerHTML = `<em style="color: var(--danger)">Erreur : ${escapeHtml(e.message)}</em>`;
+                container.innerHTML = `<em style="color: var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</em>`;
             }
         };
 
@@ -254,7 +254,7 @@ async function toggleRuleHistory(ruleId, toggleElement) {
             `).join('');
         } catch (e) {
             console.error('Erreur analyses:', e);
-            container.innerHTML = `<div class="loading">Erreur: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
+            container.innerHTML = `<div class="loading">${window.t ? window.t('common.error') : 'Erreur'}: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
         }
     } else {
         // Masquer l'historique
@@ -305,7 +305,7 @@ async function deleteAnalysisInRules(id, ruleId) {
         await toggleRuleHistory(ruleId);
     } catch (error) {
         console.error('Erreur suppression:', error);
-        alert('Erreur lors de la suppression');
+        alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
     }
 }
 
@@ -318,7 +318,7 @@ async function clearRuleHistory(ruleId) {
         await toggleRuleHistory(ruleId);
     } catch (error) {
         console.error('Erreur suppression:', error);
-        alert('Erreur lors de la suppression');
+        alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
     }
 }
 
@@ -542,7 +542,7 @@ async function browsePath(path) {
     const showHidden = document.getElementById('file-browser-show-hidden');
     if (!list || !breadcrumb || !showHidden) return;
 
-    list.innerHTML = '<div class="loading">Chargement...</div>';
+    list.innerHTML = `<div class="loading">${window.t ? window.t('common.loading') : 'Chargement...'}</div>`;
 
     try {
         const res = await apiFetch(`/api/files/browse?path=${encodeURIComponent(path)}&show_hidden=${showHidden.checked ? 'true' : 'false'}`);
@@ -570,7 +570,7 @@ async function browsePath(path) {
         list.innerHTML = rows.join('') || '<div class="loading">Dossier vide</div>';
     } catch (error) {
         console.error('Erreur browse:', error);
-        list.innerHTML = `<div class="loading">Erreur: ${escapeHtml(error.message || 'Impossible de lister ce dossier')}</div>`;
+        list.innerHTML = `<div class="loading">${window.t ? window.t('common.error') : 'Erreur'}: ${escapeHtml(error.message || 'Impossible de lister ce dossier')}</div>`;
     }
 }
 
@@ -621,7 +621,7 @@ async function saveRule() {
         loadRules();
     } catch (error) {
         console.error('Erreur sauvegarde règle:', error);
-        alert('Erreur: ' + error.message);
+        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + error.message);
     }
 }
 
@@ -657,7 +657,7 @@ async function deleteRule(id) {
         loadRules();
     } catch (error) {
         console.error('Erreur suppression règle:', error);
-        alert('Erreur: ' + error.message);
+        alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + error.message);
     }
 }
 
