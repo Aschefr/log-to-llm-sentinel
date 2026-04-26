@@ -321,13 +321,18 @@ async def _run_session(session_id: int):
         finally:
             db.close()
 
+        gran_label = (
+            f"{granularity_s // 60} minute(s)" if granularity_s < 3600
+            else f"{granularity_s // 3600} heure(s)" if granularity_s < 86400
+            else f"{granularity_s // 86400} jour(s)"
+        )
         await _send_notification(
             rule_id,
             '[Sentinel] 🚀 Auto-apprentissage démarré',
-            f'<p>Début de l\'analyse du fichier <code>{log_path}</code></p>'
-            f'<p>Période : {period_start.strftime("%Y-%m-%d %H:%M")} UTC → '
-            f'{period_end.strftime("%Y-%m-%d %H:%M")} UTC</p>'
-            f'<p>Granularité : {granularity_s // 60} minutes — {n_packets} paquets prévus</p>'
+            f'**Fichier :** `{log_path}`\n'
+            f'**Période :** {period_start.strftime("%Y-%m-%d %H:%M")} UTC → '
+            f'{period_end.strftime("%Y-%m-%d %H:%M")} UTC\n'
+            f'**Granularité :** {gran_label} — {n_packets} paquets prévus'
         )
 
         _db_update(session_id, status='scanning')
@@ -442,8 +447,8 @@ async def _run_session(session_id: int):
                 await _send_notification(
                     rule_id,
                     '[Sentinel] 📦 Premier paquet analysé',
-                    f'<p>Premier paquet traité : <strong>{window_label}</strong></p>'
-                    f'<p>Candidats initiaux : {", ".join(packet_kws[:10])}</p>'
+                    f'**Fenêtre :** {window_label}\n'
+                    f'**Candidats initiaux :** {", ".join(packet_kws[:10])}'
                 )
 
             _db_update(
@@ -457,8 +462,8 @@ async def _run_session(session_id: int):
         await _send_notification(
             rule_id,
             '[Sentinel] 📋 Liste initiale de mots-clés',
-            f'<p>{len(all_raw)} candidats extraits de {n_packets} paquets :</p>'
-            f'<p>{", ".join(all_raw)}</p>'
+            f'**{len(all_raw)} candidat(s)** extraits de {n_packets} paquets :\n'
+            + (', '.join(f'`{k}`' for k in all_raw) if all_raw else '_aucun_')
         )
 
         # Guard: if no candidates at all, don't hallucinate — abort cleanly
@@ -508,14 +513,14 @@ async def _run_session(session_id: int):
             refine_rationale_json=json.dumps(rationale),
         )
 
+        rationale_lines = '\n'.join(
+            f'- **{k}** — {v}' for k, v in list(rationale.items())[:10]
+        )
         await _send_notification(
             rule_id,
             '[Sentinel] ✂️ Liste raffinée',
-            f'<p>Après raffinement : <strong>{", ".join(final_kws)}</strong></p>'
-            + ''.join(
-                f'<p>• <strong>{k}</strong> — {v}</p>'
-                for k, v in list(rationale.items())[:10]
-            )
+            f'**Mots-clés retenus :** {" | ".join(f"`{k}`" for k in final_kws)}\n'
+            + (f'\n{rationale_lines}' if rationale_lines else '')
         )
 
         # ── Auto-validate (0s countdown) ───────────────────────────────────────
@@ -551,9 +556,9 @@ async def _do_validate(session_id: int, keywords: list[str]):
     await _send_notification(
         rule_id,
         '[Sentinel] ✅ Mots-clés validés automatiquement',
-        f'<p>Les mots-clés suivants ont été appliqués à la règle :</p>'
-        f'<p><strong>{", ".join(keywords)}</strong></p>'
-        f'<p><em>Vous pouvez réviser ou annuler ce résultat depuis la page Règles.</em></p>'
+        f'**Mots-clés appliqués à la règle :**\n'
+        f'{" | ".join(f"`{k}`" for k in keywords)}\n\n'
+        f'_Vous pouvez réviser ou annuler ce résultat depuis la page Règles._'
     )
 
 
