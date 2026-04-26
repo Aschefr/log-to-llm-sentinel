@@ -160,9 +160,14 @@ function renderTabContent(rule) {
         </div>
 
         <!-- Visionneuse de logs -->
-        <div class="monitor-viewer-header">
-            <span class="viewer-title">📄 Log en direct <span class="viewer-linecount" id="linecount-${rule.id}"></span><span class="kw-filter-label hidden" id="kw-filter-label-${rule.id}"></span></span>
-            <div class="viewer-actions">
+        <div class="monitor-viewer-header" onclick="toggleLogViewer(${rule.id})">
+            <span class="viewer-title">
+                <span class="viewer-toggle-icon">▼</span>
+                📄 Log en direct 
+                <span class="viewer-linecount" id="linecount-${rule.id}"></span>
+                <span class="kw-filter-label hidden" id="kw-filter-label-${rule.id}"></span>
+            </span>
+            <div class="viewer-actions" onclick="event.stopPropagation()">
                 <button class="btn btn-secondary btn-sm" id="freeze-btn-${rule.id}" onclick="toggleFreeze(${rule.id})">❄️ Figer</button>
                 <button class="btn btn-secondary btn-sm" onclick="copyViewerContent(${rule.id})">📋 Copier</button>
             </div>
@@ -181,8 +186,11 @@ function renderTabContent(rule) {
         </div>
 
         <!-- Analyses récentes -->
-        <div class="monitor-analyses-header">
-            <strong>📊 Analyses récentes (LLM)</strong>
+        <div class="monitor-analyses-header" onclick="toggleAnalysesSection(${rule.id})">
+            <span class="viewer-title">
+                <span class="viewer-toggle-icon" id="analyses-toggle-icon-${rule.id}">▼</span>
+                <strong>📊 Analyses récentes (LLM)</strong>
+            </span>
         </div>
         <div id="monitor-analyses-${rule.id}" class="monitor-analyses-list">
             <div class="loading">Chargement...</div>
@@ -207,6 +215,28 @@ function startPolling(rule) {
     fetchBuffer();
     tailIntervals[rule.id] = setInterval(fetchAndRender, 3000);
     bufferIntervals[rule.id] = setInterval(fetchBuffer, 2000);
+}
+
+function toggleLogViewer(ruleId) {
+    const viewer = document.getElementById(`log-viewer-${ruleId}`);
+    if (!viewer) return;
+    
+    const isHidden = viewer.classList.toggle('hidden');
+    const header = viewer.previousElementSibling;
+    if (header) {
+        header.classList.toggle('collapsed', isHidden);
+    }
+}
+
+function toggleAnalysesSection(ruleId) {
+    const section = document.getElementById(`monitor-analyses-${ruleId}`);
+    if (!section) return;
+    
+    const isHidden = section.classList.toggle('hidden');
+    const header = section.previousElementSibling;
+    if (header) {
+        header.classList.toggle('collapsed', isHidden);
+    }
 }
 
 function stopAllPolling() {
