@@ -53,7 +53,7 @@ async def create_config(data: dict, db: Session = Depends(get_db)):
             context_size=int(data.get("context_size", 16384)),
             system_prompt=data.get("system_prompt", "Tu es un expert DevOps. Analyse ces événements et fais une synthèse globale de la situation du service."),
             max_analyses=int(data.get("max_analyses", 50)),
-            last_run_at=datetime.utcnow() # N'envoie pas la méta analyse tout de suite
+            last_run_at=None  # Pas de fenêtre vide - sera calculée selon schedule_type
         )
         db.add(config)
         db.commit()

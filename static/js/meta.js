@@ -126,7 +126,11 @@ async function loadConfigs() {
                     <div id="preview-rules-${c.id}" style="display:flex; flex-direction:column; gap:0.75rem;">
                         <div class="loading" data-i18n="common.loading">Chargement...</div>
                     </div>
-                    <button class="btn btn-primary btn-sm" style="margin-top:1rem;" onclick="triggerCustomMeta(${c.id})">${window.t('meta.run_custom')}</button>
+                    <div style="display:flex; align-items:center; gap:0.5rem; margin-top:1rem; flex-wrap:wrap;">
+                        <button id="trigger-btn-${c.id}" class="btn btn-primary btn-sm" onclick="triggerCustomMeta(${c.id})">${window.t('meta.run_custom')}</button>
+                        <button id="trigger-stop-${c.id}" class="btn btn-danger btn-sm" style="display:none;">🛑 ${window.t('common.stop') || 'Arrêter'}</button>
+                        <span id="trigger-status-${c.id}" style="font-size:0.82rem; display:none;"></span>
+                    </div>
                 </div>
 
                 <div class="accordion-header" onclick="toggleAccordion('results-${c.id}', this)">
@@ -195,7 +199,12 @@ function _renderPreview(configId) {
     }
 
     container.innerHTML = periodHeader + data.rules_context.map((ruleCtx, ruleIdx) => {
-        const entriesHtml = ruleCtx.entries.map((e, entryIdx) => {
+        // Séparer les entrées actives et exclues
+        const activeEntries = ruleCtx.entries.map((e, idx) => ({...e, _origIdx: idx})).filter(e => !e._excluded);
+        const excludedCount = ruleCtx.entries.length - activeEntries.length;
+
+        const entriesHtml = activeEntries.map((e) => {
+            const entryIdx = e._origIdx;
             const sevColor = e.severity === 'CRITICAL' ? 'var(--danger)' : e.severity === 'WARNING' ? 'var(--warning)' : 'var(--info)';
             const kwBadges = e.keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('');
             return `
@@ -213,12 +222,12 @@ function _renderPreview(configId) {
             </div>`;
         }).join('');
 
-        const activeCount = ruleCtx.entries.filter(e => !e._excluded).length;
+        const excludedBadge = excludedCount > 0 ? `<span style="font-size:0.75rem; color:var(--danger); margin-left:0.5rem;">(${excludedCount} exclué(s))</span>` : '';
         return `
         <div class="card" style="padding:1rem; border-left:3px solid var(--accent);">
             <div style="font-weight:600; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
-                <span>📌 ${escapeHtml(ruleCtx.rule_name)}</span>
-                <span style="font-size:0.8rem; color:var(--text-secondary);">${activeCount} entrée(s)</span>
+                <span>📌 ${escapeHtml(ruleCtx.rule_name)}${excludedBadge}</span>
+                <span style="font-size:0.8rem; color:var(--text-secondary);">${activeEntries.length} entrée(s)</span>
             </div>
             <div style="display:flex; flex-direction:column; gap:0.5rem;">${entriesHtml}</div>
         </div>`;
@@ -537,27 +546,28 @@ async function deleteConfig(id) {
     }
 }
 
+// Map des AbortControllers actifs par configId
+const _metaAbortControllers = {};
+
 async function triggerCustomMeta(id) {
-    if (!confirm("Lancer la méta-analyse avec ce contexte ? (S'exécute en arrière-plan)")) return;
-    
     // Charger les données si pas encore fait (apercu fermé)
     if (!_previewData[id]) {
         try {
             const res = await apiFetch(`/api/meta-analysis/trigger/preview/${id}`);
             _previewData[id] = res;
         } catch (e) {
-            alert('Impossible de charger le contexte : ' + e.message);
+            _setTriggerStatus(id, `❌ ${e.message}`, false);
             return;
         }
     }
 
     const data = _previewData[id];
     if (!data || !data.rules_context || data.rules_context.length === 0) {
-        alert('Aucun contexte disponible pour cette configuration.');
+        _setTriggerStatus(id, '❌ Aucun contexte disponible.', false);
         return;
     }
 
-    // Reconstruire le texte en excluant les entrées supprimées et en ajoutant les annotations
+    // Reconstruire le texte (entrées actives + annotations)
     const lines = [];
     data.rules_context.forEach(ruleCtx => {
         ruleCtx.entries.forEach(e => {
@@ -571,19 +581,59 @@ async function triggerCustomMeta(id) {
     });
 
     if (lines.length === 0) {
-        alert('Toutes les entrées ont été exclues. Aucun contexte à envoyer.');
+        _setTriggerStatus(id, '❌ Toutes les entrées ont été exclues.', false);
         return;
     }
 
-    const contextText = lines.join('\n\n');
+    const abortController = new AbortController();
+    _metaAbortControllers[id] = abortController;
+    _setTriggerStatus(id, null, true, abortController, id);
+
     try {
-        await apiFetch(`/api/meta-analysis/trigger/${id}`, { 
+        await apiFetch(`/api/meta-analysis/trigger/${id}`, {
             method: 'POST',
-            body: { custom_context: contextText }
+            body: { custom_context: lines.join('\n\n') },
+            signal: abortController.signal
         });
-        alert(`Méta-analyse lancée avec ${lines.length} entrée(s). Le résultat apparaitra bientôt dans les Historiques.`);
+        _setTriggerStatus(id, `✅ ${lines.length} entrée(s) envoyée(s). Résultat bientôt dans les Historiques.`, false);
+        setTimeout(() => _setTriggerStatus(id, null, false), 5000);
     } catch (e) {
-        alert('Erreur: ' + e.message);
+        if (e.name === 'AbortError') {
+            _setTriggerStatus(id, '⏹ Analyse annulée.', false);
+        } else {
+            _setTriggerStatus(id, `❌ Erreur : ${e.message}`, false);
+        }
+        setTimeout(() => _setTriggerStatus(id, null, false), 4000);
+    } finally {
+        delete _metaAbortControllers[id];
+    }
+}
+
+function _setTriggerStatus(configId, message, loading, abortController, triggerId) {
+    const btn = document.getElementById(`trigger-btn-${configId}`);
+    const statusEl = document.getElementById(`trigger-status-${configId}`);
+    const stopBtn = document.getElementById(`trigger-stop-${configId}`);
+    if (!btn) return;
+
+    if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = `⏳ ${window.t('common.loading') || 'En cours...'}`;
+        if (stopBtn) {
+            stopBtn.style.display = 'inline-flex';
+            stopBtn.onclick = () => {
+                if (abortController) abortController.abort();
+                apiFetch(`/api/meta-analysis/cancel/${triggerId}`, { method: 'POST' }).catch(() => {});
+            };
+        }
+    } else {
+        btn.disabled = false;
+        btn.innerHTML = window.t('meta.run_custom') || '▶ Lancer l’analyse';
+        if (stopBtn) stopBtn.style.display = 'none';
+    }
+
+    if (statusEl) {
+        statusEl.textContent = message || '';
+        statusEl.style.display = message ? 'block' : 'none';
     }
 }
 
