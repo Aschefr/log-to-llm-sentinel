@@ -460,6 +460,12 @@ let conversations = [];
 console.log("Chat initialized with activeConvId:", activeConvId);
 
 document.addEventListener('DOMContentLoaded', async () => {
+    window.i18n?.onLanguageChange(() => {
+        loadConversations();
+        if (activeConvId) loadHistory(activeConvId);
+        // data-i18n attributes are handled by i18n.js automatically
+    });
+
     try {
         await loadConversations();
 
@@ -502,14 +508,14 @@ async function loadConversations() {
         renderConversationList();
     } catch (e) {
         console.error(e);
-        if (list) list.innerHTML = `<div class="loading" style="color:var(--danger)">Erreur de chargement: ${e.message}</div>`;
+        if (list) list.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('chat.error_network') : 'Erreur'} : ${e.message}</div>`;
     }
 }
 
 function renderConversationList() {
     const list = document.getElementById('conversation-list');
     if (conversations.length === 0) {
-        list.innerHTML = '<div class="loading">Aucune conversation.</div>';
+        list.innerHTML = `<div class="loading">${window.t ? window.t('chat.no_conversation') : 'Aucune conversation.'}</div>`;
         return;
     }
     list.innerHTML = conversations.map(c => `
@@ -526,7 +532,7 @@ function renderConversationList() {
 }
 
 async function deleteConversation(id) {
-    if (!confirm('Supprimer cette conversation ?')) return;
+    if (!confirm(window.t ? window.t('chat.delete_conversation') : 'Supprimer cette conversation ?')) return;
     try {
         await apiFetch(`/chat/api/delete/${id}`, { method: 'DELETE' });
         if (activeConvId === id) {
@@ -628,7 +634,7 @@ async function loadHistory(id) {
         } catch (_) { /* pending check optionnel, on ignore les erreurs */ }
 
     } catch (e) {
-        container.innerHTML = `<div class="loading" style="color:var(--danger)">Erreur: ${e.message}</div>`;
+        container.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('chat.error_network') : 'Erreur'}: ${e.message}</div>`;
     }
 }
 
@@ -637,7 +643,7 @@ function setSendBtn(generating) {
     const btn = document.getElementById('send-btn');
     if (!btn) return;
     if (generating) {
-        btn.textContent = '🛑 Arrêter';
+        btn.textContent = window.t ? window.t('chat.stop') : '🛑 Arrêter';
         btn.classList.remove('btn-primary');
         btn.classList.add('btn-danger');
         btn.removeAttribute('data-i18n');
@@ -692,13 +698,13 @@ function escapeAttr(s) {
 /** Construit le HTML des boutons d'action d'une bulle IA */
 function aiActionsHtml(text) {
     return `<div class="message-actions">
-        <button class="msg-action-btn" onclick="copyMsg(this)" data-text="${escapeAttr(text)}" data-i18n-title="common.copy" title="${window.t('common.copy')}">
+        <button class="msg-action-btn" onclick="copyMsg(this)" data-text="${escapeAttr(text)}" data-i18n-title="common.copy" title="${window.t ? window.t('common.copy') : 'Copier'}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copier
+            ${window.t ? window.t('common.copy') : 'Copier'}
         </button>
-        <button class="msg-action-btn" onclick="retryLastAiMsg()" data-i18n-title="chat.regenerate" title="${window.t('chat.regenerate')}">
+        <button class="msg-action-btn" onclick="retryLastAiMsg()" data-i18n-title="chat.regenerate" title="${window.t ? window.t('chat.regenerate') : 'Régénérer'}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
-            Ré-essayer
+            ${window.t ? window.t('chat.regenerate') : 'Ré-essayer'}
         </button>
     </div>`;
 }
@@ -706,13 +712,13 @@ function aiActionsHtml(text) {
 /** Construit le HTML des boutons d'action d'une bulle utilisateur */
 function userActionsHtml(text) {
     return `<div class="message-actions">
-        <button class="msg-action-btn" onclick="copyMsg(this)" data-text="${escapeAttr(text)}" data-i18n-title="common.copy" title="${window.t('common.copy')}">
+        <button class="msg-action-btn" onclick="copyMsg(this)" data-text="${escapeAttr(text)}" data-i18n-title="common.copy" title="${window.t ? window.t('common.copy') : 'Copier'}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copier
+            ${window.t ? window.t('common.copy') : 'Copier'}
         </button>
-        <button class="msg-action-btn" onclick="editMsg(this)" data-text="${escapeAttr(text)}" data-i18n-title="chat.edit_resend" title="${window.t('chat.edit_resend')}">
+        <button class="msg-action-btn" onclick="editMsg(this)" data-text="${escapeAttr(text)}" data-i18n-title="chat.edit_resend" title="${window.t ? window.t('chat.edit_resend') : 'Modifier'}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Modifier
+            ${window.t ? window.t('common.edit') : 'Modifier'}
         </button>
     </div>`;
 }
