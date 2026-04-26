@@ -244,5 +244,25 @@
     "copy_analysis": "Copier l'analyse",
     "delete_analysis": "Supprimer cette analyse",
     "view_in_monitor": "Voir dans Monitor"
+  },
+  "meta": {
+    "title": "Méta-Analyse",
+    "new_config": "+ Nouvelle Configuration",
+    "configs": "Configurations Actives",
+    "results": "Derniers Résultats",
+    "filter_all": "-- Toutes les configurations --",
+    "modal_title": "Nouvelle Méta-Analyse",
+    "modal_title_new": "Nouvelle Méta-Analyse",
+    "modal_title_edit": "Modifier la Configuration",
+    "name": "Nom de la configuration",
+    "rules": "Règles cibles (Laissez vide pour inclure toutes les règles)",
+    "rules_help": "Maintenez Ctrl/Cmd pour sélectionner plusieurs règles.",
+    "interval": "Intervalle (heures)",
+    "context": "Taille Contexte (tokens)",
+    "max_analyses": "Limite d'analyses",
+    "system_prompt": "Prompt Système IA",
+    "enabled": "Activé",
+    "notify": "Notifier à la fin"
   }
 }
+

@@ -241,8 +241,27 @@
     "done": "Done",
     "cancel": "Cancel",
     "confirm": "Confirm",
-    "copy_analysis": "Copy analysis",
+    "copy_analysis": "Copy Analysis",
     "delete_analysis": "Delete this analysis",
     "view_in_monitor": "View in Monitor"
+  },
+  "meta": {
+    "title": "Meta-Analysis",
+    "new_config": "+ New Configuration",
+    "configs": "Active Configurations",
+    "results": "Latest Results",
+    "filter_all": "-- All configurations --",
+    "modal_title": "New Meta-Analysis",
+    "modal_title_new": "New Meta-Analysis",
+    "modal_title_edit": "Edit Configuration",
+    "name": "Configuration Name",
+    "rules": "Target Rules (Leave empty to include all rules)",
+    "rules_help": "Hold Ctrl/Cmd to select multiple rules.",
+    "interval": "Interval (hours)",
+    "context": "Context Size (tokens)",
+    "max_analyses": "Analyses Limit",
+    "system_prompt": "AI System Prompt",
+    "enabled": "Enabled",
+    "notify": "Notify on completion"
   }
 }

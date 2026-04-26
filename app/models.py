@@ -95,3 +95,29 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     conversation = relationship("ChatConversation", back_populates="messages")
+
+class MetaAnalysisConfig(Base):
+    __tablename__ = "meta_analysis_configs"
+    id = Column(Integer, primary_key=True, index=True)
+    rule_ids_json = Column(Text, default="[]")  # List of rule IDs to include. Empty means all rules.
+    name = Column(String, nullable=False)
+    interval_hours = Column(Integer, default=24)
+    enabled = Column(Boolean, default=True)
+    notify_enabled = Column(Boolean, default=True)
+    context_size = Column(Integer, default=16000)
+    system_prompt = Column(Text, default="Tu es un expert DevOps. Analyse ces événements et fais une synthèse globale de la situation du service.")
+    max_analyses = Column(Integer, default=50)
+    last_run_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class MetaAnalysisResult(Base):
+    __tablename__ = "meta_analysis_results"
+    id = Column(Integer, primary_key=True, index=True)
+    config_id = Column(Integer, ForeignKey("meta_analysis_configs.id", ondelete="CASCADE"))
+    period_start = Column(DateTime)
+    period_end = Column(DateTime)
+    analyses_count = Column(Integer, default=0)
+    detection_ids_json = Column(Text, default="[]")  # List of detection IDs included
+    matched_keywords_json = Column(Text, default="[]")  # List of all keywords matched across all included analyses
+    ollama_response = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)

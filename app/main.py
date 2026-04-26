@@ -15,9 +15,12 @@ from app.routers import i18n as i18n_router
 from app.services.log_watcher import LogWatcher
 from app.services.orchestrator import Orchestrator
 from app.services.task_manager import task_manager
+from app.services.meta_service import MetaAnalysisService
 
 # ── Instances globales ──
 orchestrator = Orchestrator()
+meta_service = MetaAnalysisService(orchestrator=orchestrator)
+
 log_watcher = LogWatcher(on_new_lines=orchestrator.handle_new_lines)
 watcher_task = None
 
@@ -51,7 +54,13 @@ async def lifespan(app: FastAPI):
             if removed:
                 print(f"[Main] Nettoyage tâches : {removed} entrée(s) supprimée(s)")
 
+    async def _run_meta_analyses_loop():
+        while True:
+            await asyncio.sleep(600)  # Vérifie toutes les 10 minutes
+            await meta_service.run_scheduled_analyses()
+
     asyncio.create_task(_cleanup_tasks())
+    asyncio.create_task(_run_meta_analyses_loop())
 
     yield
 
@@ -76,6 +85,10 @@ static_dir = os.path.join(BASE_DIR, "static")
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # ── Routers ──
+from app.routers import chat as chat_router
+from app.routers import i18n as i18n_router
+from app.routers import meta_analysis as meta_router
+
 app.include_router(rules.router)
 app.include_router(config.router)
 app.include_router(dashboard.router)
@@ -83,6 +96,7 @@ app.include_router(files_router.router)
 app.include_router(monitor_router.router)
 app.include_router(chat_router.router)
 app.include_router(i18n_router.router)
+app.include_router(meta_router.router)
 
 
 # ── Pages ──
@@ -104,3 +118,7 @@ def config_page(request: Request):
 @app.get("/monitor")
 def monitor_page(request: Request):
     return templates.TemplateResponse("monitor.html", {"request": request})
+
+@app.get("/meta-analysis")
+def meta_analysis_page(request: Request):
+    return templates.TemplateResponse("meta.html", {"request": request})
