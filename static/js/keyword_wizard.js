@@ -19,6 +19,10 @@ let _wizardGranularity   = null; // null = not yet chosen by user
 
 /* ── Granularity options ────────────────────────────────────────────────── */
 const GRANULARITY_OPTIONS = [
+    { value: 1  * 60,    label: '1 minute'   },
+    { value: 2  * 60,    label: '2 minutes'  },
+    { value: 5  * 60,    label: '5 minutes'  },
+    { value: 10 * 60,    label: '10 minutes' },
     { value: 15 * 60,    label: '15 minutes' },
     { value: 30 * 60,    label: '30 minutes' },
     { value: 60 * 60,    label: '1 heure'    },
@@ -31,16 +35,21 @@ const GRANULARITY_OPTIONS = [
 ];
 
 function _suggestGranularity(durationS) {
-    if (durationS <= 6  * 3600)  return 15 * 60;
-    if (durationS <= 24 * 3600)  return 3600;
-    if (durationS <= 7  * 86400) return 6 * 3600;
-    if (durationS <= 30 * 86400) return 86400;
+    if (durationS <= 10 * 60)   return 1  * 60;   // ≤10 min  → 1 min
+    if (durationS <= 30 * 60)   return 5  * 60;   // ≤30 min  → 5 min
+    if (durationS <= 6  * 3600) return 15 * 60;   // ≤6 h    → 15 min
+    if (durationS <= 24 * 3600) return 3600;      // ≤24 h    → 1 h
+    if (durationS <= 7  * 86400) return 6 * 3600; // ≤7 j    → 6 h
+    if (durationS <= 30 * 86400) return 86400;    // ≤30 j    → 1 j
     return 7 * 86400;
 }
 
 function _allowedGranularities(durationS) {
-    if (durationS <= 6  * 3600)  return [15*60, 30*60, 3600];
-    if (durationS <= 24 * 3600)  return [30*60, 3600, 2*3600, 6*3600];
+    if (durationS <= 5  * 60)   return [1*60, 2*60];
+    if (durationS <= 15 * 60)   return [1*60, 2*60, 5*60];
+    if (durationS <= 30 * 60)   return [2*60, 5*60, 10*60, 15*60];
+    if (durationS <= 6  * 3600) return [5*60, 10*60, 15*60, 30*60, 3600];
+    if (durationS <= 24 * 3600) return [15*60, 30*60, 3600, 2*3600, 6*3600];
     if (durationS <= 7  * 86400) return [3600, 6*3600, 12*3600, 86400];
     if (durationS <= 30 * 86400) return [6*3600, 12*3600, 86400, 7*86400];
     return [86400, 7*86400, 14*86400];
