@@ -101,21 +101,14 @@ async function loadRules() {
                     <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id}, this)">🗑️ Supprimer</button>
                 </div>
                 <div class="rule-toggles" style="display: flex; flex-direction: column; gap: 0.5rem; flex-basis: 100%;">
-                    <div class="rule-last-line">
-                        <strong>Dernière ligne détectée :</strong>
-                        <div class="last-line-content">${escapeHtml(rule.last_log_line || 'Aucune ligne trouvée ou fichier inaccessible')}</div>
-                    </div>
-                    <div>
-                        <div class="rule-history-toggle" onclick="toggleLiveLogs(${rule.id}, this, '${escapeHtml(rule.log_file_path).replace(/'/g, "\\'")}')">
-                            <span class="toggle-icon">▶</span> Log en temps réel
+                    <div class="rule-last-line" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <strong>Dernière ligne détectée :</strong>
+                            <div class="last-line-content">${escapeHtml(rule.last_log_line || 'Aucune ligne trouvée ou fichier inaccessible')}</div>
                         </div>
-                        <div id="live-logs-${rule.id}" class="rule-history-inline hidden"></div>
-                    </div>
-                    <div>
-                        <div class="rule-history-toggle" onclick="toggleRuleHistory(${rule.id}, this)">
-                            <span class="toggle-icon">▶</span> Analyses LLM récentes
-                        </div>
-                        <div id="rule-history-${rule.id}" class="rule-history-inline hidden"></div>
+                        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?rule=${rule.id}'">
+                            🔍 ${window.t ? window.t('rules.view_in_monitor') || 'Voir dans Monitor' : 'Voir dans Monitor'}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -125,192 +118,11 @@ async function loadRules() {
     }
 }
 
-const liveLogIntervals = {};
 
-async function toggleLiveLogs(ruleId, toggleElement, path) {
-    const container = document.getElementById(`live-logs-${ruleId}`);
-    if (!container) return;
-
-    let icon = null;
-    if (toggleElement) {
-        icon = toggleElement.querySelector('.toggle-icon');
-    }
-
-    if (container.classList.contains('hidden')) {
-        container.classList.remove('hidden');
-        if (icon) icon.textContent = '▼';
-        container.innerHTML = '<div class="loading">Chargement des logs...</div>';
-        
-        const fetchLogs = async () => {
-            if (container.classList.contains('hidden')) return; // Stop if closed
-            try {
-                const res = await apiFetch(`/api/files/tail?path=${encodeURIComponent(path)}&lines=15`);
-                if (res.lines && res.lines.length > 0) {
-                    const newContent = res.lines.map(l => escapeHtml(typeof l === 'string' ? l : l.text)).join('<br>');
-                    let pre = document.getElementById(`live-log-pre-${ruleId}`);
-                    
-                    if (!pre) {
-                        // Première fois : création du conteneur
-                        container.innerHTML = `
-                            <div class="live-logs-header-inline">
-                                <button class="btn btn-secondary btn-sm" onclick="copyLiveLogs(${ruleId})">📋 Copier</button>
-                                <button class="btn btn-secondary btn-sm" onclick="clearLiveLogs(${ruleId})">🗑️ Effacer</button>
-                            </div>
-                            <pre class="live-log-content" id="live-log-pre-${ruleId}">${newContent}</pre>
-                        `;
-                        pre = document.getElementById(`live-log-pre-${ruleId}`);
-                        // Délai pour laisser le DOM se mettre à jour avant de scroller
-                        setTimeout(() => pre.scrollTop = pre.scrollHeight, 10);
-                    } else {
-                        // Éviter de toucher au DOM si le texte est identique
-                        if (pre.innerHTML !== newContent) {
-                            // On vérifie si l'utilisateur est déjà tout en bas
-                            const isAtBottom = Math.abs((pre.scrollHeight - pre.scrollTop) - pre.clientHeight) < 10;
-                            
-                            pre.innerHTML = newContent;
-                            
-                            // Si l'utilisateur lisait en bas, on auto-scroll
-                            if (isAtBottom) {
-                                setTimeout(() => pre.scrollTop = pre.scrollHeight, 10);
-                            }
-                        }
-                    }
-                } else {
-                    container.innerHTML = '<em>Fichier vide ou illisible.</em>';
-                }
-            } catch (e) {
-                container.innerHTML = `<em style="color: var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</em>`;
-            }
-        };
-
-        await fetchLogs();
-        liveLogIntervals[ruleId] = setInterval(fetchLogs, 3000); // refresh every 3s
-    } else {
-        container.classList.add('hidden');
-        if (icon) icon.textContent = '▶';
-        if (liveLogIntervals[ruleId]) {
-            clearInterval(liveLogIntervals[ruleId]);
-            delete liveLogIntervals[ruleId];
-        }
-    }
-}
-
-const ruleHistoryIntervals = {};
-
-async function toggleRuleHistory(ruleId, toggleElement) {
-    const container = document.getElementById(`rule-history-${ruleId}`);
-    if (!container) return;
-
-    let icon = null;
-    if (toggleElement) {
-        icon = toggleElement.querySelector('.toggle-icon');
-    } else {
-        const card = container.closest('.rule-card');
-        if (card) {
-            icon = card.querySelector('.toggle-icon');
-        }
-    }
-
-    if (container.classList.contains('hidden')) {
-        container.classList.remove('hidden');
-        if (icon) icon.textContent = '▼';
-        
-        container.innerHTML = '<div class="loading">Chargement de l\'historique...</div>';
-        
-        const fetchHistory = async () => {
-            if (container.classList.contains('hidden')) return; // Stop if closed
-            try {
-                const url = `/api/dashboard/recent?limit=10&rule_id=${ruleId}`;
-                const analyses = await apiFetch(url);
-
-                const header = `
-                    <div class="history-actions" style="margin-bottom: 0.5rem; display: flex; justify-content: flex-end;">
-                        <button class="btn btn-secondary btn-sm" onclick="clearRuleHistory(${ruleId}, this)">🗑️ Effacer tout l'historique</button>
-                    </div>
-                `;
-
-                if (!analyses || analyses.length === 0) {
-                    const newHtml = header + '<div class="loading">Aucune analyse pour cette règle</div>';
-                    if (container.innerHTML !== newHtml) container.innerHTML = newHtml;
-                    return;
-                }
-
-                const newHtml = header + analyses.map(a => `
-                    <div class="analysis-card inline-history-card">
-                        <div class="analysis-header">
-                            <div>
-                                <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
-                            </div>
-                            <div class="analysis-actions">
-                                <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
-                                <button class="btn-icon" onclick="copyAnalysisText(this)" title="${window.t && window.t('common.copy_analysis') ? window.t('common.copy_analysis') : 'Copier l\'analyse'}">
-                                    <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
-                                </button>
-                                <button class="btn-icon delete-analysis-btn" onclick="deleteAnalysisInRules(${a.id}, ${ruleId}, this)" title="${window.t && window.t('common.delete_analysis') ? window.t('common.delete_analysis') : 'Supprimer'}">
-                                    <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
-                        <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
-                    </div>
-                `).join('');
-                
-                // Anti-flicker: Update only if changed
-                if (container.innerHTML !== newHtml) {
-                    container.innerHTML = newHtml;
-                }
-            } catch (e) {
-                console.error('Erreur analyses:', e);
-                const errHtml = `<div class="loading">${window.t ? window.t('common.error') : 'Erreur'}: ${escapeHtml(e.message || 'Impossible de charger l’historique')}</div>`;
-                if (container.innerHTML !== errHtml) container.innerHTML = errHtml;
-            }
-        };
-
-        await fetchHistory();
-        ruleHistoryIntervals[ruleId] = setInterval(fetchHistory, 10000); // 10 secondes
-
-    } else {
-        container.classList.add('hidden');
-        if (icon) icon.textContent = '▶';
-        if (ruleHistoryIntervals[ruleId]) {
-            clearInterval(ruleHistoryIntervals[ruleId]);
-            delete ruleHistoryIntervals[ruleId];
-        }
-    }
-}
 
 async function clearLiveLogs(ruleId) {
     const pre = document.getElementById(`live-log-pre-${ruleId}`);
     if (pre) pre.innerHTML = '';
-}
-
-async function copyLiveLogs(ruleId) {
-    const pre = document.getElementById(`live-log-pre-${ruleId}`);
-    if (!pre) return;
-    try {
-        await copyToClipboard(pre.innerText);
-        alert('Logs copiés !');
-    } catch (e) {
-        console.error('Erreur copie logs:', e);
-    }
-}
-
-function copyAnalysisText(btn) {
-    const card = btn.closest('.analysis-card');
-    if (!card) return;
-    const line = card.querySelector('.analysis-line').innerText;
-    const response = card.querySelector('.analysis-response').innerText;
-    const text = `Ligne: ${line}\n\nAnalyse:\n${response}`;
-    
-    copyToClipboard(text).then(() => {
-        const oldContent = btn.innerHTML;
-        btn.innerHTML = '✅';
-        setTimeout(() => { btn.innerHTML = oldContent; }, 2000);
-    }).catch(err => {
-        console.error('Erreur copie:', err);
-    });
-}
 
 async function deleteAnalysisInRules(id, ruleId, btnElement) {
     showInlineConfirm(btnElement, 'Supprimer cette analyse ?', async () => {

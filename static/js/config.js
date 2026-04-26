@@ -40,15 +40,12 @@ function applyProfile(type) {
     if (type === 'eco') {
         temp.value = 0.1;
         ctx.value = 2048;
-        document.getElementById('ollama-think').checked = false;
     } else if (type === 'balanced') {
         temp.value = 0.4;
         ctx.value = 4096;
-        document.getElementById('ollama-think').checked = true;
     } else if (type === 'gpu') {
         temp.value = 0.7;
         ctx.value = 8192;
-        document.getElementById('ollama-think').checked = true;
     }
     
     // Déclencher l'auto-sauvegarde
@@ -156,8 +153,6 @@ async function loadConfig() {
         document.getElementById('monitor-log-lines').value = config.monitor_log_lines || 60;
         document.getElementById('ollama-temp').value = config.ollama_temp || 0.1;
         document.getElementById('ollama-ctx').value = config.ollama_ctx || 4096;
-        const thinkEl = document.getElementById('ollama-think');
-        if (thinkEl) thinkEl.checked = config.ollama_think !== false;
         window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) {
@@ -438,7 +433,7 @@ function renderOllamaLogs(logs) {
     if (sel && sel.rangeCount > 0 && sel.toString().length > 0) {
         const range = sel.getRangeAt(0);
         if (container.contains(range.commonAncestorContainer)) {
-            return; // Protéger la sélection, on rafraîchira au prochain cycle
+            return; // Protéger la sélection, on rafraîchirait au prochain cycle
         }
     }
 
@@ -563,7 +558,6 @@ async function saveConfig(messageEl, isAutoSave = false) {
         monitor_log_lines: parseInt(document.getElementById('monitor-log-lines').value) || 60,
         ollama_temp: parseFloat(document.getElementById('ollama-temp').value) || 0.1,
         ollama_ctx: parseInt(document.getElementById('ollama-ctx').value) || 4096,
-        ollama_think: document.getElementById('ollama-think').checked,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
     };
 
@@ -624,6 +618,15 @@ async function setupAppriseTags() {
         select.value = '__custom__';
         customInput.value = window.__desiredAppriseTags || '';
         customGroup.classList.remove('hidden');
+    }
+}
+
+window.setOllamaCtx = function(val) {
+    const el = document.getElementById('ollama-ctx');
+    if (el) {
+        el.value = val;
+        // Trigger auto-save
+        el.dispatchEvent(new Event('input'));
     }
 }
 

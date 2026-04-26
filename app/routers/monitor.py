@@ -60,6 +60,24 @@ def get_monitored_rules():
         config = db.query(GlobalConfig).first()
         monitor_lines = config.monitor_log_lines if config else 60
 
+        from sqlalchemy import func
+        from app.models import Analysis
+        
+        # Récupération des statistiques par règle
+        stats_query = db.query(
+            Analysis.rule_id,
+            Analysis.severity,
+            func.count(Analysis.id).label("count")
+        ).group_by(Analysis.rule_id, Analysis.severity).all()
+        
+        stats_dict = {}
+        for rule_id, severity, count in stats_query:
+            if rule_id not in stats_dict:
+                stats_dict[rule_id] = {"total": 0, "info": 0, "warning": 0, "critical": 0}
+            if severity in stats_dict[rule_id]:
+                stats_dict[rule_id][severity] += count
+            stats_dict[rule_id]["total"] += count
+
         rules = db.query(Rule).filter(Rule.enabled == True).all()
         return {
             "monitor_log_lines": monitor_lines,
@@ -73,6 +91,7 @@ def get_monitored_rules():
                     "anti_spam_delay": r.anti_spam_delay or 60,
                     "notify_severity_threshold": r.notify_severity_threshold or "info",
                     "notify_on_match": r.notify_on_match,
+                    "stats": stats_dict.get(r.id, {"total": 0, "info": 0, "warning": 0, "critical": 0})
                 }
                 for r in rules
             ]

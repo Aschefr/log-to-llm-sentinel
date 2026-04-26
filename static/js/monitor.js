@@ -24,18 +24,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') searchById();
     });
 
-    // ─── Auto-recherche via query param ?search=<id> ──────────────────────
-    // Utilisé depuis le bouton "Afficher dans Monitor" du Chat / Dashboard
+    // ─── Auto-recherche via query param ?search=<id> ou ?rule=<id> ──────────────────────
     const urlParams = new URLSearchParams(window.location.search);
     const searchParam = urlParams.get('search');
+    const ruleParam = urlParams.get('rule');
+
     if (searchParam) {
         const searchInput = document.getElementById('monitor-search-id');
         if (searchInput) {
             searchInput.value = searchParam;
-            // Attendre que les règles soient chargées avant de lancer la recherche
-            // (petit délai pour s'assurer que le DOM est prêt)
             setTimeout(() => searchById(), 300);
         }
+    } else if (ruleParam) {
+        // Le chargement sélectionnera cette règle si elle est valide
     }
 });
 
@@ -48,8 +49,20 @@ async function loadMonitorRules() {
         monitorLogLines = res.monitor_log_lines || 60;
         
         renderTabs();
+        renderTabs();
         if (monitorRules.length > 0) {
-            selectTab(monitorRules[0].id);
+            const urlParams = new URLSearchParams(window.location.search);
+            const ruleParam = urlParams.get('rule');
+            const savedTab = sessionStorage.getItem('sentinel_monitor_tab');
+            
+            let ruleToSelect = monitorRules[0].id;
+            if (ruleParam && monitorRules.find(r => r.id == ruleParam)) {
+                ruleToSelect = parseInt(ruleParam);
+            } else if (savedTab && monitorRules.find(r => r.id == savedTab)) {
+                ruleToSelect = parseInt(savedTab);
+            }
+            
+            selectTab(ruleToSelect);
         } else {
             document.getElementById('monitor-tab-content').innerHTML =
                 '<div class="loading">Aucune règle active. <a href="/rules">Créer une règle</a></div>';
@@ -82,6 +95,8 @@ function selectTab(ruleId) {
     const activeTab = document.getElementById(`tab-${ruleId}`);
     if (activeTab) activeTab.classList.add('active');
 
+    sessionStorage.setItem('sentinel_monitor_tab', ruleId);
+
     const rule = monitorRules.find(r => r.id === ruleId);
     if (!rule) return;
 
@@ -110,6 +125,15 @@ function renderTabContent(rule) {
                 </div>
                 <div><span class="info-label">⏱ Anti-spam</span>${rule.anti_spam_delay}s</div>
                 <div><span class="info-label">🔔 Seuil</span>${rule.notify_severity_threshold}</div>
+                <div>
+                    <span class="info-label">📊 Statistiques (Filtrer)</span>
+                    <div style="display:flex; gap:0.25rem; flex-wrap:wrap; margin-top:0.2rem;">
+                        <span class="badge" style="cursor:pointer; background:rgba(255,255,255,0.1);" onclick="loadMonitorAnalyses(${rule.id}, null)" title="Toutes les analyses">Total: ${rule.stats?.total || 0}</span>
+                        <span class="badge badge-critical" style="cursor:pointer;" onclick="loadMonitorAnalyses(${rule.id}, 'critical')">Critique: ${rule.stats?.critical || 0}</span>
+                        <span class="badge badge-warning" style="cursor:pointer;" onclick="loadMonitorAnalyses(${rule.id}, 'warning')">Warning: ${rule.stats?.warning || 0}</span>
+                        <span class="badge badge-info" style="cursor:pointer;" onclick="loadMonitorAnalyses(${rule.id}, 'info')">Info: ${rule.stats?.info || 0}</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -150,7 +174,7 @@ function renderTabContent(rule) {
     `;
 
     // Charger les analyses immédiatement
-    loadRuleAnalyses(rule.id);
+    loadMonitorAnalyses(rule.id);
 }
 
 // ─── Polling ───────────────────────────────────────────────────────────────
@@ -450,15 +474,22 @@ function copyViewerContent(ruleId) {
 
 // ─── Analyses récentes ─────────────────────────────────────────────────────
 
-async function loadRuleAnalyses(ruleId) {
+async function loadMonitorAnalyses(ruleId, severityFilter = null) {
     const container = document.getElementById(`monitor-analyses-${ruleId}`);
     if (!container) return;
+
     try {
-        const analyses = await apiFetch(`/api/monitor/analyses/${ruleId}`);
-        if (!analyses || analyses.length === 0) {
-            container.innerHTML = '<div class="loading">Aucune analyse pour cette règle.</div>';
+        let url = `/api/dashboard/recent?limit=20&rule_id=${ruleId}`;
+        if (severityFilter) {
+            url += `&severity=${severityFilter}`;
+        }
+        
+        const analyses = await apiFetch(url);
+        if (analyses.length === 0) {
+            container.innerHTML = `<div class="no-logs">Aucune analyse récente ${severityFilter ? `de niveau ${severityFilter}` : ''}</div>`;
             return;
         }
+
         container.innerHTML = analyses.map(a => `
             <div class="monitor-analysis-card">
                 <div class="monitor-analysis-header">
