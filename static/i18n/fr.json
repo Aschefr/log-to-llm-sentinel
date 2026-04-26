@@ -87,7 +87,8 @@
     "confirm_delete": "Supprimer cette règle ?",
     "keywords_badge_remove": "Supprimer ce mot-clé",
     "notify_badge": "Notif",
-    "disabled_badge": "Désactivée"
+    "disabled_badge": "Désactivée",
+    "view_in_monitor": "Voir dans Monitor"
   },
   "monitor": {
     "title": "🔬 Monitor",

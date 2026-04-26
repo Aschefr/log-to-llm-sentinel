@@ -87,7 +87,8 @@
     "confirm_delete": "Delete this rule?",
     "keywords_badge_remove": "Remove keyword",
     "notify_badge": "Notify",
-    "disabled_badge": "Disabled"
+    "disabled_badge": "Disabled",
+    "view_in_monitor": "View in Monitor"
   },
   "monitor": {
     "title": "🔬 Monitor",
