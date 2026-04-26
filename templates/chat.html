@@ -569,13 +569,20 @@ async function loadHistory(id) {
         
         let html = '';
         if (data.analysis) {
+            const detectionId = data.analysis.detection_id;
             html += `
                 <div class="msg-label" style="text-align:center; margin-bottom:0.25rem;">${window.t ? window.t('chat.label_context') : 'Analyse attachée'}</div>
-                <div class="message-bubble context">
-                    <strong>${window.t('chat.analysis_context')} #${data.analysis.detection_id || '...'}</strong><br>
+                <div class="message-bubble context" id="context-bubble">
+                    <strong>${window.t('chat.analysis_context')} #${detectionId || '...'}</strong><br>
                     <code style="display:block; margin-top:0.5rem; opacity:0.8; font-size:0.8rem;">${escapeHtml(data.analysis.triggered_line)}</code>
                     <hr style="opacity:0.1; margin:0.75rem 0;">
                     <div class="markdown-body" style="font-size:0.9rem;">${marked.parse(data.analysis.ollama_response)}</div>
+                    ${detectionId ? `
+                    <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid rgba(255,255,255,0.08); display:flex; justify-content:flex-end;">
+                        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?search=${encodeURIComponent(detectionId)}'" title="${window.t ? window.t('chat.show_in_monitor') : 'Afficher dans Monitor'}">
+                            🔍 ${window.t ? window.t('chat.show_in_monitor') : 'Afficher dans Monitor'}
+                        </button>
+                    </div>` : ''}
                 </div>
             `;
         }
@@ -1016,6 +1023,21 @@ async function readStream(taskId, fromPos, signal) {
                         _activeTaskId = null;
                         _streamFullText = '';
                         setSendBtn(false);  // ← Revenir en mode "Envoyer"
+
+                        // ── Auto-nommage au 1er échange complet ────────────────────────
+                        // On détecte le 1er échange en comptant les wrappers de messages.
+                        // Après le 1er échange : 1 user + 1 assistant = 2 wrappers
+                        if (activeConvId) {
+                            const msgContainer = document.getElementById('chat-messages');
+                            const wrapperCount = msgContainer
+                                ? msgContainer.querySelectorAll('.message-wrapper').length
+                                : 0;
+                            if (wrapperCount <= 2) {
+                                // Premier échange : lancer l'auto-nommage
+                                autoTitleConversation(activeConvId);
+                            }
+                        }
+
                         loadConversations();
                         return;
                     }
@@ -1077,6 +1099,28 @@ async function createNewChat() {
         selectConversation(res.id);
     } catch (e) {
         alert(e.message);
+    }
+}
+
+/**
+ * Auto-nomme une conversation en appelant l'endpoint dédié.
+ * Met à jour le titre dans le header et la liste latérale.
+ */
+async function autoTitleConversation(convId) {
+    try {
+        const res = await apiFetch(`/chat/api/auto-title/${convId}`, { method: 'POST', body: {} });
+        if (res.title) {
+            // Mettre à jour le titre dans le header
+            const titleEl = document.getElementById('current-chat-title');
+            if (titleEl && activeConvId === convId) {
+                titleEl.textContent = res.title;
+            }
+            // Mettre à jour la liste de conversations
+            await loadConversations();
+        }
+    } catch (e) {
+        // Silencieux : l'auto-nommage est best-effort
+        console.warn('[Chat] Auto-title failed:', e.message);
     }
 }
 

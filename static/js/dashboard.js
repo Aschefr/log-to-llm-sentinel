@@ -90,12 +90,18 @@ async function loadRecentAnalyses() {
                         </button>
                     </div>
                 </div>
-                <div class="analysis-line">${escapeHtml(a.triggered_line)}</div>
+                ${a.matched_keywords && a.matched_keywords.length > 0 ? `
+                <div class="analysis-keywords">
+                    <span class="kw-label">${window.t('monitor.keywords') || 'Mots-clés'} :</span>
+                    ${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')}
+                </div>` : ''}
+                <div class="analysis-line">${highlightKeywords(a.triggered_line, a.matched_keywords || [])}</div>
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
                 <div class="analysis-footer" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; gap: 0.5rem;">
                         <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">${window.t('common.retry')}</button>
                         <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">${window.t('common.notify')}</button>
+                        ${a.detection_id ? `<button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?search=${encodeURIComponent(a.detection_id)}'" title="${window.t('common.view_in_monitor') || 'Voir dans Monitor'}">🔍 Monitor</button>` : ''}
                     </div>
                     <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">${window.t('common.deepen')}</button>
                 </div>

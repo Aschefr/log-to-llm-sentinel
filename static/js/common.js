@@ -203,3 +203,33 @@ function toggleSection(containerId, arrowId) {
         if (arrow) arrow.classList.remove('expanded');
     }
 }
+
+/**
+ * Surligne les occurrences de mots-clés dans un texte brut.
+ * Retourne du HTML sécurisé avec les mots-clés entourés de <mark class="kw-highlight">.
+ * @param {string} text - Texte brut à afficher (sera échappé)
+ * @param {string[]} keywords - Liste de mots-clés à surligner
+ * @returns {string} HTML avec surbrillance
+ */
+function highlightKeywords(text, keywords) {
+    if (!text) return '';
+    if (!keywords || keywords.length === 0) return escapeHtml(text);
+
+    // Construire un regex combiné insensible à la casse
+    const escaped = keywords
+        .filter(k => k && k.trim())
+        .map(k => k.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+    if (escaped.length === 0) return escapeHtml(text);
+
+    const pattern = new RegExp(`(${escaped.join('|')})`, 'gi');
+
+    // Découper le texte en parties, échapper chacune, wrapper les matches
+    return text.split(pattern).map((part, i) => {
+        if (i % 2 === 1) {
+            // C'est un match — on l'entoure d'un mark
+            return `<mark class="kw-highlight">${escapeHtml(part)}</mark>`;
+        }
+        return escapeHtml(part);
+    }).join('');
+}

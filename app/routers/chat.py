@@ -91,6 +91,7 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
             
     return {
         "title": conv.title,
+        "analysis_id": conv.analysis_id,
         "analysis": analysis,
         "messages": [
             {"role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
@@ -366,6 +367,86 @@ async def regenerate_last(conv_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Aucun message utilisateur trouvé")
 
     return {"status": "ok", "last_user_content": last_user.content}
+
+
+@router.post("/api/auto-title/{conv_id}")
+async def auto_title_conversation(conv_id: int, db: Session = Depends(get_db)):
+    """
+    Génère automatiquement un titre court pour la conversation
+    à partir du premier échange (1er message user + 1ère réponse assistant).
+    Si la conversation est liée à une analyse, préfixe avec [#detection_id].
+    """
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation non trouvée")
+
+    messages = (
+        db.query(ChatMessage)
+        .filter(ChatMessage.conversation_id == conv_id)
+        .order_by(ChatMessage.created_at.asc())
+        .limit(4)
+        .all()
+    )
+
+    user_msg = next((m for m in messages if m.role == "user"), None)
+    ai_msg = next((m for m in messages if m.role == "assistant"), None)
+
+    if not user_msg or not ai_msg:
+        return {"title": conv.title}
+
+    # Construire le mini-prompt de titrage
+    excerpt_user = user_msg.content[:300]
+    excerpt_ai = ai_msg.content[:300]
+    title_prompt = (
+        "Tu dois générer un titre ultra-court (4 à 6 mots maximum) pour cette conversation de diagnostic système.\n"
+        "Réponds UNIQUEMENT avec le titre, sans ponctuation finale, sans guillemets, sans explication.\n\n"
+        f"Question : {excerpt_user}\n"
+        f"Réponse : {excerpt_ai}\n\n"
+        "Titre :"
+    )
+
+    cfg = db.query(GlobalConfig).first()
+    ollama_url   = (cfg.ollama_url   or "http://ollama:11434") if cfg else "http://ollama:11434"
+    ollama_model = (cfg.ollama_model or "gemma4:e4b")         if cfg else "gemma4:e4b"
+
+    generated_title = ""
+    try:
+        if _orchestrator:
+            async with _orchestrator._ollama_semaphore:
+                async for chunk in _orchestrator.ollama.generate_stream(
+                    prompt=title_prompt,
+                    url=ollama_url,
+                    model=ollama_model,
+                    think=False,  # Pas de réflexion pour un titre
+                    options={"temperature": 0.3, "num_ctx": 512}
+                ):
+                    text = chunk.get("message", {}).get("content", "") or chunk.get("response", "")
+                    if text:
+                        generated_title += text
+                    if chunk.get("done"):
+                        break
+    except Exception as e:
+        logger.error("ChatRouter", f"Auto-title error: {e}")
+        return {"title": conv.title}
+
+    # Nettoyer le titre généré
+    generated_title = generated_title.strip().strip('"\'\'"').rstrip('.!?')
+    # Garder seulement la première ligne
+    generated_title = generated_title.split('\n')[0].strip()
+    if not generated_title:
+        return {"title": conv.title}
+
+    # Préfixer avec l'ID de détection si disponible
+    if conv.analysis_id:
+        analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
+        if analysis and analysis.detection_id:
+            generated_title = f"[#{analysis.detection_id}] {generated_title}"
+
+    # Sauvegarder en BDD
+    conv.title = generated_title
+    db.commit()
+
+    return {"title": generated_title}
 
 
 @router.delete("/api/messages/{conv_id}")

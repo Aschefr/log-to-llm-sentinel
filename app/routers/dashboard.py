@@ -83,6 +83,7 @@ def get_recent_analyses(limit: int = 10, rule_id: int | None = None, severity: s
 
         results = q.order_by(Analysis.analyzed_at.desc()).limit(limit).all()
         
+        import json as _json
         return [
             {
                 "id": a.id,
@@ -93,6 +94,7 @@ def get_recent_analyses(limit: int = 10, rule_id: int | None = None, severity: s
                 "severity": a.severity,
                 "detection_id": a.detection_id,
                 "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
+                "matched_keywords": _json.loads(a.matched_keywords_json) if a.matched_keywords_json else [],
             }
             for a, rule_name in results
         ]

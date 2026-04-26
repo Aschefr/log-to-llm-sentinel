@@ -141,7 +141,9 @@
     "label_user": "You",
     "label_context": "Attached Analysis",
     "regenerate": "Regenerate",
-    "edit_resend": "Edit and resend"
+    "edit_resend": "Edit and resend",
+    "show_in_monitor": "🔍 View in Monitor",
+    "label_ollama": "Ollama"
   },
   "config": {
     "title": "Global Configuration",
@@ -240,6 +242,7 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "copy_analysis": "Copy analysis",
-    "delete_analysis": "Delete this analysis"
+    "delete_analysis": "Delete this analysis",
+    "view_in_monitor": "View in Monitor"
   }
 }

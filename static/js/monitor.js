@@ -23,6 +23,20 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('monitor-search-id').addEventListener('keydown', e => {
         if (e.key === 'Enter') searchById();
     });
+
+    // ─── Auto-recherche via query param ?search=<id> ──────────────────────
+    // Utilisé depuis le bouton "Afficher dans Monitor" du Chat / Dashboard
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchParam = urlParams.get('search');
+    if (searchParam) {
+        const searchInput = document.getElementById('monitor-search-id');
+        if (searchInput) {
+            searchInput.value = searchParam;
+            // Attendre que les règles soient chargées avant de lancer la recherche
+            // (petit délai pour s'assurer que le DOM est prêt)
+            setTimeout(() => searchById(), 300);
+        }
+    }
 });
 
 // ─── Chargement des règles / onglets ───────────────────────────────────────
@@ -457,7 +471,7 @@ async function loadRuleAnalyses(ruleId) {
                         ? a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')
                         : '<em>N/A</em>'}
                 </div>
-                <div class="analysis-line">${escapeHtml(a.triggered_line || '')}</div>
+                <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
                 <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; gap: 0.5rem;">

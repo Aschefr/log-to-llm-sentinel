@@ -1197,6 +1197,34 @@ body {
 .kw-filter-label { font-size: 0.78rem; color: var(--warning); font-weight: 600; margin-left: 0.5rem; }
 .kw-filter-label.hidden { display: none; }
 
+/* --- Keyword highlight in triggered lines -------------------------------- */
+mark.kw-highlight {
+    background: rgba(251, 191, 36, 0.22);
+    color: #fcd34d;
+    border-radius: 2px;
+    padding: 0 2px;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(251, 191, 36, 0.5);
+}
+
+/* --- Analysis keywords row (Dashboard) ----------------------------------- */
+.analysis-keywords {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.8rem;
+}
+.analysis-keywords .kw-label {
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-right: 0.1rem;
+}
+
+
 /* --- Ollama debug logs ----------------------------------------------- */
 .ollama-log-entry { padding: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); flex-direction: column; gap: 0; }
 .ollama-debug-block { margin-top: 0.5rem; }
