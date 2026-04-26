@@ -205,6 +205,16 @@ async function loadConfigs() {
             `;
         }
         container.innerHTML = html;
+
+        // Vérifier les analyses en cours (persistance cross-navigation)
+        try {
+            const runningRes = await apiFetch('/api/meta-analysis/running');
+            if (runningRes.running && runningRes.running.length > 0) {
+                runningRes.running.forEach(configId => {
+                    _setTriggerStatus(configId, null, true, null, configId);
+                });
+            }
+        } catch (_) { /* silencieux */ }
     } catch (e) {
         container.innerHTML = `<div style="color:var(--danger)">Erreur: ${e.message}</div>`;
     }
@@ -249,13 +259,13 @@ function _renderPreview(configId) {
         const ps = new Date(data.period_start).toLocaleString();
         const pe = new Date(data.period_end).toLocaleString();
         periodHeader = `<div style="font-size:0.82rem; color:var(--text-secondary); background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:4px; padding:0.4rem 0.75rem; margin-bottom:0.75rem;">
-            📅 Période couverte : <strong>${ps}</strong> → <strong>${pe}</strong>
-            &nbsp;&nbsp;•&nbsp;&nbsp; ${data.analyses_count || 0} événement(s)
+            📅 ${window.t('meta.preview_period')} : <strong>${ps}</strong> → <strong>${pe}</strong>
+            &nbsp;&nbsp;•&nbsp;&nbsp; ${data.analyses_count || 0} ${window.t('meta.events_count')}
         </div>`;
     }
     
     if (!data || !data.rules_context || data.rules_context.length === 0) {
-        container.innerHTML = `<p style="color:var(--text-secondary);">Aucune analyse disponible pour ces r\u00e8gles.</p>`;
+        container.innerHTML = periodHeader + `<p style="color:var(--text-secondary);">${window.t('meta.no_context_available')}</p>`;
         return;
     }
 
@@ -274,14 +284,26 @@ function _renderPreview(configId) {
                     <span style="font-size:0.75rem; color:var(--text-secondary);">${e.date}</span>
                     <span style="font-size:0.75rem; font-weight:600; color:${sevColor};">${e.severity}</span>
                     <a href="/monitor?search=${encodeURIComponent(e.detection_id)}" class="btn btn-secondary btn-sm" style="padding:0.1rem 0.4rem; font-size:0.7rem;">🔍 ${e.detection_id}</a>
-                    <button type="button" onclick="_deletePreviewEntry(${configId},${ruleIdx},${entryIdx})" title="Exclure de l'analyse" style="margin-left:auto; background:none; border:1px solid var(--danger); color:var(--danger); border-radius:3px; padding:0.1rem 0.4rem; font-size:0.75rem; cursor:pointer; line-height:1;">× Exclure</button>
+                    <button type="button" onclick="_deletePreviewEntry(${configId},${ruleIdx},${entryIdx})" title="${window.t('meta.exclude_btn')}" style="margin-left:auto; background:none; border:1px solid var(--danger); color:var(--danger); border-radius:3px; padding:0.1rem 0.4rem; font-size:0.75rem; cursor:pointer; line-height:1;">× ${window.t('meta.exclude_btn')}</button>
                 </div>
                 <div style="font-family:monospace; font-size:0.78rem; background:rgba(0,0,0,0.3); padding:0.3rem 0.5rem; border-radius:3px; white-space:pre-wrap; word-break:break-all;">${escapeHtml(e.triggered_line)}</div>
                 <div style="font-size:0.78rem; color:var(--text-secondary); font-style:italic;">IA : ${escapeHtml(e.short_ia)}</div>
                 ${kwBadges ? `<div style="display:flex; flex-wrap:wrap; gap:0.25rem;">${kwBadges}</div>` : ''}
-                <textarea placeholder="Annotation (optionnel)..." data-config="${configId}" data-rule="${ruleIdx}" data-entry="${entryIdx}" onchange="_updateAnnotation(this)" style="width:100%; font-size:0.78rem; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:3px; color:var(--text-primary); padding:0.3rem; resize:vertical; min-height:40px; font-family:inherit; margin-top:0.1rem;">${e.annotation || ''}</textarea>
+                <textarea placeholder="${window.t('meta.annotation_placeholder')}" data-config="${configId}" data-rule="${ruleIdx}" data-entry="${entryIdx}" onchange="_updateAnnotation(this)" style="width:100%; font-size:0.78rem; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:3px; color:var(--text-primary); padding:0.3rem; resize:vertical; min-height:40px; font-family:inherit; margin-top:0.1rem;">${e.annotation || ''}</textarea>
             </div>`;
         }).join('');
+
+        // Badges des entrées exclues avec bouton Restaurer
+        const excludedEntries = ruleCtx.entries.map((e, idx) => ({...e, _origIdx: idx})).filter(e => e._excluded);
+        const excludedRestoreHtml = excludedEntries.length > 0 ? `
+            <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-top:0.5rem; padding-top:0.5rem; border-top:1px dashed rgba(255,255,255,0.1);">
+                <span style="font-size:0.75rem; color:var(--text-secondary); align-self:center;">${window.t('meta.restore_btn')} :</span>
+                ${excludedEntries.map(e => `
+                    <button type="button" onclick="_restorePreviewEntry(${configId},${ruleIdx},${e._origIdx})"
+                        style="font-size:0.72rem; background:rgba(255,255,255,0.05); border:1px solid var(--danger); color:var(--danger); border-radius:3px; padding:0.1rem 0.5rem; cursor:pointer; line-height:1.4;">
+                        ↺ ${e.detection_id}
+                    </button>`).join('')}
+            </div>` : '';
 
         const excludedBadge = excludedCount > 0
             ? (() => {
@@ -293,9 +315,10 @@ function _renderPreview(configId) {
         <div class="card" style="padding:1rem; border-left:3px solid var(--accent);">
             <div style="font-weight:600; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
                 <span>📌 ${escapeHtml(ruleCtx.rule_name)}${excludedBadge}</span>
-                <span style="font-size:0.8rem; color:var(--text-secondary);">${activeEntries.length} entrée(s)</span>
+                <span style="font-size:0.8rem; color:var(--text-secondary);">${activeEntries.length} ${window.t('meta.entries_count')}</span>
             </div>
             <div style="display:flex; flex-direction:column; gap:0.5rem;">${entriesHtml}</div>
+            ${excludedRestoreHtml}
         </div>`;
     }).join('');
 
@@ -305,17 +328,17 @@ function _renderPreview(configId) {
 }
 
 function _deletePreviewEntry(configId, ruleIdx, entryIdx) {
-    const el = document.getElementById(`entry-${configId}-${ruleIdx}-${entryIdx}`);
-    if (el) el.remove();
     if (_previewData[configId]) {
         _previewData[configId].rules_context[ruleIdx].entries[entryIdx]._excluded = true;
     }
-    // Mettre à jour le compteur
-    const ruleCtx = _previewData[configId]?.rules_context[ruleIdx];
-    if (ruleCtx) {
-        const card = document.querySelector(`#preview-rules-${configId} .card:nth-child(${ruleIdx + 1}) [style*='color:var(--text-secondary)']`);
-        if (card) card.textContent = `${ruleCtx.entries.filter(e => !e._excluded).length} entrée(s)`;
+    _renderPreview(configId);
+}
+
+function _restorePreviewEntry(configId, ruleIdx, entryIdx) {
+    if (_previewData[configId]) {
+        _previewData[configId].rules_context[ruleIdx].entries[entryIdx]._excluded = false;
     }
+    _renderPreview(configId);
 }
 
 function _updateAnnotation(el) {

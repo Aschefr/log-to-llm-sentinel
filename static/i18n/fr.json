@@ -310,6 +310,14 @@
     "excluded_one": "retiré du contexte",
     "excluded_many": "retirés du contexte",
     "next_run_label": "Prochaine analyse",
-    "next_period_label": "Période prévue"
+    "next_period_label": "Période prévue",
+    "preview_period": "Période couverte",
+    "events_count": "événement(s)",
+    "entries_count": "entrée(s)",
+    "exclude_btn": "Exclure",
+    "annotation_placeholder": "Annotation (optionnel)...",
+    "restore_btn": "Restaurer",
+    "no_context_available": "Aucune analyse disponible pour ces règles.",
+    "unfold_to_load": "Dépliez pour charger..."
   }
 }

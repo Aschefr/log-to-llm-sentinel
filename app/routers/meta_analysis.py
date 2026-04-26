@@ -10,6 +10,10 @@ from app.services.meta_service import MetaAnalysisService
 
 router = APIRouter(prefix="/api/meta-analysis", tags=["meta-analysis"])
 
+# Suivi des analyses en cours (config_id -> True)
+_running_configs: set = set()
+_cancel_requests: set = set()
+
 def get_db():
     db = SessionLocal()
     try:
@@ -126,10 +130,29 @@ async def trigger_meta_analysis(config_id: int, background_tasks: BackgroundTask
 
     # On exécute de manière asynchrone pour ne pas bloquer la requête
     async def task_runner():
-        await meta_service.execute_meta_analysis(config_id, custom_context=custom_context)
+        _running_configs.add(config_id)
+        _cancel_requests.discard(config_id)
+        try:
+            await meta_service.execute_meta_analysis(config_id, custom_context=custom_context)
+        finally:
+            _running_configs.discard(config_id)
+            _cancel_requests.discard(config_id)
         
     background_tasks.add_task(task_runner)
     return {"status": "ok", "message": "Méta-analyse lancée en arrière-plan"}
+
+
+@router.get("/running")
+async def get_running_configs():
+    """Retourne la liste des config_id dont l'analyse est actuellement en cours."""
+    return {"running": list(_running_configs)}
+
+
+@router.post("/cancel/{config_id}")
+async def cancel_meta_analysis(config_id: int):
+    """Demande l'annulation d'une analyse en cours."""
+    _cancel_requests.add(config_id)
+    return {"status": "ok"}
 
 
 # ---- RESULTS ----
