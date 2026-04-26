@@ -126,26 +126,52 @@ async function loadRules() {
 }
 
 let _ruleSessionTimers = {};
+const _completedSessions = new Set(); // session IDs already finished — don't re-poll
 
 function _pollAllLearningSessions(rules) {
     rules.forEach(rule => {
+        const sid = rule.last_learning_session_id;
+        // Skip sessions we already completed
+        if (_completedSessions.has(sid)) return;
+
         // Clear existing timer for this rule
         if (_ruleSessionTimers[rule.id]) {
             clearInterval(_ruleSessionTimers[rule.id]);
             delete _ruleSessionTimers[rule.id];
         }
         // Fetch once immediately
-        _fetchAndApplySession(rule.id, rule.last_learning_session_id);
+        _fetchAndApplySession(rule.id, sid);
         // Then poll every 3s
         _ruleSessionTimers[rule.id] = setInterval(async () => {
-            const done = await _fetchAndApplySession(rule.id, rule.last_learning_session_id);
+            const done = await _fetchAndApplySession(rule.id, sid);
             if (done) {
                 clearInterval(_ruleSessionTimers[rule.id]);
                 delete _ruleSessionTimers[rule.id];
-                loadRules(); // refresh card with final keywords
+                _completedSessions.add(sid);
+                // Update only the keywords line in this card, no full reload
+                _refreshCardKeywords(rule.id);
             }
         }, 3000);
     });
+}
+
+/** Update only the keywords paragraph in a rule card without rebuilding the whole list */
+async function _refreshCardKeywords(ruleId) {
+    try {
+        const rules = await apiFetch('/api/rules');
+        const rule = rules.find(r => r.id === ruleId);
+        if (!rule) return;
+        const card = document.getElementById(`rule-card-${ruleId}`);
+        if (!card) return;
+        // Update keyword line (3rd <p> in .rule-info)
+        const kwLine = card.querySelector('.rule-info p:nth-child(3)');
+        if (kwLine) {
+            kwLine.innerHTML = `🔑 ${
+                rule.keywords.join(', ') ||
+                `<em style="opacity:.5">${window.t ? window.t('rules.no_keywords') : 'Aucun mot-clé'}</em>`
+            }`;
+        }
+    } catch(e) { /* silent */ }
 }
 
 async function _fetchAndApplySession(ruleId, sessionId) {
