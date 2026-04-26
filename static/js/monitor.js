@@ -100,7 +100,7 @@ function selectTab(ruleId) {
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.delete('line');
         window.history.replaceState({}, document.title, newUrl.toString());
-    } else {
+    } else if (!activeKeywordFilter) {
         activeKeywordFilter = '__matches__'; // Par défaut
     }
     
@@ -275,6 +275,12 @@ async function fetchLogs(rule) {
         // Réappliquer le filtre mot-clé actif
         applyKeywordFilter(rule.id);
         updateFilterLabel(rule.id);
+        
+        // S'assurer que les badges reflètent bien l'état actif
+        document.querySelectorAll('.kw-filter-btn').forEach(b => {
+            const bKw = decodeURIComponent(b.dataset.kw || '');
+            b.classList.toggle('active', bKw === activeKeywordFilter);
+        });
 
     } catch (e) {
         viewer.innerHTML = `<em class="no-logs" style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</em>`;
