@@ -266,7 +266,7 @@ async function loadRulesStatus() {
                     <div style="margin-top:0.5rem; padding:0.5rem 0.6rem; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:6px;">
                         <div style="display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap; margin-bottom:0.35rem;">
                             <strong style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; letter-spacing:0.05em;">${window.t('dashboard.last_trigger')}</strong>
-                            ${rule.last_analysis_severity ? `<span class="severity-badge severity-${rule.last_analysis_severity}" style="font-size:0.65rem; padding:0.1rem 0.4rem;">${rule.last_analysis_severity.toUpperCase()}</span>` : ''}
+                            ${rule.last_analysis_severity ? `<span class="severity-badge ${rule.last_analysis_severity}" style="font-size:0.65rem; padding:0.1rem 0.4rem;">${rule.last_analysis_severity.toUpperCase()}</span>` : ''}
                             ${rule.last_analysis_at ? `<span style="font-size:0.7rem; opacity:0.55;">${new Date(rule.last_analysis_at).toLocaleString()}</span>` : ''}
                             <a href="/monitor?search=${encodeURIComponent(rule.last_detection_id)}" style="margin-left:auto; background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.4); color:var(--accent); border-radius:4px; padding:0.1rem 0.5rem; font-size:0.7rem; text-decoration:none; font-family:monospace; transition:background 0.2s;" onmouseover="this.style.background='rgba(99,102,241,0.3)'" onmouseout="this.style.background='rgba(99,102,241,0.15)'">#${escapeHtml(rule.last_detection_id)} ↗</a>
                         </div>
