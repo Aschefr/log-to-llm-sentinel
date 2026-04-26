@@ -65,21 +65,37 @@
                     </div>
                 </div>
                 <div class="form-group">
-                    <label for="rule-keywords" data-i18n="rules.label_keywords">Mots-clés (séparés par des virgules)</label>
-                    <input type="text" id="rule-keywords" list="keywords-suggestions" data-i18n-placeholder="rules.placeholder_keywords" placeholder="error, exception, fatal">
-                    <datalist id="keywords-suggestions"></datalist>
-                    <div class="keyword-chips" id="keyword-chips"></div>
-                    <div style="display:flex;align-items:center;gap:.6rem;margin-top:.4rem">
-                        <div class="form-hint" data-i18n="rules.keywords_hint" style="margin:0">Clique sur une suggestion pour l'ajouter, ou écris librement.</div>
-                        <button type="button" id="kw-autolearn-btn" class="btn btn-secondary btn-sm" style="white-space:nowrap;flex-shrink:0" onclick="kwWizardOpen()">🤖 Auto-apprendre</button>
+                    <label data-i18n="rules.label_keywords">Mots-clés</label>
+
+                    <!-- Tab switcher -->
+                    <div class="kw-tabs" role="tablist">
+                        <button type="button" id="kw-tab-manual" class="kw-tab kw-tab--active"
+                                role="tab" aria-selected="true" onclick="kwTabSwitch('manual')">
+                            ✏️ Mots-clés manuels
+                        </button>
+                        <button type="button" id="kw-tab-auto" class="kw-tab"
+                                role="tab" aria-selected="false" onclick="kwTabSwitch('auto')">
+                            🤖 Auto-apprentissage
+                        </button>
                     </div>
-                    <!-- Keyword auto-learning wizard (inline, hidden by default) -->
-                    <div id="kw-wizard" class="kw-wizard kw-wizard--hidden" style="margin-top:.75rem">
-                        <div class="kw-wizard-header">
-                            <span>🤖 Auto-apprentissage des mots-clés</span>
-                            <button type="button" class="kw-wizard-close" onclick="kwWizardClose()">×</button>
+
+                    <!-- Panel: manual keywords -->
+                    <div id="kw-panel-manual" class="kw-tab-panel">
+                        <input type="text" id="rule-keywords" list="keywords-suggestions"
+                               data-i18n-placeholder="rules.placeholder_keywords"
+                               placeholder="error, exception, fatal">
+                        <datalist id="keywords-suggestions"></datalist>
+                        <div class="keyword-chips" id="keyword-chips"></div>
+                        <div class="form-hint" data-i18n="rules.keywords_hint">
+                            Clique sur une suggestion pour l'ajouter, ou écris librement.
                         </div>
-                        <div id="kw-wizard-body" class="kw-wizard-body"></div>
+                    </div>
+
+                    <!-- Panel: auto-learning wizard -->
+                    <div id="kw-panel-auto" class="kw-tab-panel kw-tab-panel--hidden">
+                        <div id="kw-wizard" class="kw-wizard">
+                            <div id="kw-wizard-body" class="kw-wizard-body"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="form-group">

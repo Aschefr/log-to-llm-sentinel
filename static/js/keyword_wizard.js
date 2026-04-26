@@ -45,40 +45,65 @@ function _allowedGranularities(durationS) {
     return [86400, 7*86400, 14*86400];
 }
 
-/* ── Entry points ───────────────────────────────────────────────────────── */
-function kwWizardOpen() {
-    const wizard = document.getElementById('kw-wizard');
-    if (!wizard) return;
-    _wizardReset();
-    wizard.classList.remove('kw-wizard--hidden');
+/* ── Tab switch (replaces kwWizardOpen / kwWizardClose) ─────────────────── */
+function kwTabSwitch(tab) {
+    const manualPanel = document.getElementById('kw-panel-manual');
+    const autoPanel   = document.getElementById('kw-panel-auto');
+    const manualTab   = document.getElementById('kw-tab-manual');
+    const autoTab     = document.getElementById('kw-tab-auto');
+    const origSave    = document.querySelector('#rule-form .form-actions button[type="submit"]');
+    const launchBtn   = document.getElementById('kw-launch-main-btn');
 
-    // Swap: hide "Enregistrer", show launch button
-    const origSave = document.querySelector('#rule-form .form-actions button[type="submit"]');
-    const replBtn  = document.getElementById('kw-launch-main-btn');
-    if (origSave) origSave.classList.add('hidden');
-    if (replBtn)  replBtn.classList.remove('hidden');
+    if (tab === 'auto') {
+        // Switch to auto-learning panel
+        manualPanel.classList.add('kw-tab-panel--hidden');
+        autoPanel.classList.remove('kw-tab-panel--hidden');
+        manualTab.classList.remove('kw-tab--active');
+        autoTab.classList.add('kw-tab--active');
+        manualTab.setAttribute('aria-selected', 'false');
+        autoTab.setAttribute('aria-selected', 'true');
 
-    _renderConfigPhase();
-    _watchFormValidation();
+        // Swap buttons
+        if (origSave)  origSave.classList.add('hidden');
+        if (launchBtn) launchBtn.classList.remove('hidden');
+
+        // Render wizard if body is empty
+        const body = document.getElementById('kw-wizard-body');
+        if (body && !body.innerHTML.trim()) _renderConfigPhase();
+        _watchFormValidation();
+    } else {
+        // Switch to manual panel
+        autoPanel.classList.add('kw-tab-panel--hidden');
+        manualPanel.classList.remove('kw-tab-panel--hidden');
+        autoTab.classList.remove('kw-tab--active');
+        manualTab.classList.add('kw-tab--active');
+        autoTab.setAttribute('aria-selected', 'false');
+        manualTab.setAttribute('aria-selected', 'true');
+
+        // Restore buttons
+        if (origSave)  origSave.classList.remove('hidden');
+        if (launchBtn) launchBtn.classList.add('hidden');
+
+        // Re-enable keyword input
+        const kwInput = document.getElementById('rule-keywords');
+        if (kwInput) kwInput.removeAttribute('readonly');
+    }
 }
 
-function kwWizardClose() {
-    const wizard = document.getElementById('kw-wizard');
-    if (!wizard) return;
+/* Keep legacy aliases so resetForm() in rules.js still works */
+function kwWizardOpen()  { kwTabSwitch('auto');   }
+function kwWizardClose() { kwTabSwitch('manual'); }
+
+/* Called by rules.js resetForm() to fully reset the tab state */
+function kwWizardReset() {
     _stopAllPolling();
-    wizard.classList.add('kw-wizard--hidden');
-
-    // Restore "Enregistrer", hide launch button
-    const origSave = document.querySelector('#rule-form .form-actions button[type="submit"]');
-    const replBtn  = document.getElementById('kw-launch-main-btn');
-    if (origSave) origSave.classList.remove('hidden');
-    if (replBtn)  replBtn.classList.add('hidden');
-
-    const kwInput = document.getElementById('rule-keywords');
-    if (kwInput) kwInput.removeAttribute('readonly');
-
     _wizardReset();
+    // Reset tab to manual
+    const body = document.getElementById('kw-wizard-body');
+    if (body) body.innerHTML = '';
+    kwTabSwitch('manual');
 }
+
 
 /* ── Internal helpers ───────────────────────────────────────────────────── */
 function _wizardReset() {

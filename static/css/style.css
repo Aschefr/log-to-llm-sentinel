@@ -1608,17 +1608,50 @@ mark.kw-highlight {
    Keyword Auto-Learning Wizard
    ═══════════════════════════════════════════════ */
 
+/* Tab switcher */
+.kw-tabs {
+    display: flex;
+    gap: 2px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 0.75rem;
+}
+.kw-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    border-radius: 6px;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+    padding: 0.4rem 0.75rem;
+    transition: background 0.18s, color 0.18s;
+    white-space: nowrap;
+}
+.kw-tab:hover:not(.kw-tab--active) {
+    background: rgba(255,255,255,0.06);
+    color: var(--text-secondary);
+}
+.kw-tab--active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+}
+
+/* Tab panels */
+.kw-tab-panel { display: block; }
+.kw-tab-panel--hidden { display: none !important; }
+
 .kw-wizard {
-    border-left: 3px solid var(--accent);
-    border-radius: 0 8px 8px 0;
-    background: rgba(99, 102, 241, 0.05);
     border: 1px solid rgba(99, 102, 241, 0.2);
     border-left-width: 3px;
     border-radius: 8px;
     overflow: hidden;
     transition: all 0.25s ease;
 }
-.kw-wizard--hidden { display: none !important; }
 
 .kw-wizard-header {
     display: flex;
