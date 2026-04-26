@@ -119,9 +119,9 @@ function _updateLaunchBtn() {
 
 /* ── Phase 1: Config ────────────────────────────────────────────────────── */
 function _renderConfigPhase() {
-    const now       = new Date();
-    const yesterday = new Date(now - 24 * 3600 * 1000);
-    const toLocal   = d => {
+    const now      = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 3600 * 1000);
+    const toLocal  = d => {
         const p = n => String(n).padStart(2, '0');
         return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
     };
@@ -139,9 +139,9 @@ function _renderConfigPhase() {
         <div class="kw-config-grid">
             <label class="kw-label">Période d'analyse <span style="opacity:.5;font-size:.75em">(heure locale)</span></label>
             <div class="kw-period-row">
-                <input type="datetime-local" id="kw-period-start" value="${toLocal(yesterday)}" class="kw-input">
+                <input type="datetime-local" id="kw-period-start" value="${toLocal(now)}"      class="kw-input">
                 <span style="opacity:.5">→</span>
-                <input type="datetime-local" id="kw-period-end"   value="${toLocal(now)}"       class="kw-input">
+                <input type="datetime-local" id="kw-period-end"   value="${toLocal(tomorrow)}" class="kw-input">
             </div>
             <label class="kw-label" style="margin-top:.75rem">
                 Granularité (taille d'un paquet)
