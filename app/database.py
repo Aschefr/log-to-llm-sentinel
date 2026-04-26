@@ -37,6 +37,7 @@ def init_db():
         "ALTER TABLE meta_analysis_configs ADD COLUMN schedule_time VARCHAR DEFAULT '00:00'",
         "ALTER TABLE meta_analysis_configs ADD COLUMN schedule_day INTEGER DEFAULT 1",
         "ALTER TABLE meta_analysis_results ADD COLUMN context_sent TEXT DEFAULT NULL",
+        "ALTER TABLE rules ADD COLUMN last_learning_session_id INTEGER DEFAULT NULL",
     ]
     with engine.connect() as conn:
         for sql in migrations:
