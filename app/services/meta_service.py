@@ -11,6 +11,13 @@ from app.services.notification_service import NotificationService
 from app import logger
 
 
+def _last_paragraph(text: str, max_len: int = 500) -> str:
+    """Retourne le dernier paragraphe non vide du texte (souvent le Résumé court IA)."""
+    paras = [p.strip() for p in text.split('\n\n') if p.strip()]
+    last = paras[-1] if paras else text.strip()
+    return (last[:max_len] + '…') if len(last) > max_len else last
+
+
 class MetaAnalysisService:
     """
     Service gérant les méta-analyses périodiques.
@@ -137,7 +144,7 @@ class MetaAnalysisService:
                     try: all_kws.update(json.loads(analysis.matched_keywords_json))
                     except: pass
                 date_str = analysis.analyzed_at.strftime('%Y-%m-%dT%H:%M:%SZ')
-                short_ia = analysis.ollama_response.split('\n\n')[0][:200] + '...' if analysis.ollama_response else 'N/A'
+                short_ia = _last_paragraph(analysis.ollama_response) if analysis.ollama_response else 'N/A'
                 by_rule[rule_id]['entries'].append({
                     'date': date_str,
                     'severity': analysis.severity.upper(),
@@ -258,7 +265,7 @@ class MetaAnalysisService:
                         except: pass
                     rule_name = rule.name if rule else "Inconnue"
                     date_str = analysis.analyzed_at.strftime("%Y-%m-%d %H:%M:%S")
-                    short_ia = analysis.ollama_response.split("\n\n")[0][:200] + "..." if analysis.ollama_response else "N/A"
+                    short_ia = _last_paragraph(analysis.ollama_response) if analysis.ollama_response else "N/A"
                     block = f"[{date_str}] [SEVERITY: {analysis.severity.upper()}] [R\u00e8gle: {rule_name}] [ID: {analysis.detection_id}]\nLigne: {analysis.triggered_line[:500]}\nIA unitaire: {short_ia}"
                     compressed_data.append(block)
 
