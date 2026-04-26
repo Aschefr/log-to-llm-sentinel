@@ -1,6 +1,11 @@
 let allRules = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Re-rendre le contenu dynamique lors d'un changement de langue (ou lors de son initialisation asynchrone)
+    window.i18n?.onLanguageChange(() => {
+        loadConfigs();
+    });
+
     await loadRules();
     await loadConfigs();
 
@@ -16,11 +21,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         opt.value = i; opt.textContent = i;
         daySelect.appendChild(opt);
     }
-
-    // Re-rendre le contenu dynamique lors d'un changement de langue
-    window.i18n?.onLanguageChange(() => {
-        loadConfigs();
-    });
 });
 
 function updateScheduleUI() {
