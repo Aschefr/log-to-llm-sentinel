@@ -69,36 +69,50 @@ async function loadRules() {
     }
 }
 
+// --- Schedule time helpers (local <-> UTC) ---
+// getTimezoneOffset() = (UTC - local) in minutes, e.g. UTC+2 → -120
+function _scheduleLocalToUTC(localHHMM) {
+    const [lh, lm] = localHHMM.split(':').map(Number);
+    const totalUTC = (lh * 60 + lm + new Date().getTimezoneOffset() + 1440) % 1440;
+    return String(Math.floor(totalUTC / 60)).padStart(2, '0') + ':' + String(totalUTC % 60).padStart(2, '0');
+}
+function _scheduleUTCToLocal(utcHHMM) {
+    const [uh, um] = utcHHMM.split(':').map(Number);
+    const totalLocal = (uh * 60 + um - new Date().getTimezoneOffset() + 1440) % 1440;
+    return String(Math.floor(totalLocal / 60)).padStart(2, '0') + ':' + String(totalLocal % 60).padStart(2, '0');
+}
+
 /**
- * Calcule la prochaine ex\u00e9cution planifi\u00e9e et la plage temporelle correspondante.
+ * Calcule la prochaine exécution planifiée et la plage temporelle correspondante.
  * Retourne { nextRun: Date, periodStart: Date, periodEnd: Date }
  */
 function _computeNextRun(c) {
     const now = new Date();
-    const [h, m] = (c.schedule_time || '00:00').split(':').map(Number);
+    // schedule_time stored as UTC HH:MM
+    const [sch_h, sch_m] = (c.schedule_time || '00:00').split(':').map(Number);
 
     let nextRun;
 
     if (c.schedule_type === 'daily') {
         nextRun = new Date(now);
-        nextRun.setHours(h, m, 0, 0);
-        if (nextRun <= now) nextRun.setDate(nextRun.getDate() + 1);
+        nextRun.setUTCHours(sch_h, sch_m, 0, 0);
+        if (nextRun <= now) nextRun.setUTCDate(nextRun.getUTCDate() + 1);
 
     } else if (c.schedule_type === 'weekly') {
         // schedule_day : 1=lundi \u2026 7=dimanche (ISO)
         const targetDow = ((c.schedule_day || 1) % 7); // JS: 0=dim, 1=lun...
         nextRun = new Date(now);
-        nextRun.setHours(h, m, 0, 0);
-        const curDow = now.getDay(); // 0=dim
+        nextRun.setUTCHours(sch_h, sch_m, 0, 0);
+        const curDow = now.getUTCDay();
         let diff = targetDow - curDow;
         if (diff < 0 || (diff === 0 && nextRun <= now)) diff += 7;
-        nextRun.setDate(nextRun.getDate() + diff);
+        nextRun.setUTCDate(nextRun.getUTCDate() + diff);
 
     } else { // monthly
         const targetDay = c.schedule_day || 1;
-        nextRun = new Date(now.getFullYear(), now.getMonth(), targetDay, h, m, 0, 0);
+        nextRun = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), targetDay, sch_h, sch_m, 0));
         if (nextRun <= now) {
-            nextRun = new Date(now.getFullYear(), now.getMonth() + 1, targetDay, h, m, 0, 0);
+            nextRun = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, targetDay, sch_h, sch_m, 0));
         }
     }
 
@@ -144,9 +158,9 @@ async function loadConfigs() {
             const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : neverLabel;
             
             let scheduleText = '';
-            if (c.schedule_type === 'daily') scheduleText = `${window.t('meta.schedule_daily')} ${window.t('meta.schedule_hour').toLowerCase()} ${c.schedule_time}`;
-            else if (c.schedule_type === 'weekly') scheduleText = `${window.t('meta.schedule_weekly')} (${window.t('meta.schedule_weekday')} ${c.schedule_day}) ${window.t('meta.schedule_hour').toLowerCase()} ${c.schedule_time}`;
-            else if (c.schedule_type === 'monthly') scheduleText = `${window.t('meta.schedule_monthly')} ${window.t('meta.schedule_monthday').toLowerCase()} ${c.schedule_day} ${window.t('meta.schedule_hour').toLowerCase()} ${c.schedule_time}`;
+            if (c.schedule_type === 'daily') scheduleText = `${window.t('meta.schedule_daily')} ${window.t('meta.schedule_hour').toLowerCase()} ${_scheduleUTCToLocal(c.schedule_time || '00:00')}`;
+            else if (c.schedule_type === 'weekly') scheduleText = `${window.t('meta.schedule_weekly')} (${window.t('meta.schedule_weekday')} ${c.schedule_day}) ${window.t('meta.schedule_hour').toLowerCase()} ${_scheduleUTCToLocal(c.schedule_time || '00:00')}`;
+            else if (c.schedule_type === 'monthly') scheduleText = `${window.t('meta.schedule_monthly')} ${window.t('meta.schedule_monthday').toLowerCase()} ${c.schedule_day} ${window.t('meta.schedule_hour').toLowerCase()} ${_scheduleUTCToLocal(c.schedule_time || '00:00')}`;
             
             // Calcul prochaine exécution (heure locale du navigateur)
             const _nr = c.enabled ? _computeNextRun(c) : null;
@@ -630,7 +644,7 @@ function editConfig(config) {
     document.getElementById('config-schedule-type').value = config.schedule_type || 'daily';
     updateScheduleUI();
     document.getElementById('config-schedule-day').value = config.schedule_day || 1;
-    document.getElementById('config-schedule-time').value = config.schedule_time || '00:00';
+    document.getElementById('config-schedule-time').value = _scheduleUTCToLocal(config.schedule_time || '00:00');
     
     // Mettre à jour les options de contexte selon la langue
     const ctxSelect = document.getElementById('config-context');
@@ -662,7 +676,7 @@ async function saveConfig() {
         rule_ids: ruleIds,
         schedule_type: document.getElementById('config-schedule-type').value,
         schedule_day: document.getElementById('config-schedule-day').value,
-        schedule_time: document.getElementById('config-schedule-time').value,
+        schedule_time: _scheduleLocalToUTC(document.getElementById('config-schedule-time').value),
         context_size: parseInt(document.getElementById('config-context').value),
         max_analyses: parseInt(document.getElementById('config-max').value),
         system_prompt: document.getElementById('config-prompt').value,
