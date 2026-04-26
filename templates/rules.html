@@ -70,11 +70,13 @@
                     <!-- Tab switcher -->
                     <div class="kw-tabs" role="tablist">
                         <button type="button" id="kw-tab-manual" class="kw-tab kw-tab--active"
-                                role="tab" aria-selected="true" onclick="kwTabSwitch('manual')">
+                                role="tab" aria-selected="true" onclick="kwTabSwitch('manual')"
+                                data-i18n="kw.tab_manual">
                             ✏️ Mots-clés manuels
                         </button>
                         <button type="button" id="kw-tab-auto" class="kw-tab"
-                                role="tab" aria-selected="false" onclick="kwTabSwitch('auto')">
+                                role="tab" aria-selected="false" onclick="kwTabSwitch('auto')"
+                                data-i18n="kw.tab_auto">
                             🤖 Auto-apprentissage
                         </button>
                     </div>
@@ -134,7 +136,7 @@
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary" data-i18n="rules.save">Enregistrer</button>
                     <button type="button" id="kw-launch-main-btn" class="btn btn-primary hidden"
-                            onclick="_launchSession()">
+                            onclick="_launchSession()" data-i18n="kw.launch_full">
                         🤖 Auto-apprentissage : Lancer l'analyse
                     </button>
                     <button type="button" id="cancel-rule" class="btn btn-secondary" data-i18n="rules.cancel">Annuler</button>

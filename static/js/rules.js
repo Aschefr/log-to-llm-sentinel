@@ -157,13 +157,19 @@ async function _fetchAndApplySession(ruleId, sessionId) {
         const pct = data.total_packets > 0
             ? Math.round((data.completed_packets / data.total_packets) * 100) : 0;
 
+        const _t = (key, fb, vars) => {
+            let s = window.t ? window.t(key) || fb : fb;
+            if (vars) Object.entries(vars).forEach(([k, v]) => { s = s.replace(`{${k}}`, v); });
+            return s;
+        };
+
         const STATUS = {
-            pending:   `⏳ En attente de démarrage…`,
-            scanning:  `🔍 Scan — ${data.completed_packets}/${data.total_packets} paquets (${pct}%)`,
-            refining:  `🧠 Raffinement IA en cours…`,
-            validated: `✅ Apprentissage terminé`,
-            reverted:  `↩️ Annulé — mots-clés restaurés`,
-            error:     `⚠️ Erreur : ${data.error_message || 'Inconnue'}`,
+            pending:   _t('kw.card_pending',   '⏳ En attente de démarrage…'),
+            scanning:  _t('kw.card_scanning',  '🔍 Scan — {done}/{total} paquets ({pct}%)', { done: data.completed_packets, total: data.total_packets, pct }),
+            refining:  _t('kw.card_refining',  '🧠 Raffinement IA en cours…'),
+            validated: _t('kw.card_validated', '✅ Apprentissage terminé'),
+            reverted:  _t('kw.card_reverted',  '↩️ Annulé — mots-clés restaurés'),
+            error:     _t('kw.card_error',     '⚠️ Erreur : {msg}', { msg: data.error_message || 'Inconnue' }),
         };
 
         const isActive = ['pending', 'scanning', 'refining'].includes(data.status);

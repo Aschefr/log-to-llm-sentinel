@@ -139,7 +139,7 @@ function _updateLaunchBtn() {
     const valid = name.trim().length > 0 && path.trim().length > 0;
     btn.disabled = !valid;
     btn.style.opacity = valid ? '1' : '0.45';
-    btn.title = valid ? '' : 'Renseignez le nom et le chemin du fichier log pour activer';
+    btn.title = valid ? '' : (window.t ? window.t('kw.launch_no_path') : 'Renseignez le nom et le chemin du fichier log pour activer');
 }
 
 /* ── Phase 1: Config ────────────────────────────────────────────────────── */
@@ -153,28 +153,28 @@ function _renderConfigPhase() {
 
     _wizardBody().innerHTML = `
         <div class="kw-phase-steps">
-            <span class="kw-step kw-step--active">1 Config</span>
+            <span class="kw-step kw-step--active">${window.t ? window.t('kw.step_config') : '1 Config'}</span>
             <span class="kw-step-sep">›</span>
-            <span class="kw-step">2 Scan</span>
+            <span class="kw-step">${window.t ? window.t('kw.step_scan') : '2 Scan'}</span>
             <span class="kw-step-sep">›</span>
-            <span class="kw-step">3 Raffinement</span>
+            <span class="kw-step">${window.t ? window.t('kw.step_refine') : '3 Raffinement'}</span>
             <span class="kw-step-sep">›</span>
-            <span class="kw-step">4 Validé</span>
+            <span class="kw-step">${window.t ? window.t('kw.step_validated') : '4 Validé'}</span>
         </div>
         <div class="kw-config-grid">
-            <label class="kw-label">Période d'analyse <span style="opacity:.5;font-size:.75em">(heure locale)</span></label>
+            <label class="kw-label">${window.t ? window.t('kw.period_label') : "Période d'analyse"} <span style="opacity:.5;font-size:.75em">${window.t ? window.t('kw.period_local_hint') : '(heure locale)'}</span></label>
             <div class="kw-period-row">
                 <input type="datetime-local" id="kw-period-start" value="${toLocal(now)}"      class="kw-input">
                 <span style="opacity:.5">→</span>
                 <input type="datetime-local" id="kw-period-end"   value="${toLocal(tomorrow)}" class="kw-input">
             </div>
             <label class="kw-label" style="margin-top:.75rem">
-                Granularité (taille d'un paquet)
+                ${window.t ? window.t('kw.granularity_label') : 'Granularité (taille d\'un paquet)'}
                 <span id="kw-granularity-hint" class="kw-hint"></span>
             </label>
             <select id="kw-granularity" class="kw-input"></select>
             <div id="kw-packets-estimate" class="kw-hint" style="margin-top:.35rem"></div>
-            <div id="kw-config-limit-hint" class="kw-hint" style="margin-top:.35rem;opacity:.55">Limite par paquet : récupération…</div>
+            <div id="kw-config-limit-hint" class="kw-hint" style="margin-top:.35rem;opacity:.55">${window.t ? window.t('kw.limit_loading') : 'Limite par paquet : récupération…'}</div>
         </div>
     `;
 
@@ -219,7 +219,11 @@ function _refreshGranularitySelect() {
     }
 
     const hint = document.getElementById('kw-granularity-hint');
-    if (hint) hint.textContent = `(suggestion : ${GRANULARITY_OPTIONS.find(o => o.value === suggested)?.label || '?'})`;
+    if (hint) {
+        const label = GRANULARITY_OPTIONS.find(o => o.value === suggested)?.label || '?';
+        const tpl   = window.t ? window.t('kw.granularity_suggestion') : '(suggestion : {label})';
+        hint.textContent = tpl.replace('{label}', label);
+    }
 
     _updateEstimate();
 }
@@ -229,8 +233,9 @@ function _updateEstimate() {
     if (!el) return;
     const dur  = _durationS();
     const gran = parseInt((document.getElementById('kw-granularity') || {}).value) || 3600;
-    const n    = Math.max(1, Math.ceil(dur / gran));
-    el.textContent = `≈ ${n} paquet${n > 1 ? 's' : ''} à traiter`;
+    const n = Math.max(1, Math.ceil(dur / gran));
+    const tpl = window.t ? window.t('kw.packets_estimate') : '≈ {n} paquet(s) à traiter';
+    el.textContent = tpl.replace('{n}', n);
 }
 
 async function _fetchMaxChars() {
@@ -238,9 +243,11 @@ async function _fetchMaxChars() {
     if (!el) return;
     try {
         const cfg = await fetch('/api/config').then(r => r.json());
-        el.textContent = `Limite par paquet : ${(cfg.max_log_chars || 5000).toLocaleString()} caractères (config globale)`;
+        const max = cfg.max_log_chars || 5000;
+        const tpl = window.t ? window.t('kw.limit_hint') : 'Limite par paquet : {max} caractères (config globale)';
+        el.textContent = tpl.replace('{max}', max.toLocaleString());
     } catch {
-        el.textContent = 'Limite par paquet : 5 000 caractères (défaut)';
+        el.textContent = window.t ? window.t('kw.limit_default') : 'Limite par paquet : 5 000 caractères (défaut)';
     }
 }
 
@@ -255,12 +262,12 @@ async function _launchSession() {
     const granularity = parseInt((document.getElementById('kw-granularity') || {}).value) || 3600;
 
     if (!periodStart || !periodEnd || new Date(periodEnd) <= new Date(periodStart)) {
-        alert('Période invalide — la date de fin doit être après la date de début.');
+        alert(window.t ? window.t('kw.error_invalid_period') : 'Période invalide — la date de fin doit être après la date de début.');
         return;
     }
 
     const launchBtn = document.getElementById('kw-launch-main-btn');
-    if (launchBtn) { launchBtn.disabled = true; launchBtn.textContent = 'Enregistrement…'; }
+    if (launchBtn) { launchBtn.disabled = true; launchBtn.textContent = window.t ? window.t('kw.launch_saving') : 'Enregistrement…'; }
 
     // Step 1: Save the rule to get a real rule_id
     let ruleId = null;
@@ -285,12 +292,12 @@ async function _launchSession() {
         }).then(r => r.json());
         ruleId = saved.id || parseInt(existingId) || null;
     } catch (e) {
-        alert('Erreur lors de la sauvegarde de la règle : ' + e.message);
-        if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = '▶ Lancer l\'analyse'; }
+        alert((window.t ? window.t('kw.error_save') : 'Erreur lors de la sauvegarde de la règle : ') + e.message);
+        if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = window.t ? window.t('kw.launch_btn') : '▶ Lancer l\'analyse'; }
         return;
     }
 
-    if (launchBtn) launchBtn.textContent = 'Démarrage…';
+    if (launchBtn) launchBtn.textContent = window.t ? window.t('kw.launch_starting') : 'Démarrage…';
 
     // Step 2: Start the learning session
     let sessionId = null;
@@ -311,8 +318,8 @@ async function _launchSession() {
         sessionId = res.session_id;
         _wizardSessionId = sessionId;
     } catch (e) {
-        alert('Erreur lors du lancement de la session : ' + e.message);
-        if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = '▶ Lancer l\'analyse'; }
+        alert((window.t ? window.t('kw.error_start') : 'Erreur lors du lancement de la session : ') + e.message);
+        if (launchBtn) { launchBtn.disabled = false; launchBtn.textContent = window.t ? window.t('kw.launch_btn') : '▶ Lancer l\'analyse'; }
         return;
     }
 
