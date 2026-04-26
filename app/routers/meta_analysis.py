@@ -104,6 +104,16 @@ async def delete_config(config_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"status": "ok"}
 
+@router.post("/configs/{config_id}/reset-last-run")
+async def reset_last_run(config_id: int, db: Session = Depends(get_db)):
+    """Remet last_run_at à None pour que la prochaine fenêtre soit recalculée depuis le schedule."""
+    config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == config_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="Config non trouvée")
+    config.last_run_at = None
+    db.commit()
+    return {"status": "ok"}
+
 
 # ---- TRIGGER ----
 

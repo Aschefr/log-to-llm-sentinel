@@ -184,11 +184,12 @@ async function loadConfigs() {
                         <div>📝 ${rulesText}</div>
                         <div>🕒 ${lastRunLabel} ${lastRun}</div>
                     </div>
-                    ${nextRunHtml}
-                    <div style="display: flex; gap: 0.5rem; margin-top:0.75rem;">
+                    <div style="display: flex; gap: 0.5rem; margin-top:0.75rem; flex-wrap:wrap;">
                         <button class="btn btn-secondary btn-sm" onclick='editConfig(${JSON.stringify(c).replace(/'/g, "&#39;")})'>${window.t('common.edit') || 'Modifier'}</button>
                         <button class="btn btn-secondary btn-sm" style="color:var(--danger); border-color:var(--danger);" onclick="deleteConfig(${c.id}, this)">${window.t('common.delete')}</button>
+                        ${c.last_run_at ? `<button class="btn btn-secondary btn-sm" style="color:var(--warning); border-color:var(--warning); font-size:0.75rem;" onclick="resetLastRun(${c.id}, this)" title="${window.t('meta.reset_last_run_confirm')}">↺ ${window.t('meta.reset_last_run')}</button>` : ''}
                     </div>
+                    ${nextRunHtml}
                 </div>
                 
                 <!-- Accordéons -->
@@ -700,6 +701,18 @@ async function deleteConfig(id, btnElement) {
     showInlineConfirm(btnElement, window.t ? window.t('meta.delete_config_confirm') : 'Are you sure you want to delete this configuration?', async () => {
         try {
             await apiFetch(`/api/meta-analysis/configs/${id}`, { method: 'DELETE' });
+            await loadConfigs();
+        } catch (e) {
+            alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
+        }
+    });
+}
+
+async function resetLastRun(id, btnElement) {
+    showInlineConfirm(btnElement, window.t ? window.t('meta.reset_last_run_confirm') : 'Reset the last run date?', async () => {
+        try {
+            await apiFetch(`/api/meta-analysis/configs/${id}/reset-last-run`, { method: 'POST' });
+            delete _previewData[id];
             await loadConfigs();
         } catch (e) {
             alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);

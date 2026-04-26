@@ -400,6 +400,8 @@
     "analysis_cancelled": "Analyse annulée.",
     "rule_block_label": "Règle:",
     "period_from": "De",
-    "period_to": "à"
+    "period_to": "à",
+    "reset_last_run": "Réinitialiser la période",
+    "reset_last_run_confirm": "Réinitialiser la date du dernier run ? La prochaine période sera recalculée depuis le début du schedule."
   }
 }

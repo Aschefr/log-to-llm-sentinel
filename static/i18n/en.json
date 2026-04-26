@@ -400,6 +400,8 @@
     "analysis_cancelled": "Analysis cancelled.",
     "rule_block_label": "Rule:",
     "period_from": "From",
-    "period_to": "To"
+    "period_to": "To",
+    "reset_last_run": "Reset period",
+    "reset_last_run_confirm": "Reset the last run date? The next period will restart from the schedule default."
   }
 }
