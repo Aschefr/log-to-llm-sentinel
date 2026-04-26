@@ -293,32 +293,34 @@ function _renderPreview(configId) {
             </div>`;
         }).join('');
 
-        // Badges des entrées exclues avec bouton Restaurer
+        // Badges des entrées exclues avec bouton Restaurer inline
         const excludedEntries = ruleCtx.entries.map((e, idx) => ({...e, _origIdx: idx})).filter(e => e._excluded);
-        const excludedRestoreHtml = excludedEntries.length > 0 ? `
-            <div style="display:flex; flex-wrap:wrap; gap:0.35rem; margin-top:0.5rem; padding-top:0.5rem; border-top:1px dashed rgba(255,255,255,0.1);">
-                <span style="font-size:0.75rem; color:var(--text-secondary); align-self:center;">${window.t('meta.restore_btn')} :</span>
-                ${excludedEntries.map(e => `
-                    <button type="button" onclick="_restorePreviewEntry(${configId},${ruleIdx},${e._origIdx})"
-                        style="font-size:0.72rem; background:rgba(255,255,255,0.05); border:1px solid var(--danger); color:var(--danger); border-radius:3px; padding:0.1rem 0.5rem; cursor:pointer; line-height:1.4;">
-                        ↺ ${e.detection_id}
-                    </button>`).join('')}
-            </div>` : '';
+        
+        let excludedBadge = '';
+        if (excludedCount > 0) {
+            const word = excludedCount > 1 ? window.t('meta.excluded_many') : window.t('meta.excluded_one');
+            const badgesHtml = excludedEntries.map(e => `
+                <button type="button" onclick="_restorePreviewEntry(${configId},${ruleIdx},${e._origIdx})"
+                    title="${window.t('meta.restore_btn') || 'Restaurer'}"
+                    style="font-size:0.68rem; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); color:var(--danger); border-radius:4px; padding:0.1rem 0.4rem; margin-left:0.2rem; cursor:pointer; line-height:1.2; vertical-align:middle; transition:0.2s; display:inline-flex; align-items:center; gap:0.2rem;">
+                    <span>↺</span> ${e.detection_id}
+                </button>`).join('');
+                
+            excludedBadge = `<span style="font-size:0.75rem; color:var(--danger); margin-left:0.5rem; display:inline-flex; align-items:center; flex-wrap:wrap; gap:0.2rem; font-weight:normal;">
+                (${excludedCount} ${word}) ${badgesHtml}
+            </span>`;
+        }
 
-        const excludedBadge = excludedCount > 0
-            ? (() => {
-                const word = excludedCount > 1 ? window.t('meta.excluded_many') : window.t('meta.excluded_one');
-                return `<span style="font-size:0.75rem; color:var(--danger); margin-left:0.5rem;">(${excludedCount} ${word})</span>`;
-            })()
-            : '';
         return `
         <div class="card" style="padding:1rem; border-left:3px solid var(--accent);">
-            <div style="font-weight:600; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center;">
-                <span>📌 ${escapeHtml(ruleCtx.rule_name)}${excludedBadge}</span>
+            <div style="font-weight:600; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+                <div style="display:flex; align-items:center; flex-wrap:wrap;">
+                    <span>📌 ${escapeHtml(ruleCtx.rule_name)}</span>
+                    ${excludedBadge}
+                </div>
                 <span style="font-size:0.8rem; color:var(--text-secondary);">${activeEntries.length} ${window.t('meta.entries_count')}</span>
             </div>
             <div style="display:flex; flex-direction:column; gap:0.5rem;">${entriesHtml}</div>
-            ${excludedRestoreHtml}
         </div>`;
     }).join('');
 
