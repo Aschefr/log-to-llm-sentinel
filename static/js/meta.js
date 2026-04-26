@@ -327,9 +327,22 @@ function _renderPreview(configId) {
     }
 }
 
+function _savePreviewState(configId) {
+    if (!_previewData[configId]) return;
+    const state = { exclusions: [], annotations: {} };
+    _previewData[configId].rules_context.forEach(r => {
+        r.entries.forEach(e => {
+            if (e._excluded) state.exclusions.push(e.detection_id);
+            if (e.annotation && e.annotation.trim()) state.annotations[e.detection_id] = e.annotation.trim();
+        });
+    });
+    sessionStorage.setItem(`sentinel_meta_state_${configId}`, JSON.stringify(state));
+}
+
 function _deletePreviewEntry(configId, ruleIdx, entryIdx) {
     if (_previewData[configId]) {
         _previewData[configId].rules_context[ruleIdx].entries[entryIdx]._excluded = true;
+        _savePreviewState(configId);
     }
     _renderPreview(configId);
 }
@@ -337,6 +350,7 @@ function _deletePreviewEntry(configId, ruleIdx, entryIdx) {
 function _restorePreviewEntry(configId, ruleIdx, entryIdx) {
     if (_previewData[configId]) {
         _previewData[configId].rules_context[ruleIdx].entries[entryIdx]._excluded = false;
+        _savePreviewState(configId);
     }
     _renderPreview(configId);
 }
@@ -345,6 +359,7 @@ function _updateAnnotation(el) {
     const { config, rule, entry } = el.dataset;
     if (_previewData[config]?.rules_context[rule]?.entries[entry]) {
         _previewData[config].rules_context[rule].entries[entry].annotation = el.value;
+        _savePreviewState(config);
     }
 }
 
@@ -354,6 +369,20 @@ async function loadPreview(configId) {
     container.innerHTML = `<div class="loading">${window.t('common.loading')}</div>`;
     try {
         const res = await apiFetch(`/api/meta-analysis/trigger/preview/${configId}`);
+        
+        // Restaurer l'état (annotations/exclusions) si existant dans la session
+        try {
+            const saved = JSON.parse(sessionStorage.getItem(`sentinel_meta_state_${configId}`));
+            if (saved) {
+                res.rules_context.forEach(r => {
+                    r.entries.forEach(e => {
+                        if (saved.exclusions.includes(e.detection_id)) e._excluded = true;
+                        if (saved.annotations[e.detection_id]) e.annotation = saved.annotations[e.detection_id];
+                    });
+                });
+            }
+        } catch (_) { /* silencieux */ }
+        
         _previewData[configId] = res;
         _renderPreview(configId);
     } catch (e) {
@@ -664,6 +693,10 @@ async function triggerCustomMeta(id) {
             },
             signal: abortController.signal
         });
+        
+        // Effacer l'état de session une fois l'analyse lancée avec succès
+        sessionStorage.removeItem(`sentinel_meta_state_${id}`);
+
         // Le POST retourne immédiatement (background_task).
         // On poll /running toutes les 2s pour maintenir le bouton Stop tant que l'analyse tourne réellement.
         await _pollUntilDone(id, abortController);
