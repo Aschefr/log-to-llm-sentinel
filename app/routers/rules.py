@@ -100,6 +100,7 @@ def get_rule(rule_id: int):
             "context_lines": rule.context_lines or 5,
             "anti_spam_delay": rule.anti_spam_delay or 60,
             "notify_severity_threshold": rule.notify_severity_threshold or "info",
+            "last_learning_session_id": rule.last_learning_session_id,
         }
     finally:
         db.close()
