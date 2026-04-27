@@ -23,6 +23,16 @@
     // Callbacks à appeler après chaque changement de langue (pour re-rendre le contenu dynamique)
     const _reRenderCallbacks = [];
 
+    // Fallback SVG pour Chrome sur Windows qui ne gère pas les emojis drapeaux
+    const FLAG_SVGS = {
+        '🇫🇷': '<svg viewBox="0 0 3 2" style="width:18px;height:14px;border-radius:2px;display:inline-block;vertical-align:middle;box-shadow:0 0 2px rgba(0,0,0,0.2)"><path fill="#002654" d="M0 0h1v2H0z"/><path fill="#fff" d="M1 0h1v2H1z"/><path fill="#ed2939" d="M2 0h1v2H2z"/></svg>',
+        '🇬🇧': '<svg viewBox="0 0 60 30" style="width:18px;height:14px;border-radius:2px;display:inline-block;vertical-align:middle;box-shadow:0 0 2px rgba(0,0,0,0.2)"><clipPath id="uk-a"><path d="M0 0h60v30H0z"/></clipPath><clipPath id="uk-b"><path d="M30 15h30v15zv15H0zH0V0zV0h30z"/></clipPath><g clip-path="url(#uk-a)"><path fill="#012169" d="M0 0h60v30H0z"/><path stroke="#fff" stroke-width="6" d="M0 0l60 30m0-30L0 30"/><path stroke="#C8102E" stroke-width="4" clip-path="url(#uk-b)" d="M0 0l60 30m0-30L0 30"/><path stroke="#fff" stroke-width="10" d="M30 0v30M0 15h60"/><path stroke="#C8102E" stroke-width="6" d="M30 0v30M0 15h60"/></g></svg>'
+    };
+
+    function getFlagHTML(flagEmoji) {
+        return FLAG_SVGS[flagEmoji] || flagEmoji;
+    }
+
     /**
      * Résout une clé en chemin pointé ("section.key") dans l'objet de traductions.
      * Retourne la clé elle-même si non trouvée (fail-safe visible).
@@ -126,7 +136,7 @@
         container.innerHTML = `
             <div class="lang-switcher-wrapper">
                 <button class="lang-btn" id="lang-toggle-btn" aria-haspopup="true" aria-expanded="false">
-                    <span>${current.flag}</span>
+                    <span>${getFlagHTML(current.flag)}</span>
                     <span class="lang-code">${current.code.toUpperCase()}</span>
                     <svg width="10" height="10" viewBox="0 0 10 10"><path fill="currentColor" d="M5 7L1 3h8z"/></svg>
                 </button>
@@ -135,7 +145,7 @@
                         <button class="lang-option ${l.code === _currentLang ? 'active' : ''}"
                                 onclick="window.switchLanguage('${l.code}')"
                                 role="menuitem">
-                            <span>${l.flag}</span>
+                            <span>${getFlagHTML(l.flag)}</span>
                             <span>${l.name}</span>
                         </button>
                     `).join('')}
@@ -166,7 +176,7 @@
         const btn = document.getElementById('lang-toggle-btn');
         if (btn && current) {
             btn.innerHTML = `
-                <span>${current.flag}</span>
+                <span>${getFlagHTML(current.flag)}</span>
                 <span class="lang-code">${current.code.toUpperCase()}</span>
                 <svg width="10" height="10" viewBox="0 0 10 10"><path fill="currentColor" d="M5 7L1 3h8z"/></svg>
             `;

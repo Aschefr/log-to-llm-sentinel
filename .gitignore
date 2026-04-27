@@ -3,3 +3,21 @@ data/sentinel.db
 logs/host_system_journal.log
 scratch/ha_sentinel_package.yaml
 version.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Config / IDE
+.env
+.idea/
+.vscode/
+*.swp
+
+# Docker Data
+ollama_data/
