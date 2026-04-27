@@ -139,6 +139,8 @@ function _watchFormValidation() {
     if (pathInput) pathInput.addEventListener('input', check);
     // Also watch when the file browser selects a path
     if (pathInput) new MutationObserver(check).observe(pathInput, { attributes: true, attributeFilter: ['value'] });
+    // Re-check when source tabs are clicked (local ↔ webhook)
+    document.querySelectorAll('.source-card').forEach(c => c.addEventListener('click', check));
     _updateLaunchBtn();
 }
 
@@ -147,7 +149,13 @@ function _updateLaunchBtn() {
     const path = (document.getElementById('rule-path') || {}).value || '';
     const btn  = document.getElementById('kw-launch-main-btn');
     if (!btn) return;
-    const valid = name.trim().length > 0 && path.trim().length > 0;
+
+    // Webhook mode: path is empty but token exists → valid
+    const activeSource = document.querySelector('.source-card.kw-tab--active');
+    const isWebhook = activeSource && activeSource.dataset.source === 'webhook';
+    const hasSource = isWebhook ? !!window._currentWebhookToken : path.trim().length > 0;
+
+    const valid = name.trim().length > 0 && hasSource;
     btn.disabled = !valid;
     btn.style.opacity = valid ? '1' : '0.45';
     btn.title = valid ? '' : (window.t ? window.t('kw.launch_no_path') : 'Renseignez le nom et le chemin du fichier log pour activer');
@@ -267,7 +275,12 @@ async function _fetchMaxChars() {
 
 /* ── Launch: save rule → start session → close modal ───────────────────── */
 async function _launchSession() {
-    const logPath  = (document.getElementById('rule-path') || {}).value || '';
+    const activeSource = document.querySelector('.source-card.kw-tab--active');
+    const isWebhook = activeSource && activeSource.dataset.source === 'webhook';
+
+    const logPath  = isWebhook
+        ? '[WEBHOOK]:' + (window._currentWebhookToken || '')
+        : ((document.getElementById('rule-path') || {}).value || '');
     const ruleName = (document.getElementById('rule-name') || {}).value || '';
     if (!logPath || !ruleName) return;
 

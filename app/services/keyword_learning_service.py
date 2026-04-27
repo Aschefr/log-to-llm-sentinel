@@ -8,8 +8,10 @@ Then: immediate auto-validation + notification at each major step.
 """
 import asyncio
 import json
+import os
 import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 
 from app.database import SessionLocal
@@ -27,6 +29,22 @@ _TS_PATTERNS = [
 ]
 
 _CURRENT_YEAR = datetime.utcnow().year
+
+
+def _resolve_log_path(log_path: str) -> str:
+    """Resolve a log_file_path to a physical file path.
+
+    For webhook rules the path is stored as ``[WEBHOOK]:<token>`` in the DB.
+    The webhook router persists received lines to ``data/webhooks/<token>.log``.
+    This helper returns the physical path so the learning service can read it
+    like any other log file.
+    """
+    if log_path and log_path.startswith('[WEBHOOK]:'):
+        token = log_path.split(':', 1)[1]
+        safe = "".join(c for c in token if c.isalnum() or c in "-_")
+        webhook_dir = Path(os.environ.get("SENTINEL_DATA_DIR", "/app/data")) / "webhooks"
+        return str(webhook_dir / f"{safe}.log")
+    return log_path
 
 # ── Prompts ────────────────────────────────────────────────────────────────────
 _PROMPT_PHASE1 = """\
@@ -336,7 +354,7 @@ async def _run_session(session_id: int):
             if not s:
                 return
             rule_id     = s.rule_id
-            log_path    = s.log_file_path
+            log_path    = _resolve_log_path(s.log_file_path)
             period_start = s.period_start
             period_end   = s.period_end
             granularity_s = s.granularity_s
@@ -606,7 +624,7 @@ async def revaluate_session(session_id: int, current_keywords: list[str]):
             KeywordLearningSession.id == session_id).first()
         if not s:
             return
-        log_path  = s.log_file_path
+        log_path  = _resolve_log_path(s.log_file_path)
         max_chars = s.max_chars_per_packet
         n_packets = s.total_packets
         rule_id   = s.rule_id
