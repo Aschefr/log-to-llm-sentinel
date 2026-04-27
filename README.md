@@ -5,12 +5,14 @@
 Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. Unlike traditional tools that just search for text, Sentinel uses **Ollama (Local LLM)** to understand *why* an error happened and tells you exactly what you need to know.
 
 <p align="center">
-  <img src="screenshots/log-to-llm-sentinel_dashboard.png" width="49%" alt="Dashboard Overview">
-  <img src="screenshots/log-to-llm-sentinel_monitor.png" width="49%" alt="Real-time Monitor">
-  <img src="screenshots/log-to-llm-sentinel_chat.png" width="49%" alt="AI Chat Analysis">
-  <img src="screenshots/log-to-llm-sentinel_meta_analysis.png" width="49%" alt="Meta Analysis">
-  <img src="screenshots/log-to-llm-sentinel_rules.png" width="49%" alt="Rules Configuration">
-  <img src="screenshots/log-to-llm-sentinel_config.png" width="49%" alt="System Configuration">
+  <img src="screenshots/log-to-llm-sentinel_dashboard.png" width="100%" alt="Dashboard Overview">
+</p>
+<p align="center">
+  <img src="screenshots/log-to-llm-sentinel_monitor.png" width="19%" alt="Real-time Monitor">
+  <img src="screenshots/log-to-llm-sentinel_chat.png" width="19%" alt="AI Chat Analysis">
+  <img src="screenshots/log-to-llm-sentinel_meta_analysis.png" width="19%" alt="Meta Analysis">
+  <img src="screenshots/log-to-llm-sentinel_rules.png" width="19%" alt="Rules Configuration">
+  <img src="screenshots/log-to-llm-sentinel_config.png" width="19%" alt="System Configuration">
 </p>
 
 ---
