@@ -24,9 +24,11 @@ Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. 
 ## ✨ Key Features
 
 - 🧠 **Smart AI Analysis**: Don't just get alerted; get an explanation. Sentinel uses Ollama to analyze log context and provide a human-readable diagnosis.
+- 💬 **Interactive AI Chat**: Deepen any diagnosis by starting a conversation with the AI. The dedicated chat interface allows you to ask follow-up questions and brainstorm solutions in real-time.
+
 - 🤖 **Keyword Auto-Learning**: Not sure what to look for? Let the AI scan your historical logs. It will automatically suggest and validate the most important keywords to monitor.
 - 🔗 **Home Assistant Ready**: Use Webhooks to stream logs from your smart home directly to Sentinel.
-- 🔔 **Universal Notifications**: Get alerted via Discord, Telegram, Slack, or Email thanks to built-in Apprise support.
+- 🔔 **Smart Notifications**: Integrated with SMTP and Apprise (Discord, Telegram, Slack). Sentinel intelligently adapts to character limits by asking the local AI to generate concise summaries when needed, ensuring critical alerts always fit your favorite messaging platform.
 - 🌍 **Fully Multilingual**: Beautiful interface available in **English** and **French**.
 - 🔒 **100% Private**: Everything runs locally on your machine. No data ever leaves your network.
 
@@ -85,7 +87,7 @@ Once the containers are started, open your browser and go to the port you chose 
 
 ### 💡 The "Auto-Learning" Magic
 Setting up keywords can be tedious. Use the **Auto-Learning Wizard**:
-- Select a time period (e.g., "The last 24 hours").
+- Select a time period (e.g., "The next 24 hours").
 - Sentinel will "read" your logs in chunks.
 - It identifies recurring errors and asks the AI to refine a list of "Actionable Keywords."
 - **Result**: A perfectly tuned monitoring rule in minutes, not hours.
