@@ -119,7 +119,10 @@
     "preview_unavailable": "Preview unavailable:",
     "file_empty_preview": "Empty file.",
     "new_rule_from_template": "New rule (Template)",
-    "delete_confirm": "Are you sure you want to delete this rule?"
+    "delete_confirm": "Are you sure you want to delete this rule?",
+    "no_keywords": "No keywords",
+    "label_source": "Source of logs",
+    "webhook_hint": "Use this URL to send logs to Sentinel via an HTTP POST request. You can test it immediately, even before saving the rule!"
   },
   "monitor": {
     "title": "🔬 Monitor",
@@ -210,7 +213,8 @@
     "regenerate": "Regenerate",
     "edit_resend": "Edit and resend",
     "show_in_monitor": "🔍 View in Monitor",
-    "label_ollama": "Ollama"
+    "label_ollama": "Ollama",
+    "stop": "🛑 Stop"
   },
   "config": {
     "title": "Global Configuration",
