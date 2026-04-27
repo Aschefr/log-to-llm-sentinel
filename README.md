@@ -25,6 +25,7 @@ Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. 
 
 - 🧠 **Smart AI Analysis**: Don't just get alerted; get an explanation. Sentinel uses Ollama to analyze log context and provide a human-readable diagnosis.
 - 💬 **Interactive AI Chat**: Deepen any diagnosis by starting a conversation with the AI. The dedicated chat interface allows you to ask follow-up questions and brainstorm solutions in real-time.
+- 📊 **AI Meta-Analysis**: Get the big picture. Schedule daily, weekly, or monthly reports that aggregate multiple detections into a high-level summary of your system's health and trends.
 
 - 🤖 **Keyword Auto-Learning**: Not sure what to look for? Let the AI scan your historical logs. It will automatically suggest and validate the most important keywords to monitor.
 - 🔗 **Home Assistant Ready**: Use Webhooks to stream logs from your smart home directly to Sentinel.
@@ -91,6 +92,13 @@ Setting up keywords can be tedious. Use the **Auto-Learning Wizard**:
 - Sentinel will "read" your logs in chunks.
 - It identifies recurring errors and asks the AI to refine a list of "Actionable Keywords."
 - **Result**: A perfectly tuned monitoring rule in minutes, not hours.
+
+### 📊 Meta-Analysis: The Big Picture
+For long-term monitoring, use **Meta-Analysis**:
+- Define a schedule (Daily, Weekly, Monthly).
+- Select which rules to include.
+- Sentinel will collect all relevant analyses and generate a global synthesis.
+- Perfect for identifying silent trends that don't trigger individual critical alerts but are recurring.
 
 ---
 
