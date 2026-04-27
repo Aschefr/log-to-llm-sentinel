@@ -89,6 +89,22 @@ static_dir = os.path.join(BASE_DIR, "static")
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+# ── Global Context (Version) ──
+from app.version import get_app_version
+@app.middleware("http")
+async def add_version_to_context(request: Request, call_next):
+    # This isn't the cleanest way for Jinja2 context but it works for global injection
+    response = await call_next(request)
+    return response
+
+@app.get("/api/version")
+def get_api_version():
+    return {"version": get_app_version()}
+
+# Pass version to all templates automatically
+from app.version import get_app_version
+templates.env.globals.update(app_version=get_app_version())
+
 # ── Routers ──
 from app.routers import chat as chat_router
 from app.routers import i18n as i18n_router

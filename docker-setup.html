@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Log to LLM Sentinel Configurator</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --bg: #0f172a;
@@ -15,11 +18,14 @@
             --accent-hover: #4f46e5;
             --text: #f1f5f9;
             --text-dim: #94a3b8;
-            --border: rgba(255,255,255,0.1);
+            --border: rgba(255, 255, 255, 0.1);
             --success: #10b981;
         }
 
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: 'Outfit', sans-serif;
             background-color: var(--bg);
@@ -41,7 +47,9 @@
         }
 
         @media (max-width: 900px) {
-            .container { grid-template-columns: 1fr; }
+            .container {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* --- Left Column: Form --- */
@@ -51,16 +59,29 @@
             gap: 1.5rem;
         }
 
-        .header { margin-bottom: 1rem; }
-        .header h1 { margin: 0; font-size: 2rem; font-weight: 700; color: var(--text); }
-        .header p { margin: 0.5rem 0 0; color: var(--text-dim); font-size: 1rem; }
+        .header {
+            margin-bottom: 1rem;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .header p {
+            margin: 0.5rem 0 0;
+            color: var(--text-dim);
+            font-size: 1rem;
+        }
 
         .card {
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 1rem;
             padding: 1.5rem;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
         }
 
         .card-title {
@@ -73,11 +94,25 @@
             color: var(--accent);
         }
 
-        .form-group { margin-bottom: 1.25rem; }
-        .form-group:last-child { margin-bottom: 0; }
-        label { display: block; font-size: 0.875rem; font-weight: 500; margin-bottom: 0.5rem; color: var(--text-dim); }
-        
-        input[type="text"], input[type="number"], select {
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-dim);
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select {
             width: 100%;
             background: rgba(15, 23, 42, 0.5);
             border: 1px solid var(--border);
@@ -88,7 +123,11 @@
             font-size: 0.95rem;
             transition: border-color 0.2s;
         }
-        input:focus { outline: none; border-color: var(--accent); }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
 
         .toggle-group {
             display: flex;
@@ -100,20 +139,96 @@
             border-radius: 0.75rem;
             margin-bottom: 0.75rem;
         }
-        .toggle-info h4 { margin: 0; font-size: 0.95rem; font-weight: 600; }
-        .toggle-info p { margin: 0.25rem 0 0; font-size: 0.75rem; color: var(--text-dim); }
+
+        .toggle-info h4 {
+            margin: 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .toggle-info p {
+            margin: 0.25rem 0 0;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
 
         /* Custom Switch */
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #334155; transition: .4s; border-radius: 24px; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--accent); }
-        input:checked + .slider:before { transform: translateX(20px); }
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
 
-        .path-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
-        .btn-add { background: var(--accent); color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.85rem; font-weight: 600; margin-top: 0.5rem; }
-        .btn-remove { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2); width: 34px; height: 34px; border-radius: 0.5rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #334155;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--accent);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        .path-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .btn-add {
+            background: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .btn-remove {
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            width: 34px;
+            height: 34px;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
         /* --- Right Column: Preview --- */
         .preview-panel {
@@ -144,7 +259,11 @@
             position: relative;
         }
 
-        pre { margin: 0; white-space: pre-wrap; word-break: break-all; }
+        pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
 
         .btn-copy {
             background: var(--success);
@@ -159,11 +278,22 @@
             gap: 0.5rem;
             transition: transform 0.2s;
         }
-        .btn-copy:active { transform: scale(0.95); }
 
-        .badge-info { font-size: 0.75rem; background: rgba(99,102,241,0.15); color: var(--accent); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600; }
+        .btn-copy:active {
+            transform: scale(0.95);
+        }
+
+        .badge-info {
+            font-size: 0.75rem;
+            background: rgba(99, 102, 241, 0.15);
+            color: var(--accent);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <!-- Config Section -->
@@ -195,8 +325,10 @@
                 <div class="card-title">📁 Log Sources (Volumes)</div>
                 <div id="volumes-list">
                     <div class="path-row">
-                        <input type="text" placeholder="Host Path (e.g. /var/log/nginx)" class="v-host" value="/var/log" oninput="generate()">
-                        <input type="text" placeholder="Name (e.g. nginx-logs)" class="v-name" value="system-logs" oninput="generate()">
+                        <input type="text" placeholder="Host Path (e.g. /var/log/nginx)" class="v-host" value="/var/log"
+                            oninput="generate()">
+                        <input type="text" placeholder="Name (e.g. nginx-logs)" class="v-name" value="system-logs"
+                            oninput="generate()">
                         <button class="btn-remove" onclick="removeVolume(this)">×</button>
                     </div>
                 </div>
@@ -264,15 +396,19 @@
             const enableJournal = document.getElementById('enable_journal').checked;
             const ollamaMode = document.getElementById('ollama_mode').value;
             const ollamaGpu = document.getElementById('ollama_gpu').checked;
-            
+
             const internalOllamaOpts = document.getElementById('internal-ollama-options');
             internalOllamaOpts.style.display = (ollamaMode === 'internal') ? 'block' : 'none';
 
-            let yaml = `services:\n  sentinel:\n    image: aschefr/log-sentinel:latest\n    container_name: log-sentinel\n    ports:\n      - ${port}:10911\n    restart: unless-stopped\n    volumes:\n      - ./data:/app/data\n      - ./logs:/logs\n`;
+            let yaml = `services:\n  # --- Main Sentinel Application ---\n  sentinel:\n    image: aschefr/log-sentinel:latest\n    container_name: log-sentinel\n    ports:\n      - ${port}:10911 # Web UI access\n    restart: unless-stopped\n    volumes:\n      # Application data (database, settings)\n      - ./data:/app/data\n      # Shared logs folder\n      - ./logs:/logs\n`;
 
             const hosts = document.querySelectorAll('.v-host');
             const names = document.querySelectorAll('.v-name');
             let roots = ['/logs', '/app/data'];
+
+            if (hosts.length > 0) {
+                yaml += `      # Custom Log Source Mounts\n`;
+            }
 
             hosts.forEach((h, i) => {
                 const hostPath = h.value.trim();
@@ -283,16 +419,16 @@
                 }
             });
 
-            yaml += `    environment:\n      - PYTHONUNBUFFERED=1\n      - SENTINEL_BROWSE_ROOTS=${roots.join(',')}\n`;
+            yaml += `    environment:\n      - PYTHONUNBUFFERED=1\n      # List of folders for the UI file browser, If you add another\n      # folder mount, don't forget to add it to this list as well !\n      - SENTINEL_BROWSE_ROOTS=${roots.join(',')}\n`;
 
             if (enableJournal) {
-                yaml += `\n  system-journal-exporter:\n    image: ubuntu:24.04\n    container_name: sentinel-journal-bridge\n    restart: unless-stopped\n    volumes:\n      - /var/log/journal:/var/log/journal:ro\n      - /run/systemd/journal:/run/systemd/journal:ro\n      - /etc/machine-id:/etc/machine-id:ro\n      - ./logs:/logs\n    command: |\n      bash -c "apt-get update && apt-get install -y systemd && journalctl -f -n 100 > /logs/host_system_journal.log"\n`;
+                yaml += `\n  # --- System Journal Bridge ---\n  # This service exports binary host logs to text for Sentinel\n  system-journal-exporter:\n    image: ubuntu:24.04\n    container_name: sentinel-journal-bridge\n    restart: unless-stopped\n    volumes:\n      - /var/log/journal:/var/log/journal:ro\n      - /run/systemd/journal:/run/systemd/journal:ro\n      - /etc/machine-id:/etc/machine-id:ro\n      - ./logs:/logs\n    command: |\n      bash -c "apt-get update && apt-get install -y systemd && journalctl -f -n 100 > /logs/host_system_journal.log"\n`;
             }
 
             if (ollamaMode === 'internal') {
-                yaml += `\n  ollama:\n    image: ollama/ollama:latest\n    container_name: ollama-server\n    restart: unless-stopped\n    volumes:\n      - ./ollama_data:/root/.ollama\n    environment:\n      - OLLAMA_KV_CACHE_TYPE=q8_0\n`;
+                yaml += `\n  # --- Local AI Server ---\n  ollama:\n    image: ollama/ollama:latest\n    container_name: ollama-server\n    restart: unless-stopped\n    volumes:\n      - ./ollama_data:/root/.ollama\n    environment:\n      - OLLAMA_KV_CACHE_TYPE=q8_0\n`;
                 if (ollamaGpu) {
-                    yaml += `    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n              count: 1\n              capabilities: [gpu]\n`;
+                    yaml += `    # Enables Nvidia GPU acceleration\n    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n              count: 1\n              capabilities: [gpu]\n`;
                 }
             }
 
@@ -311,4 +447,5 @@
         generate();
     </script>
 </body>
+
 </html>

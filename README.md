@@ -30,27 +30,40 @@ The easiest way to run Sentinel is using **Docker**. This ensures all components
 ### 2. Get the files
 Either **Clone** this repository or **Download** the project as a ZIP and extract it on your computer.
 
+```bash
+git clone https://github.com/Aschefr/log-to-llm-sentinel
+cd log-to-llm-sentinel
+```
+
 ### 3. Generate your Configuration
+Download the file by right clicking **[docker-setup.html](docker-setup.html)** and select "Save link as")
+
 We provide a visual tool to help you create your `docker-compose.yml` file:
 
-1. Locate the file **`docker-setup.html`** in the project folder.
-2. **Open it with your favorite web browser** (Chrome, Firefox, Edge...).
-3. Select your options (Port, Log folders, AI mode).
-4. Copy the generated YAML code.
-5. Create a file named `docker-compose.yml` in your project folder and paste the code.
+1. **Open it with your favorite web browser** (Chrome, Firefox, Edge...).
+2. Select your options (Port, Log folders, AI mode).
+3. Copy the generated YAML code.
+4. Open the existing **`docker-compose.yml`** file in your project folder, delete its content, and paste your custom code.
 
-*(Note: If you are viewing this on GitHub, you must download the file to your computer to use it. You can [download it here](docker-setup.html) — right-click and "Save link as").*
-
-### 3. Launch the Sentinel
-Open a terminal in your project folder and run:
+### 4. Launch the Sentinel
+Open a terminal in your project folder
+```bash
+cd ~/log-to-llm-sentinel
+```
+Then run:
 
 ```bash
 docker-compose up -d
 ```
 
-### 4. Access the Interface
+### 5. Access the Interface
 Once the containers are started, open your browser and go to the port you chose (default is 10911):
 👉 **[http://localhost:10911](http://localhost:10911)**
+
+#### 🤖 AI Configuration Note
+- **Internal Ollama**: If you chose the "Internal" mode in the configurator, Sentinel is already pre-configured to talk to its own AI engine.
+- **External Ollama**: If you use an existing Ollama install, you will need to enter its address (e.g., `http://192.168.x.x:11434`) in the **Configuration** page of the Sentinel UI.
+- **Important**: This project is designed for **Local AI only**. It currently does **not** support external cloud APIs like ChatGPT, Claude, or Gemini.
 
 ---
 
