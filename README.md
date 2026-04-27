@@ -25,16 +25,21 @@ The easiest way to run Sentinel is using **Docker**. This ensures all components
 
 ### 1. Prerequisites
 - Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) or Docker Compose (Linux).
-- (Optional but recommended) Install [Ollama](https://ollama.com/) locally if you want to use your GPU for faster analysis.
+- (Optional) Install [Ollama](https://ollama.com/) locally to use your GPU.
 
-### 2. Generate your Configuration
-We provide a visual tool to help you create your `docker-compose.yml` file without any technical knowledge:
+### 2. Get the files
+Either **Clone** this repository or **Download** the project as a ZIP and extract it on your computer.
 
-👉 **[Launch the Visual Docker Configurator](docker-setup.html)**
+### 3. Generate your Configuration
+We provide a visual tool to help you create your `docker-compose.yml` file:
 
-1. Open the tool and select your options (Port, Log folders, AI mode).
-2. Copy the generated YAML code.
-3. Create a file named `docker-compose.yml` in your project folder and paste the code.
+1. Locate the file **`docker-setup.html`** in the project folder.
+2. **Open it with your favorite web browser** (Chrome, Firefox, Edge...).
+3. Select your options (Port, Log folders, AI mode).
+4. Copy the generated YAML code.
+5. Create a file named `docker-compose.yml` in your project folder and paste the code.
+
+*(Note: If you are viewing this on GitHub, you must download the file to your computer to use it. You can [download it here](docker-setup.html) — right-click and "Save link as").*
 
 ### 3. Launch the Sentinel
 Open a terminal in your project folder and run:
