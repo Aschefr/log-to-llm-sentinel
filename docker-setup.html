@@ -400,7 +400,7 @@
             const internalOllamaOpts = document.getElementById('internal-ollama-options');
             internalOllamaOpts.style.display = (ollamaMode === 'internal') ? 'block' : 'none';
 
-            let yaml = `services:\n  # --- Main Sentinel Application ---\n  sentinel:\n    image: aschefr/log-sentinel:latest\n    container_name: log-sentinel\n    ports:\n      - ${port}:10911 # Web UI access\n    restart: unless-stopped\n    volumes:\n      # Application data (database, settings)\n      - ./data:/app/data\n      # Shared logs folder\n      - ./logs:/logs\n`;
+            let yaml = `# ==============================================================================\n# LOG TO LLM SENTINEL - UNIVERSAL CONFIGURATION\n# ==============================================================================\n\nservices:\n  sentinel:\n    image: aschefr/log-to-llm-sentinel:latest\n    container_name: log-to-llm-sentinel\n    ports:\n      - ${port}:10911 # Web interface access\n    volumes:\n      # 1. MANDATORY: Application data (database, settings, history)\n      # WARNING: DO NOT REMOVE THIS VOLUME!\n      - ./data:/app/data\n      # 2. Shared logs folder (used for binary log exports and temp files)\n      - ./logs:/logs\n`;
 
             const hosts = document.querySelectorAll('.v-host');
             const names = document.querySelectorAll('.v-name');
@@ -419,17 +419,18 @@
                 }
             });
 
-            yaml += `    environment:\n      - PYTHONUNBUFFERED=1\n      # List of folders for the UI file browser, If you add another\n      # folder mount, don't forget to add it to this list as well !\n      - SENTINEL_BROWSE_ROOTS=${roots.join(',')}\n`;
+            yaml += `    environment:\n      - PYTHONUNBUFFERED=1\n      # IMPORTANT: List all container paths that the UI file browser should explore.\n      # If you add another folder mount, don't forget to add it to this list as well!\n      - SENTINEL_BROWSE_ROOTS=${roots.join(',')}\n    restart: unless-stopped\n`;
 
             if (enableJournal) {
-                yaml += `\n  # --- System Journal Bridge ---\n  # This service exports binary host logs to text for Sentinel\n  system-journal-exporter:\n    image: ubuntu:24.04\n    container_name: sentinel-journal-bridge\n    restart: unless-stopped\n    volumes:\n      - /var/log/journal:/var/log/journal:ro\n      - /run/systemd/journal:/run/systemd/journal:ro\n      - /etc/machine-id:/etc/machine-id:ro\n      - ./logs:/logs\n    command: |\n      bash -c "apt-get update && apt-get install -y systemd && journalctl -f -n 100 > /logs/host_system_journal.log"\n`;
+                yaml += `\n  # ==============================================================================\n  # SYSTEM JOURNAL BRIDGE (OPTIONAL)\n  # This service exports binary Linux Systemd logs into text for Sentinel.\n  # No changes are required on your host system.\n  # ==============================================================================\n  system-journal-exporter:\n    image: ubuntu:24.04\n    container_name: log-to-llm-sentinel-journal-bridge\n    command: |\n      bash -c "apt-get update && apt-get install -y systemd && \\ \n               journalctl -f -n 100 > /logs/host_system_journal.log"\n    volumes:\n      # Necessary mount points to access the host's system journal\n      - /var/log/journal:/var/log/journal:ro\n      - /run/systemd/journal:/run/systemd/journal:ro\n      - /etc/machine-id:/etc/machine-id:ro\n      # Writes the log stream to the shared folder with Sentinel\n      - ./logs:/logs\n    restart: unless-stopped\n`;
             }
 
             if (ollamaMode === 'internal') {
-                yaml += `\n  # --- Local AI Server ---\n  ollama:\n    image: ollama/ollama:latest\n    container_name: ollama-server\n    restart: unless-stopped\n    volumes:\n      - ./ollama_data:/root/.ollama\n    environment:\n      - OLLAMA_KV_CACHE_TYPE=q8_0\n`;
+                yaml += `\n  # ==============================================================================\n  # OPTIONAL: OLLAMA LOCAL AI SERVER\n  # ==============================================================================\n  ollama:\n    image: ollama/ollama:latest\n    container_name: ollama-server\n    ports:\n      - "11434:11434"\n    volumes:\n      - ./ollama_data:/root/.ollama\n    environment:\n      - OLLAMA_KV_CACHE_TYPE=q8_0\n`;
                 if (ollamaGpu) {
                     yaml += `    # Enables Nvidia GPU acceleration\n    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n              count: 1\n              capabilities: [gpu]\n`;
                 }
+                yaml += `    restart: unless-stopped\n\nvolumes:\n  ollama_data:\n`;
             }
 
             document.getElementById('output').textContent = yaml;

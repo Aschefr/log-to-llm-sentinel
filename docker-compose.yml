@@ -1,74 +1,74 @@
 # ==============================================================================
-# LOG TO LLM SENTINEL - CONFIGURATION UNIVERSELLE
+# LOG TO LLM SENTINEL - UNIVERSAL CONFIGURATION
 # ==============================================================================
 
 services:
   sentinel:
+    # Build from current directory (uses Dockerfile)
     build: .
-    container_name: log-sentinel
+    container_name: log-to-llm-sentinel
     ports:
-      - 10911:10911
+      - 10911:10911 # Web interface access
     volumes:
-      # 1. Donnees de l'application (Base de donnees, sessions)
+      # 1. MANDATORY: Application data (database, settings, history)
+      # WARNING: DO NOT REMOVE THIS VOLUME!
       - ./data:/app/data
-      # 2. Dossier de logs partage (contient aussi l'export du journal systeme)
+      # 2. Shared logs folder (used for binary log exports and temp files)
       - ./logs:/logs
-      # 3. Acces aux logs Docker (facultatif mais recommande)
+      # 3. Optional: Access to Docker container logs
       - /var/lib/docker/:/docker-logs:ro
-      # 4. Acces aux logs systemes classiques (/var/log/syslog, auth.log, etc.)
+      # 4. Optional: Access to standard system logs (syslog, auth.log, etc.)
       - /var/log:/system-logs:ro
-      # Accès log nextcloud
-      - /var/lib/docker/volumes/nextcloud_aio_nextcloud_data/_data/:/nextcloud-data:ro
     environment:
       - PYTHONUNBUFFERED=1
-      # IMPORTANT : Listez ici tous les chemins (cote conteneur) que l'UI doit explorer.
-      - SENTINEL_BROWSE_ROOTS=/logs,/app/data,/docker-logs,/system-logs,/nextcloud-data
+      # IMPORTANT: List all container paths that the UI file browser should explore.
+      - SENTINEL_BROWSE_ROOTS=/logs,/app/data,/docker-logs,/system-logs
     restart: unless-stopped
 
   # ==============================================================================
-  # EXPORTATEUR JOURNALD (UNIVERSEL)
-  # Ce service transforme le journal binaire Linux en fichier texte pour Sentinel.
-  # Aucun changement n'est requis sur votre systeme hote.
+  # SYSTEM JOURNAL BRIDGE (OPTIONAL)
+  # This service exports binary Linux Systemd logs into text for Sentinel.
+  # No changes are required on your host system.
   # ==============================================================================
   system-journal-exporter:
     image: ubuntu:24.04
-    container_name: log-sentinel-journal-bridge
+    container_name: log-to-llm-sentinel-journal-bridge
     command: |
       bash -c "apt-get update && apt-get install -y systemd && 
                journalctl -f -n 100 > /logs/host_system_journal.log"
     volumes:
-      # Points de montage necessaires pour acceder au journal systeme de l'hote
+      # Necessary mount points to access the host's system journal
       - /var/log/journal:/var/log/journal:ro
       - /run/systemd/journal:/run/systemd/journal:ro
       - /etc/machine-id:/etc/machine-id:ro
-      # On ecrit le flux texte dans le dossier partage avec Sentinel
+      # Writes the log stream to the shared folder with Sentinel
       - ./logs:/logs
     restart: unless-stopped
 
   # ==============================================================================
-  # NOTES : OLLAMA (OPTIONNEL)
+  # OPTIONAL: OLLAMA LOCAL AI SERVER
   # ==============================================================================
-  # Si votre instance Ollama n'est pas sur une autre machine, vous pouvez
-  # l'ajouter ici. Décommentez les lignes ci-dessous pour l'activer.
+  # If you don't have an Ollama instance on another machine, you can
+  # enable it here. Uncomment the lines below to activate.
   #
-  # --- NOTE SUR FLASH ATTENTION ---
-  # Flash Attention est conçu pour optimiser les accès à la mémoire SRAM des GPU Nvidia.
-  # Sur GPU : Accélère massivement le calcul de l'attention.
-  # Sur CPU (AMD/ARM) : Les architectures CPU gèrent le cache différemment. (déconseillé) 
-  #--- NOTE SUR KV CACHE ---
-  # KV Cache type : q8_0 permet de réduire l'usage RAM sans perte de précision notable.
+  # --- NOTE ON FLASH ATTENTION ---
+  # Only for Nvidia GPUs. Massively accelerates attention computation.
+  # Not recommended for CPUs (AMD/ARM).
   #
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama-server
-    ports:
-      - "11434:11434"
-    volumes:
-      - ./ollama_data:/root/.ollama
-    environment:
-      - OLLAMA_KV_CACHE_TYPE=q8_0
-    #  - OLLAMA_FLASH_ATTENTION=1 
-    restart: unless-stopped
+  # --- NOTE ON KV CACHE ---
+  # type: q8_0 reduces RAM usage with minimal precision loss.
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama-server
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ./ollama_data:/root/.ollama
+  #   environment:
+  #     - OLLAMA_KV_CACHE_TYPE=q8_0
+  #   #  - OLLAMA_FLASH_ATTENTION=1 
+  #   restart: unless-stopped
 
-volumes:
-  ollama_data:
+# volumes:
+#   ollama_data:

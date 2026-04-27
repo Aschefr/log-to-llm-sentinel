@@ -11,7 +11,8 @@ def get_app_version():
     try:
         if os.path.exists(".git"):
             commits = subprocess.check_output(["git", "rev-list", "--count", "HEAD"]).decode("utf-8").strip()
-            merges = subprocess.check_output(["git", "rev-list", "--merges", "--count", "HEAD"]).decode("utf-8").strip()
+            merges = int(subprocess.check_output(["git", "rev-list", "--merges", "--count", "HEAD"]).decode("utf-8").strip())
+            merges += 2  # Offset pour branches mergées avant versionning (souvent fast-forward)
             version = f"1.{merges}.{commits}"
             with open("version.txt", "w", encoding="utf-8") as f:
                 f.write(version)
