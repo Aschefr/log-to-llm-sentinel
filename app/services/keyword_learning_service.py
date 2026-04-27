@@ -344,6 +344,33 @@ async def start_session(rule_id: Optional[int], log_path: str,
     return session_id
 
 
+async def resume_stuck_sessions():
+    """Resume learning sessions that were interrupted by a restart.
+
+    Called once at application startup.  Sessions stuck in 'pending',
+    'scanning' or 'refining' are re-launched — ``_run_session`` already
+    handles resuming from the last completed packet.
+    """
+    db = SessionLocal()
+    try:
+        stuck = db.query(KeywordLearningSession).filter(
+            KeywordLearningSession.status.in_(['pending', 'scanning', 'refining'])
+        ).all()
+        if not stuck:
+            return
+        session_ids = [(s.id, s.rule_id, s.completed_packets, s.total_packets) for s in stuck]
+    finally:
+        db.close()
+
+    for sid, rid, done, total in session_ids:
+        app_logger.info(
+            'KeywordLearning',
+            f'Reprise automatique de la session {sid} (règle {rid}) — '
+            f'{done}/{total} paquets déjà traités'
+        )
+        asyncio.create_task(_run_session(sid))
+
+
 async def _run_session(session_id: int):
     """Main coroutine: phase 1 scan → phase 2 refine → validate."""
     try:
@@ -368,19 +395,46 @@ async def _run_session(session_id: int):
             else f"{granularity_s // 3600} heure(s)" if granularity_s < 86400
             else f"{granularity_s // 86400} jour(s)"
         )
-        await _send_notification(
-            rule_id,
-            '[Sentinel] 🚀 Auto-apprentissage démarré',
-            f'**Fichier :** `{log_path}`\n'
-            f'**Période :** {period_start.strftime("%Y-%m-%d %H:%M")} UTC → '
-            f'{period_end.strftime("%Y-%m-%d %H:%M")} UTC\n'
-            f'**Granularité :** {gran_label} — {n_packets} paquets prévus'
-        )
+
+        # ── Restore accumulated state from DB (supports resume after restart) ──
+        db = SessionLocal()
+        try:
+            s = db.query(KeywordLearningSession).filter(
+                KeywordLearningSession.id == session_id).first()
+            resume_from = s.completed_packets if s else 0
+            all_raw = json.loads(s.raw_keywords_json or '[]') if s else []
+            log_entries = json.loads(s.ollama_log_json or '[]') if s else []
+        finally:
+            db.close()
+
+        first_packet_sent = bool(all_raw)  # skip first-packet notification on resume
+
+        if resume_from > 0:
+            app_logger.info(
+                'KeywordLearning',
+                f'Session {session_id} — reprise depuis le paquet {resume_from + 1}/{n_packets} '
+                f'({len(all_raw)} mot(s)-clé(s) déjà accumulé(s))'
+            )
+            await _send_notification(
+                rule_id,
+                '[Sentinel] 🔄 Auto-apprentissage repris',
+                f'**Fichier :** `{log_path}`\n'
+                f'**Reprise :** paquet {resume_from + 1}/{n_packets} '
+                f'({len(all_raw)} mot(s)-clé(s) déjà accumulé(s))'
+            )
+        else:
+            await _send_notification(
+                rule_id,
+                '[Sentinel] 🚀 Auto-apprentissage démarré',
+                f'**Fichier :** `{log_path}`\n'
+                f'**Période :** {period_start.strftime("%Y-%m-%d %H:%M")} UTC → '
+                f'{period_end.strftime("%Y-%m-%d %H:%M")} UTC\n'
+                f'**Granularité :** {gran_label} — {n_packets} paquets prévus'
+            )
 
         _db_update(session_id, status='scanning')
 
         # Vérification rapide : le fichier est-il lisible ?
-        import os
         if not os.path.isfile(log_path):
             _db_update(session_id, status='error',
                        error_message=f"Fichier introuvable sur le serveur : {log_path}")
@@ -391,10 +445,12 @@ async def _run_session(session_id: int):
             return
 
         has_ts = _detect_timestamps(log_path)
-        all_raw: list[str] = []
-        log_entries = []
         fallback_offset = 0
-        first_packet_sent = False
+
+        if resume_from > 0 and not has_ts:
+            # Approximate fallback_offset for non-timestamp logs
+            fallback_offset = resume_from * max_chars
+
 
         from app.services.ollama_service import OllamaService
         db = SessionLocal()
@@ -410,7 +466,7 @@ async def _run_session(session_id: int):
 
         ollama = OllamaService()
 
-        for packet_idx in range(n_packets):
+        for packet_idx in range(resume_from, n_packets):
             # Check for cancellation
             current_status = _db_session_get_status(session_id)
             if current_status in ('error', 'reverted'):

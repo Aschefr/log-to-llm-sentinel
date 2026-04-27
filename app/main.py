@@ -47,6 +47,10 @@ async def lifespan(app: FastAPI):
     watcher_task = asyncio.create_task(log_watcher.start())
     print("[Main] LogWatcher démarré en background")
 
+    # Reprendre les sessions d'auto-apprentissage interrompues par un redémarrage
+    from app.services.keyword_learning_service import resume_stuck_sessions
+    asyncio.create_task(resume_stuck_sessions())
+
     # Nettoyage périodique des tâches d'arrière-plan (toutes les 30 min)
     async def _cleanup_tasks():
         while True:
