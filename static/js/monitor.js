@@ -256,9 +256,20 @@ async function fetchLogs(rule) {
 
     try {
         const kwParam = rule.keywords.join(',');
-        const res = await apiFetch(
-            `/api/files/tail?path=${encodeURIComponent(rule.log_file_path)}&lines=${monitorLogLines}&keywords=${encodeURIComponent(kwParam)}`
-        );
+        let res;
+        
+        if (rule.log_file_path && rule.log_file_path.startsWith('[WEBHOOK]:')) {
+            // Webhook rule → use in-memory ring buffer tail
+            const token = rule.log_file_path.split(':')[1];
+            res = await apiFetch(
+                `/api/webhook/tail/${encodeURIComponent(token)}?lines=${monitorLogLines}&keywords=${encodeURIComponent(kwParam)}`
+            );
+        } else {
+            // File-based rule → read from disk
+            res = await apiFetch(
+                `/api/files/tail?path=${encodeURIComponent(rule.log_file_path)}&lines=${monitorLogLines}&keywords=${encodeURIComponent(kwParam)}`
+            );
+        }
 
         if (!res.lines || res.lines.length === 0) {
             viewer.innerHTML = `<em class="no-logs">${window.t ? window.t('monitor.file_empty') : 'File empty or inaccessible.'}</em>`;
