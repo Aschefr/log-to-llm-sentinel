@@ -36,13 +36,64 @@
         }
         .lang-option:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
         .lang-option.active { color: var(--accent); font-weight: 600; }
+
+        /* ── Update Notification ── */
+        .update-badge {
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            margin-left: 0.8rem; padding: 0.15rem 0.5rem; border-radius: 2rem;
+            font-size: 0.65rem; font-weight: 600; cursor: help;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            vertical-align: middle;
+        }
+        .update-available { 
+            background: rgba(255, 107, 107, 0.1); color: #ff8787; 
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            box-shadow: 0 0 10px rgba(255, 107, 107, 0.1);
+        }
+        .system-up-to-date { 
+            background: rgba(81, 207, 102, 0.05); color: #69db7c; 
+            border: 1px solid rgba(81, 207, 102, 0.15);
+            opacity: 0.8;
+        }
+        .update-available:hover {
+            background: rgba(255, 107, 107, 0.2);
+            border-color: rgba(255, 107, 107, 0.5);
+            transform: translateY(-1px);
+        }
+        
+        .pulse-dot {
+            width: 7px; height: 7px; background: #ff8787; border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
+            animation: pulse 2.5s infinite;
+        }
+        .check-icon { font-size: 0.75rem; margin-top: -1px; }
+
+        @keyframes pulse {
+            0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(255, 107, 107, 0); }
+            100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
+        }
     </style>
 </head>
 <body>
     <nav class="navbar">
         <div class="nav-brand" style="display: flex; flex-direction: column; justify-content: center;">
             <span style="line-height: 1;">🔍 Log to LLM Sentinel</span>
-            <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: normal; margin-left: 1.5rem; margin-top: 0.2rem;">v{{ APP_VERSION }}</span>
+            <div style="display: flex; align-items: center; margin-left: 1.5rem; margin-top: 0.2rem;">
+                <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: normal;">v{{ APP_VERSION }}</span>
+                {% if UPDATE_STATUS.is_available %}
+                    <div class="update-badge update-available" data-i18n-title="header.update_instructions" title="To update: git pull && docker compose up -d --build">
+                        <span class="pulse-dot"></span>
+                        <span data-i18n="header.update_available">Update available</span>
+                    </div>
+                {% elif UPDATE_STATUS.is_latest %}
+                    <div class="update-badge system-up-to-date" data-i18n-title="header.up_to_date" title="System up to date">
+                        <span class="check-icon">✓</span>
+                        <span data-i18n="header.up_to_date">Up to date</span>
+                    </div>
+                {% endif %}
+            </div>
         </div>
         <div class="nav-links">
             <a href="/" data-i18n="nav.dashboard" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>

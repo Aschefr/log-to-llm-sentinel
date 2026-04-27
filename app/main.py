@@ -6,6 +6,38 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import os
 import subprocess
+import httpx
+import re
+
+def check_for_updates(current_version):
+    """Checks GitHub for new commits on main branch."""
+    try:
+        parts = current_version.split('.')
+        if len(parts) < 3:
+            return {"is_available": False, "is_latest": False, "error": True}
+        local_commits = int(parts[-1])
+        
+        url = "https://api.github.com/repos/Aschefr/log-to-llm-sentinel/commits?per_page=1"
+        headers = {"User-Agent": "Log-to-LLM-Sentinel-App"}
+        with httpx.Client(headers=headers, timeout=5.0) as client:
+            response = client.get(url)
+            if response.status_code == 200:
+                link_header = response.headers.get("Link", "")
+                if 'rel="last"' in link_header:
+                    match = re.search(r'page=(\d+)>; rel="last"', link_header)
+                    if match:
+                        remote_commits = int(match.group(1))
+                        return {
+                            "is_available": remote_commits > local_commits,
+                            "is_latest": remote_commits <= local_commits,
+                            "error": False
+                        }
+                else:
+                    return {"is_available": False, "is_latest": True, "error": False}
+    except Exception as e:
+        print(f"[Main] Update check failed: {e}")
+    return {"is_available": False, "is_latest": False, "error": True}
+
 
 def get_app_version():
     try:
@@ -109,6 +141,7 @@ app = FastAPI(title="Log-to-LLM-Sentinel", lifespan=lifespan)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 templates.env.globals['APP_VERSION'] = APP_VERSION
+templates.env.globals['UPDATE_STATUS'] = check_for_updates(APP_VERSION)
 static_dir = os.path.join(BASE_DIR, "static")
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")

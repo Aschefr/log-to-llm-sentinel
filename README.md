@@ -55,11 +55,7 @@ We provide a visual tool to help you create your `docker-compose.yml` file:
 4. Open the existing **`docker-compose.yml`** file in your project folder, delete its content, and paste your custom code.
 
 ### 4. Launch the Sentinel
-Open a terminal in your project folder
-```bash
-cd ~/log-to-llm-sentinel
-```
-Then run:
+Open a terminal in your project folder and run:
 
 ```bash
 docker-compose up -d

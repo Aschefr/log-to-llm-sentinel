@@ -16,8 +16,13 @@
     "uptime": "En ligne",
     "tooltip_cpu": "Utilisation CPU (App / Système)",
     "tooltip_ram": "Utilisation RAM (App)",
-    "tooltip_uptime": "Temps de fonctionnement",
-    "meta": "Méta-Analyse"
+    "tooltip_uptime": "Uptime",
+    "meta": "Méta-analyse"
+  },
+  "header": {
+    "update_available": "Mise à jour disponible",
+    "up_to_date": "À jour",
+    "update_instructions": "Pour mettre à jour : git pull && docker compose up -d --build"
   },
   "dashboard": {
     "title": "Dashboard",

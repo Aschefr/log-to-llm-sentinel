@@ -19,6 +19,11 @@
     "tooltip_uptime": "Uptime",
     "meta": "Meta-Analysis"
   },
+  "header": {
+    "update_available": "Update available",
+    "up_to_date": "Up to date",
+    "update_instructions": "To update: git pull && docker compose up -d --build"
+  },
   "dashboard": {
     "title": "Dashboard",
     "total_rules": "Total rules",
