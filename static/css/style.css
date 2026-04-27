@@ -1760,6 +1760,12 @@ mark.kw-highlight {
     transition: border-color 0.2s;
 }
 .kw-input:focus { border-color: var(--accent); outline: none; }
+.kw-input--disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    background: rgba(255,255,255,0.03);
+    border-style: dashed;
+}
 
 /* Native <select> inside wizard: force consistent dropdown background */
 select.kw-input {

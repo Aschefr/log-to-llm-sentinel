@@ -456,6 +456,11 @@
     "notif_first_packet_subject": "[Sentinel] 📦 First packet analysed",
     "notif_initial_list_subject": "[Sentinel] 📋 Initial keyword list",
     "notif_refined_subject": "[Sentinel] ✂️ Refined list",
-    "notif_validated_subject": "[Sentinel] ✅ Keywords auto-validated"
+    "notif_validated_subject": "[Sentinel] ✅ Keywords auto-validated",
+    "update_params": "🔄 Update Parameters",
+    "start_locked": "Start date locked (session in progress)",
+    "progress_label": "Progress: {done}/{total} packets ({pct}%)",
+    "session_status_label": "Session status",
+    "resume_info": "Analysis is in progress. You can modify the end date or granularity."
   }
 }

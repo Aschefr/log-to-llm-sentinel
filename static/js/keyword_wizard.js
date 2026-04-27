@@ -16,6 +16,7 @@ let _wizardPollTimer     = null;
 let _wizardCardTimer     = null;
 let _wizardFinalKeywords = [];
 let _wizardGranularity   = null; // null = not yet chosen by user
+let _activeSession       = null; // session data when editing an active learning rule
 
 /* ── Granularity options ────────────────────────────────────────────────── */
 const GRANULARITY_OPTIONS = [
@@ -75,7 +76,13 @@ function kwTabSwitch(tab) {
 
         // Swap buttons
         if (origSave)  origSave.classList.add('hidden');
-        if (launchBtn) launchBtn.classList.remove('hidden');
+        if (launchBtn) {
+            launchBtn.classList.remove('hidden');
+            // Update button text when editing an active session
+            if (_activeSession) {
+                launchBtn.textContent = window.t ? window.t('kw.update_params') : '🔄 Mettre à jour les paramètres';
+            }
+        }
 
         // Render wizard if body is empty
         const body = document.getElementById('kw-wizard-body');
@@ -114,12 +121,90 @@ function kwWizardReset() {
     kwTabSwitch('manual');
 }
 
+/**
+ * Load an existing learning session into the wizard (called from editRule).
+ * Pre-selects the auto tab and shows progress.
+ */
+async function kwWizardLoadSession(sessionId) {
+    try {
+        const data = await fetch(`/api/keyword-learning/${sessionId}/status`).then(r => r.json());
+        _activeSession = data;
+        _wizardSessionId = sessionId;
+
+        // Clear body so _renderConfigPhase re-renders with session data
+        const body = document.getElementById('kw-wizard-body');
+        if (body) body.innerHTML = '';
+
+        // Switch to auto tab (this triggers _renderConfigPhase)
+        kwTabSwitch('auto');
+
+        // Start polling for live updates if session is active
+        if (['pending', 'scanning', 'refining'].includes(data.status)) {
+            _startWizardSessionPoll(sessionId);
+        }
+    } catch (e) {
+        console.error('kwWizardLoadSession error:', e);
+        // Fallback: just show empty auto tab
+        kwTabSwitch('auto');
+    }
+}
+
+/** Poll session status to update the wizard steps in real time */
+function _startWizardSessionPoll(sessionId) {
+    if (_wizardPollTimer) clearInterval(_wizardPollTimer);
+    _wizardPollTimer = setInterval(async () => {
+        try {
+            const data = await fetch(`/api/keyword-learning/${sessionId}/status`).then(r => r.json());
+            _activeSession = data;
+            _updateWizardSteps(data);
+            if (['validated', 'reverted', 'error'].includes(data.status)) {
+                clearInterval(_wizardPollTimer);
+                _wizardPollTimer = null;
+            }
+        } catch { /* ignore */ }
+    }, 3000);
+}
+
+/** Update only the step indicators and progress text without rebuilding the form */
+function _updateWizardSteps(data) {
+    const stepsEl = document.getElementById('kw-wizard-steps');
+    if (stepsEl) stepsEl.innerHTML = _buildStepsHtml(data.status);
+
+    const progressEl = document.getElementById('kw-wizard-progress');
+    if (progressEl) {
+        if (data.status === 'scanning') {
+            const pct = data.total_packets > 0 ? Math.round((data.completed_packets / data.total_packets) * 100) : 0;
+            let label = window.t ? window.t('kw.progress_label') : 'Progression : {done}/{total} paquets ({pct}%)';
+            label = label.replace('{done}', data.completed_packets).replace('{total}', data.total_packets).replace('{pct}', pct);
+            progressEl.innerHTML = `
+                <div class="kw-hint" style="margin-bottom:.3rem">${label}</div>
+                <div class="kw-progress-bar-track"><div class="kw-progress-bar" style="width:${pct}%"></div></div>
+            `;
+            progressEl.style.display = 'block';
+        } else if (data.status === 'refining') {
+            progressEl.innerHTML = `<div class="kw-hint">${window.t ? window.t('kw.card_refining') : '🧠 Raffinement IA en cours…'}</div>`;
+            progressEl.style.display = 'block';
+        } else if (data.status === 'validated') {
+            progressEl.innerHTML = `<div class="kw-hint">${window.t ? window.t('kw.card_validated') : '✅ Apprentissage terminé'}</div>`;
+            progressEl.style.display = 'block';
+        } else if (data.status === 'error') {
+            let msg = window.t ? window.t('kw.card_error') : '⚠️ Erreur : {msg}';
+            msg = msg.replace('{msg}', data.error_message || 'Inconnue');
+            progressEl.innerHTML = `<div class="kw-hint" style="color:var(--danger)">${msg}</div>`;
+            progressEl.style.display = 'block';
+        } else {
+            progressEl.style.display = 'none';
+        }
+    }
+}
+
 
 /* ── Internal helpers ───────────────────────────────────────────────────── */
 function _wizardReset() {
     _wizardSessionId     = null;
     _wizardFinalKeywords = [];
     _wizardGranularity   = null;
+    _activeSession       = null;
     _stopAllPolling();
 }
 
@@ -159,33 +244,85 @@ function _updateLaunchBtn() {
     btn.disabled = !valid;
     btn.style.opacity = valid ? '1' : '0.45';
     btn.title = valid ? '' : (window.t ? window.t('kw.launch_no_path') : 'Renseignez le nom et le chemin du fichier log pour activer');
+
+    // Button text: "Update" when editing an active session, "Launch" otherwise
+    if (_activeSession) {
+        btn.textContent = window.t ? window.t('kw.update_params') : '🔄 Mettre à jour les paramètres';
+    }
+}
+
+/* ── Step indicator builder ─────────────────────────────────────────────── */
+function _buildStepsHtml(sessionStatus) {
+    const steps = [
+        { key: 'kw.step_config',    fallback: '1 Config',       statuses: [null] },
+        { key: 'kw.step_scan',      fallback: '2 Scan',         statuses: ['pending', 'scanning'] },
+        { key: 'kw.step_refine',    fallback: '3 Raffinement',  statuses: ['refining'] },
+        { key: 'kw.step_validated', fallback: '4 Validé',       statuses: ['validated'] },
+    ];
+
+    // Determine which step index is active
+    let activeIdx = 0; // default: config
+    if (sessionStatus) {
+        if (['pending', 'scanning'].includes(sessionStatus)) activeIdx = 1;
+        else if (sessionStatus === 'refining')               activeIdx = 2;
+        else if (sessionStatus === 'validated')              activeIdx = 3;
+        else if (['error', 'reverted'].includes(sessionStatus)) activeIdx = -1;
+    }
+
+    return steps.map((step, idx) => {
+        let cls = 'kw-step';
+        if (idx === activeIdx) cls += ' kw-step--active';
+        else if (idx < activeIdx) cls += ' kw-step--done';
+        const label = window.t ? window.t(step.key) || step.fallback : step.fallback;
+        return `<span class="${cls}">${label}</span>` +
+               (idx < steps.length - 1 ? '<span class="kw-step-sep">›</span>' : '');
+    }).join('');
 }
 
 /* ── Phase 1: Config ────────────────────────────────────────────────────── */
 function _renderConfigPhase() {
-    const now      = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 3600 * 1000);
+    const session = _activeSession;
     const toLocal  = d => {
         const p = n => String(n).padStart(2, '0');
         return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
     };
 
+    let startVal, endVal, startDisabled = false;
+
+    if (session && session.period_start) {
+        // Editing an existing session: use its period values
+        startVal = toLocal(new Date(session.period_start));
+        endVal   = toLocal(new Date(session.period_end));
+        startDisabled = true;
+        if (session.granularity_s) _wizardGranularity = session.granularity_s;
+    } else {
+        const now      = new Date();
+        const tomorrow = new Date(now.getTime() + 24 * 3600 * 1000);
+        startVal = toLocal(now);
+        endVal   = toLocal(tomorrow);
+    }
+
+    const statusToStep = { pending: 0, scanning: 1, refining: 2, validated: 3, error: -1, reverted: -1 };
+
     _wizardBody().innerHTML = `
-        <div class="kw-phase-steps">
-            <span class="kw-step kw-step--active">${window.t ? window.t('kw.step_config') : '1 Config'}</span>
-            <span class="kw-step-sep">›</span>
-            <span class="kw-step">${window.t ? window.t('kw.step_scan') : '2 Scan'}</span>
-            <span class="kw-step-sep">›</span>
-            <span class="kw-step">${window.t ? window.t('kw.step_refine') : '3 Raffinement'}</span>
-            <span class="kw-step-sep">›</span>
-            <span class="kw-step">${window.t ? window.t('kw.step_validated') : '4 Validé'}</span>
+        <div class="kw-phase-steps" id="kw-wizard-steps">
+            ${_buildStepsHtml(session ? session.status : null)}
         </div>
+        ${session && ['pending', 'scanning', 'refining', 'validated', 'error'].includes(session.status) ? `
+            <div id="kw-wizard-progress" style="margin-bottom:.5rem"></div>
+            <div class="kw-hint" style="margin-bottom:.75rem;opacity:.65">
+                ${window.t ? window.t('kw.resume_info') : 'L\'analyse est en cours. Vous pouvez modifier la date de fin ou la granularité.'}
+            </div>
+        ` : '<div id="kw-wizard-progress" style="display:none"></div>'}
         <div class="kw-config-grid">
             <label class="kw-label">${window.t ? window.t('kw.period_label') : "Période d'analyse"} <span style="opacity:.5;font-size:.75em">${window.t ? window.t('kw.period_local_hint') : '(heure locale)'}</span></label>
             <div class="kw-period-row">
-                <input type="datetime-local" id="kw-period-start" value="${toLocal(now)}"      class="kw-input">
+                <input type="datetime-local" id="kw-period-start" value="${startVal}"
+                       class="kw-input${startDisabled ? ' kw-input--disabled' : ''}"
+                       ${startDisabled ? 'disabled' : ''}
+                       ${startDisabled ? `title="${window.t ? window.t('kw.start_locked') : 'Date de début verrouillée (session en cours)'}"` : ''}>
                 <span style="opacity:.5">→</span>
-                <input type="datetime-local" id="kw-period-end"   value="${toLocal(tomorrow)}" class="kw-input">
+                <input type="datetime-local" id="kw-period-end"   value="${endVal}" class="kw-input">
             </div>
             <label class="kw-label" style="margin-top:.75rem">
                 ${window.t ? window.t('kw.granularity_label') : 'Granularité (taille d\'un paquet)'}
@@ -211,6 +348,9 @@ function _renderConfigPhase() {
 
     _refreshGranularitySelect();
     _fetchMaxChars();
+
+    // If editing a session, show progress immediately
+    if (session) _updateWizardSteps(session);
 }
 
 function _durationS() {

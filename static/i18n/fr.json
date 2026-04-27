@@ -456,6 +456,11 @@
     "notif_first_packet_subject": "[Sentinel] 📦 Premier paquet analysé",
     "notif_initial_list_subject": "[Sentinel] 📋 Liste initiale de mots-clés",
     "notif_refined_subject": "[Sentinel] ✂️ Liste raffinée",
-    "notif_validated_subject": "[Sentinel] ✅ Mots-clés validés automatiquement"
+    "notif_validated_subject": "[Sentinel] ✅ Mots-clés validés automatiquement",
+    "update_params": "🔄 Mettre à jour les paramètres",
+    "start_locked": "Date de début verrouillée (session en cours)",
+    "progress_label": "Progression : {done}/{total} paquets ({pct}%)",
+    "session_status_label": "État de la session",
+    "resume_info": "L'analyse est en cours. Vous pouvez modifier la date de fin ou la granularité."
   }
 }
