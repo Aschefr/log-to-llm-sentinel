@@ -1663,6 +1663,17 @@ mark.kw-highlight {
     font-weight: 600;
 }
 
+/* Source tabs: same style as kw-tab but with centered text */
+.source-card.kw-tab {
+    text-align: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-family: var(--font-ui, inherit);
+    letter-spacing: 0.01em;
+    padding: 0.5rem 0.75rem;
+}
+
 /* Tab panels */
 .kw-tab-panel { display: block; }
 .kw-tab-panel--hidden { display: none !important; }

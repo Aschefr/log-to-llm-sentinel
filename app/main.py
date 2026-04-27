@@ -41,6 +41,7 @@ async def lifespan(app: FastAPI):
     chat_router.set_orchestrator(orchestrator)
     config.set_orchestrator(orchestrator)
     rules.set_orchestrator(orchestrator)
+    webhook_router.set_orchestrator(orchestrator)
 
     # Démarre le watcher en background
     watcher_task = asyncio.create_task(log_watcher.start())
@@ -89,6 +90,7 @@ from app.routers import chat as chat_router
 from app.routers import i18n as i18n_router
 from app.routers import meta_analysis as meta_router
 from app.routers import keyword_learning as kw_learning_router
+from app.routers import webhook as webhook_router
 
 app.include_router(rules.router)
 app.include_router(config.router)
@@ -99,6 +101,7 @@ app.include_router(chat_router.router)
 app.include_router(i18n_router.router)
 app.include_router(meta_router.router)
 app.include_router(kw_learning_router.router)
+app.include_router(webhook_router.router)
 
 
 # ── Pages ──

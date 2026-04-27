@@ -88,7 +88,10 @@ async function loadRules() {
             <div class="rule-card" id="rule-card-${rule.id}">
                 <div class="rule-info">
                     <h3>${escapeHtml(rule.name)}</h3>
-                    <p>📁 ${escapeHtml(rule.log_file_path)}</p>
+                    <p>${rule.log_file_path && rule.log_file_path.startsWith('[WEBHOOK]') 
+                        ? `<span class="chip" style="background:var(--primary);color:white;border:none">🔗 Webhook</span> 
+                           <button class="btn btn-secondary btn-sm" onclick="copyWebhookUrl('${rule.log_file_path.split(':')[1] || rule.id}')" title="Copier URL curl">📋 Copier URL</button>` 
+                        : `📁 ${escapeHtml(rule.log_file_path)}`}</p>
                     <p>🔑 ${rule.keywords.join(', ') || '<em style="opacity:.5">Aucun mot-clé (apprentissage en cours…)</em>'}</p>
                     ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}
                     <p>${rule.enabled ? `✅ ${window.t ? window.t('rules.enabled_status') : 'Enabled'}` : `❌ ${window.t ? window.t('rules.disabled_status') : 'Disabled'}`} | 🔔 ${rule.notify_on_match ? `${window.t ? window.t('rules.notification_threshold') : 'Threshold:'} ${rule.notify_severity_threshold || 'info'}` : (window.t ? window.t('rules.notifications_disabled') : 'Notifications disabled')}</p>
@@ -361,12 +364,80 @@ function setupModal() {
             fetchFilePreview(pathInput.value);
         }, 500);
     });
+
+    const sourceCards = document.querySelectorAll('.source-card');
+    const pathGroup = document.getElementById('path-group');
+    const webhookGroup = document.getElementById('webhook-group');
+    const pathInputEl = document.getElementById('rule-path');
+
+    sourceCards.forEach(card => {
+        card.addEventListener('click', () => {
+            sourceCards.forEach(c => c.classList.remove('kw-tab--active'));
+            card.classList.add('kw-tab--active');
+            
+            if (card.dataset.source === 'webhook') {
+                pathGroup.classList.add('hidden');
+                webhookGroup.classList.remove('hidden');
+                pathInputEl.removeAttribute('required');
+                pathInputEl.value = ''; // Clear value so it doesn't cause hidden validation issues
+
+                // Générer un UUID si aucun token n'est encore défini (utile pour Nouvelle règle)
+                if (!window._currentWebhookToken) {
+                    window._currentWebhookToken = crypto.randomUUID();
+                }
+                updateModalWebhookUrl();
+            } else {
+                pathGroup.classList.remove('hidden');
+                webhookGroup.classList.add('hidden');
+                pathInputEl.setAttribute('required', 'required');
+            }
+        });
+    });
+}
+
+function updateModalWebhookUrl() {
+    if (!window._currentWebhookToken) return;
+    const url = window.location.origin + '/api/webhook/logs/' + window._currentWebhookToken;
+    const curlCommand = `curl -X POST -H "Content-Type: text/plain" --data-binary "@my_log.txt" ${url}`;
+    document.getElementById('webhook-curl-cmd').textContent = curlCommand;
+}
+
+function copyModalWebhookUrl() {
+    const text = document.getElementById('webhook-curl-cmd').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        alert("Commande curl copiée dans le presse-papier !");
+    }).catch(err => {
+        console.error('Erreur de copie:', err);
+    });
+}
+
+function copyWebhookUrl(ruleId) {
+    const url = window.location.origin + '/api/webhook/logs/' + ruleId;
+    const curlCommand = `curl -X POST -H "Content-Type: text/plain" --data-binary "@my_log.txt" ${url}`;
+    navigator.clipboard.writeText(curlCommand).then(() => {
+        alert("Commande curl copiée dans le presse-papier !");
+    }).catch(err => {
+        console.error('Erreur de copie:', err);
+        alert("URL : " + url);
+    });
 }
 
 function resetForm() {
     document.getElementById('rule-id').value = '';
     document.getElementById('rule-name').value = '';
     document.getElementById('rule-path').value = '';
+    window._currentWebhookToken = null;
+    
+    const sourceCards = document.querySelectorAll('.source-card');
+    sourceCards.forEach(c => c.classList.remove('active'));
+    
+    const localCard = document.querySelector('.source-card[data-source="local"]');
+    if (localCard) {
+        localCard.classList.add('kw-tab--active');
+        document.getElementById('path-group').classList.remove('hidden');
+        document.getElementById('webhook-group').classList.add('hidden');
+        document.getElementById('rule-path').setAttribute('required', 'required');
+    }
     document.getElementById('rule-keywords').value = '';
     document.getElementById('rule-context').value = '';
     document.getElementById('rule-enabled').checked = true;
@@ -525,9 +596,17 @@ function renderBrowserRow(entry, isParent) {
 
 async function saveRule() {
     const id = document.getElementById('rule-id').value;
+    const activeCard = document.querySelector('.source-card.kw-tab--active');
+    const isWebhook = activeCard && activeCard.dataset.source === 'webhook';
+    
+    let logFilePath = document.getElementById('rule-path').value;
+    if (isWebhook) {
+        logFilePath = '[WEBHOOK]:' + (window._currentWebhookToken || crypto.randomUUID());
+    }
+    
     const data = {
         name: document.getElementById('rule-name').value,
-        log_file_path: document.getElementById('rule-path').value,
+        log_file_path: logFilePath,
         keywords: document.getElementById('rule-keywords').value.split(',').map(k => k.trim()).filter(k => k),
         application_context: document.getElementById('rule-context').value,
         enabled: document.getElementById('rule-enabled').checked,
@@ -563,7 +642,24 @@ async function editRule(id) {
         const rule = await apiFetch(`/api/rules/${id}`);
         document.getElementById('rule-id').value = rule.id;
         document.getElementById('rule-name').value = rule.name;
-        document.getElementById('rule-path').value = rule.log_file_path;
+        
+        const sourceCards = document.querySelectorAll('.source-card');
+        sourceCards.forEach(c => c.classList.remove('active'));
+
+        if (rule.log_file_path && rule.log_file_path.startsWith('[WEBHOOK]')) {
+            const webhookCard = document.querySelector('.source-card[data-source="webhook"]');
+            if (webhookCard) {
+                window._currentWebhookToken = rule.log_file_path.split(':')[1] || rule.id;
+                webhookCard.click();
+            }
+        } else {
+            const localCard = document.querySelector('.source-card[data-source="local"]');
+            if (localCard) {
+                localCard.click();
+            }
+            document.getElementById('rule-path').value = rule.log_file_path;
+        }
+
         document.getElementById('rule-keywords').value = rule.keywords.join(', ');
         document.getElementById('rule-context').value = rule.application_context || '';
         document.getElementById('rule-enabled').checked = rule.enabled;
@@ -574,7 +670,12 @@ async function editRule(id) {
         document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_edit_title') : 'Edit rule';
         document.getElementById('rule-modal').classList.remove('hidden');
         closeFileBrowser();
-        fetchFilePreview(rule.log_file_path);
+        if (rule.log_file_path !== '[WEBHOOK]') {
+            fetchFilePreview(rule.log_file_path);
+        } else {
+            const container = document.getElementById('file-preview-container');
+            if (container) container.classList.add('hidden');
+        }
     } catch (error) {
         console.error('Erreur chargement règle:', error);
     }
