@@ -137,6 +137,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Log-to-LLM-Sentinel", lifespan=lifespan)
 
+
+@app.get("/api/system/update-check")
+async def api_update_check():
+    """Manual check for updates from the UI."""
+    return check_for_updates(APP_VERSION)
+
 # ── Templates & Static ──
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))

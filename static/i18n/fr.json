@@ -22,7 +22,9 @@
   "header": {
     "update_available": "Mise à jour disponible",
     "up_to_date": "À jour",
-    "update_instructions": "Pour mettre à jour : git pull && docker compose up -d --build"
+    "update_instructions": "Pour mettre à jour : git pull && docker compose up -d --build",
+    "checking": "Vérification...",
+    "check_failed": "Échec (Hors-ligne ?)"
   },
   "dashboard": {
     "title": "Dashboard",

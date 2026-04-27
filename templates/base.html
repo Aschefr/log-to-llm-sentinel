@@ -41,7 +41,7 @@
         .update-badge {
             display: inline-flex; align-items: center; gap: 0.35rem;
             margin-left: 0.8rem; padding: 0.15rem 0.5rem; border-radius: 2rem;
-            font-size: 0.65rem; font-weight: 600; cursor: help;
+            font-size: 0.65rem; font-weight: 600; cursor: pointer;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             user-select: none;
             vertical-align: middle;
@@ -56,11 +56,19 @@
             border: 1px solid rgba(81, 207, 102, 0.15);
             opacity: 0.8;
         }
+        .update-badge:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-1px);
+        }
         .update-available:hover {
             background: rgba(255, 107, 107, 0.2);
             border-color: rgba(255, 107, 107, 0.5);
-            transform: translateY(-1px);
         }
+        .check-failed { 
+            background: rgba(255, 146, 0, 0.1); color: #ff9200; 
+            border: 1px solid rgba(255, 146, 0, 0.3);
+        }
+        .update-badge:active { transform: scale(0.95); }
         
         .pulse-dot {
             width: 7px; height: 7px; background: #ff8787; border-radius: 50%;
@@ -83,12 +91,12 @@
             <div style="display: flex; align-items: center; margin-left: 1.5rem; margin-top: 0.2rem;">
                 <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: normal;">v{{ APP_VERSION }}</span>
                 {% if UPDATE_STATUS.is_available %}
-                    <div class="update-badge update-available" data-i18n-title="header.update_instructions" title="To update: git pull && docker compose up -d --build">
+                    <div id="version-update-badge" class="update-badge update-available" onclick="checkAppUpdate()" data-i18n-title="header.update_instructions" title="To update: git pull && docker compose up -d --build">
                         <span class="pulse-dot"></span>
                         <span data-i18n="header.update_available">Update available</span>
                     </div>
-                {% elif UPDATE_STATUS.is_latest %}
-                    <div class="update-badge system-up-to-date" data-i18n-title="header.up_to_date" title="System up to date">
+                {% else %}
+                    <div id="version-update-badge" class="update-badge system-up-to-date" onclick="checkAppUpdate()" data-i18n-title="header.up_to_date" title="System up to date">
                         <span class="check-icon">✓</span>
                         <span data-i18n="header.up_to_date">Up to date</span>
                     </div>
