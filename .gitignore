@@ -1,3 +1,4 @@
 docker-compose.override.yml
 data/sentinel.db
 logs/host_system_journal.log
+scratch/ha_sentinel_package.yaml
