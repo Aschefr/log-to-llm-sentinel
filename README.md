@@ -4,6 +4,10 @@
 
 Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. Unlike traditional tools that just search for text, Sentinel uses **Ollama (Local LLM)** to understand *why* an error happened and tells you exactly what you need to know.
 
+> [!CAUTION]
+> **Disclaimer**: This application is entirely "vibe coded" and designed specifically to meet the creator's personal needs. Security has not been independently audited or verified, as the intended use case is strictly local. Use this software at your own risk.
+
+
 <p align="center">
   <img src="screenshots/log-to-llm-sentinel_dashboard.png" width="100%" alt="Dashboard Overview">
 </p>
