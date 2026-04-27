@@ -693,20 +693,8 @@ async function editRule(id) {
         }
 
         // If this rule has an active learning session, open the auto tab with session data
-        if (rule.last_learning_session_id) {
-            try {
-                const session = await apiFetch(`/api/keyword-learning/${rule.last_learning_session_id}/status`);
-                if (session && ['pending', 'scanning', 'refining', 'validated'].includes(session.status)) {
-                    // Delay slightly to ensure modal DOM is ready
-                    setTimeout(() => {
-                        if (typeof kwWizardLoadSession === 'function') {
-                            kwWizardLoadSession(rule.last_learning_session_id);
-                        }
-                    }, 100);
-                }
-            } catch (e) {
-                console.warn('Could not load learning session:', e);
-            }
+        if (rule.last_learning_session_id && typeof kwWizardLoadSession === 'function') {
+            await kwWizardLoadSession(rule.last_learning_session_id);
         }
     } catch (error) {
         console.error('Erreur chargement règle:', error);
