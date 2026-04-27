@@ -1,127 +1,82 @@
-# log-to-llm-sentinel
+# 🛡️ Log to LLM Sentinel
 
-Petit projet Python (FastAPI) pour lancer une API web localement.
+**Your intelligent log guardian powered by Local AI.**
 
-Ce README est pensé pour **les personnes débutantes** : si tu suis les étapes dans l’ordre, tu devrais arriver à démarrer l’app.
+Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. Unlike traditional tools that just search for text, Sentinel uses **Ollama (Local LLM)** to understand *why* an error happened and tells you exactly what you need to know.
 
-## C’est quoi ?
+![Sentinel Dashboard Placeholder](https://raw.githubusercontent.com/Aschefr/log-to-llm-sentinel/main/static/img/screenshot_placeholder.png)
 
-- Une **API** faite avec **FastAPI**
-- Lancement via **Uvicorn**
-- Dépendances Python listées dans `requirements.txt`
+---
 
-## Pré-requis
+## ✨ Key Features
 
-- **Python 3.10+** (idéalement 3.11 ou 3.12)
-- **Git** (optionnel, mais pratique)
+- 🧠 **Smart AI Analysis**: Don't just get alerted; get an explanation. Sentinel uses Ollama to analyze log context and provide a human-readable diagnosis.
+- 🤖 **Keyword Auto-Learning**: Not sure what to look for? Let the AI scan your historical logs. It will automatically suggest and validate the most important keywords to monitor.
+- 🔗 **Home Assistant Ready**: Use Webhooks to stream logs from your smart home directly to Sentinel.
+- 🔔 **Universal Notifications**: Get alerted via Discord, Telegram, Slack, or Email thanks to built-in Apprise support.
+- 🌍 **Fully Multilingual**: Beautiful interface available in **English** and **French**.
+- 🔒 **100% Private**: Everything runs locally on your machine. No data ever leaves your network.
 
-Vérifier que Python est bien installé :
+---
 
-```bash
-python --version
-```
+## 🚀 Quick Start (For Non-Experts)
 
-## Installation (Windows)
+The easiest way to run Sentinel is using **Docker**. This ensures all components (Database, Web Server, and AI) work together perfectly.
 
-### 1) Récupérer le projet
+### 1. Prerequisites
+- Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) or Docker Compose (Linux).
+- (Optional but recommended) Install [Ollama](https://ollama.com/) locally if you want to use your GPU for faster analysis.
 
-Si tu as déjà le dossier, passe à l’étape suivante. Sinon :
-
-```bash
-git clone <URL_DU_DEPOT>
-cd log-to-llm-sentinel
-```
-
-### 2) Créer un environnement virtuel (recommandé)
+### 2. Launch the Sentinel
+Open a terminal in the project folder and run:
 
 ```bash
-python -m venv .venv
+docker-compose up -d
 ```
 
-Activer l’environnement :
+### 3. Access the Interface
+Once the containers are started, open your browser and go to:
+👉 **[http://localhost:10911](http://localhost:10911)**
 
-```bash
-.venv\Scripts\activate
-```
+---
 
-Tu devrais voir `(.venv)` au début de ta ligne de commande.
+## 📖 How it Works
 
-### 3) Installer les dépendances
+1. **Define a Rule**: Point Sentinel to a log file or a Webhook token.
+2. **Set Keywords**: Choose which words should trigger an alert (e.g., `error`, `failed`, `critical`).
+3. **AI Kick-in**: When a match is found, Sentinel grabs the surrounding lines and sends them to your local AI.
+4. **Get Notified**: You receive a notification with a summary of the situation and the AI's diagnosis.
 
-```bash
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-```
+### 💡 The "Auto-Learning" Magic
+Setting up keywords can be tedious. Use the **Auto-Learning Wizard**:
+- Select a time period (e.g., "The last 24 hours").
+- Sentinel will "read" your logs in chunks.
+- It identifies recurring errors and asks the AI to refine a list of "Actionable Keywords."
+- **Result**: A perfectly tuned monitoring rule in minutes, not hours.
 
-## Démarrer l’application
+---
 
-> Selon le projet, le point d’entrée peut varier. Les commandes ci-dessous sont les plus courantes.
+## 🏠 Home Assistant Integration
 
-Essaie d’abord :
+Sentinel is designed to play well with Home Assistant. You can send your HASS logs via Webhook:
 
-```bash
-uvicorn main:app --reload
-```
+1. Create a **Webhook Rule** in Sentinel to get a unique token.
+2. In Home Assistant, add a REST command to forward your `system_log_event`.
+3. Sentinel will now monitor your smart home in real-time!
 
-Si ça ne marche pas, essaie aussi :
+---
 
-```bash
-uvicorn app.main:app --reload
-```
+## 🛠️ Configuration
 
-Ensuite ouvre :
+Sentinel is highly customizable via the **Configuration** page:
+- **AI Model**: Choose your favorite model from Ollama (Gemma, Llama 3, Mistral...).
+- **Performance**: Adjust "Eco" or "GPU" profiles depending on your hardware.
+- **Privacy**: Fine-tune anti-spam delays and sensitivity thresholds.
 
-- **Docs interactives (Swagger)** : `http://127.0.0.1:8000/docs`
-- **Redoc** : `http://127.0.0.1:8000/redoc`
+---
 
-## Structure (à compléter)
+## 🤝 Support & Contribution
 
-Si tu ne sais pas où est `app`, cherche un fichier qui contient quelque chose comme :
+If you encounter an issue or have a suggestion, feel free to open an issue on the repository. 
 
-- `app = FastAPI()`
-
-Souvent c’est dans `main.py` ou `app/main.py`.
-
-## Problèmes courants (FAQ)
-
-### “uvicorn n’est pas reconnu…”
-
-Tu n’es probablement pas dans l’environnement virtuel.
-
-1) Active `.venv` :
-
-```bash
-.venv\Scripts\activate
-```
-
-2) Réessaie :
-
-```bash
-uvicorn main:app --reload
-```
-
-### “ModuleNotFoundError: No module named 'main'”
-
-Ça veut dire que `main.py` n’est pas à la racine, ou que le module a un autre nom.
-
-- Cherche où se trouve l’objet `app = FastAPI()`
-- Puis adapte la commande :
-  - Exemple si le fichier est `app/main.py` : `uvicorn app.main:app --reload`
-
-### “Address already in use”
-
-Le port 8000 est déjà utilisé. Tu peux changer de port :
-
-```bash
-uvicorn main:app --reload --port 8001
-```
-
-## Besoin d’aide ?
-
-Si tu bloques, copie/colle :
-
-- la commande que tu as lancée
-- le message d’erreur complet
-- ton fichier d’entrée (celui qui contient `FastAPI()`)
-
-et je t’aiderai à corriger.
+**Log to LLM Sentinel** — *Because logs are meant to be understood, not just stored.*
