@@ -5,6 +5,28 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import os
+import subprocess
+
+def get_app_version():
+    try:
+        if os.path.exists(".git"):
+            commits = subprocess.check_output(["git", "rev-list", "--count", "HEAD"]).decode("utf-8").strip()
+            merges = subprocess.check_output(["git", "rev-list", "--merges", "--count", "HEAD"]).decode("utf-8").strip()
+            version = f"1.{merges}.{commits}"
+            with open("version.txt", "w", encoding="utf-8") as f:
+                f.write(version)
+            return version
+    except Exception:
+        pass
+    try:
+        if os.path.exists("version.txt"):
+            with open("version.txt", "r", encoding="utf-8") as f:
+                return f.read().strip()
+    except Exception:
+        pass
+    return "1.0.0"
+
+APP_VERSION = get_app_version()
 
 from app.database import init_db
 from app.routers import rules, config, dashboard
@@ -85,25 +107,10 @@ app = FastAPI(title="Log-to-LLM-Sentinel", lifespan=lifespan)
 # ── Templates & Static ──
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+templates.env.globals['APP_VERSION'] = APP_VERSION
 static_dir = os.path.join(BASE_DIR, "static")
 
 app.mount("/static", StaticFiles(directory=static_dir), name="static")
-
-# ── Global Context (Version) ──
-from app.version import get_app_version
-@app.middleware("http")
-async def add_version_to_context(request: Request, call_next):
-    # This isn't the cleanest way for Jinja2 context but it works for global injection
-    response = await call_next(request)
-    return response
-
-@app.get("/api/version")
-def get_api_version():
-    return {"version": get_app_version()}
-
-# Pass version to all templates automatically
-from app.version import get_app_version
-templates.env.globals.update(app_version=get_app_version())
 
 # ── Routers ──
 from app.routers import chat as chat_router

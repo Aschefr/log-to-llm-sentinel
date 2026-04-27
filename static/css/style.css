@@ -44,24 +44,10 @@ body {
     z-index: 100;
 }
 
-.nav-brand-container {
-    display: flex;
-    flex-direction: column;
-    justify-self: start;
-}
-
 .nav-brand {
+    justify-self: start;
     font-size: 1.1rem;
     font-weight: 600;
-}
-
-.nav-version {
-    font-size: 0.65rem;
-    color: var(--text-secondary);
-    opacity: 0.6;
-    margin-top: -2px;
-    font-family: 'JetBrains Mono', monospace;
-    letter-spacing: 0.05em;
 }
 
 .nav-links {

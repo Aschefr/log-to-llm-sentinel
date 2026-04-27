@@ -40,9 +40,9 @@
 </head>
 <body>
     <nav class="navbar">
-        <div class="nav-brand-container">
-            <div class="nav-brand">🔍 Log to LLM Sentinel</div>
-            <div class="nav-version">v{{ app_version }}</div>
+        <div class="nav-brand" style="display: flex; flex-direction: column; justify-content: center;">
+            <span style="line-height: 1;">🔍 Log to LLM Sentinel</span>
+            <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: normal; margin-left: 1.5rem; margin-top: 0.2rem;">v{{ APP_VERSION }}</span>
         </div>
         <div class="nav-links">
             <a href="/" data-i18n="nav.dashboard" class="{% if request.url.path == '/' %}active{% endif %}">Dashboard</a>
