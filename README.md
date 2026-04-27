@@ -94,11 +94,68 @@ Setting up keywords can be tedious. Use the **Auto-Learning Wizard**:
 
 ## 🏠 Home Assistant Integration
 
-Sentinel is designed to play well with Home Assistant. You can send your HASS logs via Webhook:
+Sentinel can monitor your Home Assistant logs in real-time. Follow these steps to set up the integration:
 
-1. Create a **Webhook Rule** in Sentinel to get a unique token.
-2. In Home Assistant, add a REST command to forward your `system_log_event`.
-3. Sentinel will now monitor your smart home in real-time!
+### 1. Create a Webhook Rule in Sentinel
+1. Go to the **Rules** page in Sentinel.
+2. Click **Create New Rule**.
+3. In the **Source of Logs** tab, select **Webhook**.
+4. Give it a name (e.g., "Home Assistant") and click **Create**.
+5. Sentinel will generate a unique URL for you. Copy this URL.
+
+### 2. Add the Package to Home Assistant
+The best way to integrate this is by using **Packages**. 
+
+1. Install the **File Editor** add-on in Home Assistant (Settings -> Add-ons).
+2. Open File Editor and create a new file named `/config/packages/log-to-llm-sentinel.yaml`.
+3. Paste the following code into it (replace `LOG-TO-LLM-SENTINEL-IP` and `YOUR-TOKEN` with your actual values):
+
+```yaml
+rest_command:
+  sentinel_log_webhook:
+    url: "http://LOG-TO-LLM-SENTINEL-IP:10911/api/webhook/logs/YOUR-GENERATED-TOKEN-FROM-WEBHOOK-RULE-HERE"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    payload: >-
+      {"lines": ["{{ level }} [{{ name }}] {{ message[0] if message is list else message | string | truncate(800, True, '...') }}{% if exception %} | EXCEPTION: {{ exception | string | truncate(500, True, '...') }}{% endif %}"]}
+    timeout: 10
+
+system_log:
+  fire_event: true
+
+automation:
+  - id: sentinel_forward_ha_logs_realtime
+    alias: "Sentinel - Forward HA logs (realtime)"
+    description: >
+      Envoie chaque entree du journal HA vers Log Sentinel
+      en temps reel via system_log_event.
+    mode: queued
+    max: 20
+    trigger:
+      - platform: event
+        event_type: system_log_event
+
+    condition:
+      - condition: template
+        value_template: >-
+          {{ trigger.event.data.name not in
+             ['homeassistant.components.rest_command',
+              'homeassistant.util.logging',
+              'homeassistant.components.automation.sentinel_forward_ha_logs_realtime',
+              'homeassistant.helpers.template'] }}
+
+    action:
+      - service: rest_command.sentinel_log_webhook
+        data:
+          level: "{{ trigger.event.data.level }}"
+          name: "{{ trigger.event.data.name }}"
+          message: "{{ trigger.event.data.message[0] if trigger.event.data.message is list else trigger.event.data.message | string | truncate(800, True, '...') }}"
+          exception: "{{ trigger.event.data.exception | default('') | string }}"
+```
+
+4. **Restart Home Assistant** or reload your automations and REST commands.
+5. Sentinel will now receive and analyze your smart home logs in real-time!
 
 ---
 
