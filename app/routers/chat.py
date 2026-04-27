@@ -16,6 +16,11 @@ from app import logger
 router = APIRouter(prefix="/chat", tags=["chat"])
 templates = Jinja2Templates(directory="templates")
 
+# Share the same globals as main.py templates (needed because base.html uses them)
+from app.main import APP_VERSION, check_for_updates
+templates.env.globals['APP_VERSION'] = APP_VERSION
+templates.env.globals['UPDATE_STATUS'] = check_for_updates(APP_VERSION)
+
 _orchestrator: Optional[Orchestrator] = None
 
 def set_orchestrator(orch: Orchestrator):
