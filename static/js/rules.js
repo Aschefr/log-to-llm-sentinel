@@ -8,6 +8,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+/**
+ * crypto.randomUUID() is only available in secure contexts (HTTPS / localhost).
+ * This fallback works on plain HTTP over LAN (e.g. http://192.168.x.x).
+ */
+function _generateUUID() {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        return crypto.randomUUID();
+    }
+    // Polyfill: RFC4122 v4 UUID using Math.random()
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+}
+
 const TYPICAL_KEYWORDS = [
     'error',
     'exception',
@@ -383,7 +398,7 @@ function setupModal() {
 
                 // Générer un UUID si aucun token n'est encore défini (utile pour Nouvelle règle)
                 if (!window._currentWebhookToken) {
-                    window._currentWebhookToken = crypto.randomUUID();
+                    window._currentWebhookToken = _generateUUID();
                 }
                 updateModalWebhookUrl();
             } else {
@@ -601,7 +616,7 @@ async function saveRule() {
     
     let logFilePath = document.getElementById('rule-path').value;
     if (isWebhook) {
-        logFilePath = '[WEBHOOK]:' + (window._currentWebhookToken || crypto.randomUUID());
+        logFilePath = '[WEBHOOK]:' + (window._currentWebhookToken || _generateUUID());
     }
     
     const data = {
