@@ -12,9 +12,9 @@
     <div class="quick-templates" style="margin-bottom: 2rem;">
         <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 0.75rem;" data-i18n="rules.quick_templates">Modèles de surveillance rapides</h3>
         <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('auth')" data-i18n="rules.template_auth">🛡️ Connexions (auth.log)</button>
-            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('syslog')" data-i18n="rules.template_syslog">⚙️ Système (syslog)</button>
-            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('journald')" data-i18n="rules.template_journald">📜 Journald (Relais)</button>
+            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('auth')"><span aria-hidden="true">🛡️ </span><span data-i18n="rules.template_auth">Connexions (auth.log)</span></button>
+            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('syslog')"><span aria-hidden="true">⚙️ </span><span data-i18n="rules.template_syslog">Système (syslog)</span></button>
+            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('journald')"><span aria-hidden="true">📜 </span><span data-i18n="rules.template_journald">Journald (Relais)</span></button>
         </div>
     </div>
 
@@ -94,13 +94,13 @@
                     <div class="kw-tabs" role="tablist">
                         <button type="button" id="kw-tab-manual" class="kw-tab kw-tab--active"
                                 role="tab" aria-selected="true" onclick="kwTabSwitch('manual')"
-                                data-i18n="kw.tab_manual">
-                            ✏️ Mots-clés manuels
+                                >
+                            <span aria-hidden="true">✏️ </span><span data-i18n="kw.tab_manual">Mots-clés manuels</span>
                         </button>
                         <button type="button" id="kw-tab-auto" class="kw-tab"
                                 role="tab" aria-selected="false" onclick="kwTabSwitch('auto')"
-                                data-i18n="kw.tab_auto">
-                            🤖 Auto-apprentissage
+                                >
+                            <span aria-hidden="true">🤖 </span><span data-i18n="kw.tab_auto">Auto-apprentissage</span>
                         </button>
                     </div>
 
@@ -168,12 +168,12 @@
                     </label>
                 </div>
                 <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" data-i18n="rules.save">Enregistrer</button>
+                    <button type="submit" class="btn btn-primary" data-i18n="common.save">Enregistrer</button>
                     <button type="button" id="kw-launch-main-btn" class="btn btn-primary hidden"
-                            onclick="_launchSession()" data-i18n="kw.launch_full">
-                        🤖 Auto-apprentissage : Lancer l'analyse
+                            onclick="_launchSession()">
+                        <span aria-hidden="true">🤖 </span><span data-i18n="kw.launch_full">Auto-apprentissage : Lancer l'analyse</span>
                     </button>
-                    <button type="button" id="cancel-rule" class="btn btn-secondary" data-i18n="rules.cancel">Annuler</button>
+                    <button type="button" id="cancel-rule" class="btn btn-secondary" data-i18n="common.cancel">Annuler</button>
                 </div>
             </form>
         </div>

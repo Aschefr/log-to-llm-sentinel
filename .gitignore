@@ -23,3 +23,10 @@ env/
 ollama_data/
 data/learning_logs/session*
 
+scratch/audit_orphans.py
+scratch/duplicate_audit.txt
+scratch/find_duplicates.py
+scratch/orphan_audit.txt
+scratch/orphan_audit2.txt
+scratch/remove_duplicates.py
+scratch/remove_orphans.py

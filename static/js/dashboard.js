@@ -100,11 +100,11 @@ async function loadRecentAnalyses() {
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
                 <div class="analysis-footer" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">${window.t('common.retry')}</button>
-                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">${window.t('common.notify')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 ${window.t('common.retry')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 ${window.t('common.notify')}</button>
                         ${a.detection_id ? `<button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?search=${encodeURIComponent(a.detection_id)}'" title="${window.t('common.view_in_monitor') || 'Voir dans Monitor'}">🔍 Monitor</button>` : ''}
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">${window.t('common.deepen')}</button>
+                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 ${window.t('common.deepen')}</button>
                 </div>
             </div>
         `).join('');
@@ -197,7 +197,7 @@ function pollTask(taskId, btn, originalHtml, onDone) {
 async function notifyAnalysis(analysisId, btn) {
     const oldHtml = btn.innerHTML;
     try {
-        btn.innerHTML = window.t('common.sending');
+        btn.innerHTML = '⏳ ' + window.t('common.sending');
         btn.disabled = true;
 
         const res = await apiFetch(`/api/monitor/notify/${analysisId}`, {
@@ -205,7 +205,7 @@ async function notifyAnalysis(analysisId, btn) {
         });
 
         if (res.status === 'ok') {
-            btn.innerHTML = window.t('common.sent');
+            btn.innerHTML = '✅ ' + window.t('common.sent');
             setTimeout(() => {
                 btn.innerHTML = oldHtml;
                 btn.disabled = false;

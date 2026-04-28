@@ -112,7 +112,7 @@ function setupModelPulling() {
                                 }
                                 if (data.status === 'success') {
                                     progressBar.style.width = '100%';
-                                    statusText.textContent = window.t ? window.t('config.model_download_success') : '✅ Model downloaded successfully!';
+                                    statusText.textContent = '✅ ' + (window.t ? window.t('config.model_download_success') : 'Model downloaded successfully!');
                                     setTimeout(() => setupOllamaModelSelect(), 2000);
                                 }
                             }
@@ -274,7 +274,7 @@ function setupForm() {
             
             copyToClipboard(text).then(() => {
                 const oldText = copyBtn.innerHTML;
-                copyBtn.innerHTML = window.t ? window.t('config.copy_success') : '✅ Copied!';
+                copyBtn.innerHTML = '✅ ' + (window.t ? window.t('common.copied') : 'Copied!');
                 setTimeout(() => {
                     copyBtn.innerHTML = oldText;
                 }, 2000);
@@ -514,7 +514,7 @@ async function runTest(url, messageEl, buttonEl) {
     const stopBtn = document.createElement('button');
     stopBtn.className = 'btn btn-danger btn-sm';
     stopBtn.style.marginLeft = '0.5rem';
-    stopBtn.innerHTML = window.t ? window.t('config.stop_btn') : '🛑 Stop';
+    stopBtn.innerHTML = window.t ? '🛑 ' + window.t('common.stop') : '🛑 Stop';
     stopBtn.onclick = () => abortController.abort();
     
     buttonEl.parentNode.insertBefore(stopBtn, buttonEl.nextSibling);

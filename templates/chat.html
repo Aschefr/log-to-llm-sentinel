@@ -12,11 +12,11 @@
     <!-- Sidebar -->
     <aside class="chat-sidebar">
         <div class="sidebar-header">
-            <h2 data-i18n="chat.conversations">💬 Conversations</h2>
+            <h2><span aria-hidden="true">💬 </span><span data-i18n="chat.conversations">Conversations</span></h2>
             <button class="btn btn-secondary btn-sm" onclick="createNewChat()" data-i18n="chat.new_conversation">+ Nouveau</button>
         </div>
         <div id="conversation-list" class="conversation-list">
-            <div class="loading" data-i18n="chat.loading">Chargement...</div>
+            <div class="loading" data-i18n="common.loading">Chargement...</div>
         </div>
     </aside>
 
@@ -587,8 +587,8 @@ async function loadHistory(id) {
                     <div class="markdown-body" style="font-size:0.9rem;">${marked.parse(data.analysis.ollama_response)}</div>
                     ${detectionId ? `
                     <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid rgba(255,255,255,0.08); display:flex; justify-content:flex-end;">
-                        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?search=${encodeURIComponent(detectionId)}'" title="${window.t ? window.t('chat.show_in_monitor') : 'Afficher dans Monitor'}">
-                            ${window.t ? window.t('chat.show_in_monitor') : '🔍 Afficher dans Monitor'}
+                        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?search=${encodeURIComponent(detectionId)}'" title="${window.t ? window.t('common.view_in_monitor') : 'Afficher dans Monitor'}">
+                            🔍 ${window.t ? window.t('common.view_in_monitor') : 'Afficher dans Monitor'}
                         </button>
                     </div>` : ''}
                 </div>
@@ -644,7 +644,7 @@ function setSendBtn(generating) {
     const btn = document.getElementById('send-btn');
     if (!btn) return;
     if (generating) {
-        btn.textContent = window.t ? window.t('chat.stop') : '🛑 Arrêter';
+        btn.textContent = window.t ? '🛑 ' + window.t('common.stop') : '🛑 Arrêter';
         btn.classList.remove('btn-primary');
         btn.classList.add('btn-danger');
         btn.removeAttribute('data-i18n');

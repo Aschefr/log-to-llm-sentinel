@@ -170,7 +170,7 @@ function renderTabContent(rule) {
                 <span class="kw-filter-label hidden" id="kw-filter-label-${rule.id}"></span>
             </span>
             <div class="viewer-actions" onclick="event.stopPropagation()">
-                <button class="btn btn-secondary btn-sm" id="freeze-btn-${rule.id}" onclick="toggleFreeze(${rule.id})">${window.t ? window.t('monitor.freeze') : '❄️ Freeze'}</button>
+                <button class="btn btn-secondary btn-sm" id="freeze-btn-${rule.id}" onclick="toggleFreeze(${rule.id})">${window.t ? '❄️ ' + window.t('monitor.freeze') : '❄️ Freeze'}</button>
                 <button class="btn btn-secondary btn-sm" onclick="copyViewerContent(${rule.id})">${window.t ? window.t('common.copy') : 'Copy'}</button>
             </div>
         </div>
@@ -195,7 +195,7 @@ function renderTabContent(rule) {
             </span>
         </div>
         <div id="monitor-analyses-${rule.id}" class="monitor-analyses-list">
-            <div class="loading">${window.t ? window.t('monitor.loading_analyses') : 'Loading...'}</div>
+            <div class="loading">${window.t ? window.t('common.loading') : 'Loading...'}</div>
         </div>
     `;
 
@@ -520,15 +520,15 @@ async function onLineClick(el, ruleId) {
         </div>
         <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; gap: 0.5rem;">
-                <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${relatedAnalysis.id}, this)">${window.t('monitor.retry_analysis')}</button>
-                <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${relatedAnalysis.id}, this)">${window.t('monitor.notify')}</button>
+                <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${relatedAnalysis.id}, this)">🔄 ${window.t('common.retry')}</button>
+                <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${relatedAnalysis.id}, this)">🔔 ${window.t('common.notify')}</button>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="openChat(${relatedAnalysis.id})">${window.t('monitor.deepen_with_ai')}</button>
+            <button class="btn btn-primary btn-sm" onclick="openChat(${relatedAnalysis.id})">💬 ${window.t('common.deepen')}</button>
         </div>
         ` : `
         <div class="detail-row"><em>${window.t ? window.t('monitor.no_auto_analysis') : 'No automatic analysis found for this line.'}</em></div>
         <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
-            <button class="btn btn-primary btn-sm" onclick="manualAnalyze(${ruleId}, this)">${window.t('monitor.analyze_with_ollama')}</button>
+            <button class="btn btn-primary btn-sm" onclick="manualAnalyze(${ruleId}, this)">🤖 ${window.t('monitor.analyze_with_ollama')}</button>
         </div>
         `}
     `;
@@ -550,7 +550,7 @@ function toggleFreeze(ruleId) {
     isFrozen = !isFrozen;
     const btn = document.getElementById(`freeze-btn-${ruleId}`);
     if (btn) {
-        btn.textContent = isFrozen ? (window.t ? window.t('monitor.resume') : '▶️ Resume') : (window.t ? window.t('monitor.freeze') : '❄️ Freeze');
+        btn.textContent = isFrozen ? (window.t ? '▶️ ' + window.t('monitor.resume') : '▶️ Resume') : (window.t ? '❄️ ' + window.t('monitor.freeze') : '❄️ Freeze');
         btn.classList.toggle('active', isFrozen);
     }
 }
@@ -608,10 +608,10 @@ async function loadMonitorAnalyses(ruleId, severityFilter = null) {
                 <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
                 <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">${window.t('monitor.retry')}</button>
-                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">${window.t('monitor.notify')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 ${window.t('common.retry')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 ${window.t('common.notify')}</button>
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">${window.t('monitor.deepen_with_ai')}</button>
+                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 ${window.t('common.deepen')}</button>
                 </div>
             </div>
         `).join('');
@@ -713,13 +713,13 @@ async function searchById() {
                     <div class="detail-value analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : '—'}</div>
                 </div>
 
-                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.notified') : 'Notified'}</span><span class="detail-value">${a.notified ? window.t('monitor.yes') : window.t('monitor.no')}</span></div>
+                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.notified') : 'Notified'}</span><span class="detail-value">${a.notified ? '✅ ' + window.t('monitor.yes') : '❌ ' + window.t('monitor.no')}</span></div>
                 <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
                     <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">${window.t('monitor.retry_analysis')}</button>
-                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">${window.t('monitor.notify')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 ${window.t('common.retry')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 ${window.t('common.notify')}</button>
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">${window.t('monitor.deepen_with_ai')}</button>
+                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 ${window.t('monitor.deepen_with_ai')}</button>
                 </div>
             </div>
         `;
@@ -757,7 +757,7 @@ async function manualAnalyze(ruleId, btn) {
                                 </div>
                                 <div class="analysis-response markdown-body">${marked.parse(a.ollama_response)}</div>
                                 <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
-                                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">${window.t('monitor.deepen_with_ai')}</button>
+                                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 ${window.t('common.deepen')}</button>
                                 </div>
                             </div>
                         `;
@@ -775,7 +775,7 @@ async function manualAnalyze(ruleId, btn) {
 async function notifyAnalysis(analysisId, btn) {
     const oldHtml = btn.innerHTML;
     try {
-        btn.innerHTML = window.t('common.sending');
+        btn.innerHTML = '⏳ ' + window.t('common.sending');
         btn.disabled = true;
 
         const res = await apiFetch(`/api/monitor/notify/${analysisId}`, {
@@ -783,7 +783,7 @@ async function notifyAnalysis(analysisId, btn) {
         });
 
         if (res.status === 'ok') {
-            btn.innerHTML = window.t('common.sent');
+            btn.innerHTML = '✅ ' + window.t('common.sent');
             setTimeout(() => {
                 btn.innerHTML = oldHtml;
                 btn.disabled = false;

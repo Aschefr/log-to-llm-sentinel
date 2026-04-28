@@ -112,9 +112,9 @@ async function loadRules() {
                     <p>${rule.enabled ? `✅ ${window.t ? window.t('rules.enabled_status') : 'Enabled'}` : `❌ ${window.t ? window.t('rules.disabled_status') : 'Disabled'}`} | 🔔 ${rule.notify_on_match ? `${window.t ? window.t('rules.notification_threshold') : 'Threshold:'} ${rule.notify_severity_threshold || 'info'}` : (window.t ? window.t('rules.notifications_disabled') : 'Notifications disabled')}</p>
                 </div>
                 <div class="rule-actions">
-                    <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">${window.t ? window.t('rules.test_rule') : '🧪 Test'}</button>
-                    <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">${window.t ? window.t('rules.edit') : '✏️ Edit'}</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id}, this)">${window.t ? window.t('rules.delete') : '🗑️ Delete'}</button>
+                    <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 ${window.t ? window.t('rules.test_rule') : 'Test'}</button>
+                    <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ ${window.t ? window.t('common.edit') : 'Edit'}</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id}, this)">🗑️ ${window.t ? window.t('common.delete') : 'Delete'}</button>
                 </div>
                 <div class="rule-toggles" style="display:flex;flex-direction:column;gap:.5rem;flex-basis:100%">
                     <div class="rule-last-line" style="display:flex;justify-content:space-between;align-items:center">
@@ -122,8 +122,8 @@ async function loadRules() {
                             <strong>${window.t ? window.t('rules.last_detected_line') : 'Last detected line:'}</strong>
                             <div class="last-line-content">${escapeHtml(rule.last_log_line || (window.t ? window.t('dashboard.no_line_found') : 'No line found or file inaccessible'))}</div>
                         </div>
-                        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?rule=${rule.id}&line=${encodeURIComponent(rule.last_log_line || '')}'" data-i18n="rules.view_in_monitor">
-                            🔍 ${window.t ? window.t('rules.view_in_monitor') || 'Voir dans Monitor' : 'Voir dans Monitor'}
+                        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?rule=${rule.id}&line=${encodeURIComponent(rule.last_log_line || '')}'">
+                            🔍 ${window.t ? window.t('common.view_in_monitor') || 'Voir dans Monitor' : 'Voir dans Monitor'}
                         </button>
                     </div>
                     ${rule.last_learning_session_id ? `
@@ -209,12 +209,12 @@ async function _fetchAndApplySession(ruleId, sessionId) {
         };
 
         const STATUS = {
-            pending:   _t('kw.card_pending',   '⏳ En attente de démarrage…'),
-            scanning:  _t('kw.card_scanning',  '🔍 Scan — {done}/{total} paquets ({pct}%)', { done: data.completed_packets, total: data.total_packets, pct }),
-            refining:  _t('kw.card_refining',  '🧠 Raffinement IA en cours…'),
-            validated: _t('kw.card_validated', '✅ Apprentissage terminé'),
-            reverted:  _t('kw.card_reverted',  '↩️ Annulé — mots-clés restaurés'),
-            error:     _t('kw.card_error',     '⚠️ Erreur : {msg}', { msg: data.error_message || 'Inconnue' }),
+            pending:   '⏳ ' + _t('kw.card_pending',   'En attente de démarrage…'),
+            scanning:  '🔍 ' + _t('kw.card_scanning',  'Scan — {done}/{total} paquets ({pct}%)', { done: data.completed_packets, total: data.total_packets, pct }),
+            refining:  '🧠 ' + _t('kw.card_refining',  'Raffinement IA en cours…'),
+            validated: '✅ ' + _t('kw.card_validated', 'Apprentissage terminé'),
+            reverted:  '↩️ ' + _t('kw.card_reverted',  'Annulé — mots-clés restaurés'),
+            error:     '⚠️ ' + _t('kw.card_error',     'Erreur : {msg}', { msg: data.error_message || 'Inconnue' }),
         };
 
         const isActive = ['pending', 'scanning', 'refining'].includes(data.status);
@@ -297,7 +297,7 @@ async function testRule(id) {
         stopBtn = document.createElement('button');
         stopBtn.className = 'btn btn-danger btn-sm';
         stopBtn.style.marginLeft = '0.5rem';
-        stopBtn.innerHTML = window.t ? window.t('rules.stop_test') : '🛑 Stop';
+        stopBtn.innerHTML = window.t ? '🛑 ' + window.t('common.stop') : '🛑 Stop';
         stopBtn.onclick = () => abortController.abort();
         btn.parentNode.insertBefore(stopBtn, btn.nextSibling);
     }
@@ -311,7 +311,7 @@ async function testRule(id) {
         // On pourrait notifier l'utilisateur de se rendre dans le Monitor pour voir le résultat.
 
         if (btn) {
-            btn.innerHTML = window.t ? window.t('rules.test_done') : '✅ Done';
+            btn.innerHTML = window.t ? '✅ ' + window.t('common.done') : '✅ Done';
             btn.classList.remove('pulse-animation');
             btn.classList.add('btn-success-temporary');
             setTimeout(() => {
@@ -327,10 +327,10 @@ async function testRule(id) {
             btn.classList.remove('pulse-animation');
             btn.classList.add('btn-danger');
             if (e.name === 'AbortError') {
-                btn.innerHTML = window.t ? window.t('rules.test_cancelled') : '❌ Cancelled';
+                btn.innerHTML = window.t ? '❌ ' + window.t('rules.test_cancelled') : '❌ Cancelled';
             } else {
                 console.error('Erreur test rule:', e);
-                btn.innerHTML = window.t ? window.t('rules.test_error_btn') : '❌ Error';
+                btn.innerHTML = window.t ? '❌ ' + window.t('rules.test_error_btn') : '❌ Error';
             }
             setTimeout(() => {
                 if (document.getElementById(`test-btn-${id}`)) {
@@ -778,19 +778,19 @@ function applyTemplate(type) {
     resetForm();
     const templates = {
         'auth': {
-            name: window.t ? window.t('rules.template_auth').replace('🛡️ ', '') : 'Security SSH / Connections',
+            name: window.t ? window.t('rules.template_auth') : 'Security SSH / Connections',
             path: '/system-logs/auth.log',
             keywords: 'failed, Accepted, invalid user, authentication failure, sudo',
             context: 'SSH login and sudo usage monitoring on Ubuntu.'
         },
         'syslog': {
-            name: window.t ? window.t('rules.template_syslog').replace('⚙️ ', '') : 'System Stability',
+            name: window.t ? window.t('rules.template_syslog') : 'System Stability',
             path: '/system-logs/syslog',
             keywords: 'error, failed, fatal, critical, oom-killer, stopped',
             context: 'General Ubuntu system logs. Monitors service crashes and system errors.'
         },
         'journald': {
-            name: window.t ? window.t('rules.template_journald').replace('📜 ', '') : 'Journald (Docker Relay)',
+            name: window.t ? window.t('rules.template_journald') : 'Journald (Docker Relay)',
             path: '/logs/host_system_journal.log',
             keywords: 'error, fatal, panic, critical, failed',
             context: 'Relay of Systemd binary logs (journalctl) to a readable text file.'

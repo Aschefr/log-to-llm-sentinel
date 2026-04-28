@@ -39,7 +39,7 @@
 
     <form id="config-form" class="config-form config-grid">
         <section class="config-section">
-            <h2 data-i18n="config.notifications_title">🔔 Notifications &amp; Alertes</h2>
+            <h2><span aria-hidden="true">🔔 </span><span data-i18n="config.notifications_title">Notifications &amp; Alertes</span></h2>
             <div class="form-group">
                 <label for="notification-method" data-i18n="config.notification_method_label">Méthode de notification principale</label>
                 <select id="notification-method">
@@ -49,7 +49,7 @@
             </div>
 
             <div id="smtp-section" class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
-                <h3 data-i18n="config.smtp_title">📧 Configuration SMTP</h3>
+                <h3><span aria-hidden="true">📧 </span><span data-i18n="config.smtp_title">Configuration SMTP</span></h3>
                 <div class="panel-grid-2">
                     <div class="form-group panel-grid-full">
                         <label for="smtp-host" data-i18n="config.smtp_host">Hôte SMTP</label>
@@ -87,7 +87,7 @@
             </div>
 
             <div id="apprise-section" class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
-                <h3 data-i18n="config.apprise_title">🚀 Configuration Apprise</h3>
+                <h3><span aria-hidden="true">🚀 </span><span data-i18n="config.apprise_title">Configuration Apprise</span></h3>
                 <div class="form-group">
                     <label for="apprise-url" data-i18n="config.apprise_url">URL Apprise (endpoint notify)</label>
                     <input type="text" id="apprise-url" data-i18n-placeholder="config.apprise_url_placeholder" placeholder="http://192.168.1.100:8780/notify/apprise">
@@ -121,7 +121,7 @@
         </section>
 
         <section class="config-section">
-            <h2 data-i18n="config.ollama_title">🤖 Ollama</h2>
+            <h2><span aria-hidden="true">🤖 </span><span data-i18n="config.ollama_title">Ollama</span></h2>
             <div class="panel-grid-2">
                 <div class="form-group">
                     <label for="ollama-url" data-i18n="config.ollama_url">URL Ollama</label>
@@ -165,7 +165,7 @@
 
             <div class="collapsible-section" style="margin-top: 1.5rem;">
                 <div class="section-header" onclick="toggleSection('performance-settings-container', 'performance-arrow')">
-                    <h3 style="margin: 0;" data-i18n="config.performance_title">⚡ Réglages de performance</h3>
+                    <h3 style="margin: 0;"><span aria-hidden="true">⚡ </span><span data-i18n="config.performance_title">Réglages de performance</span></h3>
                     <svg id="performance-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
                 </div>
                 <div id="performance-settings-container" class="config-subsection hidden">
@@ -191,16 +191,16 @@
 
                     <div class="profile-selectors" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
                         <span class="config-hint-label" data-i18n="config.quick_profiles">Profils rapides :</span>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')" data-i18n="config.profile_eco">💻 Profil Éco (Petit CPU)</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')" data-i18n="config.profile_balanced">⚖️ Profil Équilibré</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')" data-i18n="config.profile_gpu">🚀 Profil GPU / Gamer</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')"><span aria-hidden="true">💻 </span><span data-i18n="config.profile_eco">Profil Éco (Petit CPU)</span></button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')"><span aria-hidden="true">⚖️ </span><span data-i18n="config.profile_balanced">Profil Équilibré</span></button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')"><span aria-hidden="true">🚀 </span><span data-i18n="config.profile_gpu">Profil GPU / Gamer</span></button>
                     </div>
                 </div>
             </div>
 
             <div class="collapsible-section" style="margin-top: 1.5rem;">
                 <div class="section-header" onclick="toggleSection('model-management-container', 'model-management-arrow')">
-                    <h3 style="margin: 0;" data-i18n="config.models_title">📦 Gestion des modèles</h3>
+                    <h3 style="margin: 0;"><span aria-hidden="true">📦 </span><span data-i18n="config.models_title">Gestion des modèles</span></h3>
                     <svg id="model-management-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
                 </div>
                 <div id="model-management-container" class="config-subsection hidden">
@@ -231,7 +231,7 @@
         </section>
 
         <section class="config-section">
-            <h2 data-i18n="config.interface_title">🖥️ Interface &amp; Monitor</h2>
+            <h2><span aria-hidden="true">🖥️ </span><span data-i18n="config.interface_title">Interface &amp; Monitor</span></h2>
             <div class="form-group">
                 <label for="monitor-log-lines" data-i18n="config.monitor_lines">Nombre de lignes (Monitor)</label>
                 <input type="number" id="monitor-log-lines" value="60" min="10" max="1000">
@@ -240,7 +240,7 @@
         </section>
 
         <section class="config-section config-section-full">
-            <h2 data-i18n="config.debug_title">🛠️ Debug</h2>
+            <h2><span aria-hidden="true">🛠️ </span><span data-i18n="config.debug_title">Debug</span></h2>
             <div class="form-group checkbox-group">
                     <label class="toggle-switch">
                         <input type="checkbox" id="debug-mode">
@@ -263,7 +263,7 @@
                         <button type="button" class="chip dbg-filter-btn" data-filter="NotificationService">🔔 Notification</button>
                     </div>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" id="copy-logs-btn" class="btn btn-small" data-i18n="config.copy_logs">📋 Copier</button>
+                        <button type="button" id="copy-logs-btn" class="btn btn-small"><span aria-hidden="true">📋 </span><span data-i18n="common.copy">Copier</span></button>
                         <button type="button" id="clear-logs-btn" class="btn btn-small" data-i18n="config.clear_logs">Effacer</button>
                     </div>
                 </div>
@@ -274,7 +274,7 @@
                 <div class="debug-logs-header">
                     <span data-i18n="config.ollama_call_detail">Détail des appels Ollama (Prompt/Réponse)</span>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" id="copy-ollama-logs-btn" class="btn btn-small" data-i18n="config.copy_logs">📋 Copier</button>
+                        <button type="button" id="copy-ollama-logs-btn" class="btn btn-small"><span aria-hidden="true">📋 </span><span data-i18n="common.copy">Copier</span></button>
                         <button type="button" id="clear-ollama-logs-btn" class="btn btn-small" data-i18n="config.clear_logs">Effacer</button>
                     </div>
                 </div>
