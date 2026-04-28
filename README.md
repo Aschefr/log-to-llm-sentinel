@@ -91,7 +91,7 @@ Setting up keywords can be tedious. Use the **Auto-Learning Wizard**:
 - Select a time period (e.g., "The next 24 hours").
 - Sentinel will "read" your logs in chunks.
 - It identifies recurring errors and asks the AI to refine a list of "Actionable Keywords."
-- **Result**: A perfectly tuned monitoring rule in minutes, not hours.
+- **Result**: A perfectly tuned monitoring rule.
 
 ### 📊 Meta-Analysis: The Big Picture
 For long-term monitoring, use **Meta-Analysis**:
@@ -114,16 +114,28 @@ Sentinel can monitor your Home Assistant logs in real-time. Follow these steps t
 5. Sentinel will generate a unique URL for you. Copy this URL.
 
 ### 2. Add the Package to Home Assistant
-The best way to integrate this is by using **Packages**. 
+The best way to integrate this is by using **Packages**, which keeps your configuration clean and modular.
 
-1. Install the **File Editor** add-on in Home Assistant (Settings -> Add-ons).
-2. Open File Editor and create a new file named `/config/packages/log-to-llm-sentinel.yaml`.
-3. Paste the following code into it (replace `LOG-TO-LLM-SENTINEL-IP` and `YOUR-TOKEN` with your actual values):
+1.  **Install File Editor**: Go to **Settings** -> **Add-ons** and install the **File Editor** add-on (and start it).
+2.  **Create the `packages` folder**:
+    - Open the **File Editor** UI.
+    - Click the **Folder icon** in the top left corner.
+    - If you don't see a `packages` folder, click the **New Folder** icon (the folder with a plus sign) and name it `packages`.
+3.  **Enable Packages in Home Assistant**:
+    - In File Editor, open your `configuration.yaml` file (usually in `/config/`).
+    - Add the following lines at the top level (ensure `homeassistant:` is only defined once):
+      ```yaml
+      homeassistant:
+        packages: !include_dir_named packages
+      ```
+4.  **Create the Sentinel Package**:
+    - In File Editor, go into the `packages` folder and create a new file named `log-to-llm-sentinel.yaml`.
+    - Paste the following code into it (replace `LOG-TO-LLM-SENTINEL-IP` with the IP address of your Docker host (same as in your `docker-compose.yml`) and `YOUR-TOKEN` with the token you copied from the Sentinel UI):
 
 ```yaml
 rest_command:
   sentinel_log_webhook:
-    url: "http://LOG-TO-LLM-SENTINEL-IP:10911/api/webhook/logs/YOUR-GENERATED-TOKEN-FROM-WEBHOOK-RULE-HERE"
+    url: "http://LOG-TO-LLM-SENTINEL-IP:10911/api/webhook/logs/YOUR-TOKEN"
     method: POST
     headers:
       Content-Type: "application/json"
