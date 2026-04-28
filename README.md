@@ -113,7 +113,7 @@ Sentinel can monitor your Home Assistant logs in real-time. Follow these steps t
 4. Give it a name (e.g., "Home Assistant") and click **Create**.
 5. Sentinel will generate a unique URL for you. Copy this URL.
 
-### 2. Add the Package to Home Assistant
+### 2. Add the automation to Home Assistant
 The best way to integrate this is by using **Packages**, which keeps your configuration clean and modular.
 
 1.  **Install File Editor**: Go to **Settings** -> **Add-ons** and install the **File Editor** add-on (and start it).
@@ -130,7 +130,7 @@ The best way to integrate this is by using **Packages**, which keeps your config
       ```
 4.  **Create the Sentinel Package**:
     - In File Editor, go into the `packages` folder and create a new file named `log-to-llm-sentinel.yaml`.
-    - Paste the following code into it (replace `LOG-TO-LLM-SENTINEL-IP` with the IP address of your Docker host (same as in your `docker-compose.yml`) and `YOUR-TOKEN` with the token you copied from the Sentinel UI):
+    - Paste the following code into it (replace `LOG-TO-LLM-SENTINEL-IP` with the IP address of your Docker host (same as in your `docker-compose.yml`) and `YOUR-TOKEN` with the token from the URL copied from the Sentinel UI (format=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)):
 
 ```yaml
 rest_command:
