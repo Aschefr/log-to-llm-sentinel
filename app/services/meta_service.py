@@ -270,11 +270,38 @@ class MetaAnalysisService:
                     compressed_data.append(block)
 
                 events_text = "\n\n".join(compressed_data)
-                prompt = f"{config.system_prompt}\n\nVoici les {analyses_count} \u00e9v\u00e9nements (limit\u00e9 aux plus r\u00e9cents) survenus entre {period_start.strftime('%Y-%m-%d %H:%M')} et {period_end.strftime('%Y-%m-%d %H:%M')}:\n----------------------------------------\n{events_text}\n----------------------------------------\nR\u00e9alise une synth\u00e8se experte de cette situation globale, croise les informations si plusieurs services sont touch\u00e9s, et propose des recommandations g\u00e9n\u00e9rales."
+                if lang == 'en':
+                    meta_instruction = (
+                        "Perform an expert synthesis of this global situation. "
+                        "Cross-reference information if multiple services are affected "
+                        "and propose general recommendations."
+                    )
+                    events_header = (
+                        f"Here are the {analyses_count} events (limited to most recent) "
+                        f"between {period_start.strftime('%Y-%m-%d %H:%M')} "
+                        f"and {period_end.strftime('%Y-%m-%d %H:%M')}:"
+                    )
+                else:
+                    meta_instruction = (
+                        "R\u00e9alise une synth\u00e8se experte de cette situation globale, "
+                        "croise les informations si plusieurs services sont touch\u00e9s, "
+                        "et propose des recommandations g\u00e9n\u00e9rales."
+                    )
+                    events_header = (
+                        f"Voici les {analyses_count} \u00e9v\u00e9nements (limit\u00e9 aux plus r\u00e9cents) "
+                        f"survenus entre {period_start.strftime('%Y-%m-%d %H:%M')} "
+                        f"et {period_end.strftime('%Y-%m-%d %H:%M')} :"
+                    )
+                prompt = (
+                    f"{config.system_prompt}\n\n{events_header}\n"
+                    f"{'--' * 20}\n{events_text}\n{'--' * 20}\n"
+                    f"{meta_instruction}"
+                )
 
             ollama = self.orchestrator.ollama if self.orchestrator else OllamaService()
             ollama_url = global_cfg.ollama_url or "http://ollama:11434"
             ollama_model = global_cfg.ollama_model or "gemma4:e4b"
+            lang = (global_cfg.ollama_prompt_lang or 'fr') if global_cfg else 'fr'
             
             logger.debug("MetaAnalysisService", f"Envoi prompt méta-analyse (Taille: {len(prompt)} car., Contexte: {config.context_size})")
 

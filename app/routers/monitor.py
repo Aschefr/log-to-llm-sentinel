@@ -87,11 +87,13 @@ def get_monitored_rules():
                     "name": r.name,
                     "log_file_path": r.log_file_path,
                     "keywords": r.get_keywords(),
+                    "excluded_patterns": r.get_excluded_patterns(),
                     "application_context": r.application_context,
                     "anti_spam_delay": r.anti_spam_delay or 60,
                     "notify_severity_threshold": r.notify_severity_threshold or "info",
                     "notify_on_match": r.notify_on_match,
                     "stats": stats_dict.get(r.id, {"total": 0, "info": 0, "warning": 0, "critical": 0})
+
                 }
                 for r in rules
             ]

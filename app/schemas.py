@@ -22,6 +22,7 @@ class GlobalConfigCreate(BaseModel):
     apprise_max_chars: int = 1900
     max_log_chars: int = 5000
     debug_mode: bool = False
+    ollama_prompt_lang: str = 'fr'  # 'fr' | 'en'
 
 
 class GlobalConfigRead(GlobalConfigCreate):
@@ -44,6 +45,7 @@ class RuleCreate(BaseModel):
     application_context: str = ""
     enabled: bool = True
     notify_on_match: bool = True
+    excluded_patterns: List[str] = []
 
 
 class RuleUpdate(BaseModel):
@@ -56,6 +58,7 @@ class RuleUpdate(BaseModel):
     application_context: Optional[str] = None
     enabled: Optional[bool] = None
     notify_on_match: Optional[bool] = None
+    excluded_patterns: Optional[List[str]] = None
 
 
 class RuleRead(RuleCreate):

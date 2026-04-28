@@ -9,6 +9,7 @@ Then: immediate auto-validation + notification at each major step.
 import asyncio
 import json
 import os
+import random
 import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -48,51 +49,100 @@ def _resolve_log_path(log_path: str) -> str:
 
 # ── Prompts ────────────────────────────────────────────────────────────────────
 _PROMPT_PHASE1 = """\
-Tu es un expert en monitoring de logs système.
-L'utilisateur surveille ce fichier pour être alerté UNIQUEMENT des événements \
-nécessitant une attention réelle : pannes, erreurs critiques, dégradations de \
-performance, problèmes de sécurité — immédiats ou à long terme.
+You are a system log monitoring expert.
+The user monitors this file to be alerted ONLY on events requiring real attention:
+failures, critical errors, performance degradation, security issues.
 
-Fenêtre temporelle analysée : {window}
+Analyzed time window: {window}
 
-Analyse ces lignes de log et retourne UNIQUEMENT une liste JSON de mots-clés COURTS \
-pour détecter des anomalies dans ce système.
+Analyze these log lines and return ONLY a JSON list of SHORT keywords to detect anomalies.
 
-RÈGLES STRICTES :
-- Maximum 15 mots-clés
-- Chaque mot-clé : 1 à 4 mots MAX (pas de phrases complètes)
-- Les mots-clés doivent être GÉNÉRIQUES : ils doivent matcher les futures occurrences \
-du même type d'événement, même si les numéros ou valeurs changent
-- Supprime les chiffres variables (compteurs, PID, timestamps, IDs)
-- Évite les termes trop génériques : info, log, time, started, stopping, message, repeated...
-- Exemples VALIDES : "restart counter", "job worker", "stop_after", "background worker", "out of memory"
-- Exemples INVALIDES : "restart counter is at 2361", "Background job worker will stop at 14:32"
+STRICT RULES:
+- Maximum 15 keywords
+- Each keyword: 1 to 3 words MAX (no full sentences)
+- Keywords must be GENERIC: they must match future occurrences of the same event type
+- Remove variable numbers (counters, PIDs, timestamps, IDs)
+- Avoid overly generic terms: info, log, time, started, stopping, message, repeated
+- VALID examples: "restart counter", "job worker", "out of memory", "connection refused"
+- INVALID examples: "restart counter is at 2361", "Background job will stop at 14:32"
 
-Retourne UNIQUEMENT le JSON brut, sans texte autour.
-Format : ["mot-clé1", "mot-clé2", ...]
+Return ONLY raw JSON, no surrounding text.
+Format: ["keyword1", "keyword2", ...]
 
---- LIGNES ---
+--- LOG LINES ---
 {lines}
 """
 
 _PROMPT_PHASE2 = """\
-Tu es un expert en monitoring de logs système.
-Voici {n_raw} mots-clés candidats extraits de {n_packets} tranches de log :
+You are a system log monitoring expert.
+Below is a list of {n_raw} candidate keywords extracted from {n_packets} log time-windows:
 {raw_keywords}
 
-Extrait représentatif du fichier (début + fin) :
+Representative log sample (beginning + end of file):
 {sample}
 
-Objectif : surveiller ce système en production et alerter l'utilisateur \
-uniquement sur des événements actionnables.
+Goal: monitor this system in production and alert the user ONLY on actionable events.
 
-Affine cette liste :
-- Supprime les termes bruités, trop génériques ou redondants
-- Conserve ceux signalant des problèmes réels et actionnables
-- Ajoute tout terme manquant évident (max 15 mots-clés finaux)
+STRICT RULES — you MUST follow ALL of these:
+1. SELECT keywords ONLY from the candidate list above. DO NOT invent new terms.
+2. Each retained keyword: 1 to 3 words MAX. If a candidate is longer, shorten it to its essential part.
+3. Remove noisy, overly generic, or redundant candidates.
+4. Keep ONLY those signaling real, actionable problems visible in the logs.
+5. Maximum 15 final keywords.
 
-Réponds UNIQUEMENT en JSON :
-{{"keywords": ["mot1", "mot2"], "rationale": {{"mot1": "raison courte"}}}}
+Respond ONLY with JSON:
+{{"keywords": ["word1", "word2"], "rationale": {{"word1": "short reason"}}}}
+"""
+
+_PROMPT_VALIDATE = """\
+You are a log monitoring expert reviewing a keyword refinement result.
+
+Original candidate list ({n_raw} keywords extracted from real logs):
+{raw_keywords}
+
+Refined list proposed:
+{refined_keywords}
+
+Is the refined list relevant and faithful to the original candidates?
+Answer with YES or NO only. No explanation.
+"""
+
+# Shufflable sections for retry (P_B and P_C will be randomly ordered)
+_REPHRASE_SECTION_CONSTRAINTS = """\
+STRICT CONSTRAINTS (mandatory):
+- Select ONLY from the candidate list. DO NOT invent new terms.
+- Each keyword: 1 to 3 words MAX. Shorten if longer.
+- Remove generic noise. Keep actionable signals.
+- Max 15 keywords total.
+Respond ONLY with JSON: {{"keywords": [...], "rationale": {{...}}}}
+"""
+
+_REPHRASE_SECTION_CANDIDATES = """\
+Section {idx}. Candidate keywords extracted from real log windows:
+{raw_keywords}
+"""
+
+_REPHRASE_SECTION_SAMPLE = """\
+Section {idx}. Representative log file excerpt:
+{sample}
+"""
+
+_REPHRASE_SECTION_TASK = """\
+Task: Refine the candidate list above into a final keyword set for production log monitoring.
+Respond ONLY with JSON: {{"keywords": [...], "rationale": {{...}}}}
+"""
+
+_PROMPT_EXTRACT_PHRASES = """\
+You are a log monitoring expert.
+The following list contains some phrases that are too long to use as log keywords.
+For each phrase, extract the 1-3 word core keyword that would actually match in a log line.
+Keep entries that are already short (1-3 words) unchanged.
+
+List to process:
+{phrase_list}
+
+Respond ONLY with a raw JSON array of short keywords (1-3 words each).
+Format: ["keyword1", "keyword2", ...]
 """
 
 
@@ -236,6 +286,195 @@ def _detect_timestamps(path: str, sample_lines: int = 50) -> bool:
     except Exception:
         pass
     return False
+
+
+# ── Session log file helpers ──────────────────────────────────────────────────
+
+def _session_log_path(session_id: int) -> str:
+    """Return path to the plaintext debug log for a learning session."""
+    log_dir = Path(os.environ.get("SENTINEL_DATA_DIR", "/app/data")) / "learning_logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    return str(log_dir / f"session_{session_id}.txt")
+
+
+def _log_header(session_id: int, rule_id, log_path: str, n_packets: int,
+                period_start, period_end):
+    """Write the header block to the session log file."""
+    try:
+        with open(log_path, 'w', encoding='utf-8') as f:
+            f.write("=" * 56 + "\n")
+            f.write(f"Sentinel — Auto-learning Session #{session_id}\n")
+            f.write(f"Rule ID : {rule_id or 'N/A'}\n")
+            f.write(f"Period  : {period_start.strftime('%Y-%m-%d %H:%M')} UTC"
+                    f" → {period_end.strftime('%Y-%m-%d %H:%M')} UTC\n")
+            f.write(f"Packets : {n_packets}\n")
+            f.write(f"Started : {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC\n")
+            f.write("=" * 56 + "\n\n")
+    except Exception:
+        pass
+
+
+def _log_exchange(log_path: str, phase: str, prompt: str,
+                  response: str, decision: str = ""):
+    """Append one Ollama exchange to the session log file."""
+    ts = datetime.utcnow().strftime('%H:%M:%S')
+    sep = "-" * 48
+    try:
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(f"[{ts}] {phase}\n")
+            if prompt:
+                for line in prompt.splitlines():
+                    f.write(f"  PROMPT | {line}\n")
+            if response:
+                for line in response.splitlines():
+                    f.write(f"  RESP   | {line}\n")
+            if decision:
+                f.write(f"  => {decision}\n")
+            f.write(sep + "\n\n")
+    except Exception:
+        pass
+
+
+def _log_footer(log_path: str, success: bool, keywords: list,
+                reason: str = ""):
+    """Write the footer block to the session log file."""
+    ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write("=" * 56 + "\n")
+            if success:
+                f.write(f"✅ SESSION VALIDATED — {len(keywords)} keyword(s) applied\n")
+                f.write(f"   Keywords: {' | '.join(keywords)}\n")
+            else:
+                f.write(f"❌ SESSION CANCELLED\n")
+                f.write(f"   Reason: {reason}\n")
+            f.write(f"Ended: {ts} UTC\n")
+            f.write("=" * 56 + "\n")
+    except Exception:
+        pass
+
+
+# ── Phrase detection helpers ──────────────────────────────────────────────────
+
+def _is_phrase(kw: str) -> bool:
+    """Return True if kw is a phrase (> 3 words) rather than a short keyword."""
+    return len(kw.split()) > 3
+
+
+def _split_kws_and_phrases(keywords: list) -> tuple:
+    """Split a keyword list into (short_keywords, long_phrases)."""
+    short = [k for k in keywords if not _is_phrase(k)]
+    phrases = [k for k in keywords if _is_phrase(k)]
+    return short, phrases
+
+
+# ── Validation pipeline async helpers ────────────────────────────────────────
+
+async def _validate_refined_list(ollama, raw_kws: list, refined_kws: list,
+                                  ollama_url: str, ollama_model: str,
+                                  ollama_think: bool, ollama_temp: float,
+                                  ollama_ctx: int, log_path: str,
+                                  attempt: int) -> bool:
+    """Ask Ollama YES/NO: is the refined list relevant to the raw candidates?"""
+    prompt = _PROMPT_VALIDATE.format(
+        n_raw=len(raw_kws),
+        raw_keywords=json.dumps(raw_kws),
+        refined_keywords=json.dumps(refined_kws),
+    )
+    try:
+        resp = await asyncio.wait_for(
+            ollama.analyze_async(
+                prompt=prompt, url=ollama_url, model=ollama_model,
+                think=ollama_think,
+                options={'temperature': ollama_temp, 'num_ctx': ollama_ctx}
+            ),
+            timeout=60.0
+        )
+    except asyncio.TimeoutError:
+        resp = "NO"
+    answer = resp.strip().upper()
+    is_yes = answer.startswith("YES")
+    _log_exchange(log_path,
+                  f"VALIDATION — attempt {attempt}/3",
+                  prompt, resp,
+                  "✅ YES — list accepted" if is_yes else "❌ NO — will retry")
+    return is_yes
+
+
+async def _refine_with_shuffle(ollama, all_raw: list, sample: str,
+                                ollama_url: str, ollama_model: str,
+                                ollama_think: bool, ollama_temp: float,
+                                ollama_ctx: int, log_path: str,
+                                attempt: int) -> tuple:
+    """Re-run phase 2 with shuffled paragraph order for a different perspective."""
+    # Build shufflable sections
+    section_b = _REPHRASE_SECTION_CANDIDATES.format(
+        idx=0, raw_keywords=json.dumps(all_raw))
+    section_c = _REPHRASE_SECTION_SAMPLE.format(
+        idx=0, sample=sample[:2000])
+    shuffled = [section_b, section_c]
+    random.shuffle(shuffled)
+    # Re-number after shuffle
+    for i, _ in enumerate(shuffled):
+        shuffled[i] = shuffled[i].replace("Section 0.", f"Section {i + 1}.", 1)
+
+    prompt = (
+        _REPHRASE_SECTION_CONSTRAINTS
+        + "\n".join(shuffled)
+        + _REPHRASE_SECTION_TASK
+    )
+    try:
+        resp = await asyncio.wait_for(
+            ollama.analyze_async(
+                prompt=prompt, url=ollama_url, model=ollama_model,
+                think=ollama_think,
+                options={'temperature': min(ollama_temp + 0.1 * attempt, 0.7),
+                         'num_ctx': ollama_ctx}
+            ),
+            timeout=180.0
+        )
+    except asyncio.TimeoutError:
+        resp = json.dumps({'keywords': all_raw[:15], 'rationale': {}})
+
+    kws, rationale = _extract_json_phase2(resp)
+    kws = kws[:15]
+    _log_exchange(log_path,
+                  f"RETRY (shuffle #{attempt}) — PHASE 2 reformulation",
+                  prompt, resp,
+                  f"New candidate list: {kws}")
+    return kws, rationale
+
+
+async def _extract_keywords_from_phrases(ollama, phrases: list,
+                                          real_kws: list,
+                                          ollama_url: str, ollama_model: str,
+                                          ollama_think: bool, ollama_temp: float,
+                                          ollama_ctx: int,
+                                          log_path: str) -> list:
+    """Ask Ollama to extract short keywords from long phrases."""
+    phrase_list = "\n".join(f"- {p}" for p in phrases)
+    prompt = _PROMPT_EXTRACT_PHRASES.format(phrase_list=phrase_list)
+    try:
+        resp = await asyncio.wait_for(
+            ollama.analyze_async(
+                prompt=prompt, url=ollama_url, model=ollama_model,
+                think=ollama_think,
+                options={'temperature': ollama_temp, 'num_ctx': ollama_ctx}
+            ),
+            timeout=90.0
+        )
+    except asyncio.TimeoutError:
+        resp = '[]'
+
+    extracted = _extract_json_list(resp)
+    # Keep only short results
+    extracted = [k for k in extracted if not _is_phrase(k)]
+    combined = list(dict.fromkeys(real_kws + extracted))[:15]
+    _log_exchange(log_path,
+                  "PHRASE EXTRACTION — converting phrases to keywords",
+                  prompt, resp,
+                  f"Extracted: {extracted} | Combined: {combined}")
+    return combined
 
 
 def _db_session_get_status(session_id: int) -> Optional[str]:
@@ -396,6 +635,10 @@ async def _run_session(session_id: int):
             else f"{granularity_s // 86400} jour(s)"
         )
 
+        # ── Init session log file ────────────────────────────────────────────
+        sess_log = _session_log_path(session_id)
+        _log_header(session_id, rule_id, sess_log, n_packets, period_start, period_end)
+
         # ── Restore accumulated state from DB (supports resume after restart) ──
         db = SessionLocal()
         try:
@@ -523,7 +766,7 @@ async def _run_session(session_id: int):
             except asyncio.TimeoutError:
                 response = '[]'
 
-            # Log raw response for debugging (visible in Config > Debug with KeywordLearning filter)
+            # Log raw response for debugging
             app_logger.debug(
                 'KeywordLearning',
                 f'Session {session_id} paquet {packet_idx+1} — réponse brute ({len(response)} car.) : '
@@ -534,6 +777,10 @@ async def _run_session(session_id: int):
                 'KeywordLearning',
                 f'Session {session_id} paquet {packet_idx+1} — {len(packet_kws)} mot(s)-clé(s) extraits : {packet_kws}'
             )
+            _log_exchange(sess_log,
+                          f"PHASE 1 — Packet {packet_idx+1}/{n_packets} ({window_label})",
+                          prompt, response,
+                          f"Extracted: {packet_kws}")
 
             # Accumulate unique keywords
             for kw in packet_kws:
@@ -587,7 +834,7 @@ async def _run_session(session_id: int):
             )
             return
 
-        # ── Phase 2: refine ──────────────────────────────────────────────────────
+        # ── Phase 2: initial refine ───────────────────────────────────────────
         _db_update(session_id, status='refining')
 
         sample = _read_sample(log_path, max_chars)
@@ -614,7 +861,100 @@ async def _run_session(session_id: int):
 
         final_kws, rationale = _extract_json_phase2(response2)
         final_kws = final_kws[:15]
+        _log_exchange(sess_log, "PHASE 2 — Initial refinement", prompt2, response2,
+                      f"Initial refined list: {final_kws}")
 
+        await _send_notification(
+            rule_id,
+            '[Sentinel] ✂️ Liste raffinée (validation en cours…)',
+            f'**Candidats retenus :** {" | ".join(f"`{k}`" for k in final_kws)}\n'
+            f'_Validation croisée Ollama en cours…_'
+        )
+
+        # ── Double-validation loop (max 3 attempts) ───────────────────────────
+        MAX_VALIDATION = 3
+        phrase_extraction_done = False
+
+        for val_attempt in range(1, MAX_VALIDATION + 1):
+            # STEP 2: cross-validate YES/NO
+            await _send_notification(
+                rule_id,
+                f'[Sentinel] 🔍 Validation croisée ({val_attempt}/{MAX_VALIDATION})…',
+                f'Ollama vérifie la pertinence de la liste raffinée par rapport aux candidats bruts.'
+            )
+            is_valid = await _validate_refined_list(
+                ollama, all_raw, final_kws,
+                ollama_url, ollama_model, ollama_think, ollama_temp, ollama_ctx,
+                sess_log, val_attempt
+            )
+
+            if not is_valid:
+                # STEP 4: retry with shuffle
+                if val_attempt >= MAX_VALIDATION:
+                    # 3 failures → cancel
+                    cancel_reason = (
+                        f'Ollama a rejeté la liste raffinée {MAX_VALIDATION} fois de suite. '
+                        f'La liste brute contenait : {json.dumps(all_raw[:10])}. '
+                        f'Consultez le fichier log de session pour les détails.'
+                    )
+                    _log_footer(sess_log, success=False, keywords=[], reason=cancel_reason)
+                    _db_update(session_id, status='error', error_message=cancel_reason)
+                    await _send_notification(
+                        rule_id,
+                        '[Sentinel] ❌ Auto-apprentissage annulé',
+                        f'**Échec après {MAX_VALIDATION} tentatives de validation.**\n\n'
+                        f'{cancel_reason}\n\n'
+                        f'_Téléchargez le log de session depuis la page Règles pour analyser les échanges._'
+                    )
+                    return
+
+                # Retry with shuffled prompt
+                await _send_notification(
+                    rule_id,
+                    f'[Sentinel] 🔄 Reformulation ({val_attempt+1}/{MAX_VALIDATION})…',
+                    f'La liste n\'était pas pertinente. Nouvel essai avec une présentation différente.'
+                )
+                try:
+                    final_kws, rationale = await _refine_with_shuffle(
+                        ollama, all_raw, sample,
+                        ollama_url, ollama_model, ollama_think, ollama_temp, ollama_ctx,
+                        sess_log, val_attempt
+                    )
+                    final_kws = final_kws[:15]
+                except Exception as shuffle_err:
+                    # Log in session file so user can see it
+                    _log_exchange(sess_log,
+                                  f"RETRY (shuffle #{val_attempt}) — ERREUR",
+                                  "(shuffle)", str(shuffle_err),
+                                  f"⚠️ Erreur lors du shuffle-retry : {shuffle_err}. Poursuite avec la liste précédente.")
+                    app_logger.error('KeywordLearning',
+                                     f'Session {session_id}: shuffle-retry #{val_attempt} failed: {shuffle_err}')
+                    # Don't abort — continue loop with unchanged final_kws
+                continue  # back to STEP 2
+
+
+            # STEP 5: YES — check for phrases
+            if not phrase_extraction_done:
+                real_kws, phrases = _split_kws_and_phrases(final_kws)
+                if phrases:
+                    phrase_extraction_done = True
+                    await _send_notification(
+                        rule_id,
+                        '[Sentinel] ✂️ Extraction mots-clefs depuis phrases…',
+                        f'{len(phrases)} entrée(s) trop longue(s) détectée(s). '
+                        f'Ollama extrait les mots-clefs importants.'
+                    )
+                    final_kws = await _extract_keywords_from_phrases(
+                        ollama, phrases, real_kws,
+                        ollama_url, ollama_model, ollama_think, ollama_temp, ollama_ctx,
+                        sess_log
+                    )
+                    continue  # back to STEP 2 to re-validate the shortened list
+
+            # STEP 6: list is valid and all keywords are short → done
+            break
+
+        # Save final refined list
         _db_update(
             session_id,
             final_keywords_json=json.dumps(final_kws),
@@ -626,17 +966,31 @@ async def _run_session(session_id: int):
         )
         await _send_notification(
             rule_id,
-            '[Sentinel] ✂️ Liste raffinée',
+            '[Sentinel] ✂️ Liste raffinée (validée)',
             f'**Mots-clés retenus :** {" | ".join(f"`{k}`" for k in final_kws)}\n'
             + (f'\n{rationale_lines}' if rationale_lines else '')
         )
 
-        # ── Auto-validate (0s countdown) ───────────────────────────────────────
+        # Write success footer
+        _log_footer(sess_log, success=True, keywords=final_kws)
+
+        # ── Auto-validate ─────────────────────────────────────────────────────
         await _do_validate(session_id, final_kws)
 
     except Exception as e:
-        app_logger.error('KeywordLearning', f'Session {session_id} error: {e}')
+        import traceback
+        tb = traceback.format_exc()
+        app_logger.error('KeywordLearning', f'Session {session_id} error: {e}\n{tb}')
         _db_update(session_id, status='error', error_message=str(e))
+        # Also write to session log file if we have it
+        try:
+            _log_exchange(sess_log,
+                          "ERREUR FATALE",
+                          "(interne)", str(e),
+                          f"⛔ Exception inattendue — session annulée.\n{tb}")
+        except Exception:
+            pass
+
 
 
 async def _do_validate(session_id: int, keywords: list[str]):

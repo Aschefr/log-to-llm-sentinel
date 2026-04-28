@@ -120,11 +120,22 @@
                     <div id="kw-panel-auto" class="kw-tab-panel kw-tab-panel--hidden">
                         <div id="kw-wizard" class="kw-wizard">
                             <div id="kw-wizard-body" class="kw-wizard-body"></div>
+
                         </div>
                     </div>
                 </div>
                 <div class="form-group">
+                    <label for="rule-excluded-patterns">🚫 Patterns d'exclusion <span style="opacity:.6;font-size:.85em">(negative keywords)</span></label>
+                    <input type="text" id="rule-excluded-patterns"
+                           placeholder="com.docker.backend, GET /app/settings, healthcheck…">
+                    <div class="form-hint">
+                        Si une ligne contient l'un de ces termes (séparés par des virgules), elle est ignorée — même si un mot-clé positif correspond.
+                        Utile pour filtrer les logs bruités (IPC Docker, health-checks, etc.).
+                    </div>
+                </div>
+                <div class="form-group">
                     <label for="rule-context" data-i18n="rules.label_context">Contexte applicatif (optionnel)</label>
+
                     <textarea id="rule-context" rows="3" data-i18n-placeholder="rules.placeholder_context" placeholder="Description du contexte..."></textarea>
                 </div>
                 <div class="form-group">
@@ -171,6 +182,10 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/rules.js?v=7"></script>
-<script src="/static/js/keyword_wizard.js?v=3"></script>
+<script src="/static/js/rules.js?v=10"></script>
+
+
+<script src="/static/js/keyword_wizard.js?v=7"></script>
+
+
 {% endblock %}

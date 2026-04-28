@@ -196,7 +196,8 @@ async function _fetchAndApplySession(ruleId, sessionId) {
     try {
         const data = await fetch(`/api/keyword-learning/${sessionId}/status`).then(r => r.json());
         const card = document.getElementById(`rule-learning-${ruleId}`);
-        if (!card) return true;
+        // Card div not yet in DOM (loadRules still rendering) — don't stop polling
+        if (!card) return false;
 
         const pct = data.total_packets > 0
             ? Math.round((data.completed_packets / data.total_packets) * 100) : 0;
@@ -234,7 +235,9 @@ async function _fetchAndApplySession(ruleId, sessionId) {
                 <div id="klc-actions-${ruleId}" class="kw-actions" style="margin-top:.4rem">
                     ${isActive ? `<button type="button" class="btn btn-danger btn-sm" onclick="kwStopSession(${sessionId})">⏹ ${_t('kw.stop_btn','Arrêter')}</button>` : ''}
                     ${data.status === 'validated' ? `<button type="button" class="btn btn-secondary btn-sm" onclick="kwRevertSession(${sessionId})">↩️ ${_t('kw.revert_btn','Annuler les changements')}</button>` : ''}
+                    ${isDone ? `<a href="/api/keyword-learning/${sessionId}/log" download class="btn btn-secondary btn-sm" title="Télécharger le log complet des échanges Ollama">📥 Log session</a>` : ''}
                 </div>
+
             `;
         }
 
@@ -460,6 +463,8 @@ function resetForm() {
     document.getElementById('rule-context-lines').value = '5';
     document.getElementById('rule-anti-spam').value = '60';
     document.getElementById('rule-severity-threshold').value = 'info';
+    const exclEl = document.getElementById('rule-excluded-patterns');
+    if (exclEl) exclEl.value = '';
     document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_new_title') : 'New rule';
     closeFileBrowser();
     
@@ -629,7 +634,17 @@ async function saveRule() {
         context_lines: parseInt(document.getElementById('rule-context-lines').value) || 5,
         anti_spam_delay: parseInt(document.getElementById('rule-anti-spam').value) || 60,
         notify_severity_threshold: document.getElementById('rule-severity-threshold').value,
+        excluded_patterns: ((document.getElementById('rule-excluded-patterns') || {}).value || '')
+            .split(',').map(p => p.trim()).filter(p => p),
     };
+
+    // If on manual tab, clear the learning session link so the auto tab
+    // is not selected next time and the rule card shows manual state
+    const autoTabActive = document.getElementById('kw-tab-auto')
+        ?.classList.contains('kw-tab--active');
+    if (!autoTabActive && id) {
+        data.last_learning_session_id = -1; // sentinel: clear session link
+    }
 
     try {
         if (id) {
@@ -642,6 +657,11 @@ async function saveRule() {
                 method: 'POST',
                 body: data,
             });
+        }
+
+        // Clean up wizard state if we were on the manual tab
+        if (!autoTabActive && typeof kwWizardReset === 'function') {
+            kwWizardReset();
         }
 
         document.getElementById('rule-modal').classList.add('hidden');
@@ -682,6 +702,8 @@ async function editRule(id) {
         document.getElementById('rule-context-lines').value = rule.context_lines || 5;
         document.getElementById('rule-anti-spam').value = rule.anti_spam_delay || 60;
         document.getElementById('rule-severity-threshold').value = rule.notify_severity_threshold || 'info';
+        const exclEl = document.getElementById('rule-excluded-patterns');
+        if (exclEl) exclEl.value = (rule.excluded_patterns || []).join(', ');
         document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_edit_title') : 'Edit rule';
         document.getElementById('rule-modal').classList.remove('hidden');
         closeFileBrowser();
@@ -692,9 +714,14 @@ async function editRule(id) {
             if (container) container.classList.add('hidden');
         }
 
-        // If this rule has an active learning session, open the auto tab with session data
+        // Only open auto-learning tab if the rule still has a linked session.
+        // If last_learning_session_id is null, the user saved from the manual tab
+        // → stay on manual tab (default).
         if (rule.last_learning_session_id && typeof kwWizardLoadSession === 'function') {
             await kwWizardLoadSession(rule.last_learning_session_id);
+        } else if (typeof kwWizardReset === 'function') {
+            // Ensure wizard state is clean when opening on manual tab
+            kwWizardReset();
         }
     } catch (error) {
         console.error('Erreur chargement règle:', error);

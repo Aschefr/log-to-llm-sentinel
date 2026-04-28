@@ -90,17 +90,10 @@
             <span style="line-height: 1;">🔍 Log to LLM Sentinel</span>
             <div style="display: flex; align-items: center; margin-left: 1.5rem; margin-top: 0.2rem;">
                 <span style="font-size: 0.65rem; color: var(--text-dim); font-weight: normal;">v{{ APP_VERSION }}</span>
-                {% if UPDATE_STATUS.is_available %}
-                    <div id="version-update-badge" class="update-badge update-available" onclick="checkAppUpdate()" data-i18n-title="header.update_instructions" title="To update: git pull && docker compose up -d --build">
-                        <span class="pulse-dot"></span>
-                        <span data-i18n="header.update_available">Update available</span>
+                <div id="version-update-badge" class="update-badge" onclick="checkAppUpdate()" title="">
+                        <span class="check-icon">—</span>
+                        <span data-i18n="header.checking"></span>
                     </div>
-                {% else %}
-                    <div id="version-update-badge" class="update-badge system-up-to-date" onclick="checkAppUpdate()" data-i18n-title="header.up_to_date" title="System up to date">
-                        <span class="check-icon">✓</span>
-                        <span data-i18n="header.up_to_date">Up to date</span>
-                    </div>
-                {% endif %}
             </div>
         </div>
         <div class="nav-links">
@@ -140,7 +133,7 @@
     </main>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="/static/js/i18n.js?v=2"></script>
-    <script src="/static/js/common.js?v=4"></script>
+    <script src="/static/js/common.js?v=5"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -87,6 +87,7 @@ function copyToClipboard(text) {
 
 document.addEventListener('DOMContentLoaded', () => {
     pollSystemStats();
+    restoreUpdateBadge();
 });
 
 async function pollSystemStats() {
@@ -293,6 +294,56 @@ function showInlineConfirm(btnElement, message, onConfirmCallback) {
 }
 
 /**
+ * Apply a check result object to the update badge UI.
+ */
+function applyUpdateBadge(status) {
+    const badge = document.getElementById('version-update-badge');
+    if (!badge) return;
+    badge.classList.remove('checking', 'update-available', 'system-up-to-date', 'check-failed');
+
+    if (!status || !status.checked) {
+        // Never checked yet — show neutral
+        badge.innerHTML = `<span class="check-icon">—</span>`;
+        return;
+    }
+
+    if (status.error) {
+        badge.classList.add('check-failed');
+        const errKey = 'header.check_failed';
+        const errText = window.t ? window.t(errKey) : 'Check failed';
+        badge.innerHTML = `<span class="stat-icon">⚠️</span> <span data-i18n="${errKey}">${errText}</span>`;
+        badge.setAttribute('data-i18n-title', errKey);
+        badge.setAttribute('title', errText);
+    } else if (status.is_available) {
+        badge.classList.add('update-available');
+        const avKey = 'header.update_available';
+        const avText = window.t ? window.t(avKey) : 'Update available';
+        const instKey = 'header.update_instructions';
+        const instText = window.t ? window.t(instKey) : 'git pull && docker compose up -d';
+        badge.innerHTML = `<span class="pulse-dot"></span> <span data-i18n="${avKey}">${avText}</span>`;
+        badge.setAttribute('data-i18n-title', instKey);
+        badge.setAttribute('title', instText);
+    } else {
+        badge.classList.add('system-up-to-date');
+        const upKey = 'header.up_to_date';
+        const upText = window.t ? window.t(upKey) : 'Up to date';
+        badge.innerHTML = `<span class="check-icon">✓</span> <span data-i18n="${upKey}">${upText}</span>`;
+        badge.setAttribute('data-i18n-title', upKey);
+        badge.setAttribute('title', upText);
+    }
+}
+
+/**
+ * On page load: restore badge state from server cache (persisted across navigations).
+ */
+async function restoreUpdateBadge() {
+    try {
+        const status = await apiFetch('/api/system/update-status');
+        applyUpdateBadge(status);
+    } catch (e) { /* silently ignore — badge stays neutral */ }
+}
+
+/**
  * Triggers a manual check for app updates from GitHub.
  */
 async function checkAppUpdate() {
@@ -309,42 +360,17 @@ async function checkAppUpdate() {
 
     try {
         const status = await apiFetch('/api/system/update-check');
-        
-        // Update UI based on results
-        badge.classList.remove('checking', 'update-available', 'system-up-to-date', 'check-failed');
-        
-        if (status.error) {
+        applyUpdateBadge(status);
+    } catch (e) {
+        const badge = document.getElementById('version-update-badge');
+        if (badge) {
+            badge.classList.remove('checking');
             badge.classList.add('check-failed');
             const errKey = 'header.check_failed';
             const errText = window.t ? window.t(errKey) : 'Check failed';
             badge.innerHTML = `<span class="stat-icon">⚠️</span> <span data-i18n="${errKey}">${errText}</span>`;
-            badge.setAttribute('data-i18n-title', errKey);
             badge.setAttribute('title', errText);
-        } else if (status.is_available) {
-            badge.classList.add('update-available');
-            const avKey = 'header.update_available';
-            const avText = window.t ? window.t(avKey) : 'Update available';
-            const instKey = 'header.update_instructions';
-            const instText = window.t ? window.t(instKey) : 'git pull && docker compose up -d';
-            
-            badge.innerHTML = `<span class="pulse-dot"></span> <span data-i18n="${avKey}">${avText}</span>`;
-            badge.setAttribute('data-i18n-title', instKey);
-            badge.setAttribute('title', instText);
-        } else {
-            badge.classList.add('system-up-to-date');
-            const upKey = 'header.up_to_date';
-            const upText = window.t ? window.t(upKey) : 'Up to date';
-            badge.innerHTML = `<span class="check-icon">✓</span> <span data-i18n="${upKey}">${upText}</span>`;
-            badge.setAttribute('data-i18n-title', upKey);
-            badge.setAttribute('title', upText);
         }
-    } catch (e) {
-        badge.classList.remove('checking');
-        badge.classList.add('check-failed');
-        const errKey = 'header.check_failed';
-        const errText = window.t ? window.t(errKey) : 'Check failed';
-        badge.innerHTML = `<span class="stat-icon">⚠️</span> <span data-i18n="${errKey}">${errText}</span>`;
-        badge.setAttribute('title', errText);
     }
 }
 

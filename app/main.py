@@ -9,14 +9,21 @@ import subprocess
 import httpx
 import re
 
+# ── Update cache (persists across requests / page navigations) ──
+_update_cache: dict = {"is_available": False, "is_latest": False, "error": True, "checked": False}
+
+
 def check_for_updates(current_version):
-    """Checks GitHub for new commits on main branch."""
+    """Checks GitHub for new commits on main branch and updates the in-memory cache."""
+    global _update_cache
     try:
         parts = current_version.split('.')
         if len(parts) < 3:
-            return {"is_available": False, "is_latest": False, "error": True}
+            result = {"is_available": False, "is_latest": False, "error": True, "checked": True}
+            _update_cache = result
+            return result
         local_commits = int(parts[-1])
-        
+
         url = "https://api.github.com/repos/Aschefr/log-to-llm-sentinel/commits?per_page=1"
         headers = {"User-Agent": "Log-to-LLM-Sentinel-App"}
         with httpx.Client(headers=headers, timeout=5.0) as client:
@@ -27,16 +34,23 @@ def check_for_updates(current_version):
                     match = re.search(r'page=(\d+)>; rel="last"', link_header)
                     if match:
                         remote_commits = int(match.group(1))
-                        return {
+                        result = {
                             "is_available": remote_commits > local_commits,
                             "is_latest": remote_commits <= local_commits,
-                            "error": False
+                            "error": False,
+                            "checked": True
                         }
+                        _update_cache = result
+                        return result
                 else:
-                    return {"is_available": False, "is_latest": True, "error": False}
+                    result = {"is_available": False, "is_latest": True, "error": False, "checked": True}
+                    _update_cache = result
+                    return result
     except Exception as e:
         print(f"[Main] Update check failed: {e}")
-    return {"is_available": False, "is_latest": False, "error": True}
+    result = {"is_available": False, "is_latest": False, "error": True, "checked": True}
+    _update_cache = result
+    return result
 
 
 def get_app_version():
@@ -119,8 +133,28 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(600)  # Vérifie toutes les 10 minutes
             await meta_service.run_scheduled_analyses()
 
+    # Vérification des mises à jour au démarrage + toutes les 24 h à 00:00 UTC
+    async def _daily_update_check():
+        import datetime
+        # Check immédiat au démarrage
+        print("[Main] Vérification des mises à jour au démarrage...")
+        check_for_updates(APP_VERSION)
+        print(f"[Main] Résultat mise à jour : {_update_cache}")
+        while True:
+            now = datetime.datetime.utcnow()
+            # Prochaine occurrence de 00:00 UTC
+            next_midnight = (now + datetime.timedelta(days=1)).replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            wait_seconds = (next_midnight - now).total_seconds()
+            await asyncio.sleep(wait_seconds)
+            print("[Main] Vérification quotidienne des mises à jour (00:00 UTC)...")
+            check_for_updates(APP_VERSION)
+            print(f"[Main] Résultat mise à jour : {_update_cache}")
+
     asyncio.create_task(_cleanup_tasks())
     asyncio.create_task(_run_meta_analyses_loop())
+    asyncio.create_task(_daily_update_check())
 
     yield
 
@@ -140,8 +174,14 @@ app = FastAPI(title="Log-to-LLM-Sentinel", lifespan=lifespan)
 
 @app.get("/api/system/update-check")
 async def api_update_check():
-    """Manual check for updates from the UI."""
+    """Manual check for updates from the UI. Result is cached server-side."""
     return check_for_updates(APP_VERSION)
+
+
+@app.get("/api/system/update-status")
+async def api_update_status():
+    """Returns the last cached update check result without hitting GitHub."""
+    return _update_cache
 
 # ── Templates & Static ──
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

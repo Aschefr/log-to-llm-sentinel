@@ -21,6 +21,7 @@ class Rule(Base):
     notify_severity_threshold = Column(String, default="info")
     last_position = Column(Float, default=0.0)
     last_learning_session_id = Column(Integer, nullable=True)  # dernière session d'auto-apprentissage
+    excluded_patterns_json = Column(Text, default="[]")  # patterns d'exclusion (negative keywords)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -34,6 +35,17 @@ class Rule(Base):
     def set_keywords(self, keywords):
         import json
         self.keywords_json = json.dumps(keywords)
+
+    def get_excluded_patterns(self):
+        import json
+        try:
+            return json.loads(self.excluded_patterns_json) if self.excluded_patterns_json else []
+        except json.JSONDecodeError:
+            return []
+
+    def set_excluded_patterns(self, patterns):
+        import json
+        self.excluded_patterns_json = json.dumps(patterns)
 
 
 class Analysis(Base):
@@ -76,6 +88,7 @@ class GlobalConfig(Base):
     max_log_chars = Column(Integer, default=5000)
     monitor_log_lines = Column(Integer, default=60)
     debug_mode = Column(Boolean, default=False)
+    ollama_prompt_lang = Column(String, default='fr')  # 'fr' | 'en' — langue des prompts d'analyse
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 class ChatConversation(Base):

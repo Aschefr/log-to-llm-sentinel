@@ -21,3 +21,5 @@ env/
 
 # Docker Data
 ollama_data/
+data/learning_logs/session*
+

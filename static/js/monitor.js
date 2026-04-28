@@ -137,6 +137,8 @@ function renderTabContent(rule) {
                         ${rule.keywords.map(kw =>
                             `<span class="log-kw-badge kw-filter-btn" data-kw="${encodeURIComponent(kw)}" onclick="toggleKeywordFilter(this, ${rule.id})">${escapeHtml(kw)}</span>`
                         ).join('')}
+                        ${rule.excluded_patterns && rule.excluded_patterns.length > 0 ? `
+                        <span class="log-kw-badge kw-filter-btn excl-filter-btn ${activeKeywordFilter === '__excluded__' ? 'active' : ''}" data-kw="__excluded__" onclick="toggleKeywordFilter(this, ${rule.id})" title="${window.t ? window.t('monitor.excluded_filter_title') : 'Show only excluded (filtered) lines'}">🚫 ${window.t ? window.t('monitor.excluded_filter') : 'Exclusions'}</span>` : ''}
                     </div>
                 </div>
                 <div><span class="info-label">⏱ Anti-spam</span>${rule.anti_spam_delay}s</div>
@@ -278,18 +280,30 @@ async function fetchLogs(rule) {
 
         const isAtBottom = Math.abs((viewer.scrollHeight - viewer.scrollTop) - viewer.clientHeight) < 20;
 
+        const excludedPatterns = rule.excluded_patterns || [];
+
         viewer.innerHTML = res.lines.map((line, idx) => {
             const rawText = line.text || '';
             const text = escapeHtml(rawText);
             const isSelected = selectedLineText === rawText;
             const matchClass = line.matched ? 'matched' : '';
             const selectClass = isSelected ? 'selected' : '';
-            
+
+            // Client-side exclusion detection
+            const isExcluded = excludedPatterns.length > 0
+                && excludedPatterns.some(pat => rawText.toLowerCase().includes(pat.toLowerCase()));
+            const excludedClass = isExcluded ? 'log-line-excluded' : '';
+
             const kwBadges = line.matched_keywords && line.matched_keywords.length > 0
                 ? `<span class="log-kw-badges">${line.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('')}</span>`
                 : '';
-            return `<div class="log-line ${matchClass} ${selectClass}" data-rule="${rule.id}" data-idx="${idx}" data-text="${encodeURIComponent(rawText)}" onclick="onLineClick(this, ${rule.id})">
-                <span class="log-text">${text}</span>${kwBadges}
+
+            const exclBadge = isExcluded
+                ? `<span class="log-kw-badges"><span class="log-excl-badge">🚫 ${excludedPatterns.find(p => rawText.toLowerCase().includes(p.toLowerCase())) || 'exclu'}</span></span>`
+                : '';
+
+            return `<div class="log-line ${matchClass} ${selectClass} ${excludedClass}" data-rule="${rule.id}" data-idx="${idx}" data-excluded="${isExcluded}" data-text="${encodeURIComponent(rawText)}" onclick="onLineClick(this, ${rule.id})">
+                <span class="log-text">${text}</span>${kwBadges}${exclBadge}
             </div>`;
         }).join('');
 
@@ -364,8 +378,10 @@ function applyKeywordFilter(ruleId) {
         let show = false;
         if (activeKeywordFilter === '__all__') {
             show = true;
+        } else if (activeKeywordFilter === '__excluded__') {
+            show = line.dataset.excluded === 'true';
         } else if (activeKeywordFilter === '__matches__') {
-            show = line.querySelector('.log-kw-badge') !== null;
+            show = line.querySelector('.log-kw-badge') !== null && line.dataset.excluded !== 'true';
         } else {
             const badges = Array.from(line.querySelectorAll('.log-kw-badge'))
                 .map(b => b.textContent.trim().toLowerCase());

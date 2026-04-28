@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 import app.services.keyword_learning_service as kls
@@ -113,3 +114,22 @@ def cancel_session(session_id: int):
     finally:
         db.close()
     return {"status": "cancelled"}
+
+
+@router.get("/{session_id}/log")
+def download_session_log(session_id: int):
+    """Return the plaintext debug log for a learning session as a download."""
+    import app.services.keyword_learning_service as kls_
+    log_path = kls_._session_log_path(session_id)
+    import os
+    if not os.path.isfile(log_path):
+        raise HTTPException(
+            status_code=404,
+            detail="Log de session introuvable (la session n'a peut-être pas encore démarré)."
+        )
+    filename = f"sentinel_autolearn_session_{session_id}.txt"
+    return FileResponse(
+        path=log_path,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

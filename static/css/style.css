@@ -1199,6 +1199,16 @@ body {
 .log-kw-badge { background: rgba(245,158,11,0.25); color: var(--warning); border: 1px solid rgba(245,158,11,0.4); border-radius: 3px; font-size: 0.7rem; padding: 0 0.3rem; line-height: 1.4; font-weight: 600; }
 .no-logs { display: block; padding: 1.5rem 1rem; color: var(--text-secondary); font-family: inherit; font-style: normal; text-align: center; border: 1px dashed var(--border); border-radius: 0.35rem; margin: 0.5rem; font-size: 0.85rem; }
 
+/* --- Excluded log lines -------------------------------------------------- */
+.log-line-excluded { opacity: 0.38; border-left-color: rgba(239,68,68,0.4) !important; background: rgba(239,68,68,0.03) !important; }
+.log-line-excluded .log-text { text-decoration: line-through; text-decoration-color: rgba(239,68,68,0.4); }
+.log-line-excluded:hover { opacity: 0.6; background: rgba(239,68,68,0.07) !important; }
+.log-excl-badge { background: rgba(239,68,68,0.18); color: #f87171; border: 1px solid rgba(239,68,68,0.35); border-radius: 3px; font-size: 0.68rem; padding: 0 0.3rem; line-height: 1.4; font-weight: 600; }
+.excl-filter-btn { background: rgba(239,68,68,0.12) !important; color: #f87171 !important; border-color: rgba(239,68,68,0.35) !important; }
+.excl-filter-btn:hover { background: rgba(239,68,68,0.25) !important; transform: translateY(-1px); }
+.excl-filter-btn.active { background: rgba(239,68,68,0.35) !important; border-color: #ef4444 !important; box-shadow: 0 0 0 2px rgba(239,68,68,0.4) !important; }
+
+
 .monitor-detail-panel { background: var(--bg-secondary); border: 1px solid var(--accent); border-radius: 0.5rem; padding: 1rem 1.25rem; animation: slideDown 0.2s ease; }
 .monitor-detail-panel.hidden { display: none; }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
@@ -1405,6 +1415,16 @@ mark.kw-highlight {
 .log-kw-badges { display: inline-flex; gap: 0.25rem; flex-shrink: 0; }
 .log-kw-badge { background: rgba(245,158,11,0.25); color: var(--warning); border: 1px solid rgba(245,158,11,0.4); border-radius: 3px; font-size: 0.7rem; padding: 0 0.3rem; line-height: 1.4; font-weight: 600; }
 .no-logs { display: block; padding: 1.5rem 1rem; color: var(--text-secondary); font-family: inherit; font-style: normal; text-align: center; border: 1px dashed var(--border); border-radius: 0.35rem; margin: 0.5rem; font-size: 0.85rem; }
+
+/* --- Excluded log lines -------------------------------------------------- */
+.log-line-excluded { opacity: 0.38; border-left-color: rgba(239,68,68,0.4) !important; background: rgba(239,68,68,0.03) !important; }
+.log-line-excluded .log-text { text-decoration: line-through; text-decoration-color: rgba(239,68,68,0.4); }
+.log-line-excluded:hover { opacity: 0.6; background: rgba(239,68,68,0.07) !important; }
+.log-excl-badge { background: rgba(239,68,68,0.18); color: #f87171; border: 1px solid rgba(239,68,68,0.35); border-radius: 3px; font-size: 0.68rem; padding: 0 0.3rem; line-height: 1.4; font-weight: 600; }
+.excl-filter-btn { background: rgba(239,68,68,0.12) !important; color: #f87171 !important; border-color: rgba(239,68,68,0.35) !important; }
+.excl-filter-btn:hover { background: rgba(239,68,68,0.25) !important; transform: translateY(-1px); }
+.excl-filter-btn.active { background: rgba(239,68,68,0.35) !important; border-color: #ef4444 !important; box-shadow: 0 0 0 2px rgba(239,68,68,0.4) !important; }
+
 
 .monitor-detail-panel { background: var(--bg-secondary); border: 1px solid var(--accent); border-radius: 0.5rem; padding: 1rem 1.25rem; animation: slideDown 0.2s ease; }
 .monitor-detail-panel.hidden { display: none; }

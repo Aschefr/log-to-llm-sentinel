@@ -153,6 +153,8 @@ async function loadConfig() {
         document.getElementById('monitor-log-lines').value = config.monitor_log_lines || 60;
         document.getElementById('ollama-temp').value = config.ollama_temp || 0.1;
         document.getElementById('ollama-ctx').value = config.ollama_ctx || 4096;
+        const promptLangEl = document.getElementById('ollama-prompt-lang');
+        if (promptLangEl) promptLangEl.value = config.ollama_prompt_lang || 'fr';
         window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) {
@@ -575,6 +577,7 @@ async function saveConfig(messageEl, isAutoSave = false) {
         ollama_temp: parseFloat(document.getElementById('ollama-temp').value) || 0.1,
         ollama_ctx: parseInt(document.getElementById('ollama-ctx').value) || 4096,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
+        ollama_prompt_lang: (document.getElementById('ollama-prompt-lang') || {}).value || 'fr',
     };
 
     const pwd = document.getElementById('smtp-password').value;

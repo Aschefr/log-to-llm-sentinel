@@ -40,9 +40,16 @@ class Orchestrator:
             logger.debug("Orchestrator", f"Règle '{rule.name}' : aucun mot-clé configuré, ignorée")
             return
 
+        excluded = rule.get_excluded_patterns()
+
         # Filtrer les lignes contenant au moins un mot-clé
         matching_lines = []
         for line in lines:
+            # 1. Exclusion patterns (negative keywords) — priorité max
+            if excluded and any(pat.lower() in line.lower() for pat in excluded):
+                logger.debug("Orchestrator", f"Ligne exclue (pattern d'exclusion) pour '{rule.name}' : {line[:80]}")
+                continue
+            # 2. Positive keyword match
             if any(kw.lower() in line.lower() for kw in keywords):
                 matching_lines.append(line)
                 logger.debug("Orchestrator", f"Match '{rule.name}' | kw dans : {line[:120]}")
@@ -50,6 +57,7 @@ class Orchestrator:
         if not matching_lines:
             logger.debug("Orchestrator", f"Règle '{rule.name}' : aucune correspondance")
             return
+
 
         # Ajouter au buffer de cette règle
         if rule.id not in self._buffers:
@@ -123,6 +131,7 @@ class Orchestrator:
             }
 
             max_chars = config_dict.get("max_log_chars", 5000)
+            lang = config_dict.get("ollama_prompt_lang", "fr")
 
             if len(lines) == 1:
                 line = clean_log_line(lines[0])
@@ -138,16 +147,23 @@ class Orchestrator:
                 # On limite à 30 lignes max dans le prompt pour ne pas exploser le contexte
                 recent_lines = [clean_log_line(l) for l in lines[-30:]]
                 
-                bundled_text = f"Ces {total_lines} événements correspondants sont apparus dans les {buffer_delay} dernières secondes. Voici un extrait des plus récents :\n"
+                bundled_text = f"These {total_lines} matching events appeared in the last {buffer_delay} seconds. Here are the most recent:\n" if lang == 'en' else f"Ces {total_lines} événements correspondants sont apparus dans les {buffer_delay} dernières secondes. Voici un extrait des plus récents :\n"
                 
                 current_length = len(bundled_text)
+                lines_added = 0
                 for line in reversed(recent_lines):
                     line_to_add = f"\n{line}"
                     if current_length + len(line_to_add) > max_chars:
+                        if lines_added == 0:
+                            # Guarantee at least 1 line even if it must be truncated
+                            truncated_line = line[:max_chars - current_length - 20] + "…[tronqué]"
+                            bundled_text += f"\n{truncated_line}"
                         bundled_text += f"\n... [Tronqué : limite de {max_chars} caractères atteinte ({total_lines} événements détectés)]"
                         break
                     bundled_text += line_to_add
                     current_length += len(line_to_add)
+                    lines_added += 1
+
                 
                 logger.info("Orchestrator", f"Envoi groupé pour '{rule.name}' : {total_lines} lignes ({len(bundled_text)} chars)")
                 await self._process_match(rule, bundled_text, config_dict, db, detection_id, matched_keywords)
@@ -167,7 +183,8 @@ class Orchestrator:
         # Pour simplifier, on passe le contexte vide ou on le récupère si disponible.
 
         # 2. Construire le prompt
-        prompt = self._build_prompt(rule, line, config.get("system_prompt", ""))
+        lang = config.get("ollama_prompt_lang", "fr")
+        prompt = self._build_prompt(rule, line, config.get("system_prompt", ""), lang=lang)
 
         # 3. Appeler Ollama (sous verrou pour éviter de surcharger le CPU)
         logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | ligne={line[:80]}")
@@ -272,15 +289,24 @@ class Orchestrator:
         # Gestion du résumé IA si nécessaire (pour Apprise/Discord/etc.)
         max_chars = config.get("apprise_max_chars", 1900)
         notify_body = body
+        lang = config.get("ollama_prompt_lang", "fr")
 
         if config.get("notification_method") == "apprise" and len(body) > max_chars:
             logger.debug("Orchestrator", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
-            summary_prompt = (
-                f"Résume l'analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\n"
-                f"Utilise des puces (bullet points) et des sections claires (Problème, Cause, Solution).\n"
-                f"Limite-toi à {max_chars - 500} caractères maximum.\n\n"
-                f"Analyse à résumer :\n{response}"
-            )
+            if lang == 'en':
+                summary_prompt = (
+                    f"Summarize the following log analysis for a mobile notification (Discord/Telegram).\n"
+                    f"Use bullet points and clear sections (Problem, Cause, Fix).\n"
+                    f"Limit to {max_chars - 500} characters maximum.\n\n"
+                    f"Analysis:\n{response}"
+                )
+            else:
+                summary_prompt = (
+                    f"Résume l'analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\n"
+                    f"Utilise des puces (bullet points) et des sections claires (Problème, Cause, Solution).\n"
+                    f"Limite-toi à {max_chars - 500} caractères maximum.\n\n"
+                    f"Analyse à résumer :\n{response}"
+                )
             async with self._ollama_semaphore:
                 try:
                     summary = await asyncio.wait_for(
@@ -315,24 +341,39 @@ class Orchestrator:
 
     # La méthode _clean_log_line a été déplacée dans app.utils.log_utils.clean_log_line
 
-    def _build_prompt(self, rule: Rule, line: str, system_prompt: str, context_lines: list = None) -> str:
-        """Construit le prompt pour Ollama."""
+    def _build_prompt(self, rule: Rule, line: str, system_prompt: str,
+                      context_lines: list = None, lang: str = 'fr') -> str:
+        """Construit le prompt pour Ollama — EN or FR selon lang."""
         import textwrap
         context_block = ""
         if context_lines:
-            context_block = "\nContexte précédent :\n" + "\n".join(f"{l}" for l in context_lines) + "\n"
+            ctx_label = "Previous context" if lang == 'en' else "Contexte précédent"
+            context_block = f"\n{ctx_label} :\n" + "\n".join(f"{l}" for l in context_lines) + "\n"
 
-        base_prompt = textwrap.dedent(f"""
-        Analyse la ligne de log suivante et détermine sa sévérité.
-        Ta réponse DOIT impérativement commencer par une ligne indiquant la sévérité sous ce format EXACT :
-        SEVERITY: [info|warning|critical]
+        if lang == 'en':
+            base_prompt = textwrap.dedent(f"""
+            Analyze the following log line and determine its severity.
+            Your response MUST start with a line indicating severity in this EXACT format:
+            SEVERITY: [info|warning|critical]
 
-        Ensuite, fournis un résumé court et explicatif de l'incident.
+            Then provide a short, explanatory summary of the incident.
 
-        Contexte de l'application: {rule.application_context}
-        {context_block}
-        Ligne déclenchante: {line}
-        """).strip()
+            Application context: {rule.application_context}
+            {context_block}
+            Triggering line: {line}
+            """).strip()
+        else:
+            base_prompt = textwrap.dedent(f"""
+            Analyse la ligne de log suivante et détermine sa sévérité.
+            Ta réponse DOIT impérativement commencer par une ligne indiquant la sévérité sous ce format EXACT :
+            SEVERITY: [info|warning|critical]
+
+            Ensuite, fournis un résumé court et explicatif de l'incident.
+
+            Contexte de l'application: {rule.application_context}
+            {context_block}
+            Ligne déclenchante: {line}
+            """).strip()
 
         if system_prompt:
             return f"{system_prompt.strip()}\n\n{base_prompt}"

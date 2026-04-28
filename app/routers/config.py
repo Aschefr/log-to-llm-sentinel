@@ -80,6 +80,7 @@ class ConfigUpdate(BaseModel):
     max_log_chars: Optional[int] = None
     monitor_log_lines: Optional[int] = None
     debug_mode: Optional[bool] = None
+    ollama_prompt_lang: Optional[str] = None  # 'fr' | 'en'
 
 
 @router.get("")
@@ -112,6 +113,7 @@ def get_config():
             "max_log_chars": config.max_log_chars,
             "monitor_log_lines": config.monitor_log_lines,
             "debug_mode": config.debug_mode,
+            "ollama_prompt_lang": config.ollama_prompt_lang or 'fr',
         }
     finally:
         db.close()
@@ -169,6 +171,8 @@ def update_config(config_data: ConfigUpdate):
             config.monitor_log_lines = config_data.monitor_log_lines
         if config_data.debug_mode is not None:
             config.debug_mode = config_data.debug_mode
+        if config_data.ollama_prompt_lang is not None:
+            config.ollama_prompt_lang = config_data.ollama_prompt_lang
 
         db.commit()
         return {"message": "Configuration mise à jour"}
@@ -195,6 +199,7 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
         "max_log_chars": config.max_log_chars if config else 5000,
         "monitor_log_lines": config.monitor_log_lines if config else 60,
         "debug_mode": config.debug_mode if config else False,
+        "ollama_prompt_lang": (config.ollama_prompt_lang or 'fr') if config else 'fr',
     }
 
 

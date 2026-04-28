@@ -74,13 +74,22 @@ function kwTabSwitch(tab) {
         manualTab.setAttribute('aria-selected', 'false');
         autoTab.setAttribute('aria-selected', 'true');
 
-        // Swap buttons
-        if (origSave)  origSave.classList.add('hidden');
-        if (launchBtn) {
-            launchBtn.classList.remove('hidden');
-            // Update button text when editing an active session
-            if (_activeSession) {
-                launchBtn.textContent = window.t ? window.t('kw.update_params') : '🔄 Mettre à jour les paramètres';
+        // Swap buttons depending on session state
+        const _terminalStatuses = ['validated', 'error', 'reverted'];
+        const isTerminal = _activeSession && _terminalStatuses.includes(_activeSession.status);
+
+        if (isTerminal) {
+            // Session finished: keep normal Save button, hide Launch
+            // (user must click "Nouvelle session" to relaunch)
+            if (origSave)  origSave.classList.remove('hidden');
+            if (launchBtn) launchBtn.classList.add('hidden');
+        } else {
+            if (origSave)  origSave.classList.add('hidden');
+            if (launchBtn) {
+                launchBtn.classList.remove('hidden');
+                if (_activeSession) {
+                    launchBtn.textContent = window.t ? window.t('kw.update_params') : '🔄 Mettre à jour les paramètres';
+                }
             }
         }
 
@@ -153,8 +162,12 @@ async function kwWizardLoadSession(sessionId) {
 function _startWizardSessionPoll(sessionId) {
     if (_wizardPollTimer) clearInterval(_wizardPollTimer);
     _wizardPollTimer = setInterval(async () => {
+        // Capture timer ref so we can detect if it was cancelled while fetch was in flight
+        const thisTimer = _wizardPollTimer;
         try {
             const data = await fetch(`/api/keyword-learning/${sessionId}/status`).then(r => r.json());
+            // If poll was stopped (reset) while we were fetching, discard the result
+            if (_wizardPollTimer !== thisTimer) return;
             _activeSession = data;
             _updateWizardSteps(data);
             if (['validated', 'reverted', 'error'].includes(data.status)) {
@@ -293,7 +306,9 @@ function _renderConfigPhase() {
         // Editing an existing session: use its period values
         startVal = toLocal(new Date(session.period_start));
         endVal   = toLocal(new Date(session.period_end));
-        startDisabled = true;
+        // Lock start only while the session is running; allow editing once finished
+        const _activeStatuses = ['pending', 'scanning', 'refining'];
+        startDisabled = _activeStatuses.includes(session.status);
         if (session.granularity_s) _wizardGranularity = session.granularity_s;
     } else {
         const now      = new Date();
@@ -308,10 +323,21 @@ function _renderConfigPhase() {
         <div class="kw-phase-steps" id="kw-wizard-steps">
             ${_buildStepsHtml(session ? session.status : null)}
         </div>
-        ${session && ['pending', 'scanning', 'refining', 'validated', 'error'].includes(session.status) ? `
+        ${session && ['pending', 'scanning', 'refining'].includes(session.status) ? `
             <div id="kw-wizard-progress" style="margin-bottom:.5rem"></div>
             <div class="kw-hint" style="margin-bottom:.75rem;opacity:.65">
                 ${window.t ? window.t('kw.resume_info') : 'L\'analyse est en cours. Vous pouvez modifier la date de fin ou la granularité.'}
+            </div>
+        ` : session && ['validated', 'error', 'reverted'].includes(session.status) ? `
+            <div id="kw-wizard-progress" style="display:none"></div>
+            <div style="margin-bottom:.75rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+                <span class="kw-hint" style="opacity:.75">
+                    ${session.status === 'validated' ? '✅ Session terminée.' : session.status === 'reverted' ? '↩️ Session annulée.' : '⚠️ Session en erreur.'}
+                    Modifiez la période ci-dessous et relancez.
+                </span>
+                <button type="button" class="btn btn-secondary btn-sm"
+                        onclick="_kwResetForNewSession()"
+                        style="white-space:nowrap">🔄 Nouvelle session</button>
             </div>
         ` : '<div id="kw-wizard-progress" style="display:none"></div>'}
         <div class="kw-config-grid">
@@ -424,6 +450,14 @@ async function _launchSession() {
     const ruleName = (document.getElementById('rule-name') || {}).value || '';
     if (!logPath || !ruleName) return;
 
+    // Safety guard: if session is already finished, don't start a new one
+    // (use the "Nouvelle session" button instead)
+    const _terminalStatuses = ['validated', 'error', 'reverted'];
+    if (_activeSession && _terminalStatuses.includes(_activeSession.status)) {
+        console.warn('_launchSession called with terminal session — aborting. Use _kwResetForNewSession() first.');
+        return;
+    }
+
     const periodStart = (document.getElementById('kw-period-start') || {}).value || '';
     const periodEnd   = (document.getElementById('kw-period-end')   || {}).value || '';
     const granularity = parseInt((document.getElementById('kw-granularity') || {}).value) || 3600;
@@ -451,6 +485,8 @@ async function _launchSession() {
             context_lines:             parseInt((document.getElementById('rule-context-lines') || {}).value) || 5,
             anti_spam_delay:           parseInt((document.getElementById('rule-anti-spam')     || {}).value) || 60,
             notify_severity_threshold: (document.getElementById('rule-severity-threshold') || {}).value || 'info',
+            excluded_patterns: ((document.getElementById('rule-excluded-patterns') || {}).value || '')
+                .split(',').map(p => p.trim()).filter(Boolean),
         };
         const saved = await fetch(existingId ? `/api/rules/${existingId}` : '/api/rules', {
             method:  existingId ? 'PUT' : 'POST',
@@ -490,11 +526,16 @@ async function _launchSession() {
         return;
     }
 
-    // Step 3: Close modal, reload rules list, start card polling
+    // Step 3: Close modal, reload rules list.
+    // rules.js _pollAllLearningSessions() will pick up the new session automatically.
     document.getElementById('rule-modal').classList.add('hidden');
     kwWizardClose();
+
+    // Remove this session from the completed-session cache in rules.js (if any)
+    // so that re-launching the same rule's session is properly re-polled.
+    if (typeof _completedSessions !== 'undefined') _completedSessions.delete(sessionId);
+
     if (typeof loadRules === 'function') await loadRules();
-    _startCardPolling(sessionId, ruleId);
 }
 
 /* ── Card polling (progress in rule card after modal closes) ────────────── */
@@ -576,4 +617,16 @@ function _esc(text) {
     const d = document.createElement('div');
     d.textContent = String(text || '');
     return d.innerHTML;
+}
+
+/** Reset wizard to fresh state so user can define a new period and relaunch */
+function _kwResetForNewSession() {
+    _activeSession = null;
+    _wizardSessionId = null;
+    _wizardGranularity = null;
+    _stopAllPolling();
+    const body = _wizardBody();
+    if (body) body.innerHTML = '';
+    _renderConfigPhase();
+    _watchFormValidation();
 }

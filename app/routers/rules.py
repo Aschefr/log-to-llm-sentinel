@@ -27,6 +27,7 @@ class RuleCreate(BaseModel):
     context_lines: int = 5
     anti_spam_delay: int = 60
     notify_severity_threshold: str = "info"
+    excluded_patterns: List[str] = []
 
 
 class RuleUpdate(BaseModel):
@@ -39,6 +40,8 @@ class RuleUpdate(BaseModel):
     context_lines: Optional[int] = None
     anti_spam_delay: Optional[int] = None
     notify_severity_threshold: Optional[str] = None
+    excluded_patterns: Optional[List[str]] = None
+    last_learning_session_id: Optional[int] = None  # pass -1 to explicitly clear
 
 
 @router.get("")
@@ -62,6 +65,7 @@ def get_rules():
                 "context_lines": r.context_lines or 5,
                 "anti_spam_delay": r.anti_spam_delay or 60,
                 "notify_severity_threshold": r.notify_severity_threshold or "info",
+                "excluded_patterns": r.get_excluded_patterns(),
                 "last_log_line": last_line,
                 "last_learning_session_id": r.last_learning_session_id,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
@@ -100,6 +104,7 @@ def get_rule(rule_id: int):
             "context_lines": rule.context_lines or 5,
             "anti_spam_delay": rule.anti_spam_delay or 60,
             "notify_severity_threshold": rule.notify_severity_threshold or "info",
+            "excluded_patterns": rule.get_excluded_patterns(),
             "last_learning_session_id": rule.last_learning_session_id,
         }
     finally:
@@ -121,6 +126,7 @@ def create_rule(rule_data: RuleCreate):
             notify_severity_threshold=rule_data.notify_severity_threshold,
         )
         rule.set_keywords(rule_data.keywords)
+        rule.set_excluded_patterns(rule_data.excluded_patterns)
         db.add(rule)
         db.commit()
         db.refresh(rule)
@@ -155,6 +161,11 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.anti_spam_delay = rule_data.anti_spam_delay
         if rule_data.notify_severity_threshold is not None:
             rule.notify_severity_threshold = rule_data.notify_severity_threshold
+        if rule_data.excluded_patterns is not None:
+            rule.set_excluded_patterns(rule_data.excluded_patterns)
+        if rule_data.last_learning_session_id is not None:
+            # -1 is the sentinel value meaning "clear the session link"
+            rule.last_learning_session_id = None if rule_data.last_learning_session_id == -1 else rule_data.last_learning_session_id
 
         db.commit()
         return {"id": rule.id, "message": "Règle mise à jour"}
