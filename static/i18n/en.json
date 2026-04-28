@@ -1,7 +1,8 @@
 {
   "_meta": {
     "lang": "en",
-    "name": "English"
+    "name": "English",
+    "flag": "🇬🇧"
   },
   "nav": {
     "dashboard": "Dashboard",
