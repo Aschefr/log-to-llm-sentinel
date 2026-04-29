@@ -374,3 +374,87 @@ async function checkAppUpdate() {
     }
 }
 
+// ─── Shared Analysis Card Template ──────────────────────────────────────────
+// Used by dashboard.js, monitor.js (analyses list, search result, line detail)
+// Options:
+//   collapsed  : bool  — start collapsed (default: true)
+//   showDelete : bool  — show delete button (default: false)
+//   showCopy   : bool  — show copy button (default: false)
+//   showRuleName: bool — show rule name in header (default: true)
+//   cardClass  : string — extra CSS class on wrapper (default: '')
+//   onToggle   : string — onclick function name for toggle (default: generic)
+
+function renderAnalysisCard(a, opts = {}) {
+    const collapsed = opts.collapsed !== false;
+    const showDelete = opts.showDelete || false;
+    const showCopy = opts.showCopy !== false;
+    const showRuleName = opts.showRuleName !== false;
+    const cardClass = opts.cardClass || 'analysis-card';
+    const _t = (k, fb) => window.t ? window.t(k) : fb;
+
+    const collapsedCls = collapsed ? ' collapsed' : '';
+    const toggleArrow = collapsed ? '▶' : '▼';
+
+    // Keywords summary for collapsed header
+    const kwSummary = collapsed && a.matched_keywords?.length
+        ? `<span class="analysis-kw-summary">${a.matched_keywords.slice(0,3).map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('')}${a.matched_keywords.length > 3 ? `<span class="log-kw-badge">+${a.matched_keywords.length - 3}</span>` : ''}</span>`
+        : '';
+
+    // Copy SVG icon
+    const copyBtn = showCopy ? `
+        <button class="btn-icon" onclick="event.stopPropagation(); copyAnalysisText(this)" title="${_t('common.copy_analysis', 'Copy')}">
+            <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
+        </button>` : '';
+
+    const deleteBtn = showDelete ? `
+        <button class="btn-icon delete-analysis-btn" onclick="event.stopPropagation(); deleteAnalysis(${a.id}, this)" title="${_t('common.delete_analysis', 'Delete')}">
+            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
+        </button>` : '';
+
+    const ruleName = showRuleName && a.rule_name
+        ? `<strong>${_t('dashboard.rule_label', 'Rule:')} ${escapeHtml(a.rule_name)}</strong>`
+        : '';
+
+    return `
+    <div class="${cardClass}${collapsedCls}" id="analysis-card-${a.id}" onclick="toggleAnalysisCardGeneric(event, this)">
+        <div class="analysis-header">
+            <div>
+                <span class="collapse-toggle">${toggleArrow}</span>
+                ${ruleName}
+                ${a.detection_id ? `<span class="detection-id-badge" style="margin-left:0.5rem">#${escapeHtml(a.detection_id)}</span>` : ''}
+                <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
+                <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+            </div>
+            <div class="analysis-actions">
+                ${kwSummary}
+                ${copyBtn}
+                ${deleteBtn}
+            </div>
+        </div>
+        <div class="analysis-body">
+            ${a.matched_keywords && a.matched_keywords.length > 0 ? `
+            <div class="analysis-keywords">
+                <span class="kw-label">${_t('monitor.keywords', 'Keywords')} :</span>
+                ${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')}
+            </div>` : ''}
+            <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
+            <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
+            <div class="analysis-footer">
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); retryAnalysis(${a.id}, this)">🔄 ${_t('common.retry', 'Retry')}</button>
+                    <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); notifyAnalysis(${a.id}, this)">🔔 ${_t('common.notify', 'Notify')}</button>
+                    ${a.detection_id ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); window.location.href='/monitor?search=${encodeURIComponent(a.detection_id)}'" title="${_t('common.view_in_monitor', 'View in Monitor')}">🔍 Monitor</button>` : ''}
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openChat(${a.id})">💬 ${_t('common.deepen', 'Deepen')}</button>
+            </div>
+        </div>
+    </div>`;
+}
+
+function toggleAnalysisCardGeneric(event, card) {
+    if (event.target.closest('button, a, .btn')) return;
+    card.classList.toggle('collapsed');
+    const toggle = card.querySelector('.collapse-toggle');
+    if (toggle) toggle.textContent = card.classList.contains('collapsed') ? '▶' : '▼';
+}
+

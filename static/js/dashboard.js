@@ -81,52 +81,16 @@ async function loadRecentAnalyses(append = false) {
         }
 
         const html = analyses.map((a, idx) => {
-            // First card of the first page is expanded, all others collapsed
-            const isExpanded = !append && idx === 0;
-            const collapsedClass = isExpanded ? '' : ' collapsed';
-
-            return `
-            <div class="analysis-card${collapsedClass}" onclick="toggleDashboardCard(event, this)">
-                <div class="analysis-header">
-                    <div>
-                        <span class="collapse-toggle">${isExpanded ? '▼' : '▶'}</span>
-                        <strong>${window.t ? window.t('dashboard.rule_label') : 'Rule:'} ${escapeHtml(a.rule_name || '#' + a.rule_id)}</strong>
-                        ${a.detection_id ? `<span class="detection-id-badge" style="margin-left: 0.75rem;">#${escapeHtml(a.detection_id)}</span>` : ''}
-                        <span class="analysis-time">${formatDate(a.analyzed_at)}</span>
-                    </div>
-                    <div class="analysis-actions">
-                        <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
-                        ${!isExpanded && a.matched_keywords?.length ? `<span class="analysis-kw-summary">${a.matched_keywords.slice(0,3).map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('')}${a.matched_keywords.length > 3 ? `<span class="log-kw-badge">+${a.matched_keywords.length - 3}</span>` : ''}</span>` : ''}
-                        <button class="btn-icon" onclick="event.stopPropagation(); copyAnalysisText(this)" title="${window.t('common.copy_analysis')}">
-                            <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M19,21H8V7H19M19,5H8A2,2 0 0,0 6,7V21A2,2 0 0,0 8,23H19A2,2 0 0,0 21,21V7A2,2 0 0,0 19,5M16,1H4A2,2 0 0,0 2,3V17H4V3H16V1Z" /></svg>
-                        </button>
-                        <button class="btn-icon delete-analysis-btn" onclick="event.stopPropagation(); deleteAnalysis(${a.id}, this)" title="${window.t('common.delete_analysis')}">
-                            <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="analysis-body">
-                    ${a.matched_keywords && a.matched_keywords.length > 0 ? `
-                    <div class="analysis-keywords">
-                        <span class="kw-label">${window.t('monitor.keywords') || 'Mots-clés'} :</span>
-                        ${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')}
-                    </div>` : ''}
-                    <div class="analysis-line">${highlightKeywords(a.triggered_line, a.matched_keywords || [])}</div>
-                    <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
-                    <div class="analysis-footer" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); retryAnalysis(${a.id}, this)">🔄 ${window.t('common.retry')}</button>
-                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); notifyAnalysis(${a.id}, this)">🔔 ${window.t('common.notify')}</button>
-                            ${a.detection_id ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); window.location.href='/monitor?search=${encodeURIComponent(a.detection_id)}'" title="${window.t('common.view_in_monitor') || 'Voir dans Monitor'}">🔍 Monitor</button>` : ''}
-                        </div>
-                        <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openChat(${a.id})">💬 ${window.t('common.deepen')}</button>
-                    </div>
-                </div>
-            </div>`;
+            const isFirst = !append && idx === 0;
+            return renderAnalysisCard(a, {
+                collapsed: !isFirst,
+                showDelete: true,
+                showCopy: true,
+                showRuleName: true,
+            });
         }).join('');
 
         if (append) {
-            // Remove previous "show more" button before appending
             const oldBtn = container.querySelector('.dashboard-show-more');
             if (oldBtn) oldBtn.remove();
             container.insertAdjacentHTML('beforeend', html);
@@ -134,7 +98,6 @@ async function loadRecentAnalyses(append = false) {
             container.innerHTML = html;
         }
 
-        // Add "Show more" button if there are more analyses
         if (hasMore) {
             const oldBtn = container.querySelector('.dashboard-show-more');
             if (oldBtn) oldBtn.remove();
@@ -148,14 +111,6 @@ async function loadRecentAnalyses(append = false) {
         console.error('Erreur chargement analyses récentes:', error);
         document.getElementById('recent-analyses').innerHTML = `<div class="loading">${window.t('dashboard.loading_error')}</div>`;
     }
-}
-
-function toggleDashboardCard(event, card) {
-    // Don't toggle when clicking buttons/links inside
-    if (event.target.closest('button, a, .btn')) return;
-    card.classList.toggle('collapsed');
-    const toggle = card.querySelector('.collapse-toggle');
-    if (toggle) toggle.textContent = card.classList.contains('collapsed') ? '▶' : '▼';
 }
 
 function loadMoreDashboardAnalyses() {

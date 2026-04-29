@@ -646,34 +646,13 @@ async function loadMonitorAnalyses(ruleId, severityFilter = null, resetList = tr
 
         const cards = analyses.map((a, idx) => {
             const isFirst = (offset === 0 && idx === 0);
-            const collapsed = !isFirst;
-            return `
-            <div class="monitor-analysis-card ${collapsed ? 'collapsed' : ''}" id="analysis-card-${a.id}">
-                <div class="monitor-analysis-header" onclick="toggleAnalysisCard(${a.id})" style="cursor:pointer">
-                    <span class="collapse-toggle">${collapsed ? '▶' : '▼'}</span>
-                    <span class="detection-id-badge" title="${window.t('monitor.detection_id_title')}">${escapeHtml(a.detection_id || '—')}</span>
-                    <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
-                    <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
-                    ${collapsed && a.matched_keywords?.length ? `<span class="analysis-kw-summary">${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')}</span>` : ''}
-                </div>
-                <div class="monitor-analysis-body">
-                    <div class="monitor-analysis-keywords">
-                        ${window.t ? window.t('monitor.kw_label') : 'Keywords:'} ${a.matched_keywords.length > 0
-                            ? a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')
-                            : '<em>N/A</em>'}
-                    </div>
-                    <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
-                    <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
-                    <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 ${window.t('common.retry')}</button>
-                            <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 ${window.t('common.notify')}</button>
-                        </div>
-                        <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 ${window.t('common.deepen')}</button>
-                    </div>
-                </div>
-            </div>
-        `}).join('');
+            return renderAnalysisCard(a, {
+                collapsed: !isFirst,
+                showDelete: true,
+                showCopy: true,
+                showRuleName: false,
+            });
+        }).join('');
 
         if (resetList) {
             container.innerHTML = cards;
@@ -792,23 +771,12 @@ async function searchById() {
             <div class="search-result-card">
                 <div class="search-result-close" onclick="document.getElementById('search-result').classList.add('hidden')">✕</div>
                 <h3>${window.t ? window.t('monitor.result_for') : 'Result for'} <code class="detection-id-badge">${escapeHtml(a.detection_id)}</code></h3>
-                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.rule_label') : 'Rule'}</span><span class="detail-value">${escapeHtml(a.rule_name)}</span></div>
-                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.analyzed_at') : 'Analyzed at'}</span><span class="detail-value">${a.analyzed_at ? formatDate(a.analyzed_at) : '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.severity') : 'Severity'}</span><span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span></div>
-                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.keywords') : 'Keywords'}</span><span class="detail-value">${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ') || '—'}</span></div>
-                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.detail_line_label') : 'Line'}</span><code class="detail-value">${escapeHtml(a.triggered_line || '')}</code></div>
-                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.detail_llm_analysis') : 'LLM Analysis'}</span>
-                    <div class="detail-value analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : '—'}</div>
-                </div>
-
-                <div class="detail-row"><span class="detail-label">${window.t ? window.t('monitor.notified') : 'Notified'}</span><span class="detail-value">${a.notified ? '✅ ' + window.t('monitor.yes') : '❌ ' + window.t('monitor.no')}</span></div>
-                <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 ${window.t('common.retry')}</button>
-                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 ${window.t('common.notify')}</button>
-                    </div>
-                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 ${window.t('monitor.deepen_with_ai')}</button>
-                </div>
+                ${renderAnalysisCard(a, {
+                    collapsed: false,
+                    showDelete: true,
+                    showCopy: true,
+                    showRuleName: true,
+                })}
             </div>
         `;
     } catch (e) {

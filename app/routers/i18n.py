@@ -19,7 +19,7 @@ def list_languages():
             code = filename[:-5]
             filepath = os.path.join(I18N_DIR, filename)
             try:
-                with open(filepath, "r", encoding="utf-8") as f:
+                with open(filepath, "r", encoding="utf-8-sig") as f:
                     data = json.load(f)
                 meta = data.get("_meta", {})
                 languages.append({

@@ -198,6 +198,8 @@ body {
 .analysis-card.collapsed .analysis-header { margin-bottom: 0; }
 .analysis-card.collapsed { opacity: 0.85; }
 .analysis-card.collapsed:hover { opacity: 1; }
+.analysis-footer { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.collapse-toggle { font-size: 0.7rem; margin-right: 0.5rem; color: var(--text-secondary); }
 
 .analysis-header {
     display: flex;
