@@ -1,0 +1,356 @@
+# ═══════════════════════════════════════════════
+# LOG-TO-LLM SENTINEL — EXECUTION TRACKER
+# ═══════════════════════════════════════════════
+# Status: DONE | TODO | WIP | PARTIAL | BLOCKED
+# Effort: S (<1h) | M (1-4h) | L (4-8h) | XL (>8h)
+# Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low)
+
+project: log-to-llm-sentinel
+updated: 2026-04-29
+
+# ─────────────────────────────────────────────
+# GLOBAL RULES (apply to ALL tasks)
+# ─────────────────────────────────────────────
+global_rules:
+  - id: G-01
+    rule: "Use existing i18n system. Check for duplicate keys before adding."
+  - id: G-02
+    rule: "Decorative icons hardcoded. Only text in JSON lang files."
+  - id: G-03
+    rule: "Interface with existing debug system. Add filters as needed."
+  - id: G-04
+    rule: "Debug logs in French (dev language). App UI uses English for i18n."
+  - id: G-05
+    rule: "Preserve existing visual style: badges, colors, fonts."
+  - id: G-06
+    rule: "Auto-refresh individual elements. No F5 needed."
+
+# ─────────────────────────────────────────────
+# INFRASTRUCTURE / BACKEND
+# ─────────────────────────────────────────────
+infrastructure:
+  - id: INFRA-01
+    name: "i18n system (JS + Python + JSON lang files)"
+    status: DONE
+    files: [static/js/i18n.js, app/routers/i18n.py, static/i18n/en.json, static/i18n/fr.json]
+
+  - id: INFRA-02
+    name: "Debug/logging system with per-function filters"
+    status: DONE
+    files: [app/logger.py]
+
+  - id: INFRA-03
+    name: "Webhook ingestion + token routing (Home Assistant)"
+    status: DONE
+    files: [app/routers/webhook.py, static/js/keyword_wizard.js]
+
+  - id: INFRA-04
+    name: "Auto-learning keywords (Sentinel AI)"
+    status: DONE
+    files: [app/services/keyword_learning_service.py]
+
+  - id: INFRA-05
+    name: "Orchestrator analysis pipeline"
+    status: DONE
+    files: [app/services/orchestrator.py]
+
+  - id: INFRA-06
+    name: "Task manager (background jobs)"
+    status: DONE
+    files: [app/services/task_manager.py]
+
+  - id: INFRA-07
+    name: "Notification service (SMTP SSL/STARTTLS + Apprise)"
+    status: DONE
+    files: [app/services/notification_service.py]
+
+  - id: INFRA-08
+    name: "Version check + update badge (startup + daily 00:00 UTC)"
+    status: DONE
+    files: [static/js/common.js]
+
+  - id: INFRA-09
+    name: "Ollama service abstraction"
+    status: DONE
+    files: [app/services/ollama_service.py]
+
+  - id: INFRA-10
+    name: "Log watcher (file tail)"
+    status: DONE
+    files: [app/services/log_watcher.py]
+
+# ─────────────────────────────────────────────
+# UX TRANSVERSALE
+# ─────────────────────────────────────────────
+ux_global:
+  - id: UX-01
+    name: "Responsive design"
+    status: PARTIAL
+    effort: L
+    priority: P1
+    notes: "3 @media queries exist in style.css — minimal. Needs full responsive pass on all pages."
+
+  - id: UX-02
+    name: "Flexible theme system (light/dark toggle + accent color)"
+    status: TODO
+    effort: XL
+    priority: P1
+    subtasks:
+      - "Theme toggle UI component (header)"
+      - "CSS custom properties refactor for accent/dominant color"
+      - "Light theme variant CSS"
+      - "Persist choice (localStorage)"
+      - "Accent color picker UI"
+
+  - id: UX-03
+    name: "Update theme file for new flexibility"
+    status: TODO
+    effort: M
+    priority: P1
+    deps: [UX-02]
+
+# ─────────────────────────────────────────────
+# DASHBOARD
+# ─────────────────────────────────────────────
+dashboard:
+  - id: DASH-01
+    name: "Stats overview + recent analyses + severity filter"
+    status: DONE
+    files: [static/js/dashboard.js, templates/dashboard.html]
+
+# ─────────────────────────────────────────────
+# CHAT
+# ─────────────────────────────────────────────
+chat:
+  - id: CHAT-01
+    name: "Conversation history sidebar"
+    status: DONE
+
+  - id: CHAT-02
+    name: "Auto-titled conversations (via AI)"
+    status: DONE
+
+  - id: CHAT-03
+    name: "Action buttons: Copy / Edit / Retry"
+    status: DONE
+
+  - id: CHAT-04
+    name: "Edit bubble erases conversation continuation"
+    status: DONE
+
+  - id: CHAT-05
+    name: "User bubble preserves visual formatting"
+    status: TODO
+    effort: M
+    priority: P1
+    notes: "User message should render with same formatting as typed (whitespace, line breaks, markdown)."
+
+  - id: CHAT-06
+    name: "Edit confirm ('Valider') and 'Envoyer' have identical effect"
+    status: TODO
+    effort: S
+    priority: P2
+
+  - id: CHAT-07
+    name: "Context management system (token-aware)"
+    status: TODO
+    effort: XL
+    priority: P3
+    subtasks:
+      - id: CHAT-07a
+        name: "Token counting for payload (not char counting)"
+        effort: M
+      - id: CHAT-07b
+        name: "Context fill bar (percentage of available window)"
+        effort: S
+      - id: CHAT-07c
+        name: "Overflow warning + user choice: continue / truncate / compress"
+        effort: L
+      - id: CHAT-07d
+        name: "Persist choice + display above conversation window"
+        effort: S
+      - id: CHAT-07e
+        name: "Compaction mode (~50% compression, 0% quality loss)"
+        effort: XL
+        notes: "Token-level noise removal, exact terms preserved. Ref: morphllm.com/context-compression"
+      - id: CHAT-07f
+        name: "Summary mode (~70% compression, ~20% quality loss)"
+        effort: L
+        notes: "Ollama generates structured summary with errors, diagnostics, pending tasks."
+      - id: CHAT-07g
+        name: "Compression progress indicator"
+        effort: S
+      - id: CHAT-07h
+        name: "Compressed context bubble (collapsed, different color, editable)"
+        effort: M
+      - id: CHAT-07i
+        name: "Auto-resend prompt after compression completes"
+        effort: S
+      - id: CHAT-07j
+        name: "Edit compressed: Cancel / Validate / Restart-with-edits buttons"
+        effort: M
+      - id: CHAT-07k
+        name: "Delete compressed context option (revert to full history)"
+        effort: S
+      - id: CHAT-07l
+        name: "Fill bar ignores text before latest compression"
+        effort: S
+
+  - id: CHAT-08
+    name: "Chat settings modal"
+    status: TODO
+    effort: XL
+    priority: P2
+    subtasks:
+      - id: CHAT-08a
+        name: "Chat language selector (dropdown, defaults to header lang)"
+        effort: M
+        notes: "If different from site lang → auto-save + green highlight + reset button."
+      - id: CHAT-08b
+        name: "System prompt for analysis conversations"
+        effort: M
+      - id: CHAT-08c
+        name: "Default system prompts FR/EN"
+        effort: S
+      - id: CHAT-08d
+        name: "User-editable + saveable system prompt"
+        effort: M
+      - id: CHAT-08e
+        name: "Auto-translate prompt button (via Ollama)"
+        effort: L
+        notes: "Translate from any lang to selected lang. Shows 'Restore default' after."
+      - id: CHAT-08f
+        name: "Restore default system prompt button"
+        effort: S
+      - id: CHAT-08g
+        name: "Auto-appended context block (read-only, collapsed)"
+        effort: M
+        notes: |
+          Contains: current datetime, selected lang, platform description,
+          monitored log files list with custom prompts,
+          instruction for direct/concise responses.
+
+# ─────────────────────────────────────────────
+# MONITOR
+# ─────────────────────────────────────────────
+monitor:
+  - id: MON-01
+    name: "Search field"
+    status: DONE
+
+  - id: MON-02
+    name: "Rule tabs navigation"
+    status: DONE
+
+  - id: MON-03
+    name: "Selected rule summary display"
+    status: DONE
+
+  - id: MON-04
+    name: "Keyword detection + exclusion badges with live filtering"
+    status: DONE
+
+  - id: MON-05
+    name: "Anti-spam buffer display"
+    status: DONE
+
+  - id: MON-06
+    name: "Real-time log view (collapsible, configurable line count)"
+    status: DONE
+
+  - id: MON-07
+    name: "Clickable log lines → manual AI analysis trigger"
+    status: DONE
+
+  - id: MON-08
+    name: "Exclusion patterns visual filter (dimmed, strikethrough, toggle)"
+    status: DONE
+
+  - id: MON-09
+    name: "'+' button behind tabs to add new rule (reuse Rules modal)"
+    status: TODO
+    effort: M
+    priority: P2
+
+  - id: MON-10
+    name: "Auto-learning status panel (replicate from Rules page)"
+    status: TODO
+    effort: M
+    priority: P2
+
+  - id: MON-11
+    name: "Severity filter for analyses (move badges to accordion level)"
+    status: TODO
+    effort: M
+    priority: P2
+
+  - id: MON-12
+    name: "Analysis history display"
+    status: TODO
+    effort: L
+    priority: P2
+    subtasks:
+      - "Auto-refresh after new analysis received"
+      - "Latest analysis expanded by default"
+      - "Older analyses collapsed (show: ID, date, severity, detected keywords)"
+      - "Limit 20 visible by default"
+      - "'Show more' button loads 20 previous"
+
+# ─────────────────────────────────────────────
+# META-ANALYSIS
+# ─────────────────────────────────────────────
+meta_analysis:
+  - id: META-01
+    name: "Meta-analysis engine (config, preview, trigger, results, notify)"
+    status: DONE
+    files: [app/services/meta_service.py, static/js/meta.js, templates/meta.html, app/routers/meta_analysis.py]
+
+# ─────────────────────────────────────────────
+# RULES PAGE
+# ─────────────────────────────────────────────
+rules:
+  - id: RULE-01
+    name: "Evaluate hiding/removing Rules page"
+    status: TODO
+    effort: M
+    priority: P3
+    notes: "If risky: hide from nav, keep accessible via direct URL."
+
+# ─────────────────────────────────────────────
+# CONFIGURATION
+# ─────────────────────────────────────────────
+config:
+  - id: CFG-01
+    name: "SMTP notifications (SSL/STARTTLS/plain)"
+    status: DONE
+
+  - id: CFG-02
+    name: "Apprise notifications (markdown, tags, char limit)"
+    status: DONE
+
+  - id: CFG-03
+    name: "Discord bot (native integration)"
+    status: TODO
+    effort: L
+    priority: P3
+    notes: "Apprise handles Discord but is hard to install for beginners. Native bot = simpler UX."
+
+  - id: CFG-04
+    name: "Maintenance section in 'Interface & Monitor' panel"
+    status: TODO
+    effort: L
+    priority: P2
+    subtasks:
+      - id: CFG-04a
+        name: "Disk usage display (app data size)"
+        effort: M
+      - id: CFG-04b
+        name: "Auto-delete old analyses (slider on/off + dropdown period)"
+        effort: L
+        notes: "Periods: 1 week, 1 month, 6 months, 1 year, Custom..."
+      - id: CFG-04c
+        name: "'Custom...' period shows custom input field"
+        effort: S
+      - id: CFG-04d
+        name: "Cleanup unused data button (show found items, user validates)"
+        effort: M

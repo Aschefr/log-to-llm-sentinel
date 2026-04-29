@@ -606,26 +606,13 @@ async function loadHistory(id) {
         try {
             const pending = await apiFetch(`/chat/api/pending/${id}`);
             if (pending.task_id && activeConvId === id) {
-                // Réinitialiser l'état du stream et reconnecter depuis la position 0
+                // Réinitialiser l'état du stream et reconnecter depuis la position 0.
+                // On NE crée PAS la bulle ici : readStream s'en charge pour éviter
+                // les doublons si le handler visibilitychange ou une autre voie
+                // déclenche aussi un readStream en parallèle.
                 _activeTaskId = pending.task_id;
                 _streamPos = 0;
                 _streamFullText = '';
-
-                // Créer la bulle de streaming
-                const bubble = document.createElement('div');
-                bubble.className = 'message-bubble assistant';
-                bubble.id = 'streaming-ai';
-                bubble.innerHTML = `
-                    <div class="thinking-state">
-                        <span class="thinking-dot"></span>
-                        <span class="thinking-dot"></span>
-                        <span class="thinking-dot"></span>
-                        <span style="margin-left:0.5rem; opacity:0.7; font-size:0.9rem;">${window.t('chat.thinking')}</span>
-                    </div>
-                    <div class="markdown-body"></div>
-                `;
-                container.appendChild(bubble);
-                container.scrollTop = container.scrollHeight;
 
                 if (_streamAbort) _streamAbort.abort();
                 _streamAbort = new AbortController();
