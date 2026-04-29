@@ -313,6 +313,7 @@ async function fetchLogs(rule) {
         }
 
         const isAtBottom = Math.abs((viewer.scrollHeight - viewer.scrollTop) - viewer.clientHeight) < 20;
+        const savedScrollTop = viewer.scrollTop;
 
         const excludedPatterns = rule.excluded_patterns || [];
 
@@ -359,6 +360,9 @@ async function fetchLogs(rule) {
             }
         } else if (isAtBottom) {
             viewer.scrollTop = viewer.scrollHeight;
+        } else {
+            // User had scrolled up — restore their position
+            viewer.scrollTop = savedScrollTop;
         }
 
         // Réappliquer le filtre mot-clé actif
