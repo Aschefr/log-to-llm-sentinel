@@ -226,6 +226,11 @@
     border-bottom-right-radius: 0.2rem;
 }
 
+.message-bubble.user .markdown-body {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 .message-bubble.assistant {
     align-self: flex-start;
     background: rgba(255, 255, 255, 0.02); /* Presque transparent */
@@ -853,7 +858,7 @@ function editMsg(btn) {
     });
     // Raccourcis clavier
     ta.addEventListener('keydown', e => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             confirmEdit(msgWrapper.querySelector('.inline-edit-btn.confirm'));
         }

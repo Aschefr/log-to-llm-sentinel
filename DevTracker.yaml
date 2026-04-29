@@ -95,10 +95,9 @@ infrastructure:
 ux_global:
   - id: UX-01
     name: "Responsive design"
-    status: PARTIAL
-    effort: L
-    priority: P1
-    notes: "3 @media queries exist in style.css — minimal. Needs full responsive pass on all pages."
+    status: DONE (but not perfect, some elements still need refinement)
+    effort: S
+    priority: P3
 
   - id: UX-02
     name: "Flexible theme system (light/dark toggle + accent color)"
@@ -150,16 +149,17 @@ chat:
 
   - id: CHAT-05
     name: "User bubble preserves visual formatting"
-    status: TODO
+    status: DONE
     effort: M
     priority: P1
-    notes: "User message should render with same formatting as typed (whitespace, line breaks, markdown)."
+    notes: "CSS white-space: pre-wrap on user bubble. escapeHtml kept for XSS safety."
 
   - id: CHAT-06
     name: "Edit confirm ('Valider') and 'Envoyer' have identical effect"
-    status: TODO
+    status: DONE
     effort: S
     priority: P2
+    notes: "Enter (sans Shift) valide l'édition inline, comme le chat principal."
 
   - id: CHAT-07
     name: "Context management system (token-aware)"
