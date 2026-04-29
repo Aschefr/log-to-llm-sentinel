@@ -138,12 +138,37 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
         if analysis and _orchestrator:
             rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
             cfg = db.query(GlobalConfig).first()
-            system_prompt = cfg.system_prompt.strip() if cfg and cfg.system_prompt else ""
+            system_prompt = cfg.chat_system_prompt.strip() if cfg and cfg.chat_system_prompt else ""
 
             # On construit un prompt de CHAT — pas un prompt d'analyse.
             # Le but est de donner le contexte à l'IA pour qu'elle réponde
             # aux questions de l'utilisateur en tant qu'assistant, sans
             # ré-imposer le format SEVERITY ni les instructions d'analyse.
+            lang = cfg.chat_lang if cfg and cfg.chat_lang else "fr"
+            lang_file = f"static/i18n/{lang}.json"
+            mode_text = ""
+            import os
+            import json
+            from datetime import datetime
+            
+            if os.path.exists(lang_file):
+                with open(lang_file, 'r', encoding='utf-8-sig') as f:
+                    lang_data = json.load(f)
+                    mode_text = lang_data.get("chat", {}).get("mode_de_reponse", "")
+
+            # Format mode_text with dynamic data
+            current_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            active_rules = db.query(Rule).filter(Rule.enabled == True).all()
+            rules_lines = []
+            for r in active_rules:
+                ctx = f" (Context: {r.application_context})" if r.application_context else ""
+                rules_lines.append(f"- {r.name}{ctx}")
+            rules_list_str = "\n".join(rules_lines) if rules_lines else "- Aucune règle configurée"
+            
+            mode_text = mode_text.replace("{datetime}", current_dt)
+            mode_text = mode_text.replace("{lang}", lang.upper())
+            mode_text = mode_text.replace("{rules_list}", rules_list_str)
+
             context_block = "\n".join([
                 system_prompt if system_prompt else "",
                 "",
@@ -159,16 +184,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
                 "=== Analyse initiale ===",
                 analysis.ollama_response,
                 "",
-                "=== Mode de réponse (IMPORTANT) ===",
-                "Tu participes à une CONVERSATION. L'analyse est déjà faite ci-dessus.",
-                "Règles absolues :",
-                "- Réponds à LA QUESTION posée, rien de plus",
-                "- Pas de format SEVERITY, pas de liste 'd'étapes de correction' sauf si demandé explicitement",
-                "- Si l'utilisateur dit que le service fonctionne, prends-le en compte dans ta réponse",
-                "- Ton naturel et direct, comme dans un chat entre collègues experts",
-                "- Si la question est courte, la réponse peut l'être aussi",
-                "",
-                "=== Conversation ===",
+                mode_text
             ])
             prompt = context_block.strip() + "\n"
 
@@ -467,3 +483,76 @@ async def delete_last_messages(conv_id: int, count: int = 2, db: Session = Depen
         db.delete(m)
     db.commit()
     return {"status": "ok", "deleted": len(messages)}
+
+@router.get("/api/settings")
+async def get_chat_settings(db: Session = Depends(get_db)):
+    cfg = db.query(GlobalConfig).first()
+    
+    active_rules = db.query(Rule).filter(Rule.enabled == True).all()
+    rules_lines = []
+    for r in active_rules:
+        ctx = f" (Context: {r.application_context})" if r.application_context else ""
+        rules_lines.append(f"- {r.name}{ctx}")
+    rules_list_str = "\n".join(rules_lines) if rules_lines else "- Aucune règle configurée"
+    
+    if not cfg:
+        return {"chat_lang": "", "chat_system_prompt": "", "rules_list_str": rules_list_str}
+        
+    return {
+        "chat_lang": cfg.chat_lang or "",
+        "chat_system_prompt": cfg.chat_system_prompt or "",
+        "rules_list_str": rules_list_str
+    }
+
+@router.post("/api/settings")
+async def save_chat_settings(data: dict, db: Session = Depends(get_db)):
+    cfg = db.query(GlobalConfig).first()
+    if not cfg:
+        cfg = GlobalConfig()
+        db.add(cfg)
+    
+    if "chat_lang" in data:
+        cfg.chat_lang = data["chat_lang"]
+    if "chat_system_prompt" in data:
+        cfg.chat_system_prompt = data["chat_system_prompt"]
+        
+    db.commit()
+    return {"status": "ok"}
+
+@router.post("/api/translate-prompt")
+async def translate_chat_prompt(data: dict, db: Session = Depends(get_db)):
+    prompt_text = data.get("prompt", "")
+    target_lang = data.get("lang", "fr")
+    
+    if not prompt_text:
+        return {"translated": ""}
+        
+    cfg = db.query(GlobalConfig).first()
+    ollama_url   = (cfg.ollama_url   or "http://ollama:11434") if cfg else "http://ollama:11434"
+    ollama_model = (cfg.ollama_model or "gemma4:e4b")         if cfg else "gemma4:e4b"
+    
+    translation_prompt = (
+        f"Traduisez précisément ce prompt système en '{target_lang}'. "
+        "Conservez toutes les variables, le ton et les instructions techniques exactes. "
+        "Ne répondez QUE par la traduction, sans aucun autre texte ou guillemets.\n\n"
+        f"Texte à traduire:\n{prompt_text}"
+    )
+    
+    translated = ""
+    try:
+        if _orchestrator:
+            async with _orchestrator._ollama_semaphore:
+                translated = await _orchestrator.ollama.analyze_async(
+                    prompt=translation_prompt,
+                    url=ollama_url,
+                    model=ollama_model,
+                    options={"temperature": 0.2, "num_ctx": 2048},
+                    think=True
+                )
+    except Exception as e:
+        logger.error("ChatRouter", f"Translate error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+        
+    # Nettoyage
+    translated = translated.strip()
+    return {"translated": translated}

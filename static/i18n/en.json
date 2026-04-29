@@ -190,7 +190,18 @@
         "label_context": "Attached Analysis",
         "regenerate": "Regenerate",
         "edit_resend": "Edit and resend",
-        "label_ollama": "Ollama"
+        "label_ollama": "Ollama",
+        "settings_title": "Chat Settings",
+        "lang_select": "Query Language (Chat)",
+        "lang_site_default": "Default (Site Language)",
+        "system_prompt": "System Prompt",
+        "btn_translate": "Auto-translate",
+        "btn_reset": "Reset",
+        "btn_save": "Save",
+        "btn_cancel": "Cancel",
+        "context_preview_title": "Auto-appended context (Preview)",
+        "settings_btn": "Settings ⚙️",
+        "mode_de_reponse": "=== Automatic Context ===\nCurrent date and time: {datetime}\nResponse language: {lang}\n\nThe chat platform is part of a log file analysis environment chosen by the user.\nFor your information, here are the monitored rules and files:\n{rules_list}\n\n=== Response Mode (IMPORTANT) ===\nAnswer directly, without fluff or deep explanations unless the user asks for it."
     },
     "config": {
         "title": "Global Configuration",

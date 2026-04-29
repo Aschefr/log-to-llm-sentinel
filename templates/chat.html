@@ -40,9 +40,7 @@
                     <div id="current-chat-meta" class="chat-meta"></div>
                 </div>
                 <div class="header-actions">
-                    <button class="btn-icon" onclick="loadHistory(activeConvId)" data-i18n-title="chat.refresh_btn_title" title="Rafraîchir">
-                        <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z"/></svg>
-                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="openChatSettings()" data-i18n="chat.settings_btn">Paramètres ⚙️</button>
                 </div>
             </header>
 
@@ -64,6 +62,47 @@
             </footer>
         </div>
     </main>
+
+    <!-- Settings Modal -->
+    <div id="chat-settings-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2 data-i18n="chat.settings_title">Paramètres du Chat</h2>
+                <button type="button" class="btn-close" onclick="closeChatSettings()" title="Fermer">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label data-i18n="chat.lang_select">Langue des requêtes (Chat)</label>
+                    <select id="chat-lang-select" class="form-control" onchange="markChatSettingsDirty(); updateContextPreview()">
+                        <option value="" data-i18n="chat.lang_site_default">Par défaut (Langue du site)</option>
+                        <option value="fr">Français</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label style="display: flex; justify-content: space-between; align-items: center;">
+                        <span data-i18n="chat.system_prompt">Prompt système</span>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary btn-sm" onclick="resetChatPrompt()" data-i18n="chat.btn_reset">Réinitialiser</button>
+                            <button class="btn btn-secondary btn-sm" onclick="translateChatPrompt()" data-i18n="chat.btn_translate">Traduire auto.</button>
+                        </div>
+                    </label>
+                    <textarea id="chat-system-prompt-input" class="form-control" rows="4" oninput="markChatSettingsDirty()" placeholder="..."></textarea>
+                </div>
+
+                <details style="margin-top: 1rem; border: 1px solid var(--border); border-radius: 0.5rem; padding: 0.5rem;">
+                    <summary style="cursor: pointer; font-size: 0.9rem; color: var(--text-secondary);" data-i18n="chat.context_preview_title">Contexte auto-ajouté (Aperçu)</summary>
+                    <div id="chat-context-preview" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem; white-space: pre-wrap; background: var(--bg-primary); padding: 0.5rem; border-radius: 0.25rem;">
+                    </div>
+                </details>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeChatSettings()" data-i18n="chat.btn_cancel">Annuler</button>
+                <button class="btn btn-primary hidden" onclick="saveChatSettings(true)" id="chat-settings-save-btn" data-i18n="chat.btn_save">Enregistrer</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -1199,6 +1238,142 @@ async function autoTitleConversation(convId) {
     } catch (e) {
         // Silencieux : l'auto-nommage est best-effort
         console.warn('[Chat] Auto-title failed:', e.message);
+    }
+}
+
+// ── Chat Settings Modal ──
+let _chatSettingsTimeout;
+
+async function updateContextPreview() {
+    let lang = document.getElementById('chat-lang-select').value;
+    if (!lang && window.i18n) {
+        lang = window.i18n.getCurrentLang();
+    } else if (!lang) {
+        lang = 'fr';
+    }
+    
+    let text = '';
+    try {
+        const res = await fetch(`/static/i18n/${lang}.json?v=${Date.now()}`);
+        if (res.ok) {
+            const data = await res.json();
+            text = data.chat?.mode_de_reponse || '';
+        }
+    } catch (e) {
+        text = window.t ? window.t('chat.mode_de_reponse') : '';
+    }
+    if (!text) text = '';
+    
+    // Remplacement factice pour l'aperçu
+    const dt = new Date().toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US');
+    text = text.replace('{datetime}', dt);
+    text = text.replace('{lang}', lang.toUpperCase());
+    text = text.replace('{rules_list}', _previewRulesStr);
+    
+    document.getElementById('chat-context-preview').textContent = text;
+}
+
+let _previewRulesStr = '- [Aucune règle configurée]';
+
+async function openChatSettings() {
+    const modal = document.getElementById('chat-settings-modal');
+    
+    try {
+        const res = await apiFetch('/chat/api/settings');
+        document.getElementById('chat-lang-select').value = res.chat_lang || '';
+        _previewRulesStr = res.rules_list_str || '- [Aucune règle configurée]';
+        
+        // Mettre à jour l'aperçu du contexte avec la langue sélectionnée
+        await updateContextPreview();
+        
+        if (!res.chat_system_prompt) {
+            resetChatPrompt(false); // charge le defaut sans auto-save
+        } else {
+            document.getElementById('chat-system-prompt-input').value = res.chat_system_prompt;
+        }
+        modal.classList.remove('hidden');
+    } catch (e) {
+        alert(e.message);
+    }
+}
+
+function closeChatSettings() {
+    document.getElementById('chat-settings-modal').classList.add('hidden');
+}
+
+function markChatSettingsDirty() {
+    const input = document.getElementById('chat-system-prompt-input');
+    input.style.borderColor = 'var(--accent)';
+    
+    clearTimeout(_chatSettingsTimeout);
+    _chatSettingsTimeout = setTimeout(() => {
+        saveChatSettings(false);
+    }, 1000);
+}
+
+async function saveChatSettings(closeModal = false) {
+    const lang = document.getElementById('chat-lang-select').value;
+    const input = document.getElementById('chat-system-prompt-input');
+    const prompt = input.value;
+    
+    try {
+        await apiFetch('/chat/api/settings', {
+            method: 'POST',
+            body: { chat_lang: lang, chat_system_prompt: prompt }
+        });
+        
+        input.style.borderColor = 'var(--success)';
+        input.style.boxShadow = '0 0 8px rgba(81, 207, 102, 0.4)';
+        setTimeout(() => {
+            input.style.borderColor = '';
+            input.style.boxShadow = '';
+        }, 1500);
+        
+        if (closeModal) {
+            closeChatSettings();
+        }
+    } catch (e) {
+        alert(e.message);
+    }
+}
+
+function resetChatPrompt(autoSave = true) {
+    const lang = document.getElementById('chat-lang-select').value || (window.i18n ? window.i18n.currentLang : 'fr');
+    let defaultPrompt = "Tu es un expert DevOps francophone. Réponds en français de manière directe et concise.";
+    if (lang === 'en') {
+        defaultPrompt = "You are an English-speaking DevOps expert. Answer in English directly and concisely.";
+    }
+    document.getElementById('chat-system-prompt-input').value = defaultPrompt;
+    if (autoSave) {
+        markChatSettingsDirty();
+    }
+}
+
+async function translateChatPrompt() {
+    const prompt = document.getElementById('chat-system-prompt-input').value;
+    let lang = document.getElementById('chat-lang-select').value || (window.i18n ? window.i18n.currentLang : 'fr');
+    if (!prompt) return;
+    
+    const targetLang = lang === 'en' ? 'en' : 'fr';
+    const btn = document.querySelector('[onclick="translateChatPrompt()"]');
+    const origText = btn.innerHTML;
+    btn.innerHTML = window.t ? window.t('common.loading') : '...';
+    btn.disabled = true;
+    
+    try {
+        const res = await apiFetch('/chat/api/translate-prompt', {
+            method: 'POST',
+            body: { prompt: prompt, lang: targetLang }
+        });
+        if (res.translated) {
+            document.getElementById('chat-system-prompt-input').value = res.translated;
+            markChatSettingsDirty();
+        }
+    } catch (e) {
+        alert(e.message);
+    } finally {
+        btn.innerHTML = origText;
+        btn.disabled = false;
     }
 }
 

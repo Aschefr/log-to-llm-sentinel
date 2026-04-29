@@ -190,7 +190,18 @@
         "label_context": "Analyse attachée",
         "regenerate": "Régénérer",
         "edit_resend": "Modifier et renvoyer",
-        "label_ollama": "Ollama"
+        "label_ollama": "Ollama",
+        "settings_title": "Paramètres du Chat",
+        "lang_select": "Langue des requêtes (Chat)",
+        "lang_site_default": "Par défaut (Langue du site)",
+        "system_prompt": "Prompt système",
+        "btn_translate": "Traduire auto.",
+        "btn_reset": "Réinitialiser",
+        "btn_save": "Enregistrer",
+        "btn_cancel": "Annuler",
+        "context_preview_title": "Contexte auto-ajouté (Aperçu)",
+        "settings_btn": "Paramètres ⚙️",
+        "mode_de_reponse": "=== Contexte Automatique ===\nDate et heure actuelles : {datetime}\nLangue de réponse : {lang}\n\nLa plateforme de chat fait partie d'un environnement d'analyse de fichiers de log choisis par l'utilisateur.\nA titre informatif, voici les règles et fichiers surveillés :\n{rules_list}\n\n=== Mode de réponse (IMPORTANT) ===\nRéponds de manière directe, sans fioritures ni explications approfondies à moins que l'utilisateur ne le demande."
     },
     "config": {
         "title": "Configuration Globale",

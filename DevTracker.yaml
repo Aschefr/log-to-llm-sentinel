@@ -210,7 +210,7 @@ chat:
 
   - id: CHAT-08
     name: "Chat settings modal"
-    status: TODO
+    status: DONE
     effort: XL
     priority: P2
     subtasks:
