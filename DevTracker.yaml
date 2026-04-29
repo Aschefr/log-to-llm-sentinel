@@ -24,6 +24,16 @@ global_rules:
     rule: "Preserve existing visual style: badges, colors, fonts."
   - id: G-06
     rule: "Auto-refresh individual elements. No F5 needed."
+  - id: G-07
+    rule: |
+      NEVER use PowerShell Set-Content / Get-Content to modify i18n JSON files.
+      PowerShell reads UTF-8 files as Windows-1252 by default → double-encodes accented chars.
+      ALWAYS use Python with encoding='utf-8-sig' (fr.json has BOM).
+      Repair tool: scratch/fix_i18n.py — run it, then docker compose restart sentinel.
+      Example safe write:
+        with open('static/i18n/fr.json', 'r', encoding='utf-8-sig') as f: content = f.read()
+        # ... modify content ...
+        with open('static/i18n/fr.json', 'w', encoding='utf-8-sig', newline='') as f: f.write(content)
 
 # ─────────────────────────────────────────────
 # INFRASTRUCTURE / BACKEND
