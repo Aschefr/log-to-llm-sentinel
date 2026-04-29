@@ -89,6 +89,8 @@ class GlobalConfig(Base):
     monitor_log_lines = Column(Integer, default=60)
     debug_mode = Column(Boolean, default=False)
     ollama_prompt_lang = Column(String, default='fr')  # 'fr' | 'en' — langue des prompts d'analyse
+    auto_delete_analyses = Column(Boolean, default=False)
+    auto_delete_retention_days = Column(Integer, default=30)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 class ChatConversation(Base):

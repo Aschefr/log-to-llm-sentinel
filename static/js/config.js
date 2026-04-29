@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupAppriseTags();
     setupModelPulling();
     setupNotificationMethodToggle();
+    setupMaintenance();
 });
 
 function setupNotificationMethodToggle() {
@@ -161,8 +162,29 @@ async function loadConfig() {
             debugEl.checked = config.debug_mode === true;
             toggleLogsContainer(debugEl.checked);
         }
+
+        const autoDeleteEl = document.getElementById('auto-delete-analyses');
+        if (autoDeleteEl) autoDeleteEl.checked = config.auto_delete_analyses === true;
+        
+        const retentionDays = config.auto_delete_retention_days || 30;
+        const retentionSelect = document.getElementById('retention-period');
+        const retentionCustom = document.getElementById('retention-days-custom');
+        if (retentionSelect && retentionCustom) {
+            const standardValues = ['7', '30', '180', '365'];
+            if (standardValues.includes(retentionDays.toString())) {
+                retentionSelect.value = retentionDays.toString();
+                retentionCustom.classList.add('hidden');
+            } else {
+                retentionSelect.value = 'custom';
+                retentionCustom.value = retentionDays;
+                retentionCustom.classList.remove('hidden');
+            }
+        }
+
         updateNotificationVisibility();
         window.__configLoaded = true;
+        
+        fetchMaintenanceStats();
     } catch (error) {
         console.error('Erreur chargement config:', error);
     }
@@ -578,7 +600,16 @@ async function saveConfig(messageEl, isAutoSave = false) {
         ollama_ctx: parseInt(document.getElementById('ollama-ctx').value) || 4096,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
         ollama_prompt_lang: (document.getElementById('ollama-prompt-lang') || {}).value || 'fr',
+        auto_delete_analyses: document.getElementById('auto-delete-analyses') ? document.getElementById('auto-delete-analyses').checked : false,
     };
+
+    const retSelect = document.getElementById('retention-period');
+    const retCustom = document.getElementById('retention-days-custom');
+    if (retSelect && retSelect.value === 'custom') {
+        data.auto_delete_retention_days = parseInt(retCustom.value) || 30;
+    } else if (retSelect) {
+        data.auto_delete_retention_days = parseInt(retSelect.value) || 30;
+    }
 
     const pwd = document.getElementById('smtp-password').value;
     if (pwd) data.smtp_password = pwd;
@@ -655,5 +686,71 @@ window.setAppriseMax = (val) => {
         input.value = val;
         // Trigger save if auto-save is enabled
         input.dispatchEvent(new Event('input'));
+    }
+}
+
+function setupMaintenance() {
+    const retentionSelect = document.getElementById('retention-period');
+    const retentionCustom = document.getElementById('retention-days-custom');
+    
+    if (retentionSelect && retentionCustom) {
+        retentionSelect.addEventListener('change', () => {
+            if (retentionSelect.value === 'custom') {
+                retentionCustom.classList.remove('hidden');
+                retentionCustom.focus();
+            } else {
+                retentionCustom.classList.add('hidden');
+            }
+            // Trigger auto-save on select change
+            retentionSelect.dispatchEvent(new Event('input'));
+        });
+    }
+
+    const cleanupBtn = document.getElementById('cleanup-btn');
+    if (cleanupBtn) {
+        cleanupBtn.addEventListener('click', async () => {
+            if (!confirm(window.t ? window.t('config.cleanup_confirm') : 'Êtes-vous sûr de vouloir supprimer définitivement ces données ?')) return;
+            cleanupBtn.disabled = true;
+            try {
+                const res = await apiFetch('/api/config/maintenance/cleanup', { method: 'DELETE' });
+                alert(res.detail || 'Nettoyage terminé.');
+                fetchMaintenanceStats();
+            } catch (e) {
+                alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
+                cleanupBtn.disabled = false;
+            }
+        });
+    }
+}
+
+async function fetchMaintenanceStats() {
+    const usageVal = document.getElementById('disk-usage-val');
+    const statsContainer = document.getElementById('cleanup-stats-container');
+    const daysVal = document.getElementById('cleanup-days-val');
+    const countVal = document.getElementById('cleanup-count-val');
+    const cleanupBtn = document.getElementById('cleanup-btn');
+    
+    if (!usageVal) return;
+    
+    try {
+        const res = await apiFetch('/api/config/maintenance/stats');
+        
+        const mb = (res.size_bytes / (1024 * 1024)).toFixed(2);
+        usageVal.textContent = `${mb} MB`;
+        
+        if (statsContainer && daysVal && countVal && cleanupBtn) {
+            daysVal.textContent = res.retention_days;
+            countVal.textContent = res.total_old_items;
+            
+            if (res.total_old_items > 0) {
+                statsContainer.classList.remove('hidden');
+                cleanupBtn.disabled = false;
+            } else {
+                statsContainer.classList.add('hidden');
+                cleanupBtn.disabled = true;
+            }
+        }
+    } catch (e) {
+        usageVal.textContent = 'Erreur';
     }
 }

@@ -347,20 +347,20 @@ config:
 
   - id: CFG-04
     name: "Maintenance section in 'Interface & Monitor' panel"
-    status: TODO
+    status: DONE
     effort: L
     priority: P2
     subtasks:
       - id: CFG-04a
         name: "Disk usage display (app data size)"
-        effort: M
+        status: DONE
       - id: CFG-04b
         name: "Auto-delete old analyses (slider on/off + dropdown period)"
-        effort: L
+        status: DONE
         notes: "Periods: 1 week, 1 month, 6 months, 1 year, Custom..."
       - id: CFG-04c
         name: "'Custom...' period shows custom input field"
-        effort: S
+        status: DONE
       - id: CFG-04d
         name: "Cleanup unused data button (show found items, user validates)"
-        effort: M
+        status: DONE

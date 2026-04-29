@@ -40,7 +40,8 @@ def init_db():
         "ALTER TABLE rules ADD COLUMN last_learning_session_id INTEGER DEFAULT NULL",
         "ALTER TABLE global_config ADD COLUMN ollama_prompt_lang VARCHAR DEFAULT 'fr'",
         "ALTER TABLE rules ADD COLUMN excluded_patterns_json TEXT DEFAULT '[]'",
-
+        "ALTER TABLE global_config ADD COLUMN auto_delete_analyses BOOLEAN DEFAULT 0",
+        "ALTER TABLE global_config ADD COLUMN auto_delete_retention_days INTEGER DEFAULT 30",
     ]
     with engine.connect() as conn:
         for sql in migrations:

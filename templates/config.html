@@ -237,6 +237,52 @@
                 <input type="number" id="monitor-log-lines" value="60" min="10" max="1000">
                 <div class="form-hint" data-i18n="config.monitor_lines_hint">Définit le nombre de lignes à afficher en temps réel dans la page Monitor.</div>
             </div>
+
+            <div class="collapsible-section" style="margin-top: 1.5rem;">
+                <div class="section-header" onclick="toggleSection('maintenance-container', 'maintenance-arrow')">
+                    <h3 style="margin: 0;"><span aria-hidden="true">🧹 </span><span data-i18n="config.maintenance_title">Maintenance &amp; Stockage</span></h3>
+                    <svg id="maintenance-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
+                </div>
+                <div id="maintenance-container" class="config-subsection hidden">
+                    <div class="form-group checkbox-group" style="margin-bottom: 1rem;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="auto-delete-analyses">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label" data-i18n="config.auto_delete_analyses">Suppression automatique des anciennes données</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-group" id="retention-period-group" style="margin-bottom: 1.5rem;">
+                        <label for="retention-period" data-i18n="config.retention_period">Période de conservation</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <select id="retention-period" style="flex: 1;">
+                                <option value="7" data-i18n="config.retention_1w">1 semaine</option>
+                                <option value="30" selected data-i18n="config.retention_1m">1 mois</option>
+                                <option value="180" data-i18n="config.retention_6m">6 mois</option>
+                                <option value="365" data-i18n="config.retention_1y">1 an</option>
+                                <option value="custom" data-i18n="config.retention_custom">Personnalisé...</option>
+                            </select>
+                            <input type="number" id="retention-days-custom" class="hidden" min="1" max="3650" placeholder="Jours" style="width: 100px;">
+                        </div>
+                    </div>
+
+                    <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 0.9rem;" data-i18n="config.disk_usage_title">Espace Disque (Dossier Data)</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <span style="font-size: 1.25rem; font-weight: 600;" id="disk-usage-val">...</span>
+                        </div>
+                        
+                        <div id="cleanup-stats-container" class="hidden" style="margin-bottom: 1rem; font-size: 0.85rem; color: var(--text-dim);">
+                            <span data-i18n="config.found_old_items">Éléments anciens trouvés (> <span id="cleanup-days-val">30</span> jours) : </span>
+                            <strong id="cleanup-count-val" style="color: var(--text-main);">0</strong>
+                        </div>
+
+                        <button type="button" id="cleanup-btn" class="btn btn-secondary btn-sm" style="width: 100%;">
+                            <span aria-hidden="true">🗑️ </span><span data-i18n="config.cleanup_btn">Nettoyer maintenant</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <section class="config-section config-section-full">
@@ -288,5 +334,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=2"></script>
+<script src="/static/js/config.js?v=3"></script>
 {% endblock %}

@@ -81,6 +81,8 @@ class ConfigUpdate(BaseModel):
     monitor_log_lines: Optional[int] = None
     debug_mode: Optional[bool] = None
     ollama_prompt_lang: Optional[str] = None  # 'fr' | 'en'
+    auto_delete_analyses: Optional[bool] = None
+    auto_delete_retention_days: Optional[int] = None
 
 
 @router.get("")
@@ -114,6 +116,8 @@ def get_config():
             "monitor_log_lines": config.monitor_log_lines,
             "debug_mode": config.debug_mode,
             "ollama_prompt_lang": config.ollama_prompt_lang or 'fr',
+            "auto_delete_analyses": config.auto_delete_analyses,
+            "auto_delete_retention_days": config.auto_delete_retention_days,
         }
     finally:
         db.close()
@@ -173,6 +177,10 @@ def update_config(config_data: ConfigUpdate):
             config.debug_mode = config_data.debug_mode
         if config_data.ollama_prompt_lang is not None:
             config.ollama_prompt_lang = config_data.ollama_prompt_lang
+        if config_data.auto_delete_analyses is not None:
+            config.auto_delete_analyses = config_data.auto_delete_analyses
+        if config_data.auto_delete_retention_days is not None:
+            config.auto_delete_retention_days = config_data.auto_delete_retention_days
 
         db.commit()
         return {"message": "Configuration mise à jour"}
@@ -200,6 +208,8 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
         "monitor_log_lines": config.monitor_log_lines if config else 60,
         "debug_mode": config.debug_mode if config else False,
         "ollama_prompt_lang": (config.ollama_prompt_lang or 'fr') if config else 'fr',
+        "auto_delete_analyses": config.auto_delete_analyses if config else False,
+        "auto_delete_retention_days": config.auto_delete_retention_days if config else 30,
     }
 
 
@@ -450,3 +460,90 @@ def clear_ollama_debug_logs():
     from app.logger import clear_ollama_logs
     clear_ollama_logs()
     return {"message": "Logs Ollama effacés"}
+
+
+@router.get("/maintenance/stats")
+def get_maintenance_stats():
+    import os
+    from app.models import Analysis, ChatConversation, MetaAnalysisResult, KeywordLearningSession
+    from datetime import datetime, timedelta
+
+    db = SessionLocal()
+    try:
+        config = db.query(GlobalConfig).first()
+        retention_days = config.auto_delete_retention_days if config else 30
+        threshold_date = datetime.utcnow() - timedelta(days=retention_days)
+
+        # Taille dossier data
+        data_dir = "./data/"
+        total_size_bytes = 0
+        if os.path.exists(data_dir):
+            for dirpath, _, filenames in os.walk(data_dir):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    if not os.path.islink(fp):
+                        total_size_bytes += os.path.getsize(fp)
+
+        # Stats BDD (old items)
+        old_analyses_count = db.query(Analysis).filter(Analysis.analyzed_at < threshold_date).count()
+        # Find old chats
+        old_chats_count = db.query(ChatConversation).filter(ChatConversation.created_at < threshold_date).count()
+        old_meta_count = db.query(MetaAnalysisResult).filter(MetaAnalysisResult.created_at < threshold_date).count()
+        old_sessions_count = db.query(KeywordLearningSession).filter(KeywordLearningSession.created_at < threshold_date).count()
+
+        total_old_items = old_analyses_count + old_chats_count + old_meta_count + old_sessions_count
+
+        return {
+            "size_bytes": total_size_bytes,
+            "retention_days": retention_days,
+            "old_analyses": old_analyses_count,
+            "old_chats": old_chats_count,
+            "old_meta": old_meta_count,
+            "old_sessions": old_sessions_count,
+            "total_old_items": total_old_items
+        }
+    finally:
+        db.close()
+
+
+@router.delete("/maintenance/cleanup")
+def cleanup_maintenance_data():
+    from app.models import Analysis, ChatConversation, ChatMessage, MetaAnalysisResult, KeywordLearningSession
+    from datetime import datetime, timedelta
+
+    db = SessionLocal()
+    try:
+        config = db.query(GlobalConfig).first()
+        retention_days = config.auto_delete_retention_days if config else 30
+        threshold_date = datetime.utcnow() - timedelta(days=retention_days)
+
+        # Delete old chat messages and conversations
+        old_chats = db.query(ChatConversation).filter(ChatConversation.created_at < threshold_date).all()
+        for chat in old_chats:
+            db.query(ChatMessage).filter(ChatMessage.conversation_id == chat.id).delete()
+            db.delete(chat)
+
+        # Delete old analyses
+        deleted_analyses = db.query(Analysis).filter(Analysis.analyzed_at < threshold_date).delete()
+
+        # Delete old meta results
+        deleted_meta = db.query(MetaAnalysisResult).filter(MetaAnalysisResult.created_at < threshold_date).delete()
+
+        # Delete old keyword sessions
+        deleted_sessions = db.query(KeywordLearningSession).filter(KeywordLearningSession.created_at < threshold_date).delete()
+
+        db.commit()
+
+        return {
+            "ok": True,
+            "detail": "Nettoyage terminé.",
+            "deleted_analyses": deleted_analyses,
+            "deleted_meta": deleted_meta,
+            "deleted_sessions": deleted_sessions
+        }
+    except Exception as e:
+        db.rollback()
+        logger.error("ConfigRouter", f"Erreur nettoyage: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
