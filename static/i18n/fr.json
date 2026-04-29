@@ -168,7 +168,8 @@
         "show_more": "Afficher plus",
         "no_more_analyses": "Pas d'autres analyses",
         "autolearn_title": "Auto-apprentissage",
-        "edit_rule": "Modifier la règle"
+        "edit_rule": "Modifier la règle",
+        "delete_rule_confirm": "Êtes-vous sûr de vouloir supprimer cette règle ? Cela supprimera également les analyses associées."
     },
     "chat": {
         "title": "Centre d'Analyse IA",

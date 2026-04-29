@@ -134,6 +134,33 @@ function selectTab(ruleId) {
     startPolling(rule);
 }
 
+async function deleteRule(ruleId, btnElement) {
+    showInlineConfirm(btnElement, window.t ? window.t('monitor.delete_rule_confirm') : 'Are you sure you want to delete this rule?', async () => {
+        try {
+            await apiFetch(`/api/rules/${ruleId}`, { method: 'DELETE' });
+            // After deletion, select the first available rule or none
+            sessionStorage.removeItem('sentinel_monitor_tab');
+            activeRuleId = null;
+            loadMonitorRules();
+        } catch (e) {
+            alert((window.t ? window.t('common.error') : 'Error') + ': ' + e.message);
+        }
+    });
+}
+
+// Global deleteAnalysis for Monitor page (used by renderAnalysisCard)
+async function deleteAnalysis(id, btnElement) {
+    showInlineConfirm(btnElement, window.t ? window.t('common.confirm_delete_analysis') : 'Are you sure you want to delete this analysis?', async () => {
+        try {
+            await apiFetch(`/api/dashboard/analyses/${id}`, { method: 'DELETE' });
+            const card = document.getElementById(`analysis-card-${id}`);
+            if (card) card.remove();
+        } catch (e) {
+            alert((window.t ? window.t('common.error') : 'Error') + ': ' + e.message);
+        }
+    });
+}
+
 // ─── Rendu du contenu de l'onglet ─────────────────────────────────────────
 
 function renderTabContent(rule) {
@@ -161,7 +188,10 @@ function renderTabContent(rule) {
                 <div><span class="info-label">⏱ Anti-spam</span>${rule.anti_spam_delay}s</div>
                 <div><span class="info-label">🔔 ${window.t('monitor.severity')}</span>${rule.notify_severity_threshold}</div>
                 </div>
-                <button class="btn btn-secondary btn-sm" onclick="editRule(${rule.id})" title="${window.t ? window.t('common.edit') : 'Edit'}">✏️ ${window.t ? window.t('monitor.edit_rule') : 'Edit rule'}</button>
+                <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                    <button class="btn btn-secondary btn-sm" onclick="editRule(${rule.id})" title="${window.t ? window.t('common.edit') : 'Edit'}">✏️ ${window.t ? window.t('monitor.edit_rule') : 'Edit rule'}</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id}, this)" title="${window.t ? window.t('common.delete') : 'Delete'}">🗑️ ${window.t ? window.t('common.delete') : 'Delete'}</button>
+                </div>
             </div>
         </div>
 

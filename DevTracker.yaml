@@ -34,6 +34,8 @@ global_rules:
         with open('static/i18n/fr.json', 'r', encoding='utf-8-sig') as f: content = f.read()
         # ... modify content ...
         with open('static/i18n/fr.json', 'w', encoding='utf-8-sig', newline='') as f: f.write(content)
+  - id: G-08
+    rule: "NEVER use the native window.confirm() box. ALWAYS use the custom UI modal `showInlineConfirm(btnElement, message, callback)` from common.js for any user confirmation."
 
 # ─────────────────────────────────────────────
 # INFRASTRUCTURE / BACKEND
@@ -306,6 +308,13 @@ monitor:
       - "Limit 20 visible by default"
       - "'Show more' button loads 20 previous"
 
+  - id: MON-13
+    name: "Use custom UI confirm modal for delete buttons"
+    status: DONE
+    effort: S
+    priority: P2
+    notes: "Replace window.confirm() with the app's custom confirmation box for rule/analysis deletion in Monitor."
+
 # ─────────────────────────────────────────────
 # META-ANALYSIS
 # ─────────────────────────────────────────────
@@ -314,6 +323,17 @@ meta_analysis:
     name: "Meta-analysis engine (config, preview, trigger, results, notify)"
     status: DONE
     files: [app/services/meta_service.py, static/js/meta.js, templates/meta.html, app/routers/meta_analysis.py]
+
+# ─────────────────────────────────────────────
+# AUTO-LEARNING
+# ─────────────────────────────────────────────
+auto_learning:
+  - id: AL-01
+    name: "AI-suggested exclusion patterns during auto-learning"
+    status: TODO
+    effort: L
+    priority: P2
+    notes: "AI should propose noise patterns to exclude, not just positive keywords."
 
 # ─────────────────────────────────────────────
 # RULES PAGE

@@ -501,7 +501,7 @@ async function loadResultsForConfig(configId) {
                     <span style="font-size:0.85rem; color:var(--text-secondary);">${created}</span>
                     <div style="display:flex; gap:0.4rem; flex-wrap:wrap; justify-content:flex-end;">
                         <button class="btn btn-primary btn-sm" onclick="metaResultDeepen(${r.id}, ${r.config_id})">💬 ${window.t('common.deepen')}</button>
-                        <button class="btn btn-secondary btn-sm" onclick="metaResultNotify(${r.id})">🔔 ${window.t('monitor.notify')}</button>
+                        <button class="btn btn-secondary btn-sm" onclick="metaResultNotify(${r.id})">🔔 ${window.t('common.notify')}</button>
                         <button class="btn btn-secondary btn-sm" onclick="metaResultDelete(${r.id}, ${configId}, this)" style="color:var(--danger); border-color:var(--danger);">🗑️ ${window.t('common.delete')}</button>
                     </div>
                 </div>
@@ -557,7 +557,7 @@ async function metaResultNotify(resultId) {
         btn.textContent = '⏳ ' + (window.t('common.sending') || '⏳ Envoi...');
         await apiFetch(`/api/meta-analysis/results/${resultId}/notify`, { method: 'POST' });
         btn.textContent = '✅ ' + (window.t('common.sent') || 'Envoyé');
-        setTimeout(() => btn.textContent = `🔔 ${window.t('monitor.notify')}`, 3000);
+        setTimeout(() => btn.textContent = `🔔 ${window.t('common.notify')}`, 3000);
     } catch(e) {
         alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
     }

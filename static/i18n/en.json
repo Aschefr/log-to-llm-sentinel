@@ -168,7 +168,8 @@
         "show_more": "Show more",
         "no_more_analyses": "No more analyses",
         "autolearn_title": "Auto-learning",
-        "edit_rule": "Edit rule"
+        "edit_rule": "Edit rule",
+        "delete_rule_confirm": "Are you sure you want to delete this rule? This will also remove associated analyses."
     },
     "chat": {
         "title": "AI Analysis Center",
