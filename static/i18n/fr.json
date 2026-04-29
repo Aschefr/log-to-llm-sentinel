@@ -2,7 +2,7 @@
   "_meta": {
     "lang": "fr",
     "name": "Français",
-    "flag": "ðŸ‡«ðŸ‡·"
+    "flag": "🇫🇷"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -112,7 +112,7 @@
   },
   "monitor": {
     "title": "Monitor",
-    "search_placeholder": "ðŸ” Rechercher par ID de détection...",
+    "search_placeholder": "🔍 Rechercher par ID de détection...",
     "search_btn": "Rechercher",
     "triggered_line": "Ligne déclenchante",
     "llm_response": "Réponse LLM",
@@ -163,7 +163,12 @@
     "recent_analyses_llm": "Analyses récentes (LLM)",
     "statistics_filter": "Statistiques (Filtrer)",
     "file_label": "Fichier",
-    "all_filter": "Tout voir"
+    "all_filter": "Tout voir",
+    "add_rule": "Ajouter une règle",
+    "show_more": "Afficher plus",
+    "no_more_analyses": "Pas d'autres analyses",
+    "autolearn_title": "Auto-apprentissage",
+    "edit_rule": "Modifier la règle"
   },
   "chat": {
     "title": "Centre d'Analyse IA",
@@ -253,8 +258,8 @@
     "filter_all": "Tous",
     "clear_logs": "Effacer",
     "ollama_call_detail": "Détail des appels Ollama (Prompt/Réponse)",
-    "autre_option": "Autreâ€¦",
-    "other_manual": "Autre (saisie manuelle)â€¦",
+    "autre_option": "Autre…",
+    "other_manual": "Autre (saisie manuelle)…",
     "model_download_start": "Démarrage du téléchargement de",
     "model_download_success": "Modèle téléchargé avec succès !",
     "enter_model_name": "Veuillez saisir un nom de modèle",
@@ -332,7 +337,7 @@
     "ctx_massive": "32768 (Massif - Attention RAM)",
     "accordion_preview": "Aperçu des données en attente",
     "accordion_results": "Résultats Historiques",
-    "preview_help": "Vous pouvez visualiser, annoter ou supprimer des lignes du contexte avant de lancer lâ€™analyse manuellement.",
+    "preview_help": "Vous pouvez visualiser, annoter ou supprimer des lignes du contexte avant de lancer l’analyse manuellement.",
     "run_custom": "Lancer avec ce contexte édité",
     "no_configs": "Aucune configuration.",
     "no_results": "Aucun résultat historique.",
@@ -344,7 +349,7 @@
     "sources": "Analyses sources :",
     "keywords_label": "Mots-clés déclencheurs :",
     "schedule_planning": "Planification",
-    "max_analyses_label": "Limite dâ€™analyses incluses",
+    "max_analyses_label": "Limite d’analyses incluses",
     "context_size_label": "Taille du contexte (tokens)",
     "placeholder_name": "Ex : Synthèse Journalière Production",
     "default_prompt": "Tu es un expert DevOps. Analyse ces événements et fais une synthèse globale de la situation du service.",
@@ -384,12 +389,12 @@
     "period_local_hint": "(heure locale)",
     "granularity_label": "Granularité (taille d'un paquet)",
     "granularity_suggestion": "(suggestion : {label})",
-    "packets_estimate": "â‰ˆ {n} paquet(s) à traiter",
+    "packets_estimate": "≈ {n} paquet(s) à traiter",
     "limit_loading": "Limite par paquet : récupérationâ€¦",
     "limit_hint": "Limite par paquet : {max} caractères (config globale)",
     "limit_default": "Limite par paquet : 5 000 caractères (défaut)",
     "launch_btn": "Lancer l'analyse",
-    "launch_saving": "Enregistrementâ€¦",
+    "launch_saving": "Enregistrement…",
     "launch_starting": "Démarrageâ€¦",
     "launch_full": "Auto-apprentissage : Lancer l'analyse",
     "revert_btn": "Annuler les changements",
@@ -398,14 +403,15 @@
     "error_save": "Erreur lors de la sauvegarde de la règle : ",
     "error_start": "Erreur lors du lancement de la session : ",
     "card_pending": "En attente de démarrageâ€¦",
-    "card_scanning": "Scan â€” {done}/{total} paquets ({pct}%)",
-    "card_refining": "Raffinement IA en coursâ€¦",
+    "card_scanning": "Scan — {done}/{total} paquets ({pct}%)",
+    "card_refining": "Raffinement IA en cours…",
     "card_validated": "Apprentissage terminé",
     "card_reverted": "Annulé â€” mots-clés restaurés",
     "card_error": "Erreur : {msg}",
     "update_params": "Mettre à jour les paramètres",
     "start_locked": "Date de début verrouillée (session en cours)",
     "progress_label": "Progression : {done}/{total} paquets ({pct}%)",
-    "resume_info": "L'analyse est en cours. Vous pouvez modifier la date de fin ou la granularité."
+    "resume_info": "L'analyse est en cours. Vous pouvez modifier la date de fin ou la granularité.",
+    "stop_btn": "Arrêter"
   }
 }

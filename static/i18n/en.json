@@ -1,4 +1,4 @@
-{
+﻿{
   "_meta": {
     "lang": "en",
     "name": "English",
@@ -163,7 +163,12 @@
     "recent_analyses_llm": "Recent Analyses (LLM)",
     "statistics_filter": "Statistics (Filter)",
     "file_label": "File",
-    "all_filter": "All"
+    "all_filter": "All",
+    "add_rule": "Add rule",
+    "show_more": "Show more",
+    "no_more_analyses": "No more analyses",
+    "autolearn_title": "Auto-learning",
+    "edit_rule": "Edit rule"
   },
   "chat": {
     "title": "AI Analysis Center",
@@ -406,6 +411,7 @@
     "update_params": "Update Parameters",
     "start_locked": "Start date locked (session in progress)",
     "progress_label": "Progress: {done}/{total} packets ({pct}%)",
-    "resume_info": "Analysis is in progress. You can modify the end date or granularity."
+    "resume_info": "Analysis is in progress. You can modify the end date or granularity.",
+    "stop_btn": "Stop"
   }
 }

@@ -25,9 +25,14 @@
     <!-- Contenu de l'onglet actif -->
     <div id="monitor-tab-content" class="monitor-tab-content"></div>
 </div>
+
+<!-- Modal ajout/édition de règle (shared partial) -->
+{% include '_rule_modal.html' %}
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/monitor.js?v=3"></script>
+<script src="/static/js/rule_modal.js?v=1"></script>
+<script src="/static/js/keyword_wizard.js?v=7"></script>
+<script src="/static/js/monitor.js?v=4"></script>
 
 {% endblock %}

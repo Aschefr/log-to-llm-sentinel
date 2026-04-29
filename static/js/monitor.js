@@ -7,13 +7,19 @@ let monitorLogLines = 60;
 let activeRuleId = null;
 let tailIntervals = {};
 let bufferIntervals = {};
+let analysisIntervals = {};
 let isFrozen = false;
 let frozenContent = null;
 let selectedLineText = null;
 let activeKeywordFilter = null;
 let autoOpenLine = false;
+let monitorAnalysesOffset = 0;
+let monitorAnalysesSeverity = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Setup shared rule modal (MON-09)
+    setupRuleModal({ onSave: loadMonitorRules });
+
     loadMonitorRules();
 
     window.i18n?.onLanguageChange(() => {
@@ -50,7 +56,6 @@ async function loadMonitorRules() {
         monitorLogLines = res.monitor_log_lines || 60;
         
         renderTabs();
-        renderTabs();
         if (monitorRules.length > 0) {
             const urlParams = new URLSearchParams(window.location.search);
             const ruleParam = urlParams.get('rule');
@@ -66,7 +71,7 @@ async function loadMonitorRules() {
             selectTab(ruleToSelect);
         } else {
             document.getElementById('monitor-tab-content').innerHTML =
-                `<div class="loading">${window.t ? window.t('monitor.no_active_rules') : 'No active rules.'} <a href="/rules">${window.t ? window.t('monitor.create_rule') : 'Create a rule'}</a></div>`;
+                `<div class="loading">${window.t ? window.t('monitor.no_active_rules') : 'No active rules.'} <a href="javascript:void(0)" onclick="openAddRuleModal()">${window.t ? window.t('monitor.create_rule') : 'Create a rule'}</a></div>`;
         }
     } catch (e) {
         document.getElementById('monitor-tabs').innerHTML =
@@ -80,7 +85,16 @@ function renderTabs() {
         <button class="monitor-tab" id="tab-${r.id}" onclick="selectTab(${r.id})">
             ${escapeHtml(r.name)}
         </button>
-    `).join('');
+    `).join('') + `
+        <button class="monitor-tab monitor-tab-add" onclick="openAddRuleModal()" title="${window.t ? window.t('monitor.add_rule') : 'Add rule'}">
+            +
+        </button>
+    `;
+}
+
+function openAddRuleModal() {
+    resetForm();
+    document.getElementById('rule-modal').classList.remove('hidden');
 }
 
 function selectTab(ruleId) {
@@ -123,11 +137,14 @@ function selectTab(ruleId) {
 // ─── Rendu du contenu de l'onglet ─────────────────────────────────────────
 
 function renderTabContent(rule) {
+    monitorAnalysesOffset = 0;
+    monitorAnalysesSeverity = null;
     const kwList = rule.keywords.join(', ') || window.t('common.na');
     document.getElementById('monitor-tab-content').innerHTML = `
         <!-- Paramètres de la règle -->
         <div class="monitor-rule-info">
-            <div class="rule-info-grid">
+            <div class="monitor-rule-info-header">
+                <div class="rule-info-grid">
                 <div><span class="info-label">📁 ${window.t ? window.t('monitor.file_label') : 'File'}</span><code>${escapeHtml(rule.log_file_path)}</code></div>
                 <div>
                     <span class="info-label">🔑 ${window.t('monitor.keywords')}</span>
@@ -143,17 +160,18 @@ function renderTabContent(rule) {
                 </div>
                 <div><span class="info-label">⏱ Anti-spam</span>${rule.anti_spam_delay}s</div>
                 <div><span class="info-label">🔔 ${window.t('monitor.severity')}</span>${rule.notify_severity_threshold}</div>
-                <div>
-                    <span class="info-label">📊 ${window.t ? window.t('monitor.statistics_filter') : 'Statistics (Filter)'}</span>
-                    <div style="display:flex; gap:0.35rem; flex-wrap:wrap; margin-top:0.35rem;">
-                        <span class="filter-badge" onclick="loadMonitorAnalyses(${rule.id}, null)" title="Total">Total: ${rule.stats?.total || 0}</span>
-                        <span class="filter-badge critical" onclick="loadMonitorAnalyses(${rule.id}, 'critical')">${window.t('dashboard.critical')}: ${rule.stats?.critical || 0}</span>
-                        <span class="filter-badge warning" onclick="loadMonitorAnalyses(${rule.id}, 'warning')">${window.t('dashboard.warning')}: ${rule.stats?.warning || 0}</span>
-                        <span class="filter-badge info" onclick="loadMonitorAnalyses(${rule.id}, 'info')">${window.t('dashboard.info')}: ${rule.stats?.info || 0}</span>
-                    </div>
                 </div>
+                <button class="btn btn-secondary btn-sm" onclick="editRule(${rule.id})" title="${window.t ? window.t('common.edit') : 'Edit'}">✏️ ${window.t ? window.t('monitor.edit_rule') : 'Edit rule'}</button>
             </div>
         </div>
+
+        ${rule.last_learning_session_id ? `
+        <!-- MON-10: Auto-learning status panel -->
+        <div class="monitor-autolearn-panel" id="monitor-autolearn-${rule.id}">
+            <span class="info-label">🤖 ${window.t ? window.t('monitor.autolearn_title') : 'Auto-learning'}</span>
+            <span class="kw-hint" style="opacity:.6">⏳ ${window.t ? window.t('common.loading') : 'Loading...'}</span>
+        </div>
+        ` : ''}
 
         <!-- Buffer anti-spam -->
         <div class="monitor-buffer-status" id="buffer-status-${rule.id}">
@@ -187,18 +205,28 @@ function renderTabContent(rule) {
             <div id="detail-panel-content-${rule.id}"></div>
         </div>
 
-        <!-- Analyses récentes -->
+        <!-- MON-11: Analyses with severity filter badges in header -->
         <div class="monitor-analyses-header" onclick="toggleAnalysesSection(${rule.id})">
             <span class="viewer-title">
                 <span class="viewer-toggle-icon" id="analyses-toggle-icon-${rule.id}">▼</span>
                 <strong>📊 ${window.t ? window.t('monitor.recent_analyses_llm') : 'Recent Analyses (LLM)'}</strong>
             </span>
+            <div class="monitor-analyses-filters" onclick="event.stopPropagation()">
+                <span class="filter-badge ${!monitorAnalysesSeverity ? 'active' : ''}" onclick="filterMonitorAnalyses(${rule.id}, null)">Total: ${rule.stats?.total || 0}</span>
+                <span class="filter-badge critical ${monitorAnalysesSeverity === 'critical' ? 'active' : ''}" onclick="filterMonitorAnalyses(${rule.id}, 'critical')">${window.t('dashboard.critical')}: ${rule.stats?.critical || 0}</span>
+                <span class="filter-badge warning ${monitorAnalysesSeverity === 'warning' ? 'active' : ''}" onclick="filterMonitorAnalyses(${rule.id}, 'warning')">${window.t('dashboard.warning')}: ${rule.stats?.warning || 0}</span>
+                <span class="filter-badge info ${monitorAnalysesSeverity === 'info' ? 'active' : ''}" onclick="filterMonitorAnalyses(${rule.id}, 'info')">${window.t('dashboard.info')}: ${rule.stats?.info || 0}</span>
+            </div>
         </div>
         <div id="monitor-analyses-${rule.id}" class="monitor-analyses-list">
             <div class="loading">${window.t ? window.t('common.loading') : 'Loading...'}</div>
         </div>
     `;
 
+    // MON-10: Load auto-learning status if session exists
+    if (rule.last_learning_session_id) {
+        _loadMonitorAutolearn(rule.id, rule.last_learning_session_id);
+    }
     // Charger les analyses immédiatement
     loadMonitorAnalyses(rule.id);
 }
@@ -217,6 +245,10 @@ function startPolling(rule) {
     fetchBuffer();
     tailIntervals[rule.id] = setInterval(fetchAndRender, 3000);
     bufferIntervals[rule.id] = setInterval(fetchBuffer, 2000);
+    // MON-12: Auto-refresh analyses every 15s
+    analysisIntervals[rule.id] = setInterval(() => {
+        if (!isFrozen) loadMonitorAnalyses(rule.id, monitorAnalysesSeverity, false);
+    }, 15000);
 }
 
 function toggleLogViewer(ruleId) {
@@ -244,8 +276,10 @@ function toggleAnalysesSection(ruleId) {
 function stopAllPolling() {
     Object.values(tailIntervals).forEach(clearInterval);
     Object.values(bufferIntervals).forEach(clearInterval);
+    Object.values(analysisIntervals).forEach(clearInterval);
     tailIntervals = {};
     bufferIntervals = {};
+    analysisIntervals = {};
 }
 
 // ─── Fetch & Rendu des logs ────────────────────────────────────────────────
@@ -564,61 +598,115 @@ function copyViewerContent(ruleId) {
     copyToClipboard(text).then(() => alert(window.t ? window.t('monitor.logs_copied') : 'Logs copied!')).catch(() => {});
 }
 
-// ─── Analyses récentes ─────────────────────────────────────────────────────
+// ─── MON-11: severity filter dispatcher ────────────────────────────────────
+function filterMonitorAnalyses(ruleId, severity) {
+    monitorAnalysesSeverity = severity;
+    monitorAnalysesOffset = 0;
+    loadMonitorAnalyses(ruleId, severity, true);
+}
 
-async function loadMonitorAnalyses(ruleId, severityFilter = null) {
+async function loadMonitorAnalyses(ruleId, severityFilter = null, resetList = true) {
     const container = document.getElementById(`monitor-analyses-${ruleId}`);
     if (!container) return;
 
+    // Use stored severity if called without explicit filter (e.g. from auto-refresh)
+    if (severityFilter === undefined || severityFilter === null) {
+        severityFilter = monitorAnalysesSeverity;
+    }
+
     // Update active badge state
     const tabContent = document.getElementById('monitor-tab-content');
-    const allBadges = tabContent ? tabContent.querySelectorAll('.filter-badge') : [];
-    allBadges.forEach(b => b.classList.remove('active'));
-    const activeBadge = Array.from(allBadges).find(b => {
-        const oc = b.getAttribute('onclick') || '';
-        return severityFilter === null ? oc.includes(', null)') : oc.includes(`'${severityFilter}'`);
-    });
-    if (activeBadge) activeBadge.classList.add('active');
+    const filterArea = tabContent ? tabContent.querySelector('.monitor-analyses-filters') : null;
+    if (filterArea) {
+        filterArea.querySelectorAll('.filter-badge').forEach(b => b.classList.remove('active'));
+        const activeBadge = Array.from(filterArea.querySelectorAll('.filter-badge')).find(b => {
+            const oc = b.getAttribute('onclick') || '';
+            return severityFilter === null ? oc.includes(', null)') : oc.includes(`'${severityFilter}'`);
+        });
+        if (activeBadge) activeBadge.classList.add('active');
+    }
+
+    const offset = resetList ? 0 : monitorAnalysesOffset;
+    if (resetList) monitorAnalysesOffset = 0;
 
     try {
-        let url = `/api/dashboard/recent?limit=20&rule_id=${ruleId}`;
+        let url = `/api/dashboard/recent?limit=20&rule_id=${ruleId}&offset=${offset}`;
         if (severityFilter) {
             url += `&severity=${severityFilter}`;
         }
         
-        const analyses = await apiFetch(url);
-        if (analyses.length === 0) {
+        const res = await apiFetch(url);
+        const analyses = res.analyses || res;
+        const hasMore = res.has_more || false;
+
+        if (analyses.length === 0 && offset === 0) {
             container.innerHTML = `<div class="no-logs">${window.t ? window.t('monitor.no_recent_analyses') : 'No recent analyses'}${severityFilter ? ` (${severityFilter})` : ''}</div>`;
             return;
         }
 
-        container.innerHTML = analyses.map(a => `
-            <div class="monitor-analysis-card">
-                <div class="monitor-analysis-header">
+        const cards = analyses.map((a, idx) => {
+            const isFirst = (offset === 0 && idx === 0);
+            const collapsed = !isFirst;
+            return `
+            <div class="monitor-analysis-card ${collapsed ? 'collapsed' : ''}" id="analysis-card-${a.id}">
+                <div class="monitor-analysis-header" onclick="toggleAnalysisCard(${a.id})" style="cursor:pointer">
+                    <span class="collapse-toggle">${collapsed ? '▶' : '▼'}</span>
                     <span class="detection-id-badge" title="${window.t('monitor.detection_id_title')}">${escapeHtml(a.detection_id || '—')}</span>
                     <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
                     <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                    ${collapsed && a.matched_keywords?.length ? `<span class="analysis-kw-summary">${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')}</span>` : ''}
                 </div>
-                <div class="monitor-analysis-keywords">
-                    ${window.t ? window.t('monitor.kw_label') : 'Keywords:'} ${a.matched_keywords.length > 0
-                        ? a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')
-                        : '<em>N/A</em>'}
-                </div>
-                <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
-                <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
-                <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 ${window.t('common.retry')}</button>
-                        <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 ${window.t('common.notify')}</button>
+                <div class="monitor-analysis-body">
+                    <div class="monitor-analysis-keywords">
+                        ${window.t ? window.t('monitor.kw_label') : 'Keywords:'} ${a.matched_keywords.length > 0
+                            ? a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')
+                            : '<em>N/A</em>'}
                     </div>
-                    <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 ${window.t('common.deepen')}</button>
+                    <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
+                    <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
+                    <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${a.id}, this)">🔄 ${window.t('common.retry')}</button>
+                            <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${a.id}, this)">🔔 ${window.t('common.notify')}</button>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 ${window.t('common.deepen')}</button>
+                    </div>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
+
+        if (resetList) {
+            container.innerHTML = cards;
+        } else {
+            // Append (pagination)
+            const showMoreBtn = container.querySelector('.monitor-show-more');
+            if (showMoreBtn) showMoreBtn.remove();
+            container.insertAdjacentHTML('beforeend', cards);
+        }
+
+        monitorAnalysesOffset = offset + analyses.length;
+
+        // Show more button
+        if (hasMore) {
+            container.insertAdjacentHTML('beforeend', `
+                <button class="btn btn-secondary monitor-show-more" onclick="loadMonitorAnalyses(${ruleId}, ${severityFilter ? `'${severityFilter}'` : 'null'}, false)">
+                    ${window.t ? window.t('monitor.show_more') : 'Show more'}
+                </button>
+            `);
+        }
     } catch (e) {
         container.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</div>`;
     }
 }
+
+function toggleAnalysisCard(analysisId) {
+    const card = document.getElementById(`analysis-card-${analysisId}`);
+    if (!card) return;
+    const isCollapsed = card.classList.toggle('collapsed');
+    const toggle = card.querySelector('.collapse-toggle');
+    if (toggle) toggle.textContent = isCollapsed ? '▶' : '▼';
+}
+
 
 async function retryAnalysis(analysisId, btn) {
     const oldHtml = btn.innerHTML;
@@ -798,4 +886,78 @@ async function notifyAnalysis(analysisId, btn) {
         btn.innerHTML = oldHtml;
         btn.disabled = false;
     }
+}
+
+// ─── MON-10: Auto-learning status panel in Monitor ─────────────────────────
+
+let _monitorAutolearnTimers = {};
+
+async function _loadMonitorAutolearn(ruleId, sessionId) {
+    // Clear existing timer
+    if (_monitorAutolearnTimers[ruleId]) {
+        clearInterval(_monitorAutolearnTimers[ruleId]);
+        delete _monitorAutolearnTimers[ruleId];
+    }
+    _renderAutolearnStatus(ruleId, sessionId);
+    _monitorAutolearnTimers[ruleId] = setInterval(async () => {
+        const done = await _renderAutolearnStatus(ruleId, sessionId);
+        if (done) {
+            clearInterval(_monitorAutolearnTimers[ruleId]);
+            delete _monitorAutolearnTimers[ruleId];
+        }
+    }, 3000);
+}
+
+async function _renderAutolearnStatus(ruleId, sessionId) {
+    try {
+        const data = await fetch(`/api/keyword-learning/${sessionId}/status`).then(r => r.json());
+        const panel = document.getElementById(`monitor-autolearn-${ruleId}`);
+        if (!panel) return false;
+
+        const pct = data.total_packets > 0
+            ? Math.round((data.completed_packets / data.total_packets) * 100) : 0;
+
+        const _t = (key, fb, vars) => {
+            let s = window.t ? window.t(key) || fb : fb;
+            if (vars) Object.entries(vars).forEach(([k, v]) => { s = s.replace(`{${k}}`, v); });
+            return s;
+        };
+
+        const STATUS = {
+            pending:   '⏳ ' + _t('kw.card_pending',   'Waiting to start…'),
+            scanning:  '🔍 ' + _t('kw.card_scanning',  'Scan — {done}/{total} packets ({pct}%)', { done: data.completed_packets, total: data.total_packets, pct }),
+            refining:  '🧠 ' + _t('kw.card_refining',  'AI refining…'),
+            validated: '✅ ' + _t('kw.card_validated', 'Learning complete'),
+            reverted:  '↩️ ' + _t('kw.card_reverted',  'Reverted'),
+            error:     '⚠️ ' + _t('kw.card_error',     'Error: {msg}', { msg: data.error_message || 'Unknown' }),
+        };
+
+        const isActive = ['pending', 'scanning', 'refining'].includes(data.status);
+        const isDone   = ['validated', 'reverted', 'error'].includes(data.status);
+
+        panel.innerHTML = `
+            <span class="info-label">🤖 ${window.t ? window.t('monitor.autolearn_title') : 'Auto-learning'}</span>
+            <div class="kw-card-status">${STATUS[data.status] || data.status}</div>
+            ${data.status === 'scanning' ? `
+            <div style="margin:.3rem 0 .4rem">
+                <div class="kw-progress-bar-track"><div class="kw-progress-bar" style="width:${pct}%"></div></div>
+            </div>` : ''}
+            ${data.status === 'scanning' && data.raw_keywords?.length ? `
+            <div class="kw-tags-row" style="margin-top:.25rem;display:flex">
+                ${data.raw_keywords.slice(0, 8).map(k => `<span class="kw-tag kw-tag--raw">${escapeHtml(k)}</span>`).join('')}
+                ${data.raw_keywords.length > 8 ? `<span class="kw-hint" style="align-self:center">+${data.raw_keywords.length - 8}</span>` : ''}
+            </div>` : ''}
+            ${data.status === 'validated' && data.final_keywords?.length ? `
+            <div class="kw-tags-row" style="margin-top:.25rem;display:flex">
+                ${data.final_keywords.map(k => `<span class="kw-tag">${escapeHtml(k)}</span>`).join('')}
+            </div>` : ''}
+            <div class="kw-actions" style="margin-top:.4rem">
+                ${isActive ? `<button type="button" class="btn btn-danger btn-sm" onclick="kwStopSession(${sessionId})">⏹ ${_t('kw.stop_btn','Stop')}</button>` : ''}
+                ${data.status === 'validated' ? `<button type="button" class="btn btn-secondary btn-sm" onclick="kwRevertSession(${sessionId})">↩️ ${_t('kw.revert_btn','Revert')}</button>` : ''}
+                ${isDone ? `<a href="/api/keyword-learning/${sessionId}/log" download class="btn btn-secondary btn-sm">📥 Log</a>` : ''}
+            </div>
+        `;
+
+        return isDone;
+    } catch { return false; }
 }

@@ -70,7 +70,7 @@ def get_stats():
 
 
 @router.get("/recent")
-def get_recent_analyses(limit: int = 10, rule_id: int | None = None, severity: str | None = None):
+def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = None, severity: str | None = None):
     db = SessionLocal()
     try:
         # Jointure explicite pour récupérer l'objet Analysis et le nom de la Règle associée
@@ -81,10 +81,11 @@ def get_recent_analyses(limit: int = 10, rule_id: int | None = None, severity: s
         if severity:
             q = q.filter(Analysis.severity == severity)
 
-        results = q.order_by(Analysis.analyzed_at.desc()).limit(limit).all()
+        total = q.count()
+        results = q.order_by(Analysis.analyzed_at.desc()).offset(offset).limit(limit).all()
         
         import json as _json
-        return [
+        analyses = [
             {
                 "id": a.id,
                 "rule_id": a.rule_id,
@@ -98,6 +99,7 @@ def get_recent_analyses(limit: int = 10, rule_id: int | None = None, severity: s
             }
             for a, rule_name in results
         ]
+        return {"analyses": analyses, "has_more": (offset + limit) < total, "total": total}
     finally:
         db.close()
 @router.delete("/analyses/{analysis_id}")

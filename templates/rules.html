@@ -9,180 +9,18 @@
         <button id="add-rule-btn" class="btn btn-primary" data-i18n="rules.new_rule">+ Nouvelle règle</button>
     </div>
 
-    <div class="quick-templates" style="margin-bottom: 2rem;">
-        <h3 style="font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 0.75rem;" data-i18n="rules.quick_templates">Modèles de surveillance rapides</h3>
-        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
-            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('auth')"><span aria-hidden="true">🛡️ </span><span data-i18n="rules.template_auth">Connexions (auth.log)</span></button>
-            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('syslog')"><span aria-hidden="true">⚙️ </span><span data-i18n="rules.template_syslog">Système (syslog)</span></button>
-            <button class="btn btn-secondary btn-sm" onclick="applyTemplate('journald')"><span aria-hidden="true">📜 </span><span data-i18n="rules.template_journald">Journald (Relais)</span></button>
-        </div>
-    </div>
-
     <div id="rules-list" class="rules-list">
         <div class="loading" data-i18n="rules.loading">Chargement des règles...</div>
     </div>
 
-    <!-- Modal ajout/édition -->
-    <div id="rule-modal" class="modal hidden">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modal-title">Nouvelle règle</h2>
-                <button id="close-modal" class="btn-close" type="button" title="Fermer">&times;</button>
-            </div>
-            <form id="rule-form">
-                <input type="hidden" id="rule-id">
-                <div class="form-group">
-                    <label for="rule-name" data-i18n="rules.label_name">Nom</label>
-                    <input type="text" id="rule-name" required data-i18n-placeholder="rules.placeholder_name" placeholder="Nom de la règle">
-                </div>
-                <div class="form-group">
-                    <label data-i18n="rules.label_source">Source des logs</label>
-                    <div class="kw-tabs" role="tablist">
-                        <div class="source-card kw-tab kw-tab--active" data-source="local"
-                             role="tab" aria-selected="true">
-                            📁 Fichier Local
-                        </div>
-                        <div class="source-card kw-tab" data-source="webhook"
-                             role="tab" aria-selected="false">
-                            🔗 Webhook API
-                        </div>
-                    </div>
-                </div>
-                <div class="form-group" id="path-group">
-                    <label for="rule-path" data-i18n="rules.label_path">Chemin du fichier log</label>
-                    <div class="input-row">
-                        <input type="text" id="rule-path" required data-i18n-placeholder="rules.placeholder_path" placeholder="/logs/app.log">
-                        <button type="button" id="browse-logs-btn" class="btn btn-secondary btn-sm" data-i18n="rules.browse">Parcourir</button>
-                    </div>
-                    <div id="file-browser" class="file-browser hidden">
-                        <div class="file-browser-header">
-                            <div class="file-browser-breadcrumb" id="file-browser-breadcrumb"></div>
-                            <div class="file-browser-actions">
-                                <label class="inline-checkbox">
-                                    <input type="checkbox" id="file-browser-show-hidden">
-                                    <span data-i18n="rules.show_hidden_files">Afficher fichiers cachés</span>
-                                </label>
-                                <button type="button" id="file-browser-close" class="btn btn-secondary btn-sm" data-i18n="rules.close_browser">Fermer</button>
-                            </div>
-                        </div>
-                        <div id="file-browser-list" class="file-browser-list">
-                            <div class="loading" data-i18n="common.loading">Chargement...</div>
-                        </div>
-                        <div class="file-browser-hint" data-i18n="rules.file_browser_hint">
-                            Astuce : monte tes logs dans Docker (ex: volume vers <code>/logs</code>) puis sélectionne le fichier ici.
-                        </div>
-                    </div>
-                    <div id="file-preview-container" class="file-preview-container hidden" style="margin-top: 0.75rem;">
-                        <div class="file-preview-header" data-i18n="rules.last_lines">Dernières lignes du fichier</div>
-                        <div id="file-preview-content" class="file-preview-content"></div>
-                    </div>
-                </div>
-                <div class="form-group hidden" id="webhook-group">
-                    <label>URL du Webhook de Test/Prod</label>
-                    <div class="form-hint" style="margin-bottom: 0.5rem;" data-i18n="rules.webhook_hint">
-                        Utilise cette URL pour envoyer des logs à Sentinel avec une requête HTTP POST. Tu peux tester immédiatement avant même d'enregistrer la règle !
-                    </div>
-                    <div class="webhook-url-box" style="display:flex;gap:0.5rem;align-items:center;background:var(--surface-sunken);padding:0.75rem;border-radius:var(--radius-md);">
-                        <code id="webhook-curl-cmd" style="flex:1;word-break:break-all;font-size:0.85rem;color:var(--primary-light);"></code>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="copyModalWebhookUrl()" title="Copier la commande curl">📋 Copier</button>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label data-i18n="rules.label_keywords">Mots-clés</label>
-
-                    <!-- Tab switcher -->
-                    <div class="kw-tabs" role="tablist">
-                        <button type="button" id="kw-tab-manual" class="kw-tab kw-tab--active"
-                                role="tab" aria-selected="true" onclick="kwTabSwitch('manual')"
-                                >
-                            <span aria-hidden="true">✏️ </span><span data-i18n="kw.tab_manual">Mots-clés manuels</span>
-                        </button>
-                        <button type="button" id="kw-tab-auto" class="kw-tab"
-                                role="tab" aria-selected="false" onclick="kwTabSwitch('auto')"
-                                >
-                            <span aria-hidden="true">🤖 </span><span data-i18n="kw.tab_auto">Auto-apprentissage</span>
-                        </button>
-                    </div>
-
-                    <!-- Panel: manual keywords -->
-                    <div id="kw-panel-manual" class="kw-tab-panel">
-                        <input type="text" id="rule-keywords" list="keywords-suggestions"
-                               data-i18n-placeholder="rules.placeholder_keywords"
-                               placeholder="error, exception, fatal">
-                        <datalist id="keywords-suggestions"></datalist>
-                        <div class="keyword-chips" id="keyword-chips"></div>
-                        <div class="form-hint" data-i18n="rules.keywords_hint">
-                            Clique sur une suggestion pour l'ajouter, ou écris librement.
-                        </div>
-                    </div>
-
-                    <!-- Panel: auto-learning wizard -->
-                    <div id="kw-panel-auto" class="kw-tab-panel kw-tab-panel--hidden">
-                        <div id="kw-wizard" class="kw-wizard">
-                            <div id="kw-wizard-body" class="kw-wizard-body"></div>
-
-                        </div>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="rule-excluded-patterns">🚫 Patterns d'exclusion <span style="opacity:.6;font-size:.85em">(negative keywords)</span></label>
-                    <input type="text" id="rule-excluded-patterns"
-                           placeholder="com.docker.backend, GET /app/settings, healthcheck…">
-                    <div class="form-hint">
-                        Si une ligne contient l'un de ces termes (séparés par des virgules), elle est ignorée — même si un mot-clé positif correspond.
-                        Utile pour filtrer les logs bruités (IPC Docker, health-checks, etc.).
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="rule-context" data-i18n="rules.label_context">Contexte applicatif (optionnel)</label>
-
-                    <textarea id="rule-context" rows="3" data-i18n-placeholder="rules.placeholder_context" placeholder="Description du contexte..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="rule-context-lines" data-i18n="rules.label_context_lines">Nombre de lignes de log envoyées à Ollama</label>
-                    <input type="number" id="rule-context-lines" min="1" max="100" value="5" placeholder="5">
-                    <div class="form-hint" data-i18n="rules.context_lines_hint">Nombre de lignes de contexte à inclure dans la requête Ollama (défaut: 5).</div>
-                </div>
-                <div class="form-group">
-                    <label for="rule-anti-spam" data-i18n="rules.label_anti_spam">Délai Anti-Spam (secondes)</label>
-                    <input type="number" id="rule-anti-spam" min="1" max="3600" value="60" placeholder="60">
-                    <div class="form-hint" data-i18n="rules.anti_spam_hint">Temps d'attente avant regroupement des alertes (défaut: 60s).</div>
-                </div>
-                <div class="form-group">
-                    <label for="rule-severity-threshold" data-i18n="rules.label_severity_threshold">Seuil de notification (Sévérité min)</label>
-                    <select id="rule-severity-threshold">
-                        <option value="info" data-i18n="rules.severity_info">Info (Toutes)</option>
-                        <option value="warning" data-i18n="rules.severity_warning">Warning (Moyenne &amp; haute)</option>
-                        <option value="critical" data-i18n="rules.severity_critical">Critical (Haute uniquement)</option>
-                    </select>
-                    <div class="form-hint" data-i18n="rules.severity_hint">Définit le niveau de sévérité minimum pour déclencher une notification.</div>
-                </div>
-                <div class="form-group checkbox-group">
-                    <label>
-                        <input type="checkbox" id="rule-enabled" checked>
-                        <span data-i18n="rules.label_enabled">Activée</span>
-                    </label>
-                    <label>
-                        <input type="checkbox" id="rule-notify" checked>
-                        <span data-i18n="rules.label_notify">Notifier sur correspondance</span>
-                    </label>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary" data-i18n="common.save">Enregistrer</button>
-                    <button type="button" id="kw-launch-main-btn" class="btn btn-primary hidden"
-                            onclick="_launchSession()">
-                        <span aria-hidden="true">🤖 </span><span data-i18n="kw.launch_full">Auto-apprentissage : Lancer l'analyse</span>
-                    </button>
-                    <button type="button" id="cancel-rule" class="btn btn-secondary" data-i18n="common.cancel">Annuler</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <!-- Modal ajout/édition (shared partial) -->
+    {% include '_rule_modal.html' %}
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/rules.js?v=10"></script>
+<script src="/static/js/rule_modal.js?v=1"></script>
+<script src="/static/js/rules.js?v=11"></script>
 
 
 <script src="/static/js/keyword_wizard.js?v=7"></script>

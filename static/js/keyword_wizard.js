@@ -261,6 +261,8 @@ function _updateLaunchBtn() {
     // Button text: "Update" when editing an active session, "Launch" otherwise
     if (_activeSession) {
         btn.textContent = window.t ? window.t('kw.update_params') : '🔄 Mettre à jour les paramètres';
+    } else {
+        btn.innerHTML = '<span aria-hidden="true">🤖 </span>' + (window.t ? window.t('kw.launch_full') : 'Auto-apprentissage : Lancer l\'analyse');
     }
 }
 
@@ -422,7 +424,7 @@ function _updateEstimate() {
     const dur  = _durationS();
     const gran = parseInt((document.getElementById('kw-granularity') || {}).value) || 3600;
     const n = Math.max(1, Math.ceil(dur / gran));
-    const tpl = window.t ? window.t('kw.packets_estimate') : '≈ {n} paquet(s) à traiter';
+    const tpl = window.t ? window.t('kw.packets_estimate') : '\u2248 {n} paquet(s) \u00e0 traiter';
     el.textContent = tpl.replace('{n}', n);
 }
 
@@ -628,5 +630,12 @@ function _kwResetForNewSession() {
     const body = _wizardBody();
     if (body) body.innerHTML = '';
     _renderConfigPhase();
+
+    // Show launch button, hide save button (we're on auto tab)
+    const origSave  = document.querySelector('#rule-form .form-actions button[type="submit"]');
+    const launchBtn = document.getElementById('kw-launch-main-btn');
+    if (origSave)  origSave.classList.add('hidden');
+    if (launchBtn) launchBtn.classList.remove('hidden');
+
     _watchFormValidation();
 }

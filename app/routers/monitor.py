@@ -92,8 +92,8 @@ def get_monitored_rules():
                     "anti_spam_delay": r.anti_spam_delay or 60,
                     "notify_severity_threshold": r.notify_severity_threshold or "info",
                     "notify_on_match": r.notify_on_match,
-                    "stats": stats_dict.get(r.id, {"total": 0, "info": 0, "warning": 0, "critical": 0})
-
+                    "stats": stats_dict.get(r.id, {"total": 0, "info": 0, "warning": 0, "critical": 0}),
+                    "last_learning_session_id": r.last_learning_session_id,
                 }
                 for r in rules
             ]

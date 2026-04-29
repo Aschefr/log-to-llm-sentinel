@@ -278,25 +278,25 @@ monitor:
 
   - id: MON-09
     name: "'+' button behind tabs to add new rule (reuse Rules modal)"
-    status: TODO
+    status: DONE
     effort: M
     priority: P2
 
   - id: MON-10
     name: "Auto-learning status panel (replicate from Rules page)"
-    status: TODO
+    status: DONE
     effort: M
     priority: P2
 
   - id: MON-11
     name: "Severity filter for analyses (move badges to accordion level)"
-    status: TODO
+    status: DONE
     effort: M
     priority: P2
 
   - id: MON-12
     name: "Analysis history display"
-    status: TODO
+    status: DONE
     effort: L
     priority: P2
     subtasks:
