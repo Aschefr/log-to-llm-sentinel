@@ -102,7 +102,7 @@ def get_rule(rule_id: int):
     try:
         rule = db.query(Rule).filter(Rule.id == rule_id).first()
         if not rule:
-            raise HTTPException(status_code=404, detail="Règle non trouvée")
+            raise HTTPException(status_code=404, detail="rule_not_found")
         return {
             "id": rule.id,
             "name": rule.name,
@@ -158,7 +158,7 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
     try:
         rule = db.query(Rule).filter(Rule.id == rule_id).first()
         if not rule:
-            raise HTTPException(status_code=404, detail="Règle non trouvée")
+            raise HTTPException(status_code=404, detail="rule_not_found")
 
         if rule_data.name is not None:
             rule.name = rule_data.name
@@ -202,7 +202,7 @@ def delete_rule(rule_id: int):
     try:
         rule = db.query(Rule).filter(Rule.id == rule_id).first()
         if not rule:
-            raise HTTPException(status_code=404, detail="Règle non trouvée")
+            raise HTTPException(status_code=404, detail="rule_not_found")
         db.delete(rule)
         db.commit()
         return {"message": "Règle supprimée"}
@@ -251,7 +251,7 @@ async def test_rule(rule_id: int, request: Request):
     try:
         rule = db.query(Rule).filter(Rule.id == rule_id).first()
         if not rule:
-            raise HTTPException(status_code=404, detail="Règle non trouvée")
+            raise HTTPException(status_code=404, detail="rule_not_found")
 
         ctx_lines = rule.context_lines or 5
         logger.debug("TestRule", f"Règle '{rule.name}' — lecture des {ctx_lines} dernières lignes de {rule.log_file_path}")

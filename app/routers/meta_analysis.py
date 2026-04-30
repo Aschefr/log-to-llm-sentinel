@@ -71,7 +71,7 @@ async def create_config(data: dict, db: Session = Depends(get_db)):
 async def update_config(config_id: int, data: dict, db: Session = Depends(get_db)):
     config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == config_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Config non trouvée")
+        raise HTTPException(status_code=404, detail="config_not_found")
     
     try:
         if "name" in data: config.name = data["name"]
@@ -97,7 +97,7 @@ async def update_config(config_id: int, data: dict, db: Session = Depends(get_db
 async def delete_config(config_id: int, db: Session = Depends(get_db)):
     config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == config_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Config non trouvée")
+        raise HTTPException(status_code=404, detail="config_not_found")
     # SQLite n'applique pas les FKs par défaut — on supprime manuellement les résultats liés
     db.query(MetaAnalysisResult).filter(MetaAnalysisResult.config_id == config_id).delete()
     db.delete(config)
@@ -109,7 +109,7 @@ async def reset_last_run(config_id: int, db: Session = Depends(get_db)):
     """Remet last_run_at à None pour que la prochaine fenêtre soit recalculée depuis le schedule."""
     config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == config_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Config non trouvée")
+        raise HTTPException(status_code=404, detail="config_not_found")
     config.last_run_at = None
     db.commit()
     return {"status": "ok"}
@@ -234,7 +234,7 @@ async def list_results(config_id: Optional[int] = None, limit: int = 20, db: Ses
 async def delete_result(result_id: int, db: Session = Depends(get_db)):
     result = db.query(MetaAnalysisResult).filter(MetaAnalysisResult.id == result_id).first()
     if not result:
-        raise HTTPException(status_code=404, detail="Résultat introuvable")
+        raise HTTPException(status_code=404, detail="result_not_found")
         
     # Restauration du pointeur de temps si on supprime la dernière analyse
     config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == result.config_id).first()
@@ -252,11 +252,11 @@ async def delete_result(result_id: int, db: Session = Depends(get_db)):
 async def notify_result(result_id: int, db: Session = Depends(get_db)):
     result = db.query(MetaAnalysisResult).filter(MetaAnalysisResult.id == result_id).first()
     if not result:
-        raise HTTPException(status_code=404, detail="Résultat introuvable")
+        raise HTTPException(status_code=404, detail="result_not_found")
     config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == result.config_id).first()
     global_cfg = db.query(GlobalConfig).first()
     if not global_cfg:
-        raise HTTPException(status_code=400, detail="Configuration globale introuvable")
+        raise HTTPException(status_code=400, detail="global_config_not_found")
     from app.main import meta_service
     await meta_service._send_notification(result, config, global_cfg)
     return {"status": "ok"}

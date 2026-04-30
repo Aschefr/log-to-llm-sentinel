@@ -47,9 +47,9 @@ async def start_session(body: StartRequest):
     period_start = _parse_dt(body.period_start)
     period_end   = _parse_dt(body.period_end)
     if period_end <= period_start:
-        raise HTTPException(status_code=400, detail="period_end must be after period_start")
+        raise HTTPException(status_code=400, detail="invalid_period")
     if body.granularity_s < 60:
-        raise HTTPException(status_code=400, detail="granularity_s must be >= 60")
+        raise HTTPException(status_code=400, detail="invalid_granularity")
 
     session_id = await kls.start_session(
         rule_id=body.rule_id,
@@ -65,7 +65,7 @@ async def start_session(body: StartRequest):
 def get_status(session_id: int):
     data = kls.get_session_status(session_id)
     if data is None:
-        raise HTTPException(status_code=404, detail="Session introuvable")
+        raise HTTPException(status_code=404, detail="session_not_found")
     return data
 
 
@@ -73,7 +73,7 @@ def get_status(session_id: int):
 async def revaluate(session_id: int, body: RevaluateRequest):
     data = kls.get_session_status(session_id)
     if data is None:
-        raise HTTPException(status_code=404, detail="Session introuvable")
+        raise HTTPException(status_code=404, detail="session_not_found")
     import asyncio
     asyncio.create_task(kls.revaluate_session(session_id, body.keywords))
     return {"status": "refining"}
@@ -83,7 +83,7 @@ async def revaluate(session_id: int, body: RevaluateRequest):
 async def validate(session_id: int, body: ValidateRequest):
     data = kls.get_session_status(session_id)
     if data is None:
-        raise HTTPException(status_code=404, detail="Session introuvable")
+        raise HTTPException(status_code=404, detail="session_not_found")
     await kls.validate_session(session_id, body.keywords)
     return {"status": "validated", "keywords": body.keywords}
 
@@ -92,7 +92,7 @@ async def validate(session_id: int, body: ValidateRequest):
 async def revert(session_id: int):
     data = kls.get_session_status(session_id)
     if data is None:
-        raise HTTPException(status_code=404, detail="Session introuvable")
+        raise HTTPException(status_code=404, detail="session_not_found")
     prev = await kls.revert_session(session_id)
     return {"status": "reverted", "keywords": prev}
 
@@ -107,7 +107,7 @@ def cancel_session(session_id: int):
         s = db.query(KeywordLearningSession).filter(
             KeywordLearningSession.id == session_id).first()
         if not s:
-            raise HTTPException(status_code=404, detail="Session introuvable")
+            raise HTTPException(status_code=404, detail="session_not_found")
         s.status = 'error'
         s.error_message = 'Annulé par l\'utilisateur'
         db.commit()

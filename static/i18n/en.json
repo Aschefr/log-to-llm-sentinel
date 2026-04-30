@@ -207,7 +207,9 @@
         "btn_cancel": "Cancel",
         "context_preview_title": "Auto-appended context (Preview)",
         "settings_btn": "Settings ⚙️",
-        "mode_de_reponse": "=== Automatic Context ===\nCurrent date and time: {datetime}\nResponse language: {lang}\n\nThe chat platform is part of a log file analysis environment chosen by the user.\nFor your information, here are the monitored rules and files:\n{rules_list}\n\n=== Response Mode (IMPORTANT) ===\nAnswer directly, without fluff or deep explanations unless the user asks for it."
+        "mode_de_reponse": "=== Automatic Context ===\nCurrent date and time: {datetime}\nResponse language: {lang}\n\nThe chat platform is part of a log file analysis environment chosen by the user.\nFor your information, here are the monitored rules and files:\n{rules_list}\n\n=== Response Mode (IMPORTANT) ===\nAnswer directly, without fluff or deep explanations unless the user asks for it.",
+        "generation_cancelled": "Generation cancelled.",
+        "error_create_conv": "Error creating conversation:"
     },
     "config": {
         "title": "Global Configuration",
@@ -467,5 +469,28 @@
         "summary_of_synthesis": "Synthesis summary",
         "full_synthesis_available": "*(Full synthesis available in the interface)*",
         "meta_summary_prompt": "Summarize the following meta-analysis for a mobile notification (Discord/Telegram).\nKeep the main trends and critical points.\nUse bullet points.\nLimit to {max_chars} characters maximum.\n\nAnalysis to summarize:\n{response}"
+    },
+    "api_errors": {
+        "orchestrator_not_configured": "Orchestrator not configured",
+        "rule_not_found": "Rule not found",
+        "rule_disabled": "Rule disabled",
+        "invalid_json": "Invalid JSON",
+        "client_closed_request": "Client closed request",
+        "orchestrator_not_initialized": "Orchestrator not initialized",
+        "analysis_not_found": "Analysis not found",
+        "global_config_not_found": "Global configuration not found",
+        "config_not_found": "Configuration not found",
+        "task_not_found": "Task not found",
+        "missing_data": "Missing data",
+        "missing_question": "Missing question",
+        "result_not_found": "Result not found",
+        "session_not_found": "Session not found",
+        "invalid_period": "End date must be after start date",
+        "invalid_granularity": "Granularity must be >= 60s",
+        "no_valid_file": "No valid file provided.",
+        "file_not_found": "File not found on disk.",
+        "path_must_be_absolute": "Path must be absolute",
+        "error_unknown": "Unknown error",
+        "error_api": "API error"
     }
 }

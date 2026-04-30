@@ -118,7 +118,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     logger.info("ChatRouter", f"Requête reçue pour conv {conv_id}")
     
     if not conv_id or not content:
-        raise HTTPException(status_code=400, detail="Données manquantes")
+        raise HTTPException(status_code=400, detail="missing_data")
         
     conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
     if not conv:
@@ -309,7 +309,7 @@ async def stream_chat(task_id: str, from_pos: int = 0):
     """
     entry = task_manager.get_chat_task(task_id)
     if not entry:
-        raise HTTPException(status_code=404, detail="Tâche non trouvée")
+        raise HTTPException(status_code=404, detail="task_not_found")
 
     async def generator():
         pos = from_pos

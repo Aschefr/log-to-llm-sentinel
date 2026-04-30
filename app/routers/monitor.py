@@ -24,23 +24,23 @@ def set_orchestrator(orch: Orchestrator):
 async def notify_analysis(analysis_id: int):
     """Envoie manuellement une notification pour une analyse."""
     if _orchestrator is None:
-        raise HTTPException(status_code=500, detail="Orchestrateur non initialisé")
+        raise HTTPException(status_code=500, detail="orchestrator_not_initialized")
 
     db = SessionLocal()
     try:
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if not analysis:
-            raise HTTPException(status_code=404, detail="Analyse non trouvée")
+            raise HTTPException(status_code=404, detail="analysis_not_found")
 
         rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
         if not rule:
-            raise HTTPException(status_code=404, detail="Règle non trouvée")
+            raise HTTPException(status_code=404, detail="rule_not_found")
 
         from app.models import GlobalConfig
         from app.routers.config import _get_config_dict
         config_obj = db.query(GlobalConfig).first()
         if not config_obj:
-            raise HTTPException(status_code=500, detail="Configuration globale non trouvée")
+            raise HTTPException(status_code=500, detail="global_config_not_found")
             
         config = _get_config_dict(config_obj)
         
@@ -224,23 +224,23 @@ async def retry_analysis(analysis_id: int):
     Retourne immédiatement un task_id. Le client pollingue GET /task/{task_id}.
     """
     if _orchestrator is None:
-        raise HTTPException(status_code=500, detail="Orchestrateur non initialisé")
+        raise HTTPException(status_code=500, detail="orchestrator_not_initialized")
 
     db = SessionLocal()
     try:
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if not analysis:
-            raise HTTPException(status_code=404, detail="Analyse non trouvée")
+            raise HTTPException(status_code=404, detail="analysis_not_found")
 
         rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
         if not rule:
-            raise HTTPException(status_code=404, detail="Règle non trouvée")
+            raise HTTPException(status_code=404, detail="rule_not_found")
 
         from app.models import GlobalConfig
         from app.routers.config import _get_config_dict
         config_obj = db.query(GlobalConfig).first()
         if not config_obj:
-            raise HTTPException(status_code=500, detail="Configuration globale non trouvée")
+            raise HTTPException(status_code=500, detail="global_config_not_found")
             
         config = _get_config_dict(config_obj)
         cleaned_line = clean_log_line(analysis.triggered_line)
@@ -305,7 +305,7 @@ def get_task_status(task_id: str):
     """Retourne le statut d'une tâche d'analyse en arrière-plan."""
     entry = task_manager.get_analysis_task(task_id)
     if not entry:
-        raise HTTPException(status_code=404, detail="Tâche non trouvée")
+        raise HTTPException(status_code=404, detail="task_not_found")
     return {
         "status": entry.status,
         "analysis_id": entry.analysis_id,
@@ -322,17 +322,17 @@ async def analyze_line(data: dict):
     rule_id = data.get("rule_id")
     
     if not line or not rule_id:
-        raise HTTPException(status_code=400, detail="Données manquantes")
+        raise HTTPException(status_code=400, detail="missing_data")
         
     if _orchestrator is None:
-        raise HTTPException(status_code=500, detail="Orchestrateur non initialisé")
+        raise HTTPException(status_code=500, detail="orchestrator_not_initialized")
 
     db = SessionLocal()
     try:
         rule = db.query(Rule).filter(Rule.id == rule_id).first()
         if not rule:
             db.close()
-            raise HTTPException(status_code=404, detail="Règle non trouvée")
+            raise HTTPException(status_code=404, detail="rule_not_found")
             
         cfg = db.query(GlobalConfig).first()
         config = {
@@ -411,7 +411,7 @@ async def chat_analysis(data: dict, request: Request):
     context_response = data.get("context_response")
     
     if not question:
-        raise HTTPException(status_code=400, detail="Question manquante")
+        raise HTTPException(status_code=400, detail="missing_question")
         
     db = SessionLocal()
     try:
@@ -419,7 +419,7 @@ async def chat_analysis(data: dict, request: Request):
         if analysis_id and str(analysis_id).isdigit():
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if not analysis:
-                raise HTTPException(status_code=404, detail="Analyse non trouvée")
+                raise HTTPException(status_code=404, detail="analysis_not_found")
             rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
             cfg = db.query(GlobalConfig).first()
             
@@ -433,7 +433,7 @@ async def chat_analysis(data: dict, request: Request):
 
         cfg = db.query(GlobalConfig).first()
         if not cfg:
-            raise HTTPException(status_code=500, detail="Configuration non trouvée")
+            raise HTTPException(status_code=500, detail="config_not_found")
 
         from app.routers.utils import cancel_on_disconnect
         async with _orchestrator._ollama_semaphore:

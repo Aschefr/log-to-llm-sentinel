@@ -13,8 +13,17 @@ async function apiFetch(url, options = {}) {
 
     const response = await fetch(url, config);
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'Erreur inconnue' }));
-        throw new Error(error.detail || 'Erreur API');
+        const error = await response.json().catch(() => ({ detail: 'error_unknown' }));
+        let detail = error.detail || 'error_api';
+        if (window.t) {
+            const transApi = window.t('api_errors.' + detail);
+            if (transApi !== 'api_errors.' + detail) detail = transApi;
+            else {
+                const transCommon = window.t('common.' + detail);
+                if (transCommon !== 'common.' + detail) detail = transCommon;
+            }
+        }
+        throw new Error(detail);
     }
     return response.json();
 }
@@ -161,7 +170,8 @@ async function openChat(analysisId, rawPrompt = null, rawResponse = null) {
             window.location.href = `/chat?id=${res.id}`;
         }
     } catch (e) {
-        alert('Erreur lors de la création de la conversation: ' + e.message);
+        const errorPrefix = window.t ? window.t('chat.error_create_conv') : 'Erreur lors de la création de la conversation :';
+        alert(`${errorPrefix} ${e.message}`);
     }
 }
 
@@ -173,14 +183,17 @@ async function askQuestion(analysisId, inputEl, contextPrompt = null, contextRes
     if (!historyEl) return;
 
     // Ajouter la question utilisateur
-    historyEl.innerHTML += `<div class="chat-msg user"><strong>Vous :</strong> ${escapeHtml(question)}</div>`;
+    const userLabel = window.t ? window.t('chat.label_user') : 'Vous';
+    historyEl.innerHTML += `<div class="chat-msg user"><strong>${userLabel} :</strong> ${escapeHtml(question)}</div>`;
     inputEl.value = '';
 
     const abortController = new AbortController();
 
     const aiMsgEl = document.createElement('div');
     aiMsgEl.className = 'chat-msg ai';
-    aiMsgEl.innerHTML = `<strong>Ollama :</strong> <span class="ai-content">⏳...</span> <button class="btn btn-danger btn-sm stop-chat-btn" style="float: right; padding: 2px 5px; font-size: 0.8rem;">🛑 Arrêter</button>`;
+    const ollamaLabel = window.t ? window.t('chat.label_ollama') : 'Ollama';
+    const stopLabel = window.t ? window.t('common.stop') : 'Arrêter';
+    aiMsgEl.innerHTML = `<strong>${ollamaLabel} :</strong> <span class="ai-content">⏳...</span> <button class="btn btn-danger btn-sm stop-chat-btn" style="float: right; padding: 2px 5px; font-size: 0.8rem;">🛑 ${stopLabel}</button>`;
     historyEl.appendChild(aiMsgEl);
     historyEl.scrollTop = historyEl.scrollHeight;
     
@@ -207,7 +220,8 @@ async function askQuestion(analysisId, inputEl, contextPrompt = null, contextRes
         }
     } catch (e) {
         if (e.name === 'AbortError') {
-            contentSpan.innerHTML = `❌ Génération annulée.`;
+            const cancelledMsg = window.t ? window.t('chat.generation_cancelled') : 'Génération annulée.';
+            contentSpan.innerHTML = `❌ ${cancelledMsg}`;
         } else {
             contentSpan.innerHTML = `${window.t ? window.t('common.error') : 'Erreur'} : ${e.message}`;
         }

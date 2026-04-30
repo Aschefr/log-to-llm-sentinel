@@ -23,6 +23,6 @@ async def cancel_on_disconnect(request: Request, coro):
         return res
     except asyncio.CancelledError:
         logger.info("Server", "Requête annulée suite à la déconnexion du client (Abandon côté frontend).")
-        raise HTTPException(status_code=499, detail="Client Closed Request")
+        raise HTTPException(status_code=499, detail="client_closed_request")
     finally:
         watcher.cancel()

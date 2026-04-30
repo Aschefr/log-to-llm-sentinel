@@ -87,7 +87,7 @@ async def receive_logs(rule_id_or_token: str, request: Request, db: Session = De
     Supporte les payloads JSON ({"lines": [...]}) ou le texte brut (une ligne par ligne).
     """
     if not _orchestrator:
-        raise HTTPException(status_code=500, detail="Orchestrateur non configuré")
+        raise HTTPException(status_code=500, detail="orchestrator_not_configured")
         
     if rule_id_or_token.isdigit():
         rule = db.query(Rule).filter(Rule.id == int(rule_id_or_token)).first()
@@ -95,10 +95,10 @@ async def receive_logs(rule_id_or_token: str, request: Request, db: Session = De
         rule = db.query(Rule).filter(Rule.log_file_path == f"[WEBHOOK]:{rule_id_or_token}").first()
         
     if not rule:
-        raise HTTPException(status_code=404, detail="Règle non trouvée")
+        raise HTTPException(status_code=404, detail="rule_not_found")
         
     if not rule.enabled:
-        raise HTTPException(status_code=400, detail="Règle désactivée")
+        raise HTTPException(status_code=400, detail="rule_disabled")
 
     content_type = request.headers.get("content-type", "")
     lines = []
@@ -113,7 +113,7 @@ async def receive_logs(rule_id_or_token: str, request: Request, db: Session = De
             else:
                 lines = [str(data)]
         except Exception:
-            raise HTTPException(status_code=400, detail="JSON invalide")
+            raise HTTPException(status_code=400, detail="invalid_json")
     else:
         body_bytes = await request.body()
         text = body_bytes.decode('utf-8', errors='ignore')

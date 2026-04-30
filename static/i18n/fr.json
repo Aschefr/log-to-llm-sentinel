@@ -207,7 +207,9 @@
         "btn_cancel": "Annuler",
         "context_preview_title": "Contexte auto-ajouté (Aperçu)",
         "settings_btn": "Paramètres ⚙️",
-        "mode_de_reponse": "=== Contexte Automatique ===\nDate et heure actuelles : {datetime}\nLangue de réponse : {lang}\n\nLa plateforme de chat fait partie d'un environnement d'analyse de fichiers de log choisis par l'utilisateur.\nA titre informatif, voici les règles et fichiers surveillés :\n{rules_list}\n\n=== Mode de réponse (IMPORTANT) ===\nRéponds de manière directe, sans fioritures ni explications approfondies à moins que l'utilisateur ne le demande."
+        "mode_de_reponse": "=== Contexte Automatique ===\nDate et heure actuelles : {datetime}\nLangue de réponse : {lang}\n\nLa plateforme de chat fait partie d'un environnement d'analyse de fichiers de log choisis par l'utilisateur.\nA titre informatif, voici les règles et fichiers surveillés :\n{rules_list}\n\n=== Mode de réponse (IMPORTANT) ===\nRéponds de manière directe, sans fioritures ni explications approfondies à moins que l'utilisateur ne le demande.",
+        "generation_cancelled": "Génération annulée.",
+        "error_create_conv": "Erreur lors de la création de la conversation :"
     },
     "config": {
         "title": "Configuration Globale",
@@ -467,5 +469,28 @@
         "summary_of_synthesis": "Résumé de la synthèse",
         "full_synthesis_available": "*(Synthèse complète dans l'interface)*",
         "meta_summary_prompt": "Résume la méta-analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\nConserve les tendances principales et les points critiques.\nUtilise des puces (bullet points).\nLimite-toi à {max_chars} caractères maximum.\n\nAnalyse à résumer :\n{response}"
+    },
+    "api_errors": {
+        "orchestrator_not_configured": "Orchestrateur non configuré",
+        "rule_not_found": "Règle non trouvée",
+        "rule_disabled": "Règle désactivée",
+        "invalid_json": "JSON invalide",
+        "client_closed_request": "Requête annulée par le client",
+        "orchestrator_not_initialized": "Orchestrateur non initialisé",
+        "analysis_not_found": "Analyse non trouvée",
+        "global_config_not_found": "Configuration globale introuvable",
+        "config_not_found": "Configuration introuvable",
+        "task_not_found": "Tâche introuvable",
+        "missing_data": "Données manquantes",
+        "missing_question": "Question manquante",
+        "result_not_found": "Résultat introuvable",
+        "session_not_found": "Session introuvable",
+        "invalid_period": "La date de fin doit être après la date de début",
+        "invalid_granularity": "La granularité doit être >= 60s",
+        "no_valid_file": "Aucun fichier valide fourni.",
+        "file_not_found": "Fichier introuvable sur le disque.",
+        "path_must_be_absolute": "Le chemin doit être absolu",
+        "error_unknown": "Erreur inconnue",
+        "error_api": "Erreur API"
     }
 }
