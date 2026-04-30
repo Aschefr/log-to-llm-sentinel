@@ -444,5 +444,28 @@
         "progress_label": "Progression : {done}/{total} paquets ({pct}%)",
         "resume_info": "L'analyse est en cours. Vous pouvez modifier la date de fin ou la granularité.",
         "stop_btn": "Arrêter"
+    },
+    "notifications": {
+        "alert": "Alerte",
+        "alert_title": "Alerte Log to LLM Sentinel",
+        "rule": "Règle",
+        "detection_id": "ID de détection",
+        "keywords": "Mots-clés",
+        "triggered_line": "Ligne déclenchante",
+        "ollama_analysis": "Analyse Ollama",
+        "severity": "Sévérité",
+        "analysis_summary": "Résumé de l'analyse",
+        "full_analysis_available": "*(Analyse complète disponible dans l'interface)*",
+        "summary_prompt": "Résume l'analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\nUtilise des puces (bullet points) et des sections claires (Problème, Cause, Solution).\nLimite-toi à {max_chars} caractères maximum.\n\nAnalyse à résumer :\n{response}",
+        "inactivity_subject": "[Sentinel ALERTE] Inactivité détectée : {rule_name}",
+        "inactivity_body": "<p>Aucune ligne reçue sur la règle <b>{rule_name}</b> depuis plus de {hours} heures.</p><p>Dernière ligne : {last_received}</p>",
+        "meta_subject": "[Sentinel] Méta-Analyse : {config_name}",
+        "meta_title": "Méta-Analyse Sentinel",
+        "period": "Période",
+        "events_analyzed": "Événements analysés",
+        "ia_synthesis": "Synthèse IA",
+        "summary_of_synthesis": "Résumé de la synthèse",
+        "full_synthesis_available": "*(Synthèse complète dans l'interface)*",
+        "meta_summary_prompt": "Résume la méta-analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\nConserve les tendances principales et les points critiques.\nUtilise des puces (bullet points).\nLimite-toi à {max_chars} caractères maximum.\n\nAnalyse à résumer :\n{response}"
     }
 }

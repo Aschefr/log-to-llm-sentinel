@@ -94,6 +94,7 @@ class GlobalConfig(Base):
     monitor_log_lines = Column(Integer, default=60)
     debug_mode = Column(Boolean, default=False)
     ollama_prompt_lang = Column(String, default='fr')  # 'fr' | 'en' — langue des prompts d'analyse
+    site_lang = Column(String, default='fr')  # langue du site (header) — utilisée pour les notifications
     chat_system_prompt = Column(Text, default="")
     chat_lang = Column(String, default="")  # Default header lang if empty
     auto_delete_analyses = Column(Boolean, default=False)

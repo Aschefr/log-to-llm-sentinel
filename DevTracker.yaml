@@ -36,7 +36,16 @@ global_rules:
         with open('static/i18n/fr.json', 'w', encoding='utf-8-sig', newline='') as f: f.write(content)
   - id: G-08
     rule: "NEVER use the native window.confirm() box. ALWAYS use the custom UI modal `showInlineConfirm(btnElement, message, callback)` from common.js for any user confirmation."
+  - id: G-09
+    rule: "Notification templates now follow the site language (GlobalConfig.site_lang).
+      IMPORTANT for future devs: when adding new notifications, use the backend i18n helper:
+        from app.utils.notification_i18n import nt
+        lang = config.site_lang or 'fr'  # (or global_cfg.site_lang)
+        subject = nt('your_key', lang)
+      To add a new translated string: add the key in the "notifications" section of the language JSON files in static/i18n/ (e.g., en.json, fr.json).
+      The site language is synced from the frontend header to GlobalConfig.site_lang via PUT /api/config/site-lang."
 
+      
 # ─────────────────────────────────────────────
 # INFRASTRUCTURE / BACKEND
 # ─────────────────────────────────────────────
@@ -98,6 +107,21 @@ infrastructure:
     priority: P3
     files: [static/js/i18n.js, app/routers/i18n.py, static/i18n/en.json, static/i18n/fr.json, static/i18n/en.json]
     notes: "In the langage menu, under current langage files, add a 'New' button that opens a small modale pannel asking the user which langage he wants (always in english for universality). A list containt every langage, with a search field for quick filtering. Pressing the button 'Start auto-translation' send Ollama a request based on the en.json file, to translate only the words and sentences (not the meta. references) and awnser in JSON only. The format MUST be check before validating. 3 retry maximum. The user stays inform of the progress with a badge-like steps visuals. Once the jobs is finished, the new (lang).json file can be writen in the correct folder, added to the .gitignore to not be erase during next update, and the UI refreshed with the new langage".
+
+  - id: INFRA-12
+    name: "i18n-aware notifications (subject + body follow site language)"
+    status: DONE
+    effort: M
+    priority: P1
+    files: [app/services/orchestrator.py, app/services/meta_service.py, app/main.py, app/utils/notification_i18n.py, app/models.py, app/routers/config.py, static/js/i18n.js]
+    notes: |
+      Notification templates now follow the site language (GlobalConfig.site_lang).
+      IMPORTANT for future devs: when adding new notifications, use the backend i18n helper:
+        from app.utils.notification_i18n import nt
+        lang = config.site_lang or 'fr'  # (or global_cfg.site_lang)
+        subject = nt('your_key', lang)
+      To add a new translated string: add the key in the "notifications" section of the language JSON files in static/i18n/ (e.g., en.json, fr.json).
+      The site language is synced from the frontend header to GlobalConfig.site_lang via PUT /api/config/site-lang.
 
 
 # ─────────────────────────────────────────────

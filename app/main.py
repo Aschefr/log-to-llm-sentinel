@@ -170,8 +170,10 @@ async def lifespan(app: FastAPI):
                                 config = db.query(GlobalConfig).first()
                                 if config:
                                     notifier = NotificationService()
-                                    subject = f"[Sentinel ALERTE] Inactivité détectée : {rule.name}"
-                                    body = f"<p>Aucune ligne reçue sur la règle <b>{rule.name}</b> depuis plus de {rule.inactivity_period_hours} heures.</p><p>Dernière ligne : {rule.last_line_received_at.strftime('%Y-%m-%d %H:%M:%S')}</p>"
+                                    from app.utils.notification_i18n import nt
+                                    lang = config.site_lang or 'fr'
+                                    subject = nt('inactivity_subject', lang).format(rule_name=rule.name)
+                                    body = nt('inactivity_body', lang).format(rule_name=rule.name, hours=rule.inactivity_period_hours, last_received=rule.last_line_received_at.strftime('%Y-%m-%d %H:%M:%S'))
                                     config_dict = {
                                         "smtp_host": config.smtp_host, "smtp_port": config.smtp_port,
                                         "smtp_user": config.smtp_user, "smtp_password": config.smtp_password,

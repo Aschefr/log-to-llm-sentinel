@@ -93,6 +93,12 @@
             _translations = await res.json();
             _currentLang = lang;
             localStorage.setItem('sentinel_lang', lang);
+            // Sync site language to backend for notifications
+            fetch('/api/config/site-lang', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lang: lang })
+            }).catch(e => console.warn('[i18n] Failed to sync site language:', e));
             applyTranslations();
             // Déclencher les callbacks de re-rendu (ex: re-render les listes dynamiques)
             _reRenderCallbacks.forEach(cb => { try { cb(lang); } catch (e) { console.warn('i18n reRender callback error:', e); } });

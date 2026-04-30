@@ -27,14 +27,14 @@ class NotificationService:
         Envoie une notification selon la méthode configurée.
         """
         method = config.get("notification_method", "smtp")
-        logger.debug("NotificationService", f"Méthode de notification : {method}")
+        logger.debug("Notification", f"Méthode de notification : {method}")
 
         if method == "smtp":
             return self._send_smtp(subject, body, config, to_email)
         elif method == "apprise":
             return self._send_apprise(subject, body, config)
         else:
-            logger.warning("NotificationService", f"Méthode inconnue: {method}")
+            logger.warning("Notification", f"Méthode inconnue: {method}")
             return False
 
     def _send_smtp(
@@ -58,13 +58,13 @@ class NotificationService:
 
         recipient = to_email or smtp_recipient or smtp_user
 
-        logger.debug("NotificationService", (
+        logger.debug("Notification", (
             f"SMTP → host={smtp_host} port={smtp_port} user={smtp_user} "
             f"mode={ssl_mode} recipient={recipient}"
         ))
 
         if not all([smtp_host, smtp_user, smtp_password]):
-            logger.error("NotificationService", "Configuration SMTP incomplète (host/user/password manquants)")
+            logger.error("Notification", "Configuration SMTP incomplète (host/user/password manquants)")
             return False
 
         try:
@@ -78,29 +78,29 @@ class NotificationService:
 
             if ssl_mode == "ssl":
                 # Connexion directement en SSL (port 465)
-                logger.debug("NotificationService", f"Connexion SMTP_SSL sur {smtp_host}:{smtp_port}")
+                logger.debug("Notification", f"Connexion SMTP_SSL sur {smtp_host}:{smtp_port}")
                 server = smtplib.SMTP_SSL(smtp_host, smtp_port, context=context)
                 server.ehlo()
             else:
                 # Connexion plain puis upgrade STARTTLS si demandé
-                logger.debug("NotificationService", f"Connexion SMTP plain sur {smtp_host}:{smtp_port}")
+                logger.debug("Notification", f"Connexion SMTP plain sur {smtp_host}:{smtp_port}")
                 server = smtplib.SMTP(smtp_host, smtp_port)
                 server.ehlo()
                 if ssl_mode == "starttls":
-                    logger.debug("NotificationService", "Lancement STARTTLS")
+                    logger.debug("Notification", "Lancement STARTTLS")
                     server.starttls(context=context)
                     server.ehlo()
 
             server.login(smtp_user, smtp_password)
-            logger.debug("NotificationService", "Login SMTP réussi")
+            logger.debug("Notification", "Login SMTP réussi")
             server.sendmail(smtp_user, recipient, msg.as_string())
             server.quit()
 
-            logger.info("NotificationService", f"Email envoyé à {recipient}")
+            logger.info("Notification", f"Email envoyé à {recipient}")
             return True
 
         except Exception as e:
-            logger.error("NotificationService", f"Erreur SMTP: {e}")
+            logger.error("Notification", f"Erreur SMTP: {e}")
             return False
 
     def _send_apprise(
@@ -116,10 +116,10 @@ class NotificationService:
         """
         apprise_url = config.get("apprise_url", "")
         if not apprise_url:
-            logger.warning("NotificationService", "URL Apprise non configurée")
+            logger.warning("Notification", "URL Apprise non configurée")
             return False
 
-        logger.debug("NotificationService", f"Apprise POST → {apprise_url}")
+        logger.debug("Notification", f"Apprise POST → {apprise_url}")
 
         try:
             # Discord et d'autres services ont des limites de caractères (souvent 2000).
@@ -142,7 +142,7 @@ class NotificationService:
                 payload["tags"] = apprise_tags
 
             data_str = json.dumps(payload)
-            logger.debug("NotificationService", f"Apprise Payload: {data_str}")
+            logger.debug("Notification", f"Apprise Payload: {data_str}")
             
             data = data_str.encode("utf-8")
             req = urllib.request.Request(
@@ -154,7 +154,7 @@ class NotificationService:
 
             with urllib.request.urlopen(req, timeout=10) as response:
                 status = getattr(response, "status", 200)
-                logger.debug("NotificationService", f"Apprise réponse HTTP {status}")
+                logger.debug("Notification", f"Apprise réponse HTTP {status}")
                 return 200 <= status < 300
 
         except urllib.error.HTTPError as e:
@@ -163,8 +163,8 @@ class NotificationService:
                 error_body = e.read().decode("utf-8")
             except:
                 pass
-            logger.error("NotificationService", f"Erreur Apprise HTTP {e.code}: {e.reason} - {error_body}")
+            logger.error("Notification", f"Erreur Apprise HTTP {e.code}: {e.reason} - {error_body}")
             return False
         except Exception as e:
-            logger.error("NotificationService", f"Erreur Apprise: {e}")
+            logger.error("Notification", f"Erreur Apprise: {e}")
             return False

@@ -49,6 +49,7 @@ def init_db():
         "ALTER TABLE rules ADD COLUMN inactivity_period_hours INTEGER DEFAULT 1",
         "ALTER TABLE rules ADD COLUMN inactivity_notify BOOLEAN DEFAULT 1",
         "ALTER TABLE rules ADD COLUMN inactivity_notified BOOLEAN DEFAULT 0",
+        "ALTER TABLE global_config ADD COLUMN site_lang VARCHAR DEFAULT 'fr'",
     ]
     with engine.connect() as conn:
         for sql in migrations:

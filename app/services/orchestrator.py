@@ -10,6 +10,7 @@ from app.services.ollama_service import OllamaService
 from app.services.notification_service import NotificationService
 from app.utils.log_utils import clean_log_line
 from app import logger
+from app.utils.notification_i18n import nt
 
 
 class Orchestrator:
@@ -258,35 +259,37 @@ class Orchestrator:
             import json
             matched_keywords = json.loads(analysis.matched_keywords_json)
             
+        lang = config.get("site_lang", config.get("ollama_prompt_lang", "fr"))
+        logger.debug("Notification", f"Notification lang={lang} (site_lang={config.get('site_lang')}, ollama_prompt_lang={config.get('ollama_prompt_lang')})")
         det_id_label = f" [ID: {detection_id}]" if detection_id else ""
-        logger.debug("Orchestrator", f"Envoi notification via '{config.get('notification_method')}' pour règle '{rule.name}'")
-        subject = f"[Sentinel] Alerte {severity.upper()} : {rule.name}{det_id_label}"
+        logger.debug("Notification", f"Envoi notification via '{config.get('notification_method')}' pour règle '{rule.name}'")
+        subject = f"[Sentinel] {nt('alert', lang)} {severity.upper()} : {rule.name}{det_id_label}"
         
         severity_emoji = "🔴" if severity == "critical" else "🟠" if severity == "warning" else "🔵"
         
         body = f"""
-        <h2>{severity_emoji} Alerte Log to LLM Sentinel</h2>
-        <p><strong>Règle:</strong> {rule.name}</p>
-        <p><strong>ID de détection:</strong> <code>{detection_id or 'N/A'}</code></p>
-        <p><strong>Mots-clés:</strong> {', '.join(matched_keywords) if matched_keywords else 'N/A'}</p>
+        <h2>{severity_emoji} {nt('alert_title', lang)}</h2>
+        <p><strong>{nt('rule', lang)}:</strong> {rule.name}</p>
+        <p><strong>{nt('detection_id', lang)}:</strong> <code>{detection_id or 'N/A'}</code></p>
+        <p><strong>{nt('keywords', lang)}:</strong> {', '.join(matched_keywords) if matched_keywords else 'N/A'}</p>
         <hr/>
-        <p><strong>Ligne déclenchante:</strong></p>
+        <p><strong>{nt('triggered_line', lang)}:</strong></p>
         <pre><code>{line}</code></pre>
-        <p><strong>Analyse Ollama:</strong></p>
+        <p><strong>{nt('ollama_analysis', lang)}:</strong></p>
         <blockquote>{response}</blockquote>
-        <p><strong>Sévérité:</strong> {severity.upper()}</p>
+        <p><strong>{nt('severity', lang)}:</strong> {severity.upper()}</p>
         """
         
         # Si Apprise, on prépare une version plus lisible pour Discord/Telegram (souvent Markdown)
         if config.get("notification_method") == "apprise":
-            body = f"""### {severity_emoji} Alerte Sentinel : {rule.name}
-**ID:** `{detection_id or 'N/A'}` | **Sévérité:** {severity.upper()}
-**Mots-clés:** {', '.join(matched_keywords) if matched_keywords else 'N/A'}
+            body = f"""### {severity_emoji} {nt('alert', lang)} Sentinel : {rule.name}
+**ID:** `{detection_id or 'N/A'}` | **{nt('severity', lang)}:** {severity.upper()}
+**{nt('keywords', lang)}:** {', '.join(matched_keywords) if matched_keywords else 'N/A'}
 
-**Ligne:**
+**{nt('triggered_line', lang)}:**
 `{line}`
 
-**Analyse Ollama:**
+**{nt('ollama_analysis', lang)}:**
 {response}
 """
 
@@ -296,21 +299,8 @@ class Orchestrator:
         lang = config.get("ollama_prompt_lang", "fr")
 
         if config.get("notification_method") == "apprise" and len(body) > max_chars:
-            logger.debug("Orchestrator", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
-            if lang == 'en':
-                summary_prompt = (
-                    f"Summarize the following log analysis for a mobile notification (Discord/Telegram).\n"
-                    f"Use bullet points and clear sections (Problem, Cause, Fix).\n"
-                    f"Limit to {max_chars - 500} characters maximum.\n\n"
-                    f"Analysis:\n{response}"
-                )
-            else:
-                summary_prompt = (
-                    f"Résume l'analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\n"
-                    f"Utilise des puces (bullet points) et des sections claires (Problème, Cause, Solution).\n"
-                    f"Limite-toi à {max_chars - 500} caractères maximum.\n\n"
-                    f"Analyse à résumer :\n{response}"
-                )
+            logger.debug("Notification", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
+            summary_prompt = nt('summary_prompt', lang).format(max_chars=max_chars - 500, response=response)
             async with self._ollama_semaphore:
                 try:
                     summary = await asyncio.wait_for(
@@ -330,13 +320,13 @@ class Orchestrator:
                     summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (60s)"
             if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                 logger.add_ollama_log(summary_prompt, summary, detection_id)
-                notify_body = f"""### {severity_emoji} Alerte Sentinel (Résumé) : {rule.name}
-**ID:** `{detection_id or 'N/A'}` | **Sévérité:** {severity.upper()}
+                notify_body = f"""### {severity_emoji} {nt('alert', lang)} Sentinel ({nt('analysis_summary', lang)}) : {rule.name}
+**ID:** `{detection_id or 'N/A'}` | **{nt('severity', lang)}:** {severity.upper()}
 
-**Résumé de l'analyse :**
+**{nt('analysis_summary', lang)} :**
 {summary}
 
-*(Analyse complète disponible dans l'interface)*"""
+{nt('full_analysis_available', lang)}"""
 
         await asyncio.to_thread(self.notifier.send, subject, notify_body, config)
         analysis.notified = True

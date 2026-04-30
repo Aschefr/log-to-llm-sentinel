@@ -444,5 +444,28 @@
         "progress_label": "Progress: {done}/{total} packets ({pct}%)",
         "resume_info": "Analysis is in progress. You can modify the end date or granularity.",
         "stop_btn": "Stop"
+    },
+    "notifications": {
+        "alert": "Alert",
+        "alert_title": "Log to LLM Sentinel Alert",
+        "rule": "Rule",
+        "detection_id": "Detection ID",
+        "keywords": "Keywords",
+        "triggered_line": "Triggered line",
+        "ollama_analysis": "Ollama Analysis",
+        "severity": "Severity",
+        "analysis_summary": "Analysis summary",
+        "full_analysis_available": "*(Full analysis available in the interface)*",
+        "summary_prompt": "Summarize the following log analysis for a mobile notification (Discord/Telegram).\nUse bullet points and clear sections (Problem, Cause, Fix).\nLimit to {max_chars} characters maximum.\n\nAnalysis:\n{response}",
+        "inactivity_subject": "[Sentinel ALERT] Inactivity detected: {rule_name}",
+        "inactivity_body": "<p>No line received on rule <b>{rule_name}</b> for more than {hours} hours.</p><p>Last line: {last_received}</p>",
+        "meta_subject": "[Sentinel] Meta-Analysis: {config_name}",
+        "meta_title": "Sentinel Meta-Analysis",
+        "period": "Period",
+        "events_analyzed": "Events analyzed",
+        "ia_synthesis": "AI Synthesis",
+        "summary_of_synthesis": "Synthesis summary",
+        "full_synthesis_available": "*(Full synthesis available in the interface)*",
+        "meta_summary_prompt": "Summarize the following meta-analysis for a mobile notification (Discord/Telegram).\nKeep the main trends and critical points.\nUse bullet points.\nLimit to {max_chars} characters maximum.\n\nAnalysis to summarize:\n{response}"
     }
 }

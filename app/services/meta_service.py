@@ -9,6 +9,7 @@ from app.models import Rule, Analysis, GlobalConfig, MetaAnalysisConfig, MetaAna
 from app.services.ollama_service import OllamaService
 from app.services.notification_service import NotificationService
 from app import logger
+from app.utils.notification_i18n import nt
 
 
 def _last_paragraph(text: str, max_len: int = 500) -> str:
@@ -359,38 +360,33 @@ class MetaAnalysisService:
         Envoie une notification globale pour la méta-analyse.
         """
         notifier = NotificationService()
+        lang = global_cfg.site_lang or 'fr'
         
-        subject = f"[Sentinel] Méta-Analyse : {config.name}"
+        subject = nt('meta_subject', lang).format(config_name=config.name)
         
         body_html = f"""
-        <h2>📊 Méta-Analyse Sentinel : {config.name}</h2>
-        <p><strong>Période:</strong> du {result.period_start.strftime('%Y-%m-%d %H:%M')} au {result.period_end.strftime('%Y-%m-%d %H:%M')}</p>
-        <p><strong>Événements analysés:</strong> {result.analyses_count}</p>
+        <h2>📊 {nt('meta_title', lang)} : {config.name}</h2>
+        <p><strong>{nt('period', lang)}:</strong> du {result.period_start.strftime('%Y-%m-%d %H:%M')} au {result.period_end.strftime('%Y-%m-%d %H:%M')}</p>
+        <p><strong>{nt('events_analyzed', lang)}:</strong> {result.analyses_count}</p>
         <hr/>
-        <h3>Synthèse IA :</h3>
+        <h3>{nt('ia_synthesis', lang)} :</h3>
         <blockquote>{result.ollama_response}</blockquote>
         """
         
         notify_body = body_html
 
         if global_cfg.notification_method == "apprise":
-            notify_body = f"""### 📊 Méta-Analyse : {config.name}
-**Période:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
-**Événements:** {result.analyses_count}
+            notify_body = f"""### 📊 {nt('meta_title', lang)} : {config.name}
+**{nt('period', lang)}:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
+**{nt('events_analyzed', lang)}:** {result.analyses_count}
 
-**Synthèse:**
+**{nt('ia_synthesis', lang)}:**
 {result.ollama_response}
 """
             max_chars = global_cfg.apprise_max_chars or 1900
             if len(notify_body) > max_chars:
                 logger.debug("MetaAnalysisService", f"Synthèse trop longue ({len(notify_body)} chars), demande de résumé simplifié à Ollama...")
-                summary_prompt = (
-                    f"Résume la méta-analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\n"
-                    f"Conserve les tendances principales et les points critiques.\n"
-                    f"Utilise des puces (bullet points).\n"
-                    f"Limite-toi à {max_chars - 500} caractères maximum.\n\n"
-                    f"Analyse à résumer :\n{result.ollama_response}"
-                )
+                summary_prompt = nt('meta_summary_prompt', lang).format(max_chars=max_chars - 500, response=result.ollama_response)
                 
                 ollama = OllamaService()
                 try:
@@ -413,14 +409,14 @@ class MetaAnalysisService:
                     summary = f"[Erreur Ollama] {str(e)}"
                     
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
-                    notify_body = f"""### 📊 Méta-Analyse (Résumé) : {config.name}
-**Période:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
-**Événements:** {result.analyses_count}
+                    notify_body = f"""### 📊 {nt('meta_title', lang)} ({nt('summary_of_synthesis', lang)}) : {config.name}
+**{nt('period', lang)}:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
+**{nt('events_analyzed', lang)}:** {result.analyses_count}
 
-**Résumé de la synthèse:**
+**{nt('summary_of_synthesis', lang)}:**
 {summary}
 
-*(Synthèse complète dans l'interface)*
+{nt('full_synthesis_available', lang)}
 """
                 else:
                     notify_body = notify_body[:max_chars-100] + "\n\n... [TRONQUÉ]"
