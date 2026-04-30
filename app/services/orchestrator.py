@@ -27,58 +27,62 @@ class Orchestrator:
         self.notifier = NotificationService()
         self._buffers = {}  # rule_id -> {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
         self._ollama_semaphore = asyncio.Semaphore(1)
-
     async def handle_new_lines(self, rule: Rule, lines: List[str]):
         """Traite les nouvelles lignes pour une règle donnée."""
-        if not rule.enabled:
-            return
+        db = SessionLocal()
+        try:
+            db_rule = db.query(Rule).filter(Rule.id == rule.id).first()
+            if not db_rule or not db_rule.enabled:
+                return
 
-        logger.debug("Orchestrator", f"Régle '{rule.name}' — {len(lines)} nouvelle(s) ligne(s) reçue(s)")
+            logger.debug("Orchestrator", f"Régle '{db_rule.name}' — {len(lines)} nouvelle(s) ligne(s) reçue(s)")
 
-        keywords = rule.get_keywords()
-        if not keywords:
-            logger.debug("Orchestrator", f"Règle '{rule.name}' : aucun mot-clé configuré, ignorée")
-            return
+            keywords = db_rule.get_keywords()
+            if not keywords:
+                logger.debug("Orchestrator", f"Règle '{db_rule.name}' : aucun mot-clé configuré, ignorée")
+                return
 
-        excluded = rule.get_excluded_patterns()
+            excluded = db_rule.get_excluded_patterns()
 
-        # Filtrer les lignes contenant au moins un mot-clé
-        matching_lines = []
-        for line in lines:
-            # 1. Exclusion patterns (negative keywords) — priorité max
-            if excluded and any(pat.lower() in line.lower() for pat in excluded):
-                logger.debug("Orchestrator", f"Ligne exclue (pattern d'exclusion) pour '{rule.name}' : {line[:80]}")
-                continue
-            # 2. Positive keyword match
-            if any(kw.lower() in line.lower() for kw in keywords):
-                matching_lines.append(line)
-                logger.debug("Orchestrator", f"Match '{rule.name}' | kw dans : {line[:120]}")
+            # Filtrer les lignes contenant au moins un mot-clé
+            matching_lines = []
+            for line in lines:
+                # 1. Exclusion patterns (negative keywords) — priorité max
+                if excluded and any(pat.lower() in line.lower() for pat in excluded):
+                    logger.debug("Orchestrator", f"Ligne exclue (pattern d'exclusion) pour '{db_rule.name}' : {line[:80]}")
+                    continue
+                # 2. Positive keyword match
+                if any(kw.lower() in line.lower() for kw in keywords):
+                    matching_lines.append(line)
+                    logger.debug("Orchestrator", f"Match '{db_rule.name}' | kw dans : {line[:120]}")
 
-        if not matching_lines:
-            logger.debug("Orchestrator", f"Règle '{rule.name}' : aucune correspondance")
-            return
+            if not matching_lines:
+                logger.debug("Orchestrator", f"Règle '{db_rule.name}' : aucune correspondance")
+                return
 
+            rule_id = db_rule.id
+            # Ajouter au buffer de cette règle
+            if rule_id not in self._buffers:
+                self._buffers[rule_id] = {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
 
-        # Ajouter au buffer de cette règle
-        if rule.id not in self._buffers:
-            self._buffers[rule.id] = {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
+            # Générer un detection_id unique si c'est la première détection de ce cycle
+            if self._buffers[rule_id]["detection_id"] is None:
+                self._buffers[rule_id]["detection_id"] = uuid.uuid4().hex[:8]
+                logger.debug("Orchestrator", f"Nouveau cycle de détection — ID: {self._buffers[rule_id]['detection_id']}")
 
-        # Générer un detection_id unique si c'est la première détection de ce cycle
-        if self._buffers[rule.id]["detection_id"] is None:
-            self._buffers[rule.id]["detection_id"] = uuid.uuid4().hex[:8]
-            logger.debug("Orchestrator", f"Nouveau cycle de détection — ID: {self._buffers[rule.id]['detection_id']}")
+            self._buffers[rule_id]["lines"].extend(matching_lines)
 
-        self._buffers[rule.id]["lines"].extend(matching_lines)
+            # Collecter les mots-clés matchés
+            for line in matching_lines:
+                for kw in keywords:
+                    if kw.lower() in line.lower():
+                        self._buffers[rule_id]["matched_keywords"].add(kw)
 
-        # Collecter les mots-clés matchés
-        for line in matching_lines:
-            for kw in keywords:
-                if kw.lower() in line.lower():
-                    self._buffers[rule.id]["matched_keywords"].add(kw)
-
-        # Démarrer le timer anti-spam si pas déjà en cours
-        if self._buffers[rule.id]["task"] is None:
-            self._buffers[rule.id]["task"] = asyncio.create_task(self._flush_buffer(rule.id))
+            # Démarrer le timer anti-spam si pas déjà en cours
+            if self._buffers[rule_id]["task"] is None:
+                self._buffers[rule_id]["task"] = asyncio.create_task(self._flush_buffer(rule_id))
+        finally:
+            db.close()
 
     async def _flush_buffer(self, rule_id: int):
         """Attend le délai anti-spam puis traite toutes les lignes accumulées."""

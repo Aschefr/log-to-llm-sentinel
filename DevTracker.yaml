@@ -91,6 +91,15 @@ infrastructure:
     status: DONE
     files: [app/services/log_watcher.py]
 
+  - id: INFRA-11
+    name: "Auto-translation with Ollama for new langage user request"
+    status: TODO
+    effort: XL
+    priority: P3
+    files: [static/js/i18n.js, app/routers/i18n.py, static/i18n/en.json, static/i18n/fr.json, static/i18n/en.json]
+    notes: "In the langage menu, under current langage files, add a 'New' button that opens a small modale pannel asking the user which langage he wants (always in english for universality). A list containt every langage, with a search field for quick filtering. Pressing the button 'Start auto-translation' send Ollama a request based on the en.json file, to translate only the words and sentences (not the meta. references) and awnser in JSON only. The format MUST be check before validating. 3 retry maximum. The user stays inform of the progress with a badge-like steps visuals. Once the jobs is finished, the new (lang).json file can be writen in the correct folder, added to the .gitignore to not be erase during next update, and the UI refreshed with the new langage".
+
+
 # ─────────────────────────────────────────────
 # UX TRANSVERSALE
 # ─────────────────────────────────────────────
@@ -315,6 +324,20 @@ monitor:
     priority: P2
     notes: "Replace window.confirm() with the app's custom confirmation box for rule/analysis deletion in Monitor."
 
+  - id: MON-14
+    name: "Show the date/time (local) of the latest received line, and the latest analysed line"
+    status: TODO
+    effort: S
+    priority: P1
+    notes: "Juste above the real-imte log panel, show the local date and time of the latest line appearing, and the local date and time of the latest analysed line"
+
+  - id: MON-15
+    name: "Detect log inactivity"
+    status: TODO
+    effort: L
+    priority: P1
+    notes: "Add a new 'log inactivity warning' period in the configuration modale of the Rules, with a notification toggle on/off and a period setting in hours set to 12h by defaults. Devide the 'Buffer active' plate in half, and put a similar plate next to it (horizontaly) with a similar light and text saying 'Inactivity detected' with a reminder of the latest date/time (local) of the latest line"
+
 # ─────────────────────────────────────────────
 # META-ANALYSIS
 # ─────────────────────────────────────────────
@@ -333,17 +356,17 @@ auto_learning:
     status: TODO
     effort: L
     priority: P2
-    notes: "AI should propose noise patterns to exclude, not just positive keywords."
+    notes: "AI should propose noise patterns to exclude, not just positive keywords. Low sensitity. maximum exclude key-words = 2, 2 word wide ("heartbeat check" is ok, "heartbeat response signal" is not)"
 
 # ─────────────────────────────────────────────
 # RULES PAGE
 # ─────────────────────────────────────────────
 rules:
   - id: RULE-01
-    name: "Evaluate hiding/removing Rules page"
+    name: "Evaluate removing Rules page"
     status: TODO
     effort: M
-    priority: P3
+    priority: P1
     notes: "If risky: hide from nav, keep accessible via direct URL."
 
 # ─────────────────────────────────────────────
@@ -362,7 +385,7 @@ config:
     name: "Discord bot (native integration)"
     status: TODO
     effort: L
-    priority: P3
+    priority: P2
     notes: "Apprise handles Discord but is hard to install for beginners. Native bot = simpler UX."
 
   - id: CFG-04
