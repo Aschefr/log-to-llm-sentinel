@@ -210,7 +210,22 @@
         "mode_de_reponse": "=== Contexte Automatique ===\nDate et heure actuelles : {datetime}\nLangue de réponse : {lang}\n\nLa plateforme de chat fait partie d'un environnement d'analyse de fichiers de log choisis par l'utilisateur.\nA titre informatif, voici les règles et fichiers surveillés :\n{rules_list}\n\n=== Mode de réponse (IMPORTANT) ===\nRéponds de manière directe, sans fioritures ni explications approfondies à moins que l'utilisateur ne le demande.",
         "generation_cancelled": "Génération annulée.",
         "error_create_conv": "Erreur lors de la création de la conversation :",
-        "context_usage": "Utilisation du contexte"
+        "context_usage": "Utilisation du contexte",
+        "archive_label": "Système (Archive)",
+        "compressed_context": "Contexte Compressé",
+        "click_to_expand": "(Cliquer pour développer)",
+        "restore_history": "Restaurer l'historique",
+        "save": "Enregistrer",
+        "compression_loading": "Compression de l'historique en cours...",
+        "restore_confirm": "Voulez-vous vraiment restaurer l'historique complet ? Cela annulera la compression et augmentera fortement l'utilisation du contexte.",
+        "compression_mode": "Gestion automatique du contexte saturé",
+        "compression_mode_ask": "Toujours demander",
+        "compression_mode_truncate": "Tronquer les plus anciens (Perte de mémoire)",
+        "compression_mode_compact": "Compacter (Réduction des blancs, pas de perte)",
+        "compression_mode_summary": "Résumé IA (Conservation du sens, coût LLM)",
+        "truncated_banner": "Contexte tronqué",
+        "truncated_info": "messages anciens exclus du contexte",
+        "truncated_detail": "Messages exclus du contexte Ollama"
     },
     "config": {
         "title": "Configuration Globale",

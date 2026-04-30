@@ -212,35 +212,45 @@ chat:
         effort: S
       - id: CHAT-07c
         name: "Overflow warning + user choice: continue / truncate / compress"
+        status: DONE
         effort: L
       - id: CHAT-07d
         name: "Persist choice + display above conversation window"
+        status: DONE
         effort: S
       - id: CHAT-07e
         name: "Compaction mode (~50% compression, 0% quality loss)"
+        status: DONE
         effort: XL
         notes: "Token-level noise removal, exact terms preserved. Ref: morphllm.com/context-compression"
       - id: CHAT-07f
         name: "Summary mode (~70% compression, ~20% quality loss)"
+        status: DONE
         effort: L
         notes: "Ollama generates structured summary with errors, diagnostics, pending tasks."
       - id: CHAT-07g
         name: "Compression progress indicator"
+        status: DONE
         effort: S
       - id: CHAT-07h
         name: "Compressed context bubble (collapsed, different color, editable)"
+        status: DONE
         effort: M
       - id: CHAT-07i
         name: "Auto-resend prompt after compression completes"
+        status: DONE
         effort: S
       - id: CHAT-07j
         name: "Edit compressed: Cancel / Validate / Restart-with-edits buttons"
+        status: DONE
         effort: M
       - id: CHAT-07k
         name: "Delete compressed context option (revert to full history)"
+        status: DONE
         effort: S
       - id: CHAT-07l
         name: "Fill bar ignores text before latest compression"
+        status: DONE
         effort: S
 
   - id: CHAT-08

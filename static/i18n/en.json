@@ -210,7 +210,22 @@
         "mode_de_reponse": "=== Automatic Context ===\nCurrent date and time: {datetime}\nResponse language: {lang}\n\nThe chat platform is part of a log file analysis environment chosen by the user.\nFor your information, here are the monitored rules and files:\n{rules_list}\n\n=== Response Mode (IMPORTANT) ===\nAnswer directly, without fluff or deep explanations unless the user asks for it.",
         "generation_cancelled": "Generation cancelled.",
         "error_create_conv": "Error creating conversation:",
-        "context_usage": "Context Usage"
+        "context_usage": "Context Usage",
+        "archive_label": "System (Archive)",
+        "compressed_context": "Compressed Context",
+        "click_to_expand": "(Click to expand)",
+        "restore_history": "Restore history",
+        "save": "Save",
+        "compression_loading": "Compressing history...",
+        "restore_confirm": "Are you sure you want to restore the full history? This will cancel the compression and greatly increase context usage.",
+        "compression_mode": "Automatic saturated context management",
+        "compression_mode_ask": "Always ask",
+        "compression_mode_truncate": "Truncate oldest (Memory loss)",
+        "compression_mode_compact": "Compact (Remove whitespace, no loss)",
+        "compression_mode_summary": "AI Summary (Preserve meaning, LLM cost)",
+        "truncated_banner": "Context truncated",
+        "truncated_info": "old messages excluded from context",
+        "truncated_detail": "Messages excluded from Ollama context"
     },
     "config": {
         "title": "Global Configuration",

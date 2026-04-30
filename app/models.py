@@ -108,6 +108,11 @@ class ChatConversation(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     analysis_id = Column(Integer, ForeignKey("analyses.id"), nullable=True)
     
+    # Compression fields
+    compression_mode = Column(String, nullable=True) # 'compact', 'summary'
+    compressed_context = Column(Text, nullable=True)
+    compressed_at = Column(DateTime, nullable=True)
+    
     messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan")
 
 class ChatMessage(Base):

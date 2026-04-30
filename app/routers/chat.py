@@ -98,6 +98,9 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
         "title": conv.title,
         "analysis_id": conv.analysis_id,
         "analysis": analysis,
+        "compression_mode": conv.compression_mode,
+        "compressed_context": conv.compressed_context,
+        "compressed_at": conv.compressed_at.isoformat() if conv.compressed_at else None,
         "messages": [
             {"role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
             for m in messages
@@ -110,7 +113,10 @@ def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
     if not conv:
         return "", 4096
         
-    history = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).order_by(ChatMessage.created_at.asc()).all()
+    history_query = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id)
+    if conv.compressed_at:
+        history_query = history_query.filter(ChatMessage.created_at > conv.compressed_at)
+    history = history_query.order_by(ChatMessage.created_at.asc()).all()
     
     # 1. Charger la configuration de base (System Prompt & Mode Text)
     cfg = db.query(GlobalConfig).first()
@@ -132,7 +138,7 @@ def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
     for r in active_rules:
         ctx = f" (Context: {r.application_context})" if r.application_context else ""
         rules_lines.append(f"- {r.name}{ctx}")
-    rules_list_str = "\n".join(rules_lines) if rules_lines else "- Aucune règle configurée"
+    rules_list_str = "\\n".join(rules_lines) if rules_lines else "- Aucune règle configurée"
     
     if mode_text:
         mode_text = mode_text.replace("{datetime}", current_dt)
@@ -144,7 +150,13 @@ def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
     if system_prompt:
         block_lines.extend([system_prompt, ""])
         
-    if conv.analysis_id:
+    if conv.compressed_context:
+        block_lines.extend([
+            "=== Contexte Compressé ===",
+            conv.compressed_context,
+            ""
+        ])
+    elif conv.analysis_id:
         analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
         if analysis:
             rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
@@ -166,16 +178,163 @@ def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
     if mode_text:
         block_lines.append(mode_text)
 
-    prompt = "\n".join(block_lines).strip() + "\n\n" if block_lines else ""
+    prompt = "\\n".join(block_lines).strip() + "\\n\\n" if block_lines else ""
 
     # 3. Ajouter l'historique de la conversation
-    for m in history[-10:]:
+    # On limite à 20 messages récents au lieu de 10 car le contexte est géré
+    for m in history[-20:]:
         role_label = "Utilisateur" if m.role == "user" else "Assistant"
-        prompt += f"{role_label} : {m.content}\n"
+        prompt += f"{role_label} : {m.content}\\n"
     
     ollama_ctx = cfg.ollama_ctx if cfg else 4096
     
     return prompt, ollama_ctx
+
+
+import uuid
+from pydantic import BaseModel
+from app.utils.compression import run_compaction, run_summary, run_truncation
+
+_compression_tasks = {}
+
+class CompressRequest(BaseModel):
+    mode: str
+
+@router.post("/api/compress/{conv_id}")
+async def start_compression(conv_id: int, req: CompressRequest, db: Session = Depends(get_db)):
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+        
+    history = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).order_by(ChatMessage.created_at.asc()).all()
+    
+    # Filtrer les messages déjà compressés
+    messages_to_process = []
+    for m in history:
+        if conv.compressed_at and m.created_at <= conv.compressed_at:
+            continue
+        messages_to_process.append(m)
+    
+    if not messages_to_process:
+        raise HTTPException(status_code=400, detail="Aucun message à compresser")
+    
+    if req.mode == "truncate":
+        # Truncate : garder les récents, résumer les anciens en une ligne chacun
+        cfg = db.query(GlobalConfig).first()
+        max_ctx = cfg.ollama_ctx if cfg else 4096
+        
+        dropped, kept = run_truncation(messages_to_process, max_ctx)
+        
+        if not dropped:
+            return {"status": "done", "mode": "truncate", "message": "Rien à tronquer"}
+        
+        # Construire le résumé des messages tronqués
+        dropped_lines = []
+        for m in dropped:
+            role_label = "U" if m.role == "user" else "A"
+            first_line = m.content.strip().split('\n')[0][:120]
+            dropped_lines.append(f"- {role_label}: {first_line}")
+        
+        compressed = "[Tronqué]\n" + "\n".join(dropped_lines)
+        
+        # Cutoff = timestamp du premier message GARDÉ (les kept restent visibles)
+        cutoff_time = kept[0].created_at if kept else datetime.utcnow()
+        # Reculer d'1 seconde pour que le premier kept passe le filtre ">"
+        from datetime import timedelta
+        cutoff_time = cutoff_time - timedelta(seconds=1)
+        
+        conv.compression_mode = "truncate"
+        conv.compressed_context = compressed
+        conv.compressed_at = cutoff_time
+        db.commit()
+        
+        return {"status": "done", "mode": "truncate"}
+    
+    # Pour compact et summary : construire le texte complet
+    text_to_compress = ""
+    if conv.analysis_id and not conv.compressed_at:
+        a = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
+        if a:
+            text_to_compress += f"=== Analyse initiale ===\n{a.triggered_line}\n{a.ollama_response}\n\n"
+            
+    for m in messages_to_process:
+        role_label = "Utilisateur" if m.role == "user" else "Assistant"
+        text_to_compress += f"{role_label} : {m.content}\n\n"
+        
+    text_to_compress = text_to_compress.strip()
+    cutoff_time = datetime.utcnow()
+    
+    if req.mode in ("compact", "summary"):
+        task_id = str(uuid.uuid4())
+        _compression_tasks[task_id] = {"status": "running", "result": None, "error": None}
+        
+        async def background_compress(t_id, txt, cid, dt, mode):
+            try:
+                if not _orchestrator:
+                    raise Exception("Orchestrator non initialisé")
+                    
+                url = "http://ollama:11434"
+                model = "gemma4:e4b"
+                ctx_size = 4096
+                with SessionLocal() as s:
+                    cfg = s.query(GlobalConfig).first()
+                    if cfg:
+                        url = cfg.ollama_url or url
+                        model = cfg.ollama_model or model
+                        ctx_size = cfg.ollama_ctx or ctx_size
+
+                if mode == "compact":
+                    res = await run_compaction(txt, _orchestrator.ollama, url, model, num_ctx=ctx_size)
+                else:
+                    res = await run_summary(txt, _orchestrator.ollama, url, model, num_ctx=ctx_size)
+                
+                with SessionLocal() as s:
+                    c = s.query(ChatConversation).filter(ChatConversation.id == cid).first()
+                    if c:
+                        c.compression_mode = mode
+                        c.compressed_context = res
+                        c.compressed_at = dt
+                        s.commit()
+                _compression_tasks[t_id]["status"] = "done"
+                _compression_tasks[t_id]["result"] = res
+            except Exception as e:
+                _compression_tasks[t_id]["status"] = "error"
+                _compression_tasks[t_id]["error"] = str(e)
+                
+        asyncio.create_task(background_compress(task_id, text_to_compress, conv_id, cutoff_time, req.mode))
+        return {"status": "running", "task_id": task_id}
+        
+    else:
+        raise HTTPException(status_code=400, detail="Mode invalide")
+
+@router.get("/api/compress/status/{task_id}")
+async def get_compression_status(task_id: str):
+    if task_id not in _compression_tasks:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return _compression_tasks[task_id]
+
+@router.delete("/api/compress/{conv_id}")
+async def revert_compression(conv_id: int, db: Session = Depends(get_db)):
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    conv.compression_mode = None
+    conv.compressed_context = None
+    conv.compressed_at = None
+    db.commit()
+    return {"status": "ok"}
+
+@router.put("/api/compress/{conv_id}")
+async def update_compression(conv_id: int, data: dict, db: Session = Depends(get_db)):
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    new_context = data.get("compressed_context")
+    if not new_context:
+        raise HTTPException(status_code=400, detail="compressed_context requis")
+    conv.compressed_context = new_context
+    db.commit()
+    return {"status": "ok"}
 
 @router.get("/api/context/{conv_id}")
 async def get_chat_context(conv_id: int, db: Session = Depends(get_db)):

@@ -58,11 +58,14 @@ def add_ollama_log(prompt: str, response: str, detection_id: str = None):
     """Enregistre un appel Ollama (Prompt complet / Réponse tronquée) pour le débug."""
     if not _get_debug_mode():
         return
+    # Garder la réponse complète pour les logs de compression
+    is_compression = detection_id and detection_id.startswith("compression-")
+    resp_display = response if is_compression else (response[:250] + "..." if len(response) > 250 else response)
     entry = {
         "timestamp": _now(),
         "detection_id": detection_id,
         "prompt": prompt,
-        "response": response[:250] + "..." if len(response) > 250 else response
+        "response": resp_display
     }
     OLLAMA_BUFFER.append(entry)
     if len(OLLAMA_BUFFER) > MAX_OLLAMA_LOGS:

@@ -44,12 +44,33 @@
                 </div>
             </header>
 
+            <div id="truncation-banner" class="hidden" style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--success); border-radius: 0.5rem; margin: 0 1rem; padding: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0.75rem; cursor: pointer;" onclick="document.getElementById('truncation-detail').classList.toggle('hidden')">
+                    <span style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="color: var(--success); font-weight: 600; font-size: 0.85rem;">🗜️ <span data-i18n="chat.truncated_banner">Contexte tronqué</span></span>
+                        <span id="truncation-count" style="font-size: 0.75rem; opacity: 0.7;"></span>
+                    </span>
+                    <span style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 0.75rem; opacity: 0.6;">▼</span>
+                        <button class="btn btn-sm btn-danger" id="truncation-cancel-btn" style="font-size: 0.7rem; padding: 0.15rem 0.5rem;" onclick="event.stopPropagation()">✕ <span data-i18n="chat.restore_history">Annuler</span></button>
+                    </span>
+                </div>
+                <div id="truncation-detail" class="hidden" style="border-top: 1px solid rgba(16, 185, 129, 0.2); padding: 0.5rem 0.75rem; max-height: 40vh; overflow-y: auto;">
+                    <div style="font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--success);" data-i18n="chat.truncated_detail">Messages exclus du contexte Ollama</div>
+                    <div id="truncation-messages" style="font-size: 0.8rem; font-family: monospace; opacity: 0.8;"></div>
+                </div>
+            </div>
+
             <div id="chat-messages" class="chat-messages-container">
                 <!-- Les messages s'affichent ici -->
             </div>
 
             <footer class="chat-footer">
 <div class="context-bar-wrapper" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem; display: none;" id="context-bar-container">
+    <div id="context-warning" class="hidden" style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--danger); padding: 0.5rem; border-radius: 0.4rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.8rem; color: var(--danger);">⚠️ Contexte saturé</span>
+        <button class="btn btn-sm" style="background: var(--danger); color: white; padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="openCompressionModal()">Gérer l'espace</button>
+    </div>
                     <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
                         <span data-i18n="chat.context_usage">Utilisation du contexte</span>
                         <span id="context-usage-text">0 / 4096 tokens</span>
@@ -72,6 +93,34 @@
         </div>
     </main>
 
+
+    <!-- Compression Modal -->
+    <div id="compression-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Gérer l'espace du contexte</h2>
+                <button type="button" class="btn-close" onclick="closeCompressionModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.9rem; margin-bottom: 1rem; color: var(--text-secondary);">Le contexte approche de sa limite maximale. Choisissez comment libérer de l'espace pour continuer l'analyse :</p>
+                <div class="form-group">
+                    <button class="btn btn-secondary" style="width: 100%; text-align: left; margin-bottom: 0.5rem;" onclick="applyCompression('truncate')">
+                        <strong>1. Tronquer (Automatique)</strong><br>
+                        <span style="font-size: 0.8rem; opacity: 0.8;">Le système oubliera les plus anciens messages de l'historique de manière glissante. (0 délai)</span>
+                    </button>
+                    <button class="btn btn-secondary" style="width: 100%; text-align: left; margin-bottom: 0.5rem;" onclick="applyCompression('compact')">
+                        <strong>2. Compacter l'historique</strong><br>
+                        <span style="font-size: 0.8rem; opacity: 0.8;">Supprime les espaces et doublons inutiles sans altérer le sens (Gain ~30-50%, 0 délai).</span>
+                    </button>
+                    <button class="btn btn-primary" style="width: 100%; text-align: left;" onclick="applyCompression('summary')">
+                        <strong>3. Résumer par l'IA (Recommandé)</strong><br>
+                        <span style="font-size: 0.8rem; opacity: 0.8;">Demande à l'IA de faire un résumé ultra-concis de tout l'historique. (Gain ~70%, prend quelques secondes).</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div id="chat-settings-modal" class="modal hidden">
         <div class="modal-content" style="max-width: 800px;">
@@ -86,6 +135,16 @@
                         <option value="" data-i18n="chat.lang_site_default">Par défaut (Langue du site)</option>
                         <option value="fr">Français</option>
                         <option value="en">English</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 1rem; margin-top: 1rem;">
+                    <label class="form-label" data-i18n="chat.compression_mode">Gestion automatique du contexte saturé</label>
+                    <select class="form-select" id="chat-auto-compression-select" onchange="localStorage.setItem('chat_auto_compression_mode', this.value); markChatSettingsDirty()">
+                        <option value="" data-i18n="chat.compression_mode_ask">Toujours demander</option>
+                        <option value="truncate" data-i18n="chat.compression_mode_truncate">Tronquer les plus anciens (Perte de mémoire)</option>
+                        <option value="compact" data-i18n="chat.compression_mode_compact">Compacter (Réduction des blancs, pas de perte)</option>
+                        <option value="summary" data-i18n="chat.compression_mode_summary">Résumé IA (Conservation du sens, coût LLM)</option>
                     </select>
                 </div>
                 
@@ -663,9 +722,18 @@ function updateContextBar(assistantStreamText = '') {
         fillBar.style.width = pct + '%';
         fillText.textContent = `${tokens} / ${max} tokens`;
         
+
         if (pct < 75) fillBar.style.background = 'var(--success)';
         else if (pct < 90) fillBar.style.background = 'var(--warning)';
         else fillBar.style.background = 'var(--danger)';
+        
+        const warningEl = document.getElementById('context-warning');
+        if (pct >= 95) {
+            warningEl.classList.remove('hidden');
+        } else {
+            warningEl.classList.add('hidden');
+        }
+
     }
 }
 
@@ -700,7 +768,7 @@ function renderConversationList() {
 }
 
 async function deleteConversation(id, btnElement) {
-    showInlineConfirm(btnElement, window.t ? window.t('chat.delete_conversation') : 'Supprimer cette conversation ?', async () => {
+    showInlineConfirm(btnElement, window.t('chat.delete_conversation'), async () => {
         try {
             await apiFetch(`/chat/api/delete/${id}`, { method: 'DELETE' });
             if (activeConvId === id) {
@@ -735,16 +803,81 @@ async function selectConversation(id) {
     await loadHistory(id);
 }
 
+
 async function loadHistory(id) {
     const container = document.getElementById('chat-messages');
     container.innerHTML = `<div class="loading">${window.t('chat.loading_history')}</div>`;
+    
+    // Reset truncation banner
+    const banner = document.getElementById('truncation-banner');
+    banner.classList.add('hidden');
+    document.getElementById('truncation-detail').classList.add('hidden');
     
     try {
         const data = await apiFetch(`/chat/api/history/${id}`);
         document.getElementById('current-chat-title').textContent = data.title;
         
+        const cutoff = data.compressed_at ? new Date(data.compressed_at).getTime() : 0;
+        const isTruncate = data.compression_mode === 'truncate';
         let html = '';
-        if (data.analysis) {
+        
+        // ── Truncate mode: show banner in header ──
+        if (isTruncate && data.compressed_context) {
+            // Count truncated messages
+            let truncatedMsgs = [];
+            data.messages.forEach(m => {
+                if (cutoff && new Date(m.created_at).getTime() <= cutoff) {
+                    truncatedMsgs.push(m);
+                }
+            });
+            
+            banner.classList.remove('hidden');
+            document.getElementById('truncation-count').textContent = 
+                `(${truncatedMsgs.length} ${window.t ? window.t('chat.truncated_info') : 'messages exclus'})`;
+            
+            // Populate detail panel with actual truncated messages
+            const detailHtml = truncatedMsgs.map(m => {
+                const role = m.role === 'user' ? 'U' : 'A';
+                const preview = escapeHtml(m.content.substring(0, 200)) + (m.content.length > 200 ? '...' : '');
+                return `<div style="margin-bottom: 0.3rem; padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);"><strong style="color: ${m.role === 'user' ? 'var(--accent)' : 'var(--success)'};">${role}:</strong> ${preview}</div>`;
+            }).join('');
+            document.getElementById('truncation-messages').innerHTML = detailHtml;
+            
+            // Wire cancel button
+            document.getElementById('truncation-cancel-btn').onclick = function(e) {
+                e.stopPropagation();
+                showInlineConfirm(this, window.t ? window.t('chat.restore_confirm') : 'Restaurer?', async () => {
+                    await apiFetch('/chat/api/compress/' + id, { method: 'DELETE' });
+                    await loadHistory(id);
+                });
+            };
+        }
+        
+        // ── Compact/Summary: inline archive bubble ──
+        let archiveHtml = '';
+        if (data.compressed_context && !isTruncate) {
+            archiveHtml = `
+                <div class="message-wrapper assistant">
+                    <div class="msg-label">${window.t ? window.t('chat.archive_label') : 'Système (Archive)'}</div>
+                    <div class="message-bubble assistant" style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--success); color: var(--text-primary); padding: 0.5rem; width: 100%;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 0.25rem;" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                            <strong style="color: var(--success);"><span aria-hidden="true">🗜️ </span>${window.t ? window.t('chat.compressed_context') : 'Contexte Compressé'} (${escapeHtml(data.compression_mode)})</strong>
+                            <span style="font-size: 0.8rem; opacity: 0.8;">${window.t ? window.t('chat.click_to_expand') : '(Cliquer pour développer)'}</span>
+                        </div>
+                        <div class="hidden" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(16, 185, 129, 0.2);">
+                            <textarea id="edit-compressed-ta" style="width: 100%; height: 60vh; resize: none; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: inherit; font-family: monospace; font-size: 0.8rem; padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 0.25rem;">${escapeHtml(data.compressed_context)}</textarea>
+                            <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                <button class="btn btn-sm btn-danger" onclick="deleteCompression(${id}, this)">🗑️ ${window.t ? window.t('chat.restore_history') : 'Restaurer l\'historique'}</button>
+                                <button class="btn btn-sm btn-primary" onclick="saveCompressionEdit(${id})">💾 ${window.t ? window.t('chat.save') : 'Enregistrer'}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (data.analysis && !cutoff) {
+
             const detectionId = data.analysis.detection_id;
             html += `
                 <div class="msg-label" style="text-align:center; margin-bottom:0.25rem;">${window.t ? window.t('chat.label_context') : 'Analyse attachée'}</div>
@@ -763,7 +896,28 @@ async function loadHistory(id) {
             `;
         }
         
-        html += data.messages.map((m, i) => buildMessageWrapper(m.role, m.content, i)).join('');
+        let archiveInserted = false;
+        data.messages.forEach((m, i) => {
+            const msgTime = new Date(m.created_at).getTime();
+            const isTruncatedMsg = isTruncate && cutoff && msgTime <= cutoff;
+            
+            // For compact/summary: insert archive bubble at cutoff point
+            if (!isTruncate && data.compressed_context && !archiveInserted && cutoff && msgTime > cutoff) {
+                html += archiveHtml;
+                archiveInserted = true;
+            }
+            
+            // Truncated messages: dimmed styling
+            if (isTruncatedMsg) {
+                html += `<div style="opacity: 0.35;">${buildMessageWrapper(m.role, m.content, i)}</div>`;
+            } else {
+                html += buildMessageWrapper(m.role, m.content, i);
+            }
+        });
+        
+        if (!isTruncate && data.compressed_context && !archiveInserted) {
+            html += archiveHtml;
+        }
         
         container.innerHTML = html;
         container.scrollTop = container.scrollHeight;
@@ -1048,10 +1202,27 @@ async function _triggerGeneration(content) {
     readStream(data.task_id, 0, _streamAbort.signal);
 }
 
-async function sendMessage() {
+async function sendMessage(force = false) {
     const input = document.getElementById('chat-input');
     const content = input.value.trim();
     if (!content || !activeConvId) return;
+
+    // Vérification du contexte plein avant envoi
+    if (window._chatContextData && !force) {
+        const base = window._chatContextData.base_prompt;
+        const max = window._chatContextData.ollama_ctx;
+        const fullText = base + "\\nUtilisateur : " + content + "\\nAssistant : ";
+        const tokens = estimateTokens(fullText);
+        if (tokens >= max) {
+            const autoMode = localStorage.getItem('chat_auto_compression_mode');
+            if (autoMode) {
+                applyCompression(autoMode, content);
+                return;
+            }
+            openCompressionModal(content);
+            return;
+        }
+    }
 
     // Passer immédiatement en mode "Arrêter" (avant le fetch asynchrone)
     setSendBtn(true);
@@ -1354,6 +1525,9 @@ async function openChatSettings() {
         document.getElementById('chat-lang-select').value = res.chat_lang || '';
         _previewRulesStr = res.rules_list_str || '- [Aucune règle configurée]';
         
+        const autoMode = localStorage.getItem('chat_auto_compression_mode') || '';
+        document.getElementById('chat-auto-compression-select').value = autoMode;
+
         // Mettre à jour l'aperçu du contexte avec la langue sélectionnée
         await updateContextPreview();
         
@@ -1446,6 +1620,69 @@ async function translateChatPrompt() {
         btn.innerHTML = origText;
         btn.disabled = false;
     }
+}
+
+
+function openCompressionModal() { document.getElementById('compression-modal').classList.remove('hidden'); }
+function closeCompressionModal() { document.getElementById('compression-modal').classList.add('hidden'); }
+
+let _compressionTaskTimer = null;
+async function applyCompression(mode) {
+    closeCompressionModal();
+    const container = document.getElementById('chat-messages');
+    container.innerHTML += `
+        <div id="compression-loader" class="message-bubble context" style="text-align: center; color: #10b981; border-color: rgba(16, 185, 129, 0.3);">
+            <div class="thinking-state" style="justify-content: center;">
+                <span class="thinking-dot" style="background:#10b981"></span><span class="thinking-dot" style="background:#10b981"></span><span class="thinking-dot" style="background:#10b981"></span>
+                <span style="margin-left:0.5rem;">${window.t ? window.t('chat.compression_loading') : 'Compression en cours...'}</span>
+            </div>
+        </div>
+    `;
+    container.scrollTop = container.scrollHeight;
+    
+    try {
+        const res = await apiFetch('/chat/api/compress/' + activeConvId, {
+            method: 'POST',
+            body: { mode: mode }
+        });
+        
+        if (mode === 'truncate') {
+            await loadHistory(activeConvId);
+        } else if (mode === 'compact' || mode === 'summary') {
+            _compressionTaskTimer = setInterval(async () => {
+                const st = await apiFetch('/chat/api/compress/status/' + res.task_id);
+                if (st.status === 'done' || st.status === 'error') {
+                    clearInterval(_compressionTaskTimer);
+                    if (st.status === 'error') alert("Erreur compression : " + st.error);
+                    await loadHistory(activeConvId);
+                }
+            }, 2000);
+        }
+    } catch (e) {
+        alert(e.message);
+        document.getElementById('compression-loader')?.remove();
+    }
+}
+
+async function saveCompressionEdit(id) {
+    const ta = document.getElementById('edit-compressed-ta');
+    if (!ta) return;
+    try {
+        await apiFetch('/chat/api/compress/' + id, {
+            method: 'PUT',
+            body: { compressed_context: ta.value }
+        });
+        await loadHistory(id);
+    } catch(e) { alert(e.message); }
+}
+
+async function deleteCompression(id, btnElement) {
+    showInlineConfirm(btnElement, window.t ? window.t('chat.restore_confirm') : "Voulez-vous vraiment restaurer l'historique complet ?", async () => {
+        try {
+            await apiFetch('/chat/api/compress/' + id, { method: 'DELETE' });
+            await loadHistory(id);
+        } catch(e) { alert(e.message); }
+    });
 }
 
 </script>
