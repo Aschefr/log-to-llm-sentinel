@@ -49,6 +49,15 @@
             </div>
 
             <footer class="chat-footer">
+<div class="context-bar-wrapper" style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem; display: none;" id="context-bar-container">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.2rem;">
+                        <span data-i18n="chat.context_usage">Utilisation du contexte</span>
+                        <span id="context-usage-text">0 / 4096 tokens</span>
+                    </div>
+                    <div class="progress" style="height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden;">
+                        <div id="context-usage-bar" style="height: 100%; width: 0%; background: var(--success); transition: width 0.3s, background 0.3s;"></div>
+                    </div>
+                </div>
                 <div class="chat-input-wrapper">
                     <button class="chat-sidebar-toggle" id="chat-sidebar-toggle" onclick="toggleChatSidebar()" aria-label="Conversations">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -613,6 +622,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         input.addEventListener('input', function() {
             this.style.height = 'auto';
             this.style.height = (this.scrollHeight) + 'px';
+            if (typeof updateContextBar === 'function') updateContextBar();
         });
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -622,6 +632,42 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
+
+
+// ── CHAT-07: Context management ──────────────────────────────────────────────
+window._chatContextData = null;
+
+function estimateTokens(text) {
+    if (!text) return 0;
+    // Heuristic: ~3.5 chars per token for Llama/Gemma models.
+    return Math.ceil(text.length / 3.5);
+}
+
+function updateContextBar(assistantStreamText = '') {
+    if (!window._chatContextData) return;
+    const base = window._chatContextData.base_prompt;
+    const max = window._chatContextData.ollama_ctx;
+    const input = document.getElementById('chat-input').value;
+    
+    // Exact payload the backend will send
+    const fullText = base + "\nUtilisateur : " + input + "\nAssistant : " + assistantStreamText;
+    const tokens = estimateTokens(fullText);
+    
+    const fillBar = document.getElementById('context-usage-bar');
+    const fillText = document.getElementById('context-usage-text');
+    const container = document.getElementById('context-bar-container');
+    
+    if (fillBar && fillText && container) {
+        container.style.display = 'block';
+        const pct = Math.min(100, Math.max(0, (tokens / max) * 100));
+        fillBar.style.width = pct + '%';
+        fillText.textContent = `${tokens} / ${max} tokens`;
+        
+        if (pct < 75) fillBar.style.background = 'var(--success)';
+        else if (pct < 90) fillBar.style.background = 'var(--warning)';
+        else fillBar.style.background = 'var(--danger)';
+    }
+}
 
 async function loadConversations() {
     const list = document.getElementById('conversation-list');
@@ -742,6 +788,9 @@ async function loadHistory(id) {
                 readStream(pending.task_id, 0, _streamAbort.signal);
             }
         } catch (_) { /* pending check optionnel, on ignore les erreurs */ }
+
+        // Mettre à jour la barre de contexte
+        try { window._chatContextData = await apiFetch('/chat/api/context/' + id); updateContextBar(); } catch(_){}
 
     } catch (e) {
         container.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('chat.error_network') : 'Erreur'}: ${e.message}</div>`;
@@ -987,6 +1036,12 @@ async function _triggerGeneration(content) {
     });
     if (!res.ok) { setSendBtn(false); throw new Error('Erreur réseau'); }
     const data = await res.json();
+    // Fetch new context asynchronously
+    apiFetch('/chat/api/context/' + activeConvId).then(ctxData => {
+        window._chatContextData = ctxData;
+        if (typeof updateContextBar === 'function') updateContextBar(_streamFullText);
+    }).catch(()=>{});
+
     _activeTaskId = data.task_id;
     _streamPos = 0;
     _streamAbort = new AbortController();
@@ -1000,6 +1055,12 @@ async function sendMessage() {
 
     // Passer immédiatement en mode "Arrêter" (avant le fetch asynchrone)
     setSendBtn(true);
+
+    // Pré-calculer le contexte localement pour éviter le saut (glitch) du compteur
+    // avant que le serveur n'ait répondu avec le nouveau contexte officiel.
+    if (window._chatContextData) {
+        window._chatContextData.base_prompt += "\\nUtilisateur : " + content + "\\n";
+    }
 
     const container = document.getElementById('chat-messages');
     
@@ -1042,6 +1103,12 @@ async function sendMessage() {
         if (!res.ok) throw new Error(window.t('chat.error_network'));
         const data = await res.json();
         if (!data.task_id) throw new Error('Pas de task_id dans la réponse');
+
+        // Fetch new context asynchronously to get the updated base (including user message)
+        apiFetch('/chat/api/context/' + activeConvId).then(ctxData => {
+            window._chatContextData = ctxData;
+            if (typeof updateContextBar === 'function') updateContextBar(_streamFullText);
+        }).catch(()=>{});
 
         // 2. Se connecter au stream SSE depuis la position 0
         _activeTaskId = data.task_id;
@@ -1124,6 +1191,7 @@ async function readStream(taskId, fromPos, signal) {
                         _streamPos = evt.pos ?? (_streamPos + 1);
                         aiContent.innerHTML = marked.parse(_streamFullText);
                         if (container) container.scrollTop = container.scrollHeight;
+                        if (typeof updateContextBar === 'function') updateContextBar(_streamFullText);
                     }
                     if (evt.done) {
                         // Génération terminée : finaliser la bulle avec boutons d'action
@@ -1141,6 +1209,9 @@ async function readStream(taskId, fromPos, signal) {
                         _streamFullText = '';
                         setSendBtn(false);  // ← Revenir en mode "Envoyer"
 
+                        // Mettre à jour le contexte après génération
+                        try { window._chatContextData = await apiFetch('/chat/api/context/' + activeConvId); updateContextBar(); } catch(_){}
+                        
                         // ── Auto-nommage au 1er échange complet ────────────────────────
                         // On détecte le 1er échange en comptant les wrappers de messages.
                         // Après le 1er échange : 1 user + 1 assistant = 2 wrappers

@@ -42,7 +42,7 @@ global_rules:
         from app.utils.notification_i18n import nt
         lang = config.site_lang or 'fr'  # (or global_cfg.site_lang)
         subject = nt('your_key', lang)
-      To add a new translated string: add the key in the "notifications" section of the language JSON files in static/i18n/ (e.g., en.json, fr.json).
+      To add a new translated string: add the key in the 'notifications' section of the language JSON files in static/i18n/ (e.g., en.json, fr.json).
       The site language is synced from the frontend header to GlobalConfig.site_lang via PUT /api/config/site-lang."
 
       
@@ -204,9 +204,11 @@ chat:
     subtasks:
       - id: CHAT-07a
         name: "Token counting for payload (not char counting)"
+        status: DONE
         effort: M
       - id: CHAT-07b
         name: "Context fill bar (percentage of available window)"
+        status: DONE
         effort: S
       - id: CHAT-07c
         name: "Overflow warning + user choice: continue / truncate / compress"

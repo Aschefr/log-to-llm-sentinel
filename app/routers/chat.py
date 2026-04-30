@@ -104,6 +104,84 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
         ]
     }
 
+
+def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
+    if not conv:
+        return "", 4096
+        
+    history = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).order_by(ChatMessage.created_at.asc()).all()
+    
+    # 1. Charger la configuration de base (System Prompt & Mode Text)
+    cfg = db.query(GlobalConfig).first()
+    system_prompt = cfg.chat_system_prompt.strip() if cfg and cfg.chat_system_prompt else ""
+    lang = cfg.chat_lang if cfg and cfg.chat_lang else "fr"
+    lang_file = f"static/i18n/{lang}.json"
+    mode_text = ""
+    
+    import os, json
+    from datetime import datetime
+    if os.path.exists(lang_file):
+        with open(lang_file, 'r', encoding='utf-8-sig') as f:
+            lang_data = json.load(f)
+            mode_text = lang_data.get("chat", {}).get("mode_de_reponse", "")
+
+    current_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    active_rules = db.query(Rule).filter(Rule.enabled == True).all()
+    rules_lines = []
+    for r in active_rules:
+        ctx = f" (Context: {r.application_context})" if r.application_context else ""
+        rules_lines.append(f"- {r.name}{ctx}")
+    rules_list_str = "\n".join(rules_lines) if rules_lines else "- Aucune règle configurée"
+    
+    if mode_text:
+        mode_text = mode_text.replace("{datetime}", current_dt)
+        mode_text = mode_text.replace("{lang}", lang.upper())
+        mode_text = mode_text.replace("{rules_list}", rules_list_str)
+
+    # 2. Construire le bloc de contexte système
+    block_lines = []
+    if system_prompt:
+        block_lines.extend([system_prompt, ""])
+        
+    if conv.analysis_id:
+        analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
+        if analysis:
+            rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
+            block_lines.extend([
+                "Tu es un assistant expert en systèmes Linux, Docker et infrastructure.",
+                "Une analyse de log a été effectuée. L'utilisateur te pose des questions de suivi.",
+                "",
+                f"=== Règle : {rule.name if rule else 'Inconnue'} ===",
+                f"Application : {rule.application_context if rule else ''}",
+                "",
+                "=== Ligne de log concernée ===",
+                analysis.triggered_line,
+                "",
+                "=== Analyse initiale ===",
+                analysis.ollama_response,
+                ""
+            ])
+
+    if mode_text:
+        block_lines.append(mode_text)
+
+    prompt = "\n".join(block_lines).strip() + "\n\n" if block_lines else ""
+
+    # 3. Ajouter l'historique de la conversation
+    for m in history[-10:]:
+        role_label = "Utilisateur" if m.role == "user" else "Assistant"
+        prompt += f"{role_label} : {m.content}\n"
+    
+    ollama_ctx = cfg.ollama_ctx if cfg else 4096
+    
+    return prompt, ollama_ctx
+
+@router.get("/api/context/{conv_id}")
+async def get_chat_context(conv_id: int, db: Session = Depends(get_db)):
+    base_prompt, ollama_ctx = build_chat_prompt(conv_id, db)
+    return {"base_prompt": base_prompt, "ollama_ctx": ollama_ctx}
+
 @router.post("/api/send")
 async def send_message(data: dict, db: Session = Depends(get_db)):
     """
@@ -130,67 +208,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     db.commit()
 
     # 2. Construire le contexte
-    history = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id).order_by(ChatMessage.created_at.asc()).all()
-    
-    prompt = ""
-    if conv.analysis_id:
-        analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
-        if analysis and _orchestrator:
-            rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
-            cfg = db.query(GlobalConfig).first()
-            system_prompt = cfg.chat_system_prompt.strip() if cfg and cfg.chat_system_prompt else ""
-
-            # On construit un prompt de CHAT — pas un prompt d'analyse.
-            # Le but est de donner le contexte à l'IA pour qu'elle réponde
-            # aux questions de l'utilisateur en tant qu'assistant, sans
-            # ré-imposer le format SEVERITY ni les instructions d'analyse.
-            lang = cfg.chat_lang if cfg and cfg.chat_lang else "fr"
-            lang_file = f"static/i18n/{lang}.json"
-            mode_text = ""
-            import os
-            import json
-            from datetime import datetime
-            
-            if os.path.exists(lang_file):
-                with open(lang_file, 'r', encoding='utf-8-sig') as f:
-                    lang_data = json.load(f)
-                    mode_text = lang_data.get("chat", {}).get("mode_de_reponse", "")
-
-            # Format mode_text with dynamic data
-            current_dt = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            active_rules = db.query(Rule).filter(Rule.enabled == True).all()
-            rules_lines = []
-            for r in active_rules:
-                ctx = f" (Context: {r.application_context})" if r.application_context else ""
-                rules_lines.append(f"- {r.name}{ctx}")
-            rules_list_str = "\n".join(rules_lines) if rules_lines else "- Aucune règle configurée"
-            
-            mode_text = mode_text.replace("{datetime}", current_dt)
-            mode_text = mode_text.replace("{lang}", lang.upper())
-            mode_text = mode_text.replace("{rules_list}", rules_list_str)
-
-            context_block = "\n".join([
-                system_prompt if system_prompt else "",
-                "",
-                "Tu es un assistant expert en systèmes Linux, Docker et infrastructure.",
-                "Une analyse de log a été effectuée. L'utilisateur te pose des questions de suivi.",
-                "",
-                f"=== Règle : {rule.name if rule else 'Inconnue'} ===",
-                f"Application : {rule.application_context if rule else ''}",
-                "",
-                "=== Ligne de log concernée ===",
-                analysis.triggered_line,
-                "",
-                "=== Analyse initiale ===",
-                analysis.ollama_response,
-                "",
-                mode_text
-            ])
-            prompt = context_block.strip() + "\n"
-
-    for m in history[-10:]:
-        role_label = "Utilisateur" if m.role == "user" else "Assistant"
-        prompt += f"{role_label} : {m.content}\n"
+    prompt, ollama_ctx = build_chat_prompt(conv_id, db)
     prompt += "Assistant : "
 
 

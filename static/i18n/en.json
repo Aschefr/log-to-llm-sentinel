@@ -209,7 +209,8 @@
         "settings_btn": "Settings ⚙️",
         "mode_de_reponse": "=== Automatic Context ===\nCurrent date and time: {datetime}\nResponse language: {lang}\n\nThe chat platform is part of a log file analysis environment chosen by the user.\nFor your information, here are the monitored rules and files:\n{rules_list}\n\n=== Response Mode (IMPORTANT) ===\nAnswer directly, without fluff or deep explanations unless the user asks for it.",
         "generation_cancelled": "Generation cancelled.",
-        "error_create_conv": "Error creating conversation:"
+        "error_create_conv": "Error creating conversation:",
+        "context_usage": "Context Usage"
     },
     "config": {
         "title": "Global Configuration",
