@@ -78,6 +78,13 @@ def get_monitored_rules():
                 stats_dict[rule_id][severity] += count
             stats_dict[rule_id]["total"] += count
 
+        # Récupération de la dernière analyse par règle
+        last_analysis_query = db.query(
+            Analysis.rule_id,
+            func.max(Analysis.analyzed_at).label("last_analyzed_at")
+        ).group_by(Analysis.rule_id).all()
+        last_analysis_dict = {row.rule_id: row.last_analyzed_at for row in last_analysis_query}
+
         rules = db.query(Rule).filter(Rule.enabled == True).all()
         return {
             "monitor_log_lines": monitor_lines,
@@ -94,6 +101,10 @@ def get_monitored_rules():
                     "notify_on_match": r.notify_on_match,
                     "stats": stats_dict.get(r.id, {"total": 0, "info": 0, "warning": 0, "critical": 0}),
                     "last_learning_session_id": r.last_learning_session_id,
+                    "last_line_received_at": r.last_line_received_at.isoformat() + "Z" if r.last_line_received_at else None,
+                    "last_analysis_at": last_analysis_dict.get(r.id).isoformat() + "Z" if last_analysis_dict.get(r.id) else None,
+                    "inactivity_warning_enabled": r.inactivity_warning_enabled,
+                    "inactivity_period_hours": r.inactivity_period_hours,
                 }
                 for r in rules
             ]
@@ -109,8 +120,30 @@ def get_buffer_status(rule_id: int):
         return {"active": False, "lines": [], "detection_id": None, "matched_keywords": []}
 
     buf = _orchestrator._buffers.get(rule_id)
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        last_line_received_at = rule.last_line_received_at.isoformat() + "Z" if rule and rule.last_line_received_at else None
+        inactivity_warning_enabled = rule.inactivity_warning_enabled if rule else False
+        inactivity_period_hours = rule.inactivity_period_hours if rule else 12
+        inactivity_notify = rule.inactivity_notify if rule else True
+        
+        from sqlalchemy import func
+        from app.models import Analysis
+        last_analysis = db.query(func.max(Analysis.analyzed_at)).filter(Analysis.rule_id == rule_id).scalar()
+        last_analysis_at = last_analysis.isoformat() + "Z" if last_analysis else None
+    finally:
+        db.close()
+
     if not buf or not buf.get("task"):
-        return {"active": False, "lines": [], "detection_id": None, "matched_keywords": []}
+        return {
+            "active": False, "lines": [], "detection_id": None, "matched_keywords": [],
+            "last_line_received_at": last_line_received_at,
+            "last_analysis_at": last_analysis_at,
+            "inactivity_warning_enabled": inactivity_warning_enabled,
+            "inactivity_period_hours": inactivity_period_hours,
+            "inactivity_notify": inactivity_notify
+        }
 
     return {
         "active": True,
@@ -118,6 +151,11 @@ def get_buffer_status(rule_id: int):
         "line_count": len(buf.get("lines", [])),
         "matched_keywords": list(buf.get("matched_keywords", set())),
         "preview_lines": buf.get("lines", [])[-5:],  # 5 dernières lignes du buffer
+        "last_line_received_at": last_line_received_at,
+        "last_analysis_at": last_analysis_at,
+        "inactivity_warning_enabled": inactivity_warning_enabled,
+        "inactivity_period_hours": inactivity_period_hours,
+        "inactivity_notify": inactivity_notify
     }
 
 

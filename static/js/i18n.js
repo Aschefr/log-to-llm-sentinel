@@ -215,6 +215,7 @@
         onLanguageChange,
         applyTranslations,
         getCurrentLang: () => _currentLang,
+        getFlagHTML: getFlagHTML,
     };
 
     // ── Initialisation ──

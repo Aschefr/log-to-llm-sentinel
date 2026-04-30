@@ -137,6 +137,14 @@ function setupRuleModal(opts = {}) {
         });
     });
 
+    const inactCheck = document.getElementById('rule-inactivity-warning-enabled');
+    const inactContainer = document.getElementById('inactivity-hours-container');
+    if (inactCheck && inactContainer) {
+        inactCheck.addEventListener('change', () => {
+            inactContainer.style.display = inactCheck.checked ? 'flex' : 'none';
+        });
+    }
+
     setupKeywordSuggestions();
 }
 
@@ -192,6 +200,14 @@ function resetForm() {
     document.getElementById('rule-context-lines').value = '5';
     document.getElementById('rule-anti-spam').value = '60';
     document.getElementById('rule-severity-threshold').value = 'info';
+    const inactCheck = document.getElementById('rule-inactivity-warning-enabled');
+    if (inactCheck) {
+        inactCheck.checked = true;
+        document.getElementById('inactivity-hours-container').style.display = 'flex';
+        document.getElementById('rule-inactivity-period-hours').value = '1';
+        const inactNotify = document.getElementById('rule-inactivity-notify');
+        if (inactNotify) inactNotify.checked = true;
+    }
     const exclEl = document.getElementById('rule-excluded-patterns');
     if (exclEl) exclEl.value = '';
     document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_new_title') : 'New rule';
@@ -230,6 +246,9 @@ async function saveRule() {
         context_lines: parseInt(document.getElementById('rule-context-lines').value) || 5,
         anti_spam_delay: parseInt(document.getElementById('rule-anti-spam').value) || 60,
         notify_severity_threshold: document.getElementById('rule-severity-threshold').value,
+        inactivity_warning_enabled: document.getElementById('rule-inactivity-warning-enabled').checked,
+        inactivity_period_hours: parseInt(document.getElementById('rule-inactivity-period-hours').value) || 12,
+        inactivity_notify: document.getElementById('rule-inactivity-notify') ? document.getElementById('rule-inactivity-notify').checked : true,
         excluded_patterns: ((document.getElementById('rule-excluded-patterns') || {}).value || '')
             .split(',').map(p => p.trim()).filter(p => p),
     };
@@ -299,6 +318,16 @@ async function editRule(id) {
         document.getElementById('rule-context-lines').value = rule.context_lines || 5;
         document.getElementById('rule-anti-spam').value = rule.anti_spam_delay || 60;
         document.getElementById('rule-severity-threshold').value = rule.notify_severity_threshold || 'info';
+        
+        const inactCheck = document.getElementById('rule-inactivity-warning-enabled');
+        if (inactCheck) {
+            inactCheck.checked = rule.inactivity_warning_enabled;
+            document.getElementById('inactivity-hours-container').style.display = rule.inactivity_warning_enabled ? 'flex' : 'none';
+            document.getElementById('rule-inactivity-period-hours').value = rule.inactivity_period_hours || 12;
+            const inactNotify = document.getElementById('rule-inactivity-notify');
+            if (inactNotify) inactNotify.checked = rule.inactivity_notify !== false;
+        }
+
         const exclEl = document.getElementById('rule-excluded-patterns');
         if (exclEl) exclEl.value = (rule.excluded_patterns || []).join(', ');
         document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_edit_title') : 'Edit rule';

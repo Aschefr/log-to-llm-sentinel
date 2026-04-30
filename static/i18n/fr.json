@@ -169,7 +169,13 @@
         "no_more_analyses": "Pas d'autres analyses",
         "autolearn_title": "Auto-apprentissage",
         "edit_rule": "Modifier la règle",
-        "delete_rule_confirm": "Êtes-vous sûr de vouloir supprimer cette règle ? Cela supprimera également les analyses associées."
+        "delete_rule_confirm": "Êtes-vous sûr de vouloir supprimer cette règle ? Cela supprimera également les analyses associées.",
+        "last_received": "Dernière ligne reçue :",
+        "last_analyzed": "Dernière analyse LLM :",
+        "inactivity_detected": "Inactivité détectée",
+        "activity_normal": "Activité normale",
+        "inactivity_tracking": "Suivi d'inactivité",
+        "excluded_filter": "Filtre d'exclusion"
     },
     "chat": {
         "title": "Centre d'Analyse IA",
@@ -321,7 +327,8 @@
         "delete_analysis": "Supprimer cette analyse",
         "view_in_monitor": "Voir dans Monitor",
         "save": "Enregistrer",
-        "edit": "Modifier"
+        "edit": "Modifier",
+        "time_ago": "Il y a"
     },
     "meta": {
         "title": "Méta-Analyse",

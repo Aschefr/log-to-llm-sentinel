@@ -1,5 +1,6 @@
 import asyncio
 import os
+from datetime import datetime
 from typing import Callable, List, Optional
 
 from app.database import SessionLocal
@@ -122,6 +123,9 @@ class LogWatcher:
                         db_rule = db.query(Rule).filter(Rule.id == rule.id).first()
                         if db_rule:
                             db_rule.last_position = new_position
+                            if new_lines:
+                                db_rule.last_line_received_at = datetime.utcnow()
+                                db_rule.inactivity_notified = False
                             db.commit()
                     finally:
                         db.close()

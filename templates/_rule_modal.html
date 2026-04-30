@@ -143,14 +143,36 @@
                 </select>
                 <div class="form-hint" data-i18n="rules.severity_hint">Définit le niveau de sévérité minimum pour déclencher une notification.</div>
             </div>
-            <div class="form-group checkbox-group">
-                <label>
+            <div class="form-group checkbox-group" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem; flex-direction: column; align-items: flex-start;">
+                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.5rem;">
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="rule-inactivity-warning-enabled" checked>
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-label" data-i18n="rules.label_inactivity_warning">Avertissement d'inactivité (Aucun log reçu)</span>
+                    </label>
+                    <div id="inactivity-hours-container" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <input type="number" id="rule-inactivity-period-hours" min="1" max="720" value="1" style="width: 80px; padding: 0.3rem 0.5rem;">
+                        <span data-i18n="rules.label_inactivity_hours" style="font-size: 0.85rem; color: var(--text-secondary);">heures</span>
+                        <div style="margin-left: 0.5rem; border-left: 1px solid var(--border); padding-left: 1rem; display: flex; align-items: center;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="rule-inactivity-notify" checked>
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label" data-i18n="rules.label_notify">Notifier</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group checkbox-group" style="flex-wrap: wrap; gap: 1.5rem;">
+                <label class="toggle-switch">
                     <input type="checkbox" id="rule-enabled" checked>
-                    <span data-i18n="rules.label_enabled">Activée</span>
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label" data-i18n="rules.label_enabled">Activée</span>
                 </label>
-                <label>
+                <label class="toggle-switch">
                     <input type="checkbox" id="rule-notify" checked>
-                    <span data-i18n="rules.label_notify">Notifier sur correspondance</span>
+                    <span class="toggle-slider"></span>
+                    <span class="toggle-label" data-i18n="rules.label_notify">Notifier sur correspondance</span>
                 </label>
             </div>
             <div class="form-actions">

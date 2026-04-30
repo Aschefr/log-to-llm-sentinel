@@ -133,7 +133,6 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(600)  # Vérifie toutes les 10 minutes
             await meta_service.run_scheduled_analyses()
 
-    # Vérification des mises à jour au démarrage + toutes les 24 h à 00:00 UTC
     async def _daily_update_check():
         import datetime
         # Check immédiat au démarrage
@@ -152,9 +151,50 @@ async def lifespan(app: FastAPI):
             check_for_updates(APP_VERSION)
             print(f"[Main] Résultat mise à jour : {_update_cache}")
 
+    async def _inactivity_checker():
+        from app.services.notification_service import NotificationService
+        from datetime import datetime, timedelta
+        from app.database import SessionLocal
+        from app.models import Rule, GlobalConfig
+        while True:
+            await asyncio.sleep(300)  # Check every 5 minutes
+            db = SessionLocal()
+            try:
+                now = datetime.utcnow()
+                rules = db.query(Rule).filter(Rule.enabled == True, Rule.inactivity_warning_enabled == True, Rule.inactivity_notified == False).all()
+                for rule in rules:
+                    if rule.last_line_received_at:
+                        delta = now - rule.last_line_received_at
+                        if delta > timedelta(hours=rule.inactivity_period_hours):
+                            if rule.inactivity_notify:
+                                config = db.query(GlobalConfig).first()
+                                if config:
+                                    notifier = NotificationService()
+                                    subject = f"[Sentinel ALERTE] Inactivité détectée : {rule.name}"
+                                    body = f"<p>Aucune ligne reçue sur la règle <b>{rule.name}</b> depuis plus de {rule.inactivity_period_hours} heures.</p><p>Dernière ligne : {rule.last_line_received_at.strftime('%Y-%m-%d %H:%M:%S')}</p>"
+                                    config_dict = {
+                                        "smtp_host": config.smtp_host, "smtp_port": config.smtp_port,
+                                        "smtp_user": config.smtp_user, "smtp_password": config.smtp_password,
+                                        "smtp_recipient": config.smtp_recipient, "smtp_tls": config.smtp_tls,
+                                        "smtp_ssl_mode": config.smtp_ssl_mode, "notification_method": config.notification_method,
+                                        "apprise_url": config.apprise_url, "apprise_tags": config.apprise_tags,
+                                        "debug_mode": config.debug_mode,
+                                    }
+                                    try:
+                                        notifier.send(subject, body, config_dict)
+                                    except Exception:
+                                        pass
+                            rule.inactivity_notified = True
+                db.commit()
+            except Exception as e:
+                print(f"[Main] Erreur inactivity checker: {e}")
+            finally:
+                db.close()
+
     asyncio.create_task(_cleanup_tasks())
     asyncio.create_task(_run_meta_analyses_loop())
     asyncio.create_task(_daily_update_check())
+    asyncio.create_task(_inactivity_checker())
 
     yield
 

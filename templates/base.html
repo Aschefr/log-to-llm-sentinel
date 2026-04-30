@@ -112,24 +112,27 @@
             <a href="/config" data-i18n="nav.config" class="{% if request.url.path == '/config' %}active{% endif %}">Configuration</a>
         </div>
         <div class="nav-right">
-            <div class="nav-stats" id="nav-system-stats">
-                <div class="stat-item" data-i18n-title="nav.tooltip_cpu" title="Utilisation CPU (App / Système)">
-                    <span class="stat-icon">📊</span>
-                    <span class="stat-label" data-i18n="nav.cpu_app">App</span>
-                    <span id="stat-cpu-app" class="stat-value">--%</span>
-                    <span class="stat-sep" style="opacity: 0.3; font-size: 0.75rem;">/</span>
-                    <span class="stat-label" data-i18n="nav.cpu_sys">Sys</span>
-                    <span id="stat-cpu-sys" class="stat-value">--%</span>
-                </div>
-                <div class="stat-item" data-i18n-title="nav.tooltip_ram" title="Utilisation RAM (App)">
-                    <span class="stat-icon">💾</span>
-                    <span class="stat-label" data-i18n="nav.ram">RAM</span>
-                    <span id="stat-ram" class="stat-value">-- MB</span>
-                </div>
-                <div class="stat-item" data-i18n-title="nav.tooltip_uptime" title="Uptime">
-                    <span class="stat-icon">⏱️</span>
-                    <span class="stat-label" data-i18n="nav.uptime">Uptime</span>
-                    <span id="stat-uptime" class="stat-value">--</span>
+            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem;">
+                <div id="server-time-display" style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.2rem;" title="Server Time">--:--:--</div>
+                <div class="nav-stats" id="nav-system-stats">
+                    <div class="stat-item" data-i18n-title="nav.tooltip_cpu" title="Utilisation CPU (App / Système)">
+                        <span class="stat-icon">📊</span>
+                        <span class="stat-label" data-i18n="nav.cpu_app">App</span>
+                        <span id="stat-cpu-app" class="stat-value">--%</span>
+                        <span class="stat-sep" style="opacity: 0.3; font-size: 0.75rem;">/</span>
+                        <span class="stat-label" data-i18n="nav.cpu_sys">Sys</span>
+                        <span id="stat-cpu-sys" class="stat-value">--%</span>
+                    </div>
+                    <div class="stat-item" data-i18n-title="nav.tooltip_ram" title="Utilisation RAM (App)">
+                        <span class="stat-icon">💾</span>
+                        <span class="stat-label" data-i18n="nav.ram">RAM</span>
+                        <span id="stat-ram" class="stat-value">-- MB</span>
+                    </div>
+                    <div class="stat-item" data-i18n-title="nav.tooltip_uptime" title="Uptime">
+                        <span class="stat-icon">⏱️</span>
+                        <span class="stat-label" data-i18n="nav.uptime">Uptime</span>
+                        <span id="stat-uptime" class="stat-value">--</span>
+                    </div>
                 </div>
             </div>
             <div id="lang-switcher"></div>

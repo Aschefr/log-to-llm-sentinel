@@ -181,8 +181,10 @@ function renderTabContent(rule) {
                         ${rule.keywords.map(kw =>
                             `<span class="log-kw-badge kw-filter-btn" data-kw="${encodeURIComponent(kw)}" onclick="toggleKeywordFilter(this, ${rule.id})">${escapeHtml(kw)}</span>`
                         ).join('')}
-                        ${rule.excluded_patterns && rule.excluded_patterns.length > 0 ? `
-                        <span class="log-kw-badge kw-filter-btn excl-filter-btn ${activeKeywordFilter === '__excluded__' ? 'active' : ''}" data-kw="__excluded__" onclick="toggleKeywordFilter(this, ${rule.id})" title="${window.t ? window.t('monitor.excluded_filter_title') : 'Show only excluded (filtered) lines'}">🚫 ${window.t ? window.t('monitor.excluded_filter') : 'Exclusions'}</span>` : ''}
+                        ${rule.excluded_patterns && rule.excluded_patterns.length > 0 ? 
+                            rule.excluded_patterns.map(pat => `
+                            <span class="log-kw-badge kw-filter-btn excl-filter-btn ${activeKeywordFilter === '__excluded_' + pat ? 'active' : ''}" data-kw="__excluded_${encodeURIComponent(pat)}" onclick="toggleKeywordFilter(this, ${rule.id})" title="${window.t ? window.t('monitor.excluded_filter_title') : 'Show only excluded (filtered) lines'}">🚫 ${escapeHtml(pat)}</span>
+                            `).join('') : ''}
                     </div>
                 </div>
                 <div><span class="info-label">⏱ Anti-spam</span>${rule.anti_spam_delay}s</div>
@@ -203,10 +205,24 @@ function renderTabContent(rule) {
         </div>
         ` : ''}
 
-        <!-- Buffer anti-spam -->
-        <div class="monitor-buffer-status" id="buffer-status-${rule.id}">
-            <span class="buffer-dot idle" id="buffer-dot-${rule.id}"></span>
-            <span id="buffer-label-${rule.id}">${window.t ? window.t('monitor.buffer_inactive') : 'Inactive buffer'}</span>
+        <div style="display: flex; gap: 1rem; margin-bottom: 0.5rem;">
+            <!-- Buffer anti-spam -->
+            <div class="monitor-buffer-status" id="buffer-status-${rule.id}" style="flex: 1; margin-bottom: 0;">
+                <span class="buffer-dot idle" id="buffer-dot-${rule.id}"></span>
+                <span id="buffer-label-${rule.id}">${window.t ? window.t('monitor.buffer_inactive') : 'Inactive buffer'}</span>
+            </div>
+        </div>
+
+        <!-- MON-14 & MON-15: Timestamps & Inactivity -->
+        <div class="monitor-buffer-status" style="margin-bottom: 0.5rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; font-size: 0.85rem; gap: 0.5rem;">
+            <span><span style="opacity: 0.7;">${window.t ? window.t('monitor.last_received') : 'Latest received line'}</span> <strong id="last-received-${rule.id}">${rule.last_line_received_at ? formatDate(rule.last_line_received_at) : '—'}</strong> <span id="last-received-ago-${rule.id}" style="opacity: 0.5; font-size: 0.8em;">${rule.last_line_received_at ? formatRelativeTime(rule.last_line_received_at) : ''}</span></span>
+            
+            <div id="inactivity-status-${rule.id}" style="display: ${rule.inactivity_warning_enabled ? 'flex' : 'none'}; align-items: center; gap: 0.5rem; justify-content: center; flex: 1; min-width: max-content;">
+                <span class="buffer-dot idle" id="inactivity-dot-${rule.id}"></span>
+                <span id="inactivity-label-${rule.id}">—</span>
+            </div>
+
+            <span><span style="opacity: 0.7;">${window.t ? window.t('monitor.last_analyzed') : 'Latest analysed line'}</span> <strong id="last-analyzed-${rule.id}">${rule.last_analysis_at ? formatDate(rule.last_analysis_at) : '—'}</strong></span>
         </div>
 
         <!-- Visionneuse de logs -->
@@ -355,8 +371,10 @@ async function fetchLogs(rule) {
             const selectClass = isSelected ? 'selected' : '';
 
             // Client-side exclusion detection
-            const isExcluded = excludedPatterns.length > 0
-                && excludedPatterns.some(pat => rawText.toLowerCase().includes(pat.toLowerCase()));
+            const matchedExclPattern = excludedPatterns.length > 0 
+                ? excludedPatterns.find(pat => rawText.toLowerCase().includes(pat.toLowerCase())) 
+                : null;
+            const isExcluded = matchedExclPattern != null;
             const excludedClass = isExcluded ? 'log-line-excluded' : '';
 
             const kwBadges = line.matched_keywords && line.matched_keywords.length > 0
@@ -364,10 +382,10 @@ async function fetchLogs(rule) {
                 : '';
 
             const exclBadge = isExcluded
-                ? `<span class="log-kw-badges"><span class="log-excl-badge">🚫 ${excludedPatterns.find(p => rawText.toLowerCase().includes(p.toLowerCase())) || 'exclu'}</span></span>`
+                ? `<span class="log-kw-badges"><span class="log-excl-badge">🚫 ${escapeHtml(matchedExclPattern)}</span></span>`
                 : '';
 
-            return `<div class="log-line ${matchClass} ${selectClass} ${excludedClass}" data-rule="${rule.id}" data-idx="${idx}" data-excluded="${isExcluded}" data-text="${encodeURIComponent(rawText)}" onclick="onLineClick(this, ${rule.id})">
+            return `<div class="log-line ${matchClass} ${selectClass} ${excludedClass}" data-rule="${rule.id}" data-idx="${idx}" data-excluded="${isExcluded}" data-excl-pat="${encodeURIComponent(matchedExclPattern || '')}" data-text="${encodeURIComponent(rawText)}" onclick="onLineClick(this, ${rule.id})">
                 <span class="log-text">${text}</span>${kwBadges}${exclBadge}
             </div>`;
         }).join('');
@@ -446,8 +464,9 @@ function applyKeywordFilter(ruleId) {
         let show = false;
         if (activeKeywordFilter === '__all__') {
             show = true;
-        } else if (activeKeywordFilter === '__excluded__') {
-            show = line.dataset.excluded === 'true';
+        } else if (activeKeywordFilter.startsWith('__excluded_')) {
+            const pat = activeKeywordFilter.substring('__excluded_'.length);
+            show = line.dataset.excluded === 'true' && decodeURIComponent(line.dataset.exclPat || '') === pat;
         } else if (activeKeywordFilter === '__matches__') {
             show = line.querySelector('.log-kw-badge') !== null && line.dataset.excluded !== 'true';
         } else {
@@ -513,6 +532,47 @@ async function fetchBufferStatus(ruleId) {
         } else {
             dot.className = 'buffer-dot idle';
             label.textContent = window.t ? window.t('monitor.buffer_inactive') : 'Inactive buffer';
+        }
+
+        // Update timestamps (MON-14)
+        const lastReceivedEl = document.getElementById(`last-received-${ruleId}`);
+        if (lastReceivedEl) lastReceivedEl.textContent = buf.last_line_received_at ? formatDate(buf.last_line_received_at) : '—';
+        const lastReceivedAgoEl = document.getElementById(`last-received-ago-${ruleId}`);
+        if (lastReceivedAgoEl) lastReceivedAgoEl.textContent = buf.last_line_received_at ? formatRelativeTime(buf.last_line_received_at) : '';
+        const lastAnalyzedEl = document.getElementById(`last-analyzed-${ruleId}`);
+        if (lastAnalyzedEl) lastAnalyzedEl.textContent = buf.last_analysis_at ? formatDate(buf.last_analysis_at) : '—';
+
+        // Update inactivity (MON-15)
+        const inactStatusEl = document.getElementById(`inactivity-status-${ruleId}`);
+        const inactDot = document.getElementById(`inactivity-dot-${ruleId}`);
+        const inactLabel = document.getElementById(`inactivity-label-${ruleId}`);
+        
+        if (inactStatusEl && inactDot && inactLabel) {
+            if (buf.inactivity_warning_enabled) {
+                inactStatusEl.style.display = 'flex';
+                let isInactive = false;
+                if (buf.last_line_received_at) {
+                    const receivedDate = new Date(buf.last_line_received_at);
+                    const diffMs = new Date() - receivedDate;
+                    if (diffMs > (buf.inactivity_period_hours * 3600000)) {
+                        isInactive = true;
+                    }
+                }
+                
+                if (isInactive) {
+                    inactDot.className = 'buffer-dot active'; 
+                    inactDot.style.backgroundColor = 'var(--danger)';
+                    inactDot.style.boxShadow = '0 0 8px var(--danger)';
+                    inactLabel.innerHTML = `⚠️ <strong style="color:var(--danger)">${window.t ? window.t('monitor.inactivity_detected') : 'Inactivity detected'}</strong> (> ${buf.inactivity_period_hours}h)`;
+                } else {
+                    inactDot.className = 'buffer-dot idle';
+                    inactDot.style.backgroundColor = '';
+                    inactDot.style.boxShadow = '';
+                    inactLabel.innerHTML = `✅ ${window.t ? window.t('monitor.activity_normal') : 'Activity normal'} (< ${buf.inactivity_period_hours}h)`;
+                }
+            } else {
+                inactStatusEl.style.display = 'none';
+            }
         }
     } catch (e) {}
 }

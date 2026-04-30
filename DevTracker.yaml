@@ -326,17 +326,25 @@ monitor:
 
   - id: MON-14
     name: "Show the date/time (local) of the latest received line, and the latest analysed line"
-    status: TODO
+    status: DONE
     effort: S
     priority: P1
     notes: "Juste above the real-imte log panel, show the local date and time of the latest line appearing, and the local date and time of the latest analysed line"
 
   - id: MON-15
     name: "Detect log inactivity"
-    status: TODO
+    status: DONE
     effort: L
     priority: P1
     notes: "Add a new 'log inactivity warning' period in the configuration modale of the Rules, with a notification toggle on/off and a period setting in hours set to 12h by defaults. Devide the 'Buffer active' plate in half, and put a similar plate next to it (horizontaly) with a similar light and text saying 'Inactivity detected' with a reminder of the latest date/time (local) of the latest line"
+
+  - id: MON-16
+    name: "Allow the user to select text inside the analysis panels"
+    status: DONE
+    effort: L
+    priority: P1
+    notes: "Currently, clicking on the text collapse the panel. I would like to be able to select text for copy-paste. Only the top part of the panel (the header) should be clickable to collapse/expand the panel should collapse/expand."
+
 
 # ─────────────────────────────────────────────
 # META-ANALYSIS

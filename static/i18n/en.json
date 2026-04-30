@@ -169,7 +169,13 @@
         "no_more_analyses": "No more analyses",
         "autolearn_title": "Auto-learning",
         "edit_rule": "Edit rule",
-        "delete_rule_confirm": "Are you sure you want to delete this rule? This will also remove associated analyses."
+        "delete_rule_confirm": "Are you sure you want to delete this rule? This will also remove associated analyses.",
+        "last_received": "Last line received:",
+        "last_analyzed": "Last LLM analysis:",
+        "inactivity_detected": "Inactivity detected",
+        "activity_normal": "Activity normal",
+        "inactivity_tracking": "Inactivity tracking",
+        "excluded_filter": "Exclusion filter"
     },
     "chat": {
         "title": "AI Analysis Center",
@@ -321,7 +327,8 @@
         "delete_analysis": "Delete this analysis",
         "view_in_monitor": "View in Monitor",
         "save": "Save",
-        "edit": "Edit"
+        "edit": "Edit",
+        "time_ago": "ago"
     },
     "meta": {
         "title": "Meta-Analysis",

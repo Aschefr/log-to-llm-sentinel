@@ -22,6 +22,11 @@ class Rule(Base):
     last_position = Column(Float, default=0.0)
     last_learning_session_id = Column(Integer, nullable=True)  # dernière session d'auto-apprentissage
     excluded_patterns_json = Column(Text, default="[]")  # patterns d'exclusion (negative keywords)
+    last_line_received_at = Column(DateTime, nullable=True)
+    inactivity_warning_enabled = Column(Boolean, default=True)
+    inactivity_period_hours = Column(Integer, default=1)
+    inactivity_notify = Column(Boolean, default=True)
+    inactivity_notified = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

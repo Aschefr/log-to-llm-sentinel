@@ -28,6 +28,9 @@ class RuleCreate(BaseModel):
     anti_spam_delay: int = 60
     notify_severity_threshold: str = "info"
     excluded_patterns: List[str] = []
+    inactivity_warning_enabled: bool = True
+    inactivity_period_hours: int = 1
+    inactivity_notify: bool = True
 
 
 class RuleUpdate(BaseModel):
@@ -42,6 +45,9 @@ class RuleUpdate(BaseModel):
     notify_severity_threshold: Optional[str] = None
     excluded_patterns: Optional[List[str]] = None
     last_learning_session_id: Optional[int] = None  # pass -1 to explicitly clear
+    inactivity_warning_enabled: Optional[bool] = None
+    inactivity_period_hours: Optional[int] = None
+    inactivity_notify: Optional[bool] = None
 
 
 @router.get("")
@@ -69,6 +75,10 @@ def get_rules():
                 "last_log_line": last_line,
                 "last_learning_session_id": r.last_learning_session_id,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
+                "inactivity_warning_enabled": r.inactivity_warning_enabled,
+                "inactivity_period_hours": r.inactivity_period_hours,
+                "inactivity_notify": r.inactivity_notify,
+                "last_line_received_at": r.last_line_received_at.isoformat() + "Z" if r.last_line_received_at else None,
                 "last_detection_id": None,
                 "last_analysis_severity": None,
             }
@@ -106,6 +116,10 @@ def get_rule(rule_id: int):
             "notify_severity_threshold": rule.notify_severity_threshold or "info",
             "excluded_patterns": rule.get_excluded_patterns(),
             "last_learning_session_id": rule.last_learning_session_id,
+            "inactivity_warning_enabled": rule.inactivity_warning_enabled,
+            "inactivity_period_hours": rule.inactivity_period_hours,
+            "inactivity_notify": rule.inactivity_notify,
+            "last_line_received_at": rule.last_line_received_at.isoformat() + "Z" if rule.last_line_received_at else None,
         }
     finally:
         db.close()
@@ -124,6 +138,9 @@ def create_rule(rule_data: RuleCreate):
             context_lines=rule_data.context_lines,
             anti_spam_delay=rule_data.anti_spam_delay,
             notify_severity_threshold=rule_data.notify_severity_threshold,
+            inactivity_warning_enabled=rule_data.inactivity_warning_enabled,
+            inactivity_period_hours=rule_data.inactivity_period_hours,
+            inactivity_notify=rule_data.inactivity_notify,
         )
         rule.set_keywords(rule_data.keywords)
         rule.set_excluded_patterns(rule_data.excluded_patterns)
@@ -166,6 +183,12 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
         if rule_data.last_learning_session_id is not None:
             # -1 is the sentinel value meaning "clear the session link"
             rule.last_learning_session_id = None if rule_data.last_learning_session_id == -1 else rule_data.last_learning_session_id
+        if rule_data.inactivity_warning_enabled is not None:
+            rule.inactivity_warning_enabled = rule_data.inactivity_warning_enabled
+        if rule_data.inactivity_period_hours is not None:
+            rule.inactivity_period_hours = rule_data.inactivity_period_hours
+        if rule_data.inactivity_notify is not None:
+            rule.inactivity_notify = rule_data.inactivity_notify
 
         db.commit()
         return {"id": rule.id, "message": "Règle mise à jour"}

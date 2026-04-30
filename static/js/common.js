@@ -46,6 +46,35 @@ function formatDate(dateString) {
     });
 }
 
+/**
+ * Returns a relative time string like "Il y a 02:34" (or "2:34 ago" in EN).
+ * @param {string} dateString - ISO date string from DB
+ * @returns {string} relative time HTML or empty string
+ */
+function formatRelativeTime(dateString) {
+    if (!dateString) return '';
+    let utcString = dateString;
+    if (!dateString.endsWith('Z') && !dateString.includes('+')) {
+        utcString += 'Z';
+    }
+    const date = new Date(utcString);
+    const diffMs = Date.now() - date.getTime();
+    if (diffMs < 0) return '';
+
+    const totalSec = Math.floor(diffMs / 1000);
+    const hours = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+
+    const pad = n => String(n).padStart(2, '0');
+    const timeStr = hours > 0
+        ? `${pad(hours)}:${pad(mins)}:${pad(secs)}`
+        : `${pad(mins)}:${pad(secs)}`;
+
+    const prefix = window.t ? window.t('common.time_ago') : 'Il y a';
+    return `${prefix} ${timeStr}`;
+}
+
 function escapeHtml(text) {
     if (!text) return '';
     const map = {
@@ -416,8 +445,8 @@ function renderAnalysisCard(a, opts = {}) {
         : '';
 
     return `
-    <div class="${cardClass}${collapsedCls}" id="analysis-card-${a.id}" onclick="toggleAnalysisCardGeneric(event, this)">
-        <div class="analysis-header">
+    <div class="${cardClass}${collapsedCls}" id="analysis-card-${a.id}">
+        <div class="analysis-header" onclick="toggleAnalysisCardGeneric(event, this.parentElement)" style="cursor: pointer;">
             <div>
                 <span class="collapse-toggle">${toggleArrow}</span>
                 ${ruleName}
@@ -457,4 +486,15 @@ function toggleAnalysisCardGeneric(event, card) {
     const toggle = card.querySelector('.collapse-toggle');
     if (toggle) toggle.textContent = card.classList.contains('collapsed') ? '▶' : '▼';
 }
-
+/* ── Server Time Display ── */
+function updateServerTime() {
+    const el = document.getElementById('server-time-display');
+    if (!el) return;
+    const now = new Date();
+    el.textContent = now.toLocaleString(window._currentLang || 'fr-FR', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        day: '2-digit', month: '2-digit', year: 'numeric'
+    });
+}
+setInterval(updateServerTime, 1000);
+updateServerTime();

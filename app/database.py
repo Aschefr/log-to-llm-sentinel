@@ -44,6 +44,11 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN auto_delete_retention_days INTEGER DEFAULT 30",
         "ALTER TABLE global_config ADD COLUMN chat_system_prompt TEXT DEFAULT ''",
         "ALTER TABLE global_config ADD COLUMN chat_lang VARCHAR DEFAULT ''",
+        "ALTER TABLE rules ADD COLUMN last_line_received_at DATETIME DEFAULT NULL",
+        "ALTER TABLE rules ADD COLUMN inactivity_warning_enabled BOOLEAN DEFAULT 1",
+        "ALTER TABLE rules ADD COLUMN inactivity_period_hours INTEGER DEFAULT 1",
+        "ALTER TABLE rules ADD COLUMN inactivity_notify BOOLEAN DEFAULT 1",
+        "ALTER TABLE rules ADD COLUMN inactivity_notified BOOLEAN DEFAULT 0",
     ]
     with engine.connect() as conn:
         for sql in migrations:

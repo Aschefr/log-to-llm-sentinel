@@ -7,7 +7,67 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModelPulling();
     setupNotificationMethodToggle();
     setupMaintenance();
+    setupLangSwitcher();
 });
+
+function setupLangSwitcher() {
+    const btn = document.getElementById('config-lang-btn');
+    const dropdown = document.getElementById('config-lang-dropdown');
+    const hiddenSelect = document.getElementById('ollama-prompt-lang');
+    if (!btn || !dropdown || !hiddenSelect) return;
+
+    function updateUI(lang) {
+        const opt = dropdown.querySelector(`[data-lang="${lang}"]`);
+        if (!opt) return;
+        
+        // Use i18n SVG fallback if available
+        const emoji = opt.querySelector('.cfg-flag').dataset.emoji;
+        const flagHtml = (window.i18n && window.i18n.getFlagHTML) ? window.i18n.getFlagHTML(emoji) : emoji;
+        
+        document.getElementById('config-lang-flag').innerHTML = flagHtml;
+        document.getElementById('config-lang-name').textContent = opt.querySelector('span:not(.cfg-flag)').textContent;
+        
+        dropdown.querySelectorAll('.lang-option').forEach(o => o.classList.toggle('active', o.dataset.lang === lang));
+        hiddenSelect.value = lang;
+        hiddenSelect.dispatchEvent(new Event('change')); // Trigger auto-save
+    }
+
+    // Initialize UI on load
+    const initialLang = hiddenSelect.value || 'fr';
+    updateUI(initialLang);
+
+    // Initialise flags in dropdown using i18n helper
+    dropdown.querySelectorAll('.cfg-flag').forEach(el => {
+        const emoji = el.dataset.emoji;
+        el.innerHTML = (window.i18n && window.i18n.getFlagHTML) ? window.i18n.getFlagHTML(emoji) : emoji;
+    });
+
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdown.classList.toggle('open');
+    });
+
+    dropdown.querySelectorAll('.lang-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+            e.stopPropagation();
+            updateUI(opt.dataset.lang);
+            dropdown.classList.remove('open');
+        });
+    });
+
+    document.addEventListener('click', () => {
+        dropdown.classList.remove('open');
+    });
+
+    // Écouter si la valeur du select caché est modifiée par le chargement de la config
+    let originalLoad = hiddenSelect.value;
+    setInterval(() => {
+        if(hiddenSelect.value !== originalLoad) {
+            originalLoad = hiddenSelect.value;
+            updateUI(hiddenSelect.value);
+        }
+    }, 500); // quick hack for when loadConfig dynamically updates it since value change via JS doesn't fire "change" event if done via .value =
+}
 
 function setupNotificationMethodToggle() {
     const select = document.getElementById('notification-method');
@@ -334,8 +394,14 @@ function setupForm() {
         const success = await saveConfig(messageEl, true);
         if (success) {
             inputsToGlow.forEach(input => {
-                input.classList.add('save-success-glow');
-                setTimeout(() => input.classList.remove('save-success-glow'), 1500);
+                let targetToGlow = input;
+                if (input.id === 'ollama-prompt-lang') {
+                    const customBtn = document.getElementById('config-lang-btn');
+                    if (customBtn) targetToGlow = customBtn;
+                }
+
+                targetToGlow.classList.add('save-success-glow');
+                setTimeout(() => targetToGlow.classList.remove('save-success-glow'), 1500);
                 
                 // Si l'URL Ollama a changé, on rafraîchit automatiquement la liste des modèles
                 if (input.id === 'ollama-url') {
