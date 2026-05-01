@@ -174,8 +174,18 @@
                 <div class="step-num">2</div>
                 <h3 data-i18n="step2_title">Localisation</h3>
             </div>
+            
+            <div id="log-type-selector" style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                <button class="platform-btn selected" style="flex:1; padding: 1rem;" onclick="setLogType('file')" id="btn-type-file">
+                    <strong data-i18n="type_file">📄 Fichier Log</strong>
+                </button>
+                <button class="platform-btn" style="flex:1; padding: 1rem;" onclick="setLogType('docker')" id="btn-type-docker">
+                    <strong data-i18n="type_docker">🐳 Docker Logs</strong>
+                </button>
+            </div>
+
             <div class="code-block"><span id="cmd-locate">...</span><button class="copy-btn" onclick="copyText('cmd-locate')">Copier</button></div>
-            <textarea id="search-results" rows="4" style="margin-top:2rem" oninput="processResults()"></textarea>
+            <textarea id="search-results" rows="4" style="margin-top:2rem" data-i18n-placeholder="placeholder_results" oninput="processResults()"></textarea>
             <div id="log-selector" class="hidden">
                 <div id="list-logs"></div>
             </div>
@@ -227,7 +237,10 @@
                 step1_title: "Application",
                 btn_next: "Suivant",
                 step2_title: "Localisation",
-                step2_choose: "Choisissez le fichier à surveiller :",
+                step2_choose: "Choisissez la source à surveiller :",
+                type_file: "📄 Fichier Log",
+                type_docker: "🐳 Docker Logs",
+                placeholder_results: "Collez le résultat ici...",
                 btn_generate: "Générer",
                 step3_warning: "Collez uniquement l'URL (ex: http://...), pas la commande curl entière.",
                 step4_title: "Résultat",
@@ -245,7 +258,10 @@
                 step1_title: "Application",
                 btn_next: "Next",
                 step2_title: "Location",
-                step2_choose: "Select file to monitor:",
+                step2_choose: "Select source to monitor:",
+                type_file: "📄 Log File",
+                type_docker: "🐳 Docker Logs",
+                placeholder_results: "Paste results here...",
                 btn_generate: "Generate",
                 step3_warning: "Paste only the URL (ex: http://...), not the entire curl command.",
                 step4_title: "Ready!",
@@ -255,7 +271,7 @@
             }
         };
 
-        let state = { lang: 'fr', platform: '', app: '', log: '', webhook: '' };
+        let state = { lang: 'fr', platform: '', app: '', log: '', webhook: '', logType: 'file' };
 
         function setLang(l) {
             state.lang = l;
@@ -264,13 +280,30 @@
                 const key = el.getAttribute('data-i18n');
                 el.innerText = i18n[l][key] || key;
             });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                el.placeholder = i18n[l][key] || key;
+            });
             updateCommands();
             buildFinal();
+        }
+
+        function setLogType(t) {
+            state.logType = t;
+            document.getElementById('btn-type-file').classList.toggle('selected', t === 'file');
+            document.getElementById('btn-type-docker').classList.toggle('selected', t === 'docker');
+            updateCommands();
         }
 
         function selectPlatform(p) {
             state.platform = p;
             document.querySelectorAll('.platform-btn').forEach(b => b.classList.toggle('selected', b.id === 'btn-' + p));
+            if (p === 'windows') {
+                setLogType('file');
+                document.getElementById('btn-type-docker').style.display = 'none';
+            } else {
+                document.getElementById('btn-type-docker').style.display = 'flex';
+            }
             next(1);
             updateCommands();
         }
@@ -285,14 +318,19 @@
         function updateCommands() {
             state.app = document.getElementById('app-name').value;
             let cmd = '...';
-            if (state.platform === 'unraid') cmd = `find /mnt/user/appdata -iname "*${state.app}*" -name "*.log"`;
-            else if (state.platform === 'linux') cmd = `find /var/lib/docker/volumes -iname "*${state.app}*" -name "*.log"`;
-            else if (state.platform === 'windows') cmd = `Get-ChildItem -Path "$env:LOCALAPPDATA" -Recurse -Filter "*${state.app}*.log" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName`;
+            if (state.logType === 'docker') {
+                cmd = `docker ps -a --format "{{.Names}}" | grep -i "${state.app || '.*'}"`;
+            } else {
+                if (state.platform === 'unraid') cmd = `find /mnt/user/appdata -iname "*${state.app}*" -name "*.log"`;
+                else if (state.platform === 'linux') cmd = `find /var/lib/docker/volumes -iname "*${state.app}*" -name "*.log"`;
+                else if (state.platform === 'windows') cmd = `Get-ChildItem -Path "$env:LOCALAPPDATA" -Recurse -Filter "*${state.app}*.log" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName`;
+            }
             document.getElementById('cmd-locate').innerText = cmd;
         }
 
         function processResults() {
-            const lines = document.getElementById('search-results').value.split('\n').filter(l => l.trim().includes('.log'));
+            const val = document.getElementById('search-results').value;
+            const lines = val.split('\n').map(l => l.trim()).filter(l => l.length > 0);
             const list = document.getElementById('list-logs');
             list.innerHTML = '';
             if (lines.length) {
@@ -300,11 +338,11 @@
                 lines.forEach(line => {
                     const div = document.createElement('div');
                     div.className = 'log-item';
-                    div.innerText = line.trim();
+                    div.innerText = line;
                     div.onclick = () => {
                         document.querySelectorAll('.log-item').forEach(i => i.classList.remove('selected'));
                         div.classList.add('selected');
-                        state.log = line.trim();
+                        state.log = line;
                         document.getElementById('btn-to-3').classList.remove('hidden');
                     };
                     list.appendChild(div);
@@ -337,9 +375,11 @@
                 stop.innerText = "# Close PowerShell window.";
                 health.innerText = `# Health Check\nGet-Process powershell | Where-Object { $_.MainWindowTitle -match "Sentinel" }`;
             } else {
-                start.innerText = `#!/bin/bash\n# Forwarder\ntail -F "${state.log}" | while read -r LINE; do\n  ESCAPED=\$(echo "\$LINE" | sed 's/"/\\\\"/g')\n  curl -s -X POST -H "Content-Type: application/json" -d "{\\"lines\\": [\\"\$ESCAPED\\"]}" "${state.webhook}"\ndone`;
+                const streamCmd = state.logType === 'docker' ? `docker logs -f "${state.log}"` : `tail -F "${state.log}"`;
+                start.innerText = `#!/bin/bash\n# Forwarder\n${streamCmd} | while read -r LINE; do\n  ESCAPED=\$(echo "\$LINE" | sed 's/"/\\\\"/g')\n  curl -s -X POST -H "Content-Type: application/json" -d "{\\"lines\\": [\\"\$ESCAPED\\"]}" "${state.webhook}"\ndone`;
                 stop.innerText = `#!/bin/bash\npkill -f "api/webhook/logs"\necho "Stopped."`;
-                health.innerText = `#!/bin/bash\necho "--- 🏥 SENTINEL HEALTH CHECK ---"\n# On cherche les processus 'tail' qui tournent sur des scripts Sentinel\nPROCS=$(ps -ef | grep "tail -F" | grep -v grep)\nif [ -z "$PROCS" ]; then echo "❌ Aucun script actif."; else\n  echo "$PROCS" | while read -r line; do\n    LOG_FILE=$(echo "$line" | grep -o "/mnt/[^ ]*")\n    echo "✅ Actif : $LOG_FILE"\n  done\nfi`;
+                
+                health.innerText = `#!/bin/bash\necho "--- 🏥 SENTINEL HEALTH CHECK ---"\n# On cherche tous les processus de flux actifs (tail ou docker logs)\nPROCS=$(ps -ef | grep -E "tail -F|docker logs -f" | grep -v grep)\nif [ -z "$PROCS" ]; then echo "❌ Aucun script actif."; else\n  echo "$PROCS" | while read -r line; do\n    # Extraction intelligente de la source\n    SOURCE=$(echo "$line" | sed -nE 's/.*(tail -F|docker logs -f) ([^ ]+).*/\\1 \\2/p')\n    echo "✅ Actif : $SOURCE"\n  done\nfi`;
             }
         }
 
