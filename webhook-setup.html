@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentinel | Assistant Webhook v5</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --border: rgba(255, 255, 255, 0.1);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent: #10b981;
+            --warning: #f59e0b;
+            --debug: #818cf8;
+            --error: #ef4444;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-dark);
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            line-height: 1.6;
+        }
+
+        .lang-switcher {
+            align-self: flex-end;
+            display: flex; gap: 0.5rem;
+            margin-bottom: 1rem; max-width: 850px; width: 100%;
+        }
+
+        .lang-btn {
+            background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+            color: var(--text-muted); padding: 0.4rem 0.8rem; border-radius: 8px;
+            cursor: pointer; font-size: 0.8rem; font-weight: 600;
+        }
+
+        .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .container {
+            max-width: 850px; width: 100%;
+            background: var(--card-bg); backdrop-filter: blur(16px);
+            border: 1px solid var(--border); border-radius: 28px;
+            padding: 3.5rem; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+        }
+
+        .header { text-align: center; margin-bottom: 3.5rem; }
+        .header h1 {
+            font-family: 'Outfit', sans-serif; font-size: 2.8rem; font-weight: 700;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .step { margin-bottom: 4rem; opacity: 0.2; filter: grayscale(1); transition: all 0.5s ease; pointer-events: none; }
+        .step.active { opacity: 1; filter: grayscale(0); pointer-events: all; }
+
+        .step-header { display: flex; align-items: center; gap: 1.2rem; margin-bottom: 1.5rem; }
+        .step-num {
+            width: 36px; height: 36px; background: var(--primary);
+            border-radius: 50%; display: flex; justify-content: center; align-items: center;
+            font-weight: 700; font-size: 1rem; box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
+        }
+
+        .platform-selector { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; margin-bottom: 2rem; }
+        .platform-btn {
+            background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border);
+            padding: 1.8rem 1rem; border-radius: 20px; cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex; flex-direction: column; align-items: center; gap: 1rem;
+            color: var(--text-muted);
+        }
+        .platform-btn.selected { background: rgba(99, 102, 241, 0.15); border-color: var(--primary); color: var(--text-main); }
+        .platform-btn span { font-size: 2.2rem; }
+
+        input, textarea {
+            width: 100%; background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--border); padding: 1.2rem;
+            border-radius: 14px; color: var(--text-main);
+            font-family: inherit; font-size: 1rem; margin-bottom: 1rem;
+        }
+        input:focus, textarea:focus { outline: none; border-color: var(--primary); }
+        input.valid { border-color: var(--accent) !important; background: rgba(16, 185, 129, 0.05); }
+
+        .code-block {
+            background: #000; padding: 1.4rem; border-radius: 16px;
+            position: relative; margin-top: 1rem;
+            font-family: 'Courier New', monospace; font-size: 0.95rem;
+            border-left: 4px solid var(--primary); overflow-x: auto;
+        }
+
+        .copy-btn {
+            position: absolute; top: 0.8rem; right: 0.8rem;
+            background: var(--primary); border: none; color: white;
+            padding: 0.5rem 1rem; border-radius: 8px;
+            cursor: pointer; font-size: 0.8rem; font-weight: 600;
+        }
+
+        .btn-next {
+            background: var(--primary); color: white; border: none;
+            padding: 1.2rem 3rem; border-radius: 14px;
+            font-weight: 700; cursor: pointer; transition: all 0.3s;
+        }
+
+        .log-item {
+            padding: 1.2rem; background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border); border-radius: 14px;
+            cursor: pointer; margin-bottom: 0.6rem;
+        }
+        .log-item.selected { border-color: var(--accent); background: rgba(16, 185, 129, 0.1); }
+
+        .final-card { background: rgba(16, 185, 129, 0.03); border: 1px solid rgba(16, 185, 129, 0.2); padding: 2.5rem; border-radius: 24px; margin-top: 2rem; }
+        .debug-card { background: rgba(129, 140, 248, 0.03); border: 1px solid rgba(129, 140, 248, 0.2); padding: 2.5rem; border-radius: 24px; margin-top: 2rem; }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="lang-switcher">
+        <button class="lang-btn active" onclick="setLang('fr')" id="lang-fr">FR</button>
+        <button class="lang-btn" onclick="setLang('en')" id="lang-en">EN</button>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <h1 data-i18n="header_title">Assistant Webhook</h1>
+            <p data-i18n="header_subtitle">Exportez vos logs vers Sentinel en temps réel.</p>
+        </div>
+
+        <div class="step active" id="step-0">
+            <div class="step-header">
+                <div class="step-num">0</div>
+                <h3 data-i18n="step0_title">Plateforme</h3>
+            </div>
+            <div class="platform-selector">
+                <div class="platform-btn" onclick="selectPlatform('unraid')" id="btn-unraid">
+                    <span>🐧</span><strong data-i18n="platform_unraid">Unraid</strong>
+                </div>
+                <div class="platform-btn" onclick="selectPlatform('linux')" id="btn-linux">
+                    <span>⚙️</span><strong data-i18n="platform_linux">Linux</strong>
+                </div>
+                <div class="platform-btn" onclick="selectPlatform('windows')" id="btn-windows">
+                    <span>🪟</span><strong data-i18n="platform_windows">Windows</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="step" id="step-1">
+            <div class="step-header">
+                <div class="step-num">1</div>
+                <h3 data-i18n="step1_title">Application</h3>
+            </div>
+            <input type="text" id="app-name" placeholder="Plex, Nextcloud..." oninput="updateCommands()">
+            <button class="btn-next" onclick="next(2)" data-i18n="btn_next">Suivant</button>
+        </div>
+
+        <div class="step" id="step-2">
+            <div class="step-header">
+                <div class="step-num">2</div>
+                <h3 data-i18n="step2_title">Localisation</h3>
+            </div>
+            <div class="code-block"><span id="cmd-locate">...</span><button class="copy-btn" onclick="copyText('cmd-locate')">Copier</button></div>
+            <textarea id="search-results" rows="4" style="margin-top:2rem" oninput="processResults()"></textarea>
+            <div id="log-selector" class="hidden">
+                <div id="list-logs"></div>
+            </div>
+            <button class="btn-next hidden" id="btn-to-3" onclick="next(3)" data-i18n="btn_next">Suivant</button>
+        </div>
+
+        <div class="step" id="step-3">
+            <div class="step-header">
+                <div class="step-num">3</div>
+                <h3 data-i18n="step3_title">Sentinel</h3>
+            </div>
+            <p style="font-size: 0.8rem; color: var(--warning); margin-bottom: 0.5rem;" data-i18n="step3_warning"></p>
+            <input type="text" id="webhook-url" placeholder="http://..." oninput="validateWebhook()">
+            <button class="btn-next" id="btn-gen" onclick="generateAndGo(4)" data-i18n="btn_generate">Générer</button>
+        </div>
+
+        <div class="step" id="step-4">
+            <div class="step-header">
+                <div class="step-num">4</div>
+                <h3 data-i18n="step4_title">Installation & Santé</h3>
+            </div>
+            
+            <div class="final-card">
+                <h4 style="color: var(--accent); margin-bottom: 0.8rem;" data-i18n="final_start">🚀 Script de transfert</h4>
+                <div class="code-block"><pre id="txt-start" style="white-space: pre-wrap; margin:0;"></pre><button class="copy-btn" onclick="copyText('txt-start')">Copier</button></div>
+            </div>
+
+            <div style="margin-top: 2rem; padding: 1.5rem; background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 18px;">
+                <h4 style="color: var(--warning); margin-bottom: 0.8rem;" data-i18n="final_stop">🛑 Arrêt global</h4>
+                <div class="code-block"><pre id="txt-stop" style="white-space: pre-wrap; margin:0;"></pre><button class="copy-btn" onclick="copyText('txt-stop')">Copier</button></div>
+            </div>
+
+            <div class="debug-card">
+                <h4 style="color: var(--debug); margin-bottom: 0.8rem;" data-i18n="final_health">🏥 Santé du système</h4>
+                <div class="code-block" style="border-left-color: var(--debug);"><pre id="txt-health" style="white-space: pre-wrap; margin:0;"></pre><button class="copy-btn" onclick="copyText('txt-health')">Copier</button></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const i18n = {
+            fr: {
+                header_title: "Assistant Webhook",
+                header_subtitle: "Exportez vos logs vers Sentinel en temps réel.",
+                step0_title: "Plateforme",
+                platform_unraid: "Unraid",
+                platform_linux: "Linux / Docker",
+                platform_windows: "Windows",
+                step1_title: "Application",
+                btn_next: "Suivant",
+                step2_title: "Localisation",
+                step2_choose: "Choisissez le fichier à surveiller :",
+                btn_generate: "Générer",
+                step3_warning: "Collez uniquement l'URL (ex: http://...), pas la commande curl entière.",
+                step4_title: "Résultat",
+                final_start: "🚀 Script de transfert",
+                final_stop: "🛑 Arrêt global",
+                final_health: "🏥 Santé du système"
+            },
+            en: {
+                header_title: "Webhook Assistant",
+                header_subtitle: "Forward logs to Sentinel in real-time.",
+                step0_title: "Platform",
+                platform_unraid: "Unraid",
+                platform_linux: "Linux / Docker",
+                platform_windows: "Windows",
+                step1_title: "Application",
+                btn_next: "Next",
+                step2_title: "Location",
+                step2_choose: "Select file to monitor:",
+                btn_generate: "Generate",
+                step3_warning: "Paste only the URL (ex: http://...), not the entire curl command.",
+                step4_title: "Ready!",
+                final_start: "🚀 Forwarding Script",
+                final_stop: "🛑 Global Stop",
+                final_health: "🏥 System Health"
+            }
+        };
+
+        let state = { lang: 'fr', platform: '', app: '', log: '', webhook: '' };
+
+        function setLang(l) {
+            state.lang = l;
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.id === 'lang-' + l));
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.innerText = i18n[l][key] || key;
+            });
+            updateCommands();
+            buildFinal();
+        }
+
+        function selectPlatform(p) {
+            state.platform = p;
+            document.querySelectorAll('.platform-btn').forEach(b => b.classList.toggle('selected', b.id === 'btn-' + p));
+            next(1);
+            updateCommands();
+        }
+
+        function next(s) {
+            document.querySelectorAll('.step').forEach((el, idx) => {
+                if (idx <= s) el.classList.add('active');
+            });
+            document.getElementById('step-' + s).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function updateCommands() {
+            state.app = document.getElementById('app-name').value;
+            let cmd = '...';
+            if (state.platform === 'unraid') cmd = `find /mnt/user/appdata -iname "*${state.app}*" -name "*.log"`;
+            else if (state.platform === 'linux') cmd = `find /var/lib/docker/volumes -iname "*${state.app}*" -name "*.log"`;
+            else if (state.platform === 'windows') cmd = `Get-ChildItem -Path "$env:LOCALAPPDATA" -Recurse -Filter "*${state.app}*.log" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName`;
+            document.getElementById('cmd-locate').innerText = cmd;
+        }
+
+        function processResults() {
+            const lines = document.getElementById('search-results').value.split('\n').filter(l => l.trim().includes('.log'));
+            const list = document.getElementById('list-logs');
+            list.innerHTML = '';
+            if (lines.length) {
+                document.getElementById('log-selector').classList.remove('hidden');
+                lines.forEach(line => {
+                    const div = document.createElement('div');
+                    div.className = 'log-item';
+                    div.innerText = line.trim();
+                    div.onclick = () => {
+                        document.querySelectorAll('.log-item').forEach(i => i.classList.remove('selected'));
+                        div.classList.add('selected');
+                        state.log = line.trim();
+                        document.getElementById('btn-to-3').classList.remove('hidden');
+                    };
+                    list.appendChild(div);
+                });
+            }
+        }
+
+        function validateWebhook() {
+            let url = document.getElementById('webhook-url').value;
+            // Auto-clean if full curl command is pasted
+            const match = url.match(/http[s]?:\/\/[^ '"]+/);
+            if (match) {
+                url = match[0];
+                document.getElementById('webhook-url').value = url;
+            }
+            const isValid = url.startsWith('http') && url.includes('/api/webhook/logs/');
+            document.getElementById('webhook-url').classList.toggle('valid', isValid);
+            state.webhook = url;
+        }
+
+        function generateAndGo(s) { buildFinal(); next(s); }
+
+        function buildFinal() {
+            const start = document.getElementById('txt-start');
+            const stop = document.getElementById('txt-stop');
+            const health = document.getElementById('txt-health');
+            
+            if (state.platform === 'windows') {
+                start.innerText = `$webhook = "${state.webhook}"\n$logPath = "${state.log}"\nGet-Content -Path $logPath -Wait -Tail 1 | ForEach-Object {\n    $body = @{ lines = @($_) } | ConvertTo-Json\n    Invoke-RestMethod -Uri $webhook -Method Post -ContentType "application/json" -Body $body\n}`;
+                stop.innerText = "# Close PowerShell window.";
+                health.innerText = `# Health Check\nGet-Process powershell | Where-Object { $_.MainWindowTitle -match "Sentinel" }`;
+            } else {
+                start.innerText = `#!/bin/bash\n# Forwarder\ntail -F "${state.log}" | while read -r LINE; do\n  ESCAPED=\$(echo "\$LINE" | sed 's/"/\\\\"/g')\n  curl -s -X POST -H "Content-Type: application/json" -d "{\\"lines\\": [\\"\$ESCAPED\\"]}" "${state.webhook}"\ndone`;
+                stop.innerText = `#!/bin/bash\npkill -f "api/webhook/logs"\necho "Stopped."`;
+                health.innerText = `#!/bin/bash\necho "--- 🏥 SENTINEL HEALTH CHECK ---"\n# On cherche les processus 'tail' qui tournent sur des scripts Sentinel\nPROCS=$(ps -ef | grep "tail -F" | grep -v grep)\nif [ -z "$PROCS" ]; then echo "❌ Aucun script actif."; else\n  echo "$PROCS" | while read -r line; do\n    LOG_FILE=$(echo "$line" | grep -o "/mnt/[^ ]*")\n    echo "✅ Actif : $LOG_FILE"\n  done\nfi`;
+            }
+        }
+
+        function copyText(id) {
+            navigator.clipboard.writeText(document.getElementById(id).innerText).then(() => {
+                const btn = document.querySelector(`#${id}`).parentElement.querySelector('.copy-btn');
+                btn.innerText = 'Copié !';
+                setTimeout(() => btn.innerText = 'Copier', 2000);
+            });
+        }
+        setLang('fr');
+    </script>
+</body>
+</html>

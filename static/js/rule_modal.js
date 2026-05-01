@@ -149,30 +149,74 @@ function setupRuleModal(opts = {}) {
 }
 
 /* ── Webhook helpers ───────────────────────────────────────────────────────── */
+function fallbackCopyTextToClipboard(text) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+        document.execCommand('copy');
+    } catch (err) {
+        console.error('Fallback copy failed', err);
+    }
+    document.body.removeChild(textArea);
+}
+
 function updateModalWebhookUrl() {
     if (!window._currentWebhookToken) return;
     const url = window.location.origin + '/api/webhook/logs/' + window._currentWebhookToken;
-    const curlCommand = `curl -X POST -H "Content-Type: text/plain" --data-binary "@my_log.txt" ${url}`;
-    document.getElementById('webhook-curl-cmd').textContent = curlCommand;
+    document.getElementById('webhook-curl-cmd').textContent = url;
 }
 
-function copyModalWebhookUrl() {
+function copyModalWebhookUrl(btnElement) {
     const text = document.getElementById('webhook-curl-cmd').textContent;
+    
+    function showCopied() {
+        if (!btnElement) return;
+        const oldText = btnElement.innerHTML;
+        btnElement.innerHTML = window.t ? window.t('rules.webhook_copied') || "✅ Copié !" : "✅ Copié !";
+        setTimeout(() => { btnElement.innerHTML = oldText; }, 2000);
+    }
+
+    if (!navigator.clipboard) {
+        fallbackCopyTextToClipboard(text);
+        showCopied();
+        return;
+    }
     navigator.clipboard.writeText(text).then(() => {
-        alert("Commande curl copiée dans le presse-papier !");
+        showCopied();
     }).catch(err => {
         console.error('Erreur de copie:', err);
+        fallbackCopyTextToClipboard(text);
+        showCopied();
     });
 }
 
-function copyWebhookUrl(ruleId) {
+function copyWebhookUrl(ruleId, btnElement) {
     const url = window.location.origin + '/api/webhook/logs/' + ruleId;
-    const curlCommand = `curl -X POST -H "Content-Type: text/plain" --data-binary "@my_log.txt" ${url}`;
-    navigator.clipboard.writeText(curlCommand).then(() => {
-        alert("Commande curl copiée dans le presse-papier !");
+    
+    function showCopied() {
+        if (!btnElement) return;
+        const oldText = btnElement.innerHTML;
+        btnElement.innerHTML = window.t ? window.t('rules.webhook_copied') || "✅ Copié !" : "✅ Copié !";
+        setTimeout(() => { btnElement.innerHTML = oldText; }, 2000);
+    }
+
+    if (!navigator.clipboard) {
+        fallbackCopyTextToClipboard(url);
+        showCopied();
+        return;
+    }
+    navigator.clipboard.writeText(url).then(() => {
+        showCopied();
     }).catch(err => {
         console.error('Erreur de copie:', err);
-        alert("URL : " + url);
+        fallbackCopyTextToClipboard(url);
+        showCopied();
     });
 }
 
@@ -184,7 +228,7 @@ function resetForm() {
     window._currentWebhookToken = null;
 
     const sourceCards = document.querySelectorAll('.source-card');
-    sourceCards.forEach(c => c.classList.remove('active'));
+    sourceCards.forEach(c => c.classList.remove('kw-tab--active'));
 
     const localCard = document.querySelector('.source-card[data-source="local"]');
     if (localCard) {
@@ -295,7 +339,7 @@ async function editRule(id) {
         document.getElementById('rule-name').value = rule.name;
 
         const sourceCards = document.querySelectorAll('.source-card');
-        sourceCards.forEach(c => c.classList.remove('active'));
+        sourceCards.forEach(c => c.classList.remove('kw-tab--active'));
 
         if (rule.log_file_path && rule.log_file_path.startsWith('[WEBHOOK]')) {
             const webhookCard = document.querySelector('.source-card[data-source="webhook"]');

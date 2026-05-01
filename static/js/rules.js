@@ -39,7 +39,7 @@ async function loadRules() {
                     <h3>${escapeHtml(rule.name)}</h3>
                     <p>${rule.log_file_path && rule.log_file_path.startsWith('[WEBHOOK]') 
                         ? `<span class="chip" style="background:var(--primary);color:white;border:none">🔗 Webhook</span> 
-                           <button class="btn btn-secondary btn-sm" onclick="copyWebhookUrl('${rule.log_file_path.split(':')[1] || rule.id}')" title="Copier URL curl">📋 Copier URL</button>` 
+                           <button class="btn btn-secondary btn-sm" onclick="copyWebhookUrl('${rule.log_file_path.split(':')[1] || rule.id}', this)" title="Copier URL curl">📋 Copier URL</button>` 
                         : `📁 ${escapeHtml(rule.log_file_path)}`}</p>
                     <p>🔑 ${rule.keywords.join(', ') || '<em style="opacity:.5">Aucun mot-clé (apprentissage en cours…)</em>'}</p>
                     ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}

@@ -108,7 +108,9 @@
         "delete_confirm": "Êtes-vous sûr de vouloir supprimer cette règle ?",
         "no_keywords": "Aucun mot-clé",
         "label_source": "Source des logs",
-        "webhook_hint": "Utilise cette URL pour envoyer des logs à Sentinel avec une requête HTTP POST. Tu peux tester immédiatement avant même d'enregistrer la règle !"
+        "webhook_hint": "Utilise cette URL pour envoyer des logs à Sentinel avec une requête HTTP POST. Tu peux tester immédiatement avant même d'enregistrer la règle !",
+        "webhook_copied": "✅ Copié !",
+        "label_inactivity_notify": "Envoyer une alerte si inactif"
     },
     "monitor": {
         "title": "Monitor",

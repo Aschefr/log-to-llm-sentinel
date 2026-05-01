@@ -108,7 +108,9 @@
         "delete_confirm": "Are you sure you want to delete this rule?",
         "no_keywords": "No keywords",
         "label_source": "Source of logs",
-        "webhook_hint": "Use this URL to send logs to Sentinel via an HTTP POST request. You can test it immediately, even before saving the rule!"
+        "webhook_hint": "Use this URL to send logs to Sentinel via an HTTP POST request. You can test it immediately, even before saving the rule!",
+        "webhook_copied": "✅ Copied!",
+        "label_inactivity_notify": "Send an alert if inactive"
     },
     "monitor": {
         "title": "Monitor",
