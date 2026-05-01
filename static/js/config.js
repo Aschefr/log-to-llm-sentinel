@@ -83,8 +83,10 @@ function updateNotificationVisibility() {
     const method = select.value;
     const smtpEl = document.getElementById('smtp-section');
     const appriseEl = document.getElementById('apprise-section');
+    const discordEl = document.getElementById('discord-section');
     if (smtpEl)    smtpEl.style.display    = (method === 'smtp')    ? '' : 'none';
     if (appriseEl) appriseEl.style.display = (method === 'apprise') ? '' : 'none';
+    if (discordEl) discordEl.style.display = (method === 'discord') ? '' : 'none';
 }
 
 
@@ -210,6 +212,8 @@ async function loadConfig() {
         document.getElementById('notification-method').value = config.notification_method || 'smtp';
         document.getElementById('apprise-url').value = config.apprise_url || '';
         document.getElementById('apprise-max-chars').value = config.apprise_max_chars || 1900;
+        const discordEl = document.getElementById('discord-webhook-url');
+        if (discordEl) discordEl.value = config.discord_webhook_url || '';
         document.getElementById('max-log-chars').value = config.max_log_chars || 5000;
         document.getElementById('monitor-log-lines').value = config.monitor_log_lines || 60;
         document.getElementById('instance-name').value = config.instance_name || '';
@@ -572,10 +576,12 @@ function setupTests() {
     const btnOllama = document.getElementById('test-ollama-btn');
     const btnSmtp = document.getElementById('test-smtp-btn');
     const btnApprise = document.getElementById('test-apprise-btn');
+    const btnDiscord = document.getElementById('test-discord-btn');
 
     const msgOllama = document.getElementById('ollama-test-message');
     const msgSmtp = document.getElementById('smtp-test-message');
     const msgApprise = document.getElementById('apprise-test-message');
+    const msgDiscord = document.getElementById('discord-test-message');
 
     if (btnOllama && msgOllama) {
         btnOllama.addEventListener('click', async () => {
@@ -590,6 +596,11 @@ function setupTests() {
     if (btnApprise && msgApprise) {
         btnApprise.addEventListener('click', async () => {
             await runTest('/api/config/test/apprise', msgApprise, btnApprise);
+        });
+    }
+    if (btnDiscord && msgDiscord) {
+        btnDiscord.addEventListener('click', async () => {
+            await runTest('/api/config/test/discord', msgDiscord, btnDiscord);
         });
     }
 }
@@ -661,6 +672,7 @@ async function saveConfig(messageEl, isAutoSave = false) {
             ? document.getElementById('apprise-tags').value 
             : document.getElementById('apprise-tags-select').value,
         apprise_max_chars: parseInt(document.getElementById('apprise-max-chars').value) || 1900,
+        discord_webhook_url: document.getElementById('discord-webhook-url') ? document.getElementById('discord-webhook-url').value : '',
         max_log_chars: parseInt(document.getElementById('max-log-chars').value) || 5000,
         monitor_log_lines: parseInt(document.getElementById('monitor-log-lines').value) || 60,
         ollama_temp: parseFloat(document.getElementById('ollama-temp').value) || 0.1,

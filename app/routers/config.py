@@ -84,6 +84,7 @@ class ConfigUpdate(BaseModel):
     ollama_prompt_lang: Optional[str] = None  # 'fr' | 'en'
     site_lang: Optional[str] = None  # langue du site (header) pour notifications
     instance_name: Optional[str] = None  # nom de l'instance (multi-déploiement)
+    discord_webhook_url: Optional[str] = None
     auto_delete_analyses: Optional[bool] = None
     auto_delete_retention_days: Optional[int] = None
 
@@ -121,6 +122,7 @@ def get_config():
             "ollama_prompt_lang": config.ollama_prompt_lang or 'fr',
             "site_lang": config.site_lang or 'fr',
             "instance_name": config.instance_name or '',
+            "discord_webhook_url": config.discord_webhook_url or '',
             "auto_delete_analyses": config.auto_delete_analyses,
             "auto_delete_retention_days": config.auto_delete_retention_days,
         }
@@ -186,6 +188,8 @@ def update_config(config_data: ConfigUpdate):
             config.site_lang = config_data.site_lang
         if config_data.instance_name is not None:
             config.instance_name = config_data.instance_name
+        if config_data.discord_webhook_url is not None:
+            config.discord_webhook_url = config_data.discord_webhook_url
         if config_data.auto_delete_analyses is not None:
             config.auto_delete_analyses = config_data.auto_delete_analyses
         if config_data.auto_delete_retention_days is not None:
@@ -235,6 +239,7 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
         "ollama_prompt_lang": (config.ollama_prompt_lang or 'fr') if config else 'fr',
         "site_lang": (config.site_lang or 'fr') if config else 'fr',
         "instance_name": (config.instance_name or '') if config else '',
+        "discord_webhook_url": (config.discord_webhook_url or '') if config else '',
         "auto_delete_analyses": config.auto_delete_analyses if config else False,
         "auto_delete_retention_days": config.auto_delete_retention_days if config else 30,
     }
@@ -376,6 +381,33 @@ def test_apprise():
             raise HTTPException(status_code=502, detail="Échec de l'envoi Apprise (vérifie l'URL ou les logs debug)")
 
         return {"ok": True, "detail": "Notification Apprise envoyée avec succès"}
+    finally:
+        db.close()
+
+
+@router.post("/test/discord")
+def test_discord():
+    """Test connexion Discord Webhook"""
+    db = SessionLocal()
+    try:
+        config = db.query(GlobalConfig).first()
+        cfg = _get_config_dict(config)
+
+        webhook_url = (cfg.get("discord_webhook_url") or "").strip()
+        if not webhook_url:
+            raise HTTPException(status_code=400, detail="Webhook Discord manquant")
+
+        from app.services.notification_service import NotificationService
+        notifier = NotificationService()
+        lang = cfg.get("site_lang", "fr")
+        subject = "Test Discord Log to LLM Sentinel"
+        body = "This is a Log to LLM Sentinel configuration test" if lang == "en" else "Ceci est un test de configuration Log to LLM Sentinel"
+        
+        ok = notifier._send_discord(subject, body, cfg)
+        if not ok:
+            raise HTTPException(status_code=502, detail="Échec de l'envoi Discord (vérifie l'URL ou les logs debug)")
+
+        return {"ok": True, "detail": "Notification Discord envoyée avec succès"}
     finally:
         db.close()
 

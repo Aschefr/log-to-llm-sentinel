@@ -100,6 +100,7 @@ class GlobalConfig(Base):
     chat_lang = Column(String, default="")  # Default header lang if empty
     auto_delete_analyses = Column(Boolean, default=False)
     auto_delete_retention_days = Column(Integer, default=30)
+    discord_webhook_url = Column(String, nullable=True)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 class ChatConversation(Base):

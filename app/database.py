@@ -54,6 +54,7 @@ def init_db():
         "ALTER TABLE chat_conversations ADD COLUMN compressed_context TEXT DEFAULT NULL",
         "ALTER TABLE chat_conversations ADD COLUMN compressed_at DATETIME DEFAULT NULL",
         "ALTER TABLE global_config ADD COLUMN instance_name VARCHAR DEFAULT ''",
+        "ALTER TABLE global_config ADD COLUMN discord_webhook_url VARCHAR DEFAULT NULL",
     ]
     with engine.connect() as conn:
         for sql in migrations:

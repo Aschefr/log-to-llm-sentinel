@@ -181,6 +181,13 @@ automation:
 
 ---
 
+## Nextcloud integration
+Find the active nextcloud.log in Docker volumes:
+
+```bash
+sudo find /var/lib/docker/volumes/ -name "nextcloud.log" -exec ls -lh {} +
+```
+
 ## 🛠️ Configuration
 
 Sentinel is highly customizable via the **Configuration** page:

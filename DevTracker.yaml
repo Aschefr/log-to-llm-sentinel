@@ -145,7 +145,7 @@ ux_global:
     name: "Flexible theme system (light/dark toggle + accent color)"
     status: TODO
     effort: XL
-    priority: P1
+    priority: P3
     subtasks:
       - "Theme toggle UI component (header)"
       - "CSS custom properties refactor for accent/dominant color"
@@ -157,7 +157,7 @@ ux_global:
     name: "Update theme file for new flexibility"
     status: TODO
     effort: M
-    priority: P1
+    priority: P3
     deps: [UX-02]
 
 # ─────────────────────────────────────────────
@@ -205,7 +205,7 @@ chat:
 
   - id: CHAT-07
     name: "Context management system (token-aware)"
-    status: TODO
+    status: DONE
     effort: XL
     priority: P3
     subtasks:
@@ -403,18 +403,24 @@ meta_analysis:
 # ─────────────────────────────────────────────
 advanced_analysis:
   - id: ADV-01
-    name: "Similarity-based contextual analysis (Chat history lookup)"
+    name: "Similarity-based contextual analysis (Memory & History)"
     status: TODO
     effort: XL
     priority: P1
     notes: |
-      When a new analysis is triggered:
-      1. Extract the triggering log line.
-      2. Check Chat history for previous deep-dives (same rule) with high similarity in the origin log line.
-      3. If a match exists, use the conversation history to ask the AI to re-analyze with this new context (checking for regressions or past fixes).
-      4. Send a notification with the refined analysis, 
-      5. The refined analysis is shown with an accordion nested under the original analysis for a complete view in the Monitor page
-    files: [app/services/orchestrator.py, app/services/chat_service.py, static/js/monitor.js]
+      Goal: Make analyses "intelligent" by learning from past manual diagnostics (Chats).
+      Workflow:
+      1. Signature Extraction: Normalize the log line (strip timestamps, IDs, hex, IPs) to create a 'fingerprint'.
+      2. Memory Lookup: Search Analysis and Chat history for the same Rule with a similar fingerprint.
+      3. Experience Injection: If a past diagnostic (Chat) is found, inject its summary/conclusion into the new analysis prompt.
+      4. Refined Notification: Mention "[Historical Context Found]" in the notification.
+      5. UI: Display the history as a nested accordion under the main analysis in Monitor.
+    subtasks:
+      - "Create Log Normalizer utility (Regex-based signature extraction)"
+      - "Implement History Lookup service (Similarity + Signature matching)"
+      - "Update Orchestrator to inject historical context into Ollama prompts"
+      - "Modify Monitor UI to support nested 'History' views"
+    files: [app/services/orchestrator.py, app/utils/log_utils.py, app/services/history_service.py, static/js/monitor.js]
 
 # ─────────────────────────────────────────────
 # AUTO-LEARNING
@@ -452,10 +458,10 @@ config:
 
   - id: CFG-03
     name: "Discord bot (native integration)"
-    status: TODO
-    effort: L
+    status: DONE
+    effort: S
     priority: P2
-    notes: "Apprise handles Discord but is hard to install for beginners. Native bot = simpler UX."
+    notes: "Added native Discord Webhook support. Replaces Apprise for beginners."
 
   - id: CFG-04
     name: "Maintenance section in 'Interface & Monitor' panel"

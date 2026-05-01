@@ -44,7 +44,8 @@
                 <label for="notification-method" data-i18n="config.notification_method_label">Méthode de notification principale</label>
                 <select id="notification-method">
                     <option value="smtp" data-i18n="config.method_smtp">Email (SMTP)</option>
-                    <option value="apprise" data-i18n="config.method_apprise">Apprise (Discord, Telegram, Slack...)</option>
+                    <option value="apprise" data-i18n="config.method_apprise">Apprise (Telegram, Slack...)</option>
+                    <option value="discord" data-i18n="config.method_discord">Discord Webhook</option>
                 </select>
             </div>
 
@@ -117,6 +118,19 @@
                     <button type="button" id="test-apprise-btn" class="btn btn-secondary btn-sm" data-i18n="config.test_apprise">Tester Apprise</button>
                 </div>
                 <div id="apprise-test-message" class="message hidden"></div>
+            </div>
+
+            <div id="discord-section" class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border); display: none;">
+                <h3><span aria-hidden="true">💬 </span><span data-i18n="config.discord_title">Configuration Discord</span></h3>
+                <div class="form-group">
+                    <label for="discord-webhook-url" data-i18n="config.discord_webhook">URL Webhook Discord</label>
+                    <input type="text" id="discord-webhook-url" data-i18n-placeholder="config.discord_webhook_placeholder" placeholder="https://discord.com/api/webhooks/...">
+                    <div class="form-hint" data-i18n="config.discord_help">Collez l'URL du Webhook depuis les paramètres d'intégration de votre salon Discord.</div>
+                </div>
+                <div class="form-actions" style="margin-top: 0.5rem;">
+                    <button type="button" id="test-discord-btn" class="btn btn-secondary btn-sm" data-i18n="config.test_discord">Tester Discord</button>
+                </div>
+                <div id="discord-test-message" class="message hidden"></div>
             </div>
         </section>
 

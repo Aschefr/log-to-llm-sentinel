@@ -33,6 +33,8 @@ class NotificationService:
             return self._send_smtp(subject, body, config, to_email)
         elif method == "apprise":
             return self._send_apprise(subject, body, config)
+        elif method == "discord":
+            return self._send_discord(subject, body, config)
         else:
             logger.warning("Notification", f"Méthode inconnue: {method}")
             return False
@@ -167,4 +169,76 @@ class NotificationService:
             return False
         except Exception as e:
             logger.error("Notification", f"Erreur Apprise: {e}")
+            return False
+
+    def _send_discord(
+        self,
+        subject: str,
+        body: str,
+        config: dict,
+    ) -> bool:
+        """
+        Envoie une notification via un Webhook Discord.
+        """
+        webhook_url = config.get("discord_webhook_url", "")
+        if not webhook_url:
+            logger.warning("Notification", "URL Webhook Discord non configurée")
+            return False
+
+        logger.debug("Notification", f"Discord POST → {webhook_url}")
+
+        try:
+            # Discord limit is 2000 chars per embed description
+            max_chars = 1900
+            safe_body = body
+            if len(body) > max_chars:
+                trunc_msg = "\n\n⚠️ **Message tronqué car trop long...**"
+                safe_body = body[:max_chars - len(trunc_msg)] + trunc_msg
+
+            color = 0x3498db
+            if "CRITICAL" in subject or "🚨" in subject:
+                color = 0xe74c3c
+            elif "WARNING" in subject or "⚠️" in subject:
+                color = 0xf1c40f
+            elif "Test" in subject:
+                color = 0x2ecc71
+
+            payload = {
+                "username": "Log-to-LLM Sentinel",
+                "embeds": [
+                    {
+                        "title": subject,
+                        "description": safe_body,
+                        "color": color
+                    }
+                ]
+            }
+
+            data_str = json.dumps(payload)
+            data = data_str.encode("utf-8")
+            req = urllib.request.Request(
+                webhook_url,
+                data=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "User-Agent": "Log-to-LLM-Sentinel/1.0"
+                },
+                method="POST",
+            )
+
+            with urllib.request.urlopen(req, timeout=10) as response:
+                status = getattr(response, "status", 200)
+                logger.debug("Notification", f"Discord réponse HTTP {status}")
+                return 200 <= status < 300
+
+        except urllib.error.HTTPError as e:
+            error_body = ""
+            try:
+                error_body = e.read().decode("utf-8")
+            except:
+                pass
+            logger.error("Notification", f"Erreur Discord HTTP {e.code}: {e.reason} - {error_body}")
+            return False
+        except Exception as e:
+            logger.error("Notification", f"Erreur Discord: {e}")
             return False

@@ -23,6 +23,7 @@ class GlobalConfigCreate(BaseModel):
     max_log_chars: int = 5000
     debug_mode: bool = False
     ollama_prompt_lang: str = 'fr'  # 'fr' | 'en'
+    discord_webhook_url: Optional[str] = None
 
 
 class GlobalConfigRead(GlobalConfigCreate):
