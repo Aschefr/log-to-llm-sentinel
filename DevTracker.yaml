@@ -392,6 +392,24 @@ meta_analysis:
     files: [app/services/meta_service.py, static/js/meta.js, templates/meta.html, app/routers/meta_analysis.py]
 
 # ─────────────────────────────────────────────
+# ADVANCED ANALYSIS
+# ─────────────────────────────────────────────
+advanced_analysis:
+  - id: ADV-01
+    name: "Similarity-based contextual analysis (Chat history lookup)"
+    status: TODO
+    effort: XL
+    priority: P1
+    notes: |
+      When a new analysis is triggered:
+      1. Extract the triggering log line.
+      2. Check Chat history for previous deep-dives (same rule) with high similarity in the origin log line.
+      3. If a match exists, use the conversation history to ask the AI to re-analyze with this new context (checking for regressions or past fixes).
+      4. Send a notification with the refined analysis, 
+      5. The refined analysis is shown with an accordion nested under the original analysis for a complete view in the Monitor page
+    files: [app/services/orchestrator.py, app/services/chat_service.py, static/js/monitor.js]
+
+# ─────────────────────────────────────────────
 # AUTO-LEARNING
 # ─────────────────────────────────────────────
 auto_learning:
