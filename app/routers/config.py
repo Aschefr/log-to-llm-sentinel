@@ -83,6 +83,7 @@ class ConfigUpdate(BaseModel):
     debug_mode: Optional[bool] = None
     ollama_prompt_lang: Optional[str] = None  # 'fr' | 'en'
     site_lang: Optional[str] = None  # langue du site (header) pour notifications
+    instance_name: Optional[str] = None  # nom de l'instance (multi-déploiement)
     auto_delete_analyses: Optional[bool] = None
     auto_delete_retention_days: Optional[int] = None
 
@@ -119,6 +120,7 @@ def get_config():
             "debug_mode": config.debug_mode,
             "ollama_prompt_lang": config.ollama_prompt_lang or 'fr',
             "site_lang": config.site_lang or 'fr',
+            "instance_name": config.instance_name or '',
             "auto_delete_analyses": config.auto_delete_analyses,
             "auto_delete_retention_days": config.auto_delete_retention_days,
         }
@@ -182,6 +184,8 @@ def update_config(config_data: ConfigUpdate):
             config.ollama_prompt_lang = config_data.ollama_prompt_lang
         if config_data.site_lang is not None:
             config.site_lang = config_data.site_lang
+        if config_data.instance_name is not None:
+            config.instance_name = config_data.instance_name
         if config_data.auto_delete_analyses is not None:
             config.auto_delete_analyses = config_data.auto_delete_analyses
         if config_data.auto_delete_retention_days is not None:
@@ -230,6 +234,7 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
         "debug_mode": config.debug_mode if config else False,
         "ollama_prompt_lang": (config.ollama_prompt_lang or 'fr') if config else 'fr',
         "site_lang": (config.site_lang or 'fr') if config else 'fr',
+        "instance_name": (config.instance_name or '') if config else '',
         "auto_delete_analyses": config.auto_delete_analyses if config else False,
         "auto_delete_retention_days": config.auto_delete_retention_days if config else 30,
     }

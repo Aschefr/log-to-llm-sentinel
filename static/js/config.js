@@ -29,7 +29,6 @@ function setupLangSwitcher() {
         
         dropdown.querySelectorAll('.lang-option').forEach(o => o.classList.toggle('active', o.dataset.lang === lang));
         hiddenSelect.value = lang;
-        hiddenSelect.dispatchEvent(new Event('change')); // Trigger auto-save
     }
 
     // Initialize UI on load
@@ -51,6 +50,7 @@ function setupLangSwitcher() {
         opt.addEventListener('click', (e) => {
             e.stopPropagation();
             updateUI(opt.dataset.lang);
+            hiddenSelect.dispatchEvent(new Event('change')); // Trigger auto-save only on user click
             dropdown.classList.remove('open');
         });
     });
@@ -212,6 +212,7 @@ async function loadConfig() {
         document.getElementById('apprise-max-chars').value = config.apprise_max_chars || 1900;
         document.getElementById('max-log-chars').value = config.max_log_chars || 5000;
         document.getElementById('monitor-log-lines').value = config.monitor_log_lines || 60;
+        document.getElementById('instance-name').value = config.instance_name || '';
         document.getElementById('ollama-temp').value = config.ollama_temp || 0.1;
         document.getElementById('ollama-ctx').value = config.ollama_ctx || 4096;
         const promptLangEl = document.getElementById('ollama-prompt-lang');
@@ -666,6 +667,7 @@ async function saveConfig(messageEl, isAutoSave = false) {
         ollama_ctx: parseInt(document.getElementById('ollama-ctx').value) || 4096,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
         ollama_prompt_lang: (document.getElementById('ollama-prompt-lang') || {}).value || 'fr',
+        instance_name: document.getElementById('instance-name') ? document.getElementById('instance-name').value : '',
         auto_delete_analyses: document.getElementById('auto-delete-analyses') ? document.getElementById('auto-delete-analyses').checked : false,
     };
 

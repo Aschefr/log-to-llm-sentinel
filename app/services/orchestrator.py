@@ -137,6 +137,7 @@ class Orchestrator:
                 "apprise_max_chars": config.apprise_max_chars if config else 1900,
                 "max_log_chars": config.max_log_chars if config else 5000,
                 "debug_mode": config.debug_mode if config else False,
+                "instance_name": config.instance_name if config else "",
             }
 
             max_chars = config_dict.get("max_log_chars", 5000)
@@ -267,7 +268,8 @@ class Orchestrator:
         logger.debug("Notification", f"Notification lang={lang} (site_lang={config.get('site_lang')}, ollama_prompt_lang={config.get('ollama_prompt_lang')})")
         det_id_label = f" [ID: {detection_id}]" if detection_id else ""
         logger.debug("Notification", f"Envoi notification via '{config.get('notification_method')}' pour règle '{rule.name}'")
-        subject = f"[Sentinel] {nt('alert', lang)} {severity.upper()} : {rule.name}{det_id_label}"
+        instance_prefix = f"[{config.get('instance_name')}] " if config.get('instance_name') else ""
+        subject = f"{instance_prefix}[Sentinel] {nt('alert', lang)} {severity.upper()} : {rule.name}{det_id_label}"
         
         severity_emoji = "🔴" if severity == "critical" else "🟠" if severity == "warning" else "🔵"
         

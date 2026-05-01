@@ -250,6 +250,11 @@
         <section class="config-section">
             <h2><span aria-hidden="true">🖥️ </span><span data-i18n="config.interface_title">Interface &amp; Monitor</span></h2>
             <div class="form-group">
+                <label for="instance-name" data-i18n="config.instance_name_label">Instance Name</label>
+                <input type="text" id="instance-name" data-i18n-placeholder="config.instance_name_placeholder" placeholder="e.g. Prod, Dev, Home...">
+                <div class="form-hint" data-i18n="config.instance_name_hint">Prefixed in notification subjects to identify this instance when multiple are deployed.</div>
+            </div>
+            <div class="form-group">
                 <label for="monitor-log-lines" data-i18n="config.monitor_lines">Nombre de lignes (Monitor)</label>
                 <input type="number" id="monitor-log-lines" value="60" min="10" max="1000">
                 <div class="form-hint" data-i18n="config.monitor_lines_hint">Définit le nombre de lignes à afficher en temps réel dans la page Monitor.</div>

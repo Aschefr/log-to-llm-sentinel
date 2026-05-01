@@ -44,8 +44,15 @@ global_rules:
         subject = nt('your_key', lang)
       To add a new translated string: add the key in the 'notifications' section of the language JSON files in static/i18n/ (e.g., en.json, fr.json).
       The site language is synced from the frontend header to GlobalConfig.site_lang via PUT /api/config/site-lang."
+  - id: G-10
+    rule: |
+      When adding a new column to any SQLAlchemy model, ALWAYS add a corresponding
+      ALTER TABLE migration in app/database.py init_db() migrations list.
+      SQLAlchemy create_all() does NOT add columns to existing tables.
+      Without this, existing databases will crash on startup after update.
+      Format: "ALTER TABLE <table> ADD COLUMN <name> <TYPE> DEFAULT <value>"
 
-      
+
 # ─────────────────────────────────────────────
 # INFRASTRUCTURE / BACKEND
 # ─────────────────────────────────────────────
@@ -469,6 +476,16 @@ config:
       - id: CFG-04d
         name: "Cleanup unused data button (show found items, user validates)"
         status: DONE
+  - id: CFG-05
+    name: "App Instance Name for multi-deployment identification"
+    status: DONE
+    effort: S
+    priority: P2
+    notes: |
+      Added instance_name field to GlobalConfig model, config API, and config UI (Interface & Monitor section).
+      Injected as prefix in all 3 notification sources: orchestrator alerts, meta-analysis, inactivity checker.
+      Format: [InstanceName] [Sentinel] ... — only appears when set, transparent when empty.
+      i18n keys added for en.json and fr.json via Python (G-07 compliant).
 
 # ─────────────────────────────────────────────
 # INVESTIGATIONS & BUGFIXES

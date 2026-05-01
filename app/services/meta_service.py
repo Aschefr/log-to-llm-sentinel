@@ -361,8 +361,9 @@ class MetaAnalysisService:
         """
         notifier = NotificationService()
         lang = global_cfg.site_lang or 'fr'
+        instance_prefix = f"[{global_cfg.instance_name}] " if global_cfg.instance_name else ""
         
-        subject = nt('meta_subject', lang).format(config_name=config.name)
+        subject = instance_prefix + nt('meta_subject', lang).format(config_name=config.name)
         
         body_html = f"""
         <h2>📊 {nt('meta_title', lang)} : {config.name}</h2>

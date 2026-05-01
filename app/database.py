@@ -53,6 +53,7 @@ def init_db():
         "ALTER TABLE chat_conversations ADD COLUMN compression_mode VARCHAR DEFAULT NULL",
         "ALTER TABLE chat_conversations ADD COLUMN compressed_context TEXT DEFAULT NULL",
         "ALTER TABLE chat_conversations ADD COLUMN compressed_at DATETIME DEFAULT NULL",
+        "ALTER TABLE global_config ADD COLUMN instance_name VARCHAR DEFAULT ''",
     ]
     with engine.connect() as conn:
         for sql in migrations:
