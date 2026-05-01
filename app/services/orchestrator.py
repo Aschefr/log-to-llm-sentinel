@@ -48,6 +48,10 @@ class Orchestrator:
             # Filtrer les lignes contenant au moins un mot-clé
             matching_lines = []
             for line in lines:
+                # 0. Skip oversized lines (defense-in-depth, BUG-01c)
+                if len(line) > 10_000:
+                    logger.warning("Orchestrator", f"Ligne surdimensionnée ignorée ({len(line)} chars) pour '{db_rule.name}'")
+                    continue
                 # 1. Exclusion patterns (negative keywords) — priorité max
                 if excluded and any(pat.lower() in line.lower() for pat in excluded):
                     logger.debug("Orchestrator", f"Ligne exclue (pattern d'exclusion) pour '{db_rule.name}' : {line[:80]}")

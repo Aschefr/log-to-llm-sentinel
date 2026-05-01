@@ -167,7 +167,10 @@ def tail_file(
         raise HTTPException(status_code=403, detail="Fichier illisible")
 
     kw_list = [kw.strip().lower() for kw in keywords.split(",") if kw.strip()] if keywords else []
-        
+
+    # Protects browser rendering from oversized lines (e.g. Nextcloud JSON dumps on restart)
+    MAX_DISPLAY_LINE_LENGTH = 10_000
+
     try:
         import collections
         with open(target, 'r', encoding='utf-8', errors='ignore') as f:
@@ -176,6 +179,9 @@ def tail_file(
         result = []
         for line in tail_lines:
             raw = line.rstrip('\n')
+            # Tronquer les lignes surdimensionnées avant envoi au frontend (BUG-01)
+            if len(raw) > MAX_DISPLAY_LINE_LENGTH:
+                raw = raw[:MAX_DISPLAY_LINE_LENGTH] + f" …[TRONQUÉ : {len(raw)} chars]"
             matched_kws = []
             if kw_list:
                 matched_kws = [kw for kw in kw_list if kw in raw.lower()]

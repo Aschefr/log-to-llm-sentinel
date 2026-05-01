@@ -1,11 +1,14 @@
 import asyncio
 import os
 from datetime import datetime
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from app.database import SessionLocal
 from app.models import Rule
 from app import logger
+
+# Protects UI rendering + LLM context from oversized lines (e.g. Nextcloud JSON dumps on restart)
+MAX_LINE_LENGTH = 10_000
 
 
 class LogWatcher:
@@ -18,6 +21,7 @@ class LogWatcher:
         self.on_new_lines = on_new_lines
         self._running = False
         self._tasks: List[asyncio.Task] = []
+        self._file_inodes: Dict[int, int] = {}  # rule_id -> last known inode
 
     async def start(self):
         """Démarre la surveillance de tous les fichiers de log."""
@@ -74,6 +78,13 @@ class LogWatcher:
         finally:
             db.close()
 
+    def _get_file_inode(self, filepath: str) -> int:
+        """Retourne l'inode du fichier (0 si indisponible)."""
+        try:
+            return os.stat(filepath).st_ino
+        except OSError:
+            return 0
+
     async def _watch_file(self, rule: Rule):
         """Surveille un fichier de log spécifique."""
         filepath = rule.log_file_path
@@ -86,17 +97,33 @@ class LogWatcher:
         finally:
             db.close()
 
+        # Stocker l'inode initial (si le fichier existe déjà)
+        if os.path.exists(filepath):
+            self._file_inodes[rule.id] = self._get_file_inode(filepath)
+
         while self._running:
             try:
                 if not os.path.exists(filepath):
                     await asyncio.sleep(2)
                     continue
 
-                # Vérifier si le fichier a été tronqué
                 file_size = os.path.getsize(filepath)
+                current_inode = self._get_file_inode(filepath)
+                known_inode = self._file_inodes.get(rule.id, 0)
+
+                # Détecter recréation du fichier (inode changé = nouveau fichier)
+                if known_inode != 0 and current_inode != 0 and current_inode != known_inode:
+                    logger.info("LogWatcher", f"Fichier {filepath} recréé (inode {known_inode} → {current_inode}), remise à zéro de la position.")
+                    position = 0
+                    self._file_inodes[rule.id] = current_inode
+
+                # Fallback : vérifier si le fichier a été tronqué
                 if file_size < position:
                     logger.info("LogWatcher", f"Fichier {filepath} tronqué, remise à zéro de la position.")
                     position = 0
+
+                # Mettre à jour l'inode connu
+                self._file_inodes[rule.id] = current_inode
 
                 with open(filepath, "r", errors="ignore") as f:
                     f.seek(position)
@@ -114,6 +141,16 @@ class LogWatcher:
                         last_line_len = len(new_lines[-1].encode('utf-8', errors='ignore'))
                         new_position -= last_line_len
                         new_lines = new_lines[:-1]
+
+                    # Tronquer les lignes surdimensionnées (BUG-01b)
+                    sanitized_lines = []
+                    for l in new_lines:
+                        if len(l) > MAX_LINE_LENGTH:
+                            logger.warning("LogWatcher", f"Ligne surdimensionnée ({len(l)} chars) dans {filepath}, troncature à {MAX_LINE_LENGTH}")
+                            sanitized_lines.append(l[:MAX_LINE_LENGTH] + f" …[TRONQUÉ : {len(l)} chars]")
+                        else:
+                            sanitized_lines.append(l)
+                    new_lines = sanitized_lines
 
                     if new_lines:
                         logger.debug("LogWatcher", f"{filepath} — {len(new_lines)} nouvelle(s) ligne(s) détectée(s)")

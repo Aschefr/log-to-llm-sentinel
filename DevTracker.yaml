@@ -469,3 +469,38 @@ config:
       - id: CFG-04d
         name: "Cleanup unused data button (show found items, user validates)"
         status: DONE
+
+# ─────────────────────────────────────────────
+# INVESTIGATIONS & BUGFIXES
+# ─────────────────────────────────────────────
+bugs:
+  - id: BUG-01
+    name: "Nextcloud logs: Massive single-line concatenation on restart"
+    status: DONE
+    effort: M
+    priority: P0
+    notes: |
+      Symptom: After `compose down`, `git pull`, `compose up -d --build`, the real-time view shows a single line
+      of thousands of characters (looks like a concatenation of all lines).
+      Root cause: last_position persisted in DB survives restart. If log file recreated (new inode) but already
+      bigger than old position → seek lands mid-line → everything to next \n = mega-line.
+      Fix: inode tracking in LogWatcher detects file recreation → resets position.
+      Protection: MAX_LINE_LENGTH=10,000 at 3 layers (LogWatcher, tail API, Orchestrator).
+    subtasks:
+      - id: BUG-01a
+        name: "Investigate LogWatcher line splitting and position reset logic"
+        status: DONE
+        notes: "Added inode tracking to detect file recreation (inode change = reset position to 0)"
+      - id: BUG-01b
+        name: "Add protection: Limit max characters per line in LogWatcher"
+        status: DONE
+        notes: "MAX_LINE_LENGTH=10,000. Truncated lines get …[TRUNCATED: N chars] suffix"
+      - id: BUG-01c
+        name: "Add protection: Skip AI analysis for oversized lines"
+        status: DONE
+        notes: "Defense-in-depth guard in Orchestrator.handle_new_lines() + tail API truncation"
+      - id: BUG-01d
+        name: "Investigate if Nextcloud startup logs have weird encoding or lack of newlines"
+        status: DONE
+        notes: "Root cause = stale last_position + file recreation, not encoding. Nextcloud uses single-line JSON objects which are fine when position tracking works correctly."
+
