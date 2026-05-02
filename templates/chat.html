@@ -339,9 +339,9 @@
 
 .message-bubble.user {
     align-self: flex-end;
-    background: rgba(59, 130, 246, 0.12); /* Bleu très subtil */
-    border: 1px solid rgba(59, 130, 246, 0.25); /* Bordure fine et sobre */
-    color: #f8fafc;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    color: var(--text-primary);
     border-bottom-right-radius: 0.2rem;
 }
 
@@ -420,7 +420,7 @@
     flex: 1;
     background: transparent;
     border: none;
-    color: #fff;
+    color: var(--text-primary);
     padding: 0.5rem;
     resize: none;
     font-family: inherit;
@@ -647,6 +647,40 @@
     .welcome-icon { font-size: 2.5rem; }
     .welcome-content h1 { font-size: 1.25rem; }
     .welcome-content p { font-size: 0.85rem; }
+}
+
+/* ── Light theme: chat-specific overrides ── */
+[data-theme="light"] .chat-sidebar {
+    background: #f1f5f9;
+}
+[data-theme="light"] .chat-header {
+    background: rgba(0, 0, 0, 0.04);
+}
+[data-theme="light"] .chat-input-wrapper {
+    background: #ffffff;
+    border-color: rgba(0, 0, 0, 0.12);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .chat-input-wrapper textarea {
+    color: #1e293b;
+}
+[data-theme="light"] .conv-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+[data-theme="light"] .message-bubble.assistant {
+    background: rgba(0, 0, 0, 0.03);
+    border-color: rgba(0, 0, 0, 0.1);
+}
+[data-theme="light"] .message-bubble.context {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .msg-action-btn:hover {
+    background: rgba(0, 0, 0, 0.06);
+    border-color: rgba(0, 0, 0, 0.15);
+}
+[data-theme="light"] .chat-sidebar-toggle {
+    background: #f1f5f9;
 }
 </style>
 

@@ -8,6 +8,12 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            var theme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <style>
         /* ── Language Switcher ── */
         .lang-switcher-wrapper { position: relative; }
@@ -36,6 +42,16 @@
         }
         .lang-option:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
         .lang-option.active { color: var(--accent); font-weight: 600; }
+
+        /* ── Theme Switcher ── */
+        .theme-btn {
+            display: flex; align-items: center; justify-content: center;
+            background: transparent; border: 1px solid var(--border);
+            color: var(--text-secondary); border-radius: 0.4rem;
+            padding: 0.3rem 0.5rem; cursor: pointer; font-size: 1rem;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .theme-btn:hover { border-color: var(--accent); color: var(--text-primary); }
 
         /* ── Update Notification ── */
         .update-badge {
@@ -135,6 +151,9 @@
                     </div>
                 </div>
             </div>
+            <button id="theme-toggle-btn" class="theme-btn" onclick="toggleTheme()" data-i18n-title="header.theme_light" title="Passer au thème clair">
+                ☀️
+            </button>
             <div id="lang-switcher"></div>
         </div>
     </nav>

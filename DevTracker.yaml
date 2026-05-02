@@ -143,17 +143,17 @@ ux_global:
 
   - id: UX-02
     name: "Flexible theme system (light/dark toggle)"
-    status: TODO
+    status: DONE
     effort: XL
     priority: P2
     subtasks:
-      - "Theme toggle UI component (header)"
-      - "Light (but not too 'bright') theme variant CSS"
-      - "Persist choice (localStorage)"
+      - "[x] Theme toggle UI component (header)"
+      - "[x] Light (but not too 'bright') theme variant CSS"
+      - "[x] Persist choice (localStorage)"
 
   - id: UX-03
     name: "Update theme file for new flexibility"
-    status: TODO
+    status: DONE
     effort: M
     priority: P2
     deps: [UX-02]

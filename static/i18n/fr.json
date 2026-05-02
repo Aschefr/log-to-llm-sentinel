@@ -23,7 +23,9 @@
         "up_to_date": "À jour",
         "update_instructions": "Pour mettre à jour : git pull && docker compose up -d --build",
         "checking": "Vérification...",
-        "check_failed": "Échec (Hors-ligne ?)"
+        "check_failed": "Échec (Hors-ligne ?)",
+        "theme_light": "Passer au thème clair",
+        "theme_dark": "Passer au thème sombre"
     },
     "dashboard": {
         "title": "Dashboard",
