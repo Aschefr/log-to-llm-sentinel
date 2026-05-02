@@ -57,6 +57,16 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN discord_webhook_url VARCHAR DEFAULT NULL",
         "ALTER TABLE keyword_learning_sessions ADD COLUMN raw_exclusions_json TEXT DEFAULT '[]'",
         "ALTER TABLE keyword_learning_sessions ADD COLUMN final_exclusions_json TEXT DEFAULT '[]'",
+        # CHAT-09
+        "ALTER TABLE chat_conversations ADD COLUMN auto_compression_mode VARCHAR DEFAULT NULL",
+        """CREATE TABLE IF NOT EXISTS chat_compressions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            conversation_id INTEGER REFERENCES chat_conversations(id),
+            mode TEXT,
+            content TEXT,
+            compressed_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
     ]
     with engine.connect() as conn:
         for sql in migrations:

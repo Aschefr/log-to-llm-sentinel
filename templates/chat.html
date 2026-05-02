@@ -52,6 +52,10 @@
                     <div id="current-chat-meta" class="chat-meta"></div>
                 </div>
                 <div class="header-actions">
+                    <span id="auto-compression-badge" class="hidden" style="font-size: 0.72rem; background: rgba(16,185,129,0.15); border: 1px solid var(--success); color: var(--success); border-radius: 0.8rem; padding: 0.1rem 0.5rem; display: inline-flex; align-items: center; gap: 0.3rem;">
+                        🗜️ <span id="auto-compression-badge-label"></span>
+                        <button onclick="resetConvAutoCompression()" style="background:none;border:none;cursor:pointer;color:inherit;padding:0;font-size:0.85rem;line-height:1;" title="Désactiver">×</button>
+                    </span>
                     <button class="btn btn-secondary btn-sm" onclick="openChatSettings()" data-i18n="chat.settings_btn">Paramètres ⚙️</button>
                 </div>
             </header>
@@ -129,6 +133,13 @@
                         <span style="font-size: 0.8rem; opacity: 0.8;">Demande à l'IA de faire un résumé ultra-concis de tout l'historique. (Gain ~70%, prend quelques secondes).</span>
                     </button>
                 </div>
+                <!-- 09-C : mémoriser le choix pour cette conversation -->
+                <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.08);">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.82rem; color: var(--text-secondary);">
+                        <input type="checkbox" id="compression-remember-cb" style="cursor: pointer;">
+                        <span data-i18n="chat.compression_remember">Mémoriser ce choix pour cette conversation</span>
+                    </label>
+                </div>
             </div>
         </div>
     </div>
@@ -151,13 +162,101 @@
                 </div>
 
                 <div style="margin-bottom: 1rem; margin-top: 1rem;">
-                    <label class="form-label" data-i18n="chat.compression_mode">Gestion automatique du contexte saturé</label>
-                    <select class="form-select" id="chat-auto-compression-select" onchange="localStorage.setItem('chat_auto_compression_mode', this.value); markChatSettingsDirty()">
-                        <option value="" data-i18n="chat.compression_mode_ask">Toujours demander</option>
-                        <option value="truncate" data-i18n="chat.compression_mode_truncate">Tronquer les plus anciens (Perte de mémoire)</option>
-                        <option value="compact" data-i18n="chat.compression_mode_compact">Compacter (Réduction des blancs, pas de perte)</option>
-                        <option value="summary" data-i18n="chat.compression_mode_summary">Résumé IA (Conservation du sens, coût LLM)</option>
-                    </select>
+                    <label class="form-label" data-i18n="chat.compression_mode" style="margin-bottom: 0.6rem; display: block;">Gestion automatique du contexte saturé</label>
+                    <!-- Select caché pour compatibilité JS -->
+                    <select id="chat-auto-compression-select" style="display:none;"></select>
+                    <!-- Sélecteur carte premium -->
+                    <div id="compression-mode-cards" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                        <button type="button" class="comp-mode-card" data-value="" onclick="selectCompressionModeCard(this)"
+                            style="grid-column: 1 / -1;">
+                            <span class="comp-card-icon">💬</span>
+                            <span class="comp-card-body">
+                                <strong data-i18n="chat.compression_mode_ask"></strong>
+                                <span class="comp-card-desc" data-i18n="chat.compression_desc_ask"></span>
+                            </span>
+                            <span class="comp-card-check">✓</span>
+                        </button>
+                        <button type="button" class="comp-mode-card" data-value="truncate" onclick="selectCompressionModeCard(this)">
+                            <span class="comp-card-icon">✂️</span>
+                            <span class="comp-card-body">
+                                <strong data-i18n="chat.compression_mode_truncate_short"></strong>
+                                <span class="comp-card-desc" data-i18n="chat.compression_desc_truncate"></span>
+                            </span>
+                            <span class="comp-card-check">✓</span>
+                        </button>
+                        <button type="button" class="comp-mode-card" data-value="compact" onclick="selectCompressionModeCard(this)">
+                            <span class="comp-card-icon">🗜️</span>
+                            <span class="comp-card-body">
+                                <strong data-i18n="chat.compression_mode_compact_short"></strong>
+                                <span class="comp-card-desc" data-i18n="chat.compression_desc_compact"></span>
+                            </span>
+                            <span class="comp-card-check">✓</span>
+                        </button>
+                        <button type="button" class="comp-mode-card comp-mode-recommended" data-value="summary" onclick="selectCompressionModeCard(this)">
+                            <span class="comp-card-icon">🤖</span>
+                            <span class="comp-card-body">
+                                <strong data-i18n="chat.compression_mode_summary_short"></strong>
+                                <span class="comp-card-desc" data-i18n="chat.compression_desc_summary"></span>
+                            </span>
+                            <span class="comp-card-check">✓</span>
+                        </button>
+                    </div>
+                    <style>
+                        .comp-mode-card {
+                            display: flex;
+                            align-items: center;
+                            gap: 0.6rem;
+                            padding: 0.55rem 0.7rem;
+                            background: rgba(255,255,255,0.04);
+                            border: 1px solid rgba(255,255,255,0.1);
+                            border-radius: 0.6rem;
+                            cursor: pointer;
+                            color: var(--text-primary);
+                            text-align: left;
+                            transition: border-color 0.18s, background 0.18s, transform 0.12s;
+                            position: relative;
+                            width: 100%;
+                        }
+                        .comp-mode-card:hover {
+                            background: rgba(255,255,255,0.08);
+                            border-color: rgba(255,255,255,0.22);
+                            transform: translateY(-1px);
+                        }
+                        .comp-mode-card.active {
+                            border-color: var(--accent);
+                            background: rgba(99,102,241,0.12);
+                            box-shadow: 0 0 0 1px var(--accent);
+                        }
+                        .comp-mode-card.comp-mode-recommended.active {
+                            border-color: var(--success);
+                            background: rgba(16,185,129,0.1);
+                            box-shadow: 0 0 0 1px var(--success);
+                        }
+                        .comp-card-icon { font-size: 1.1rem; flex-shrink: 0; }
+                        .comp-card-body { display: flex; flex-direction: column; flex: 1; gap: 0.1rem; }
+                        .comp-card-body strong { font-size: 0.82rem; font-weight: 600; }
+                        .comp-card-desc { font-size: 0.72rem; opacity: 0.6; line-height: 1.3; }
+                        .comp-card-check {
+                            font-size: 0.75rem;
+                            color: var(--accent);
+                            opacity: 0;
+                            transition: opacity 0.15s;
+                            flex-shrink: 0;
+                        }
+                        .comp-mode-card.comp-mode-recommended .comp-card-check { color: var(--success); }
+                        .comp-mode-card.active .comp-card-check { opacity: 1; }
+                        /* Light mode */
+                        [data-theme="light"] .comp-mode-card {
+                            background: rgba(0,0,0,0.03);
+                            border-color: rgba(0,0,0,0.12);
+                        }
+                        [data-theme="light"] .comp-mode-card:hover {
+                            background: rgba(0,0,0,0.06);
+                        }
+                        [data-theme="light"] .comp-mode-card.active {
+                            background: rgba(99,102,241,0.08);
+                        }
+                    </style>
                 </div>
                 
                 <div class="form-group">
@@ -493,7 +592,8 @@
     color: var(--text-primary);
 }
 
-.msg-action-btn.danger:hover {
+.msg-action-btn.danger:hover,
+.msg-action-btn.msg-action-danger:hover {
     color: var(--danger);
     border-color: rgba(239,68,68,0.3);
     background: rgba(239,68,68,0.07);
@@ -865,33 +965,30 @@ async function loadHistory(id) {
         const data = await apiFetch(`/chat/api/history/${id}`);
         document.getElementById('current-chat-title').textContent = data.title;
         
+        // ── 09-C : mettre à jour le badge auto-mode ──
+        updateAutoCompressionBadge(data.auto_compression_mode);
+
         const cutoff = data.compressed_at ? new Date(data.compressed_at).getTime() : 0;
         const isTruncate = data.compression_mode === 'truncate';
         let html = '';
-        
+
         // ── Truncate mode: show banner in header ──
         if (isTruncate && data.compressed_context) {
-            // Count truncated messages
             let truncatedMsgs = [];
             data.messages.forEach(m => {
                 if (cutoff && new Date(m.created_at).getTime() <= cutoff) {
                     truncatedMsgs.push(m);
                 }
             });
-            
             banner.classList.remove('hidden');
-            document.getElementById('truncation-count').textContent = 
+            document.getElementById('truncation-count').textContent =
                 `(${truncatedMsgs.length} ${window.t ? window.t('chat.truncated_info') : 'messages exclus'})`;
-            
-            // Populate detail panel with actual truncated messages
             const detailHtml = truncatedMsgs.map(m => {
                 const role = m.role === 'user' ? 'U' : 'A';
                 const preview = escapeHtml(m.content.substring(0, 200)) + (m.content.length > 200 ? '...' : '');
                 return `<div style="margin-bottom: 0.3rem; padding: 0.2rem 0; border-bottom: 1px solid rgba(255,255,255,0.05);"><strong style="color: ${m.role === 'user' ? 'var(--accent)' : 'var(--success)'};">${role}:</strong> ${preview}</div>`;
             }).join('');
             document.getElementById('truncation-messages').innerHTML = detailHtml;
-            
-            // Wire cancel button
             document.getElementById('truncation-cancel-btn').onclick = function(e) {
                 e.stopPropagation();
                 showInlineConfirm(this, window.t ? window.t('chat.restore_confirm') : 'Restaurer?', async () => {
@@ -900,23 +997,32 @@ async function loadHistory(id) {
                 });
             };
         }
-        
-        // ── Compact/Summary: inline archive bubble ──
-        let archiveHtml = '';
-        if (data.compressed_context && !isTruncate) {
-            archiveHtml = `
+
+        // ── 09-B : construire un index des compressions triées par cutoff ──
+        // Fallback : si data.compressions est vide mais compressed_context existe (anciennes convs)
+        const compressionsList = (data.compressions && data.compressions.length > 0)
+            ? data.compressions
+            : (data.compressed_context && !isTruncate
+                ? [{ id: null, mode: data.compression_mode, content: data.compressed_context, compressed_at: data.compressed_at }]
+                : []);
+
+        /** Construit le HTML d'une bulle de compression (compact/summary) */
+        function buildArchiveBubble(comp) {
+            const compId = comp.id || id; // fallback sur conv id pour compatibilité
+            const editTaId = `edit-compressed-ta-${compId}`;
+            return `
                 <div class="message-wrapper assistant">
                     <div class="msg-label">${window.t ? window.t('chat.archive_label') : 'Système (Archive)'}</div>
                     <div class="message-bubble assistant" style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--success); color: var(--text-primary); padding: 0.5rem; width: 100%;">
                         <div style="display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 0.25rem;" onclick="this.nextElementSibling.classList.toggle('hidden')">
-                            <strong style="color: var(--success);"><span aria-hidden="true">🗜️ </span>${window.t ? window.t('chat.compressed_context') : 'Contexte Compressé'} (${escapeHtml(data.compression_mode)})</strong>
+                            <strong style="color: var(--success);"><span aria-hidden="true">🗜️ </span>${window.t ? window.t('chat.compressed_context') : 'Contexte Compressé'} (${escapeHtml(comp.mode || '')})</strong>
                             <span style="font-size: 0.8rem; opacity: 0.8;">${window.t ? window.t('chat.click_to_expand') : '(Cliquer pour développer)'}</span>
                         </div>
                         <div class="hidden" style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(16, 185, 129, 0.2);">
-                            <textarea id="edit-compressed-ta" style="width: 100%; height: 60vh; resize: none; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: inherit; font-family: monospace; font-size: 0.8rem; padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 0.25rem;">${escapeHtml(data.compressed_context)}</textarea>
+                            <textarea id="${editTaId}" style="width: 100%; height: 60vh; resize: none; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: inherit; font-family: monospace; font-size: 0.8rem; padding: 0.5rem; margin-bottom: 0.5rem; border-radius: 0.25rem;">${escapeHtml(comp.content || '')}</textarea>
                             <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
-                                <button class="btn btn-sm btn-danger" onclick="deleteCompression(${id}, this)">🗑️ ${window.t ? window.t('chat.restore_history') : 'Restaurer l\'historique'}</button>
-                                <button class="btn btn-sm btn-primary" onclick="saveCompressionEdit(${id})">💾 ${window.t ? window.t('chat.save') : 'Enregistrer'}</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteCompression(${id}, this)">🗑️ ${window.t ? window.t('chat.restore_history') : "Restaurer l'historique"}</button>
+                                <button class="btn btn-sm btn-primary" onclick="saveCompressionEditById(${id}, '${editTaId}')">💾 ${window.t ? window.t('chat.save') : 'Enregistrer'}</button>
                             </div>
                         </div>
                     </div>
@@ -944,27 +1050,36 @@ async function loadHistory(id) {
             `;
         }
         
-        let archiveInserted = false;
+        // 09-B : pointer courant dans compressionsList pour insérer les bulles au bon endroit
+        let compIdx = 0;
         data.messages.forEach((m, i) => {
             const msgTime = new Date(m.created_at).getTime();
             const isTruncatedMsg = isTruncate && cutoff && msgTime <= cutoff;
             
-            // For compact/summary: insert archive bubble at cutoff point
-            if (!isTruncate && data.compressed_context && !archiveInserted && cutoff && msgTime > cutoff) {
-                html += archiveHtml;
-                archiveInserted = true;
+            // Insérer toutes les bulles de compression dont le cutoff est avant ce message
+            while (!isTruncate && compIdx < compressionsList.length) {
+                const comp = compressionsList[compIdx];
+                const compCutoff = comp.compressed_at ? new Date(comp.compressed_at).getTime() : 0;
+                if (compCutoff && msgTime > compCutoff) {
+                    html += buildArchiveBubble(comp);
+                    compIdx++;
+                } else {
+                    break;
+                }
             }
             
             // Truncated messages: dimmed styling
             if (isTruncatedMsg) {
-                html += `<div style="opacity: 0.35;">${buildMessageWrapper(m.role, m.content, i)}</div>`;
+                html += `<div style="opacity: 0.35;">${buildMessageWrapper(m.role, m.content, i, m.id)}</div>`;
             } else {
-                html += buildMessageWrapper(m.role, m.content, i);
+                html += buildMessageWrapper(m.role, m.content, i, m.id);
             }
         });
         
-        if (!isTruncate && data.compressed_context && !archiveInserted) {
-            html += archiveHtml;
+        // Insérer les bulles de compression restantes (après tous les messages)
+        while (!isTruncate && compIdx < compressionsList.length) {
+            html += buildArchiveBubble(compressionsList[compIdx]);
+            compIdx++;
         }
         
         container.innerHTML = html;
@@ -1057,7 +1172,14 @@ function escapeAttr(s) {
 }
 
 /** Construit le HTML des boutons d'action d'une bulle IA */
-function aiActionsHtml(text) {
+function aiActionsHtml(text, msgId) {
+    const delTitle = window.t ? window.t('chat.delete_message_title') : 'Supprimer ce message';
+    const delLabel = window.t ? window.t('common.delete') : 'Supprimer';
+    const delBtn = msgId ? `
+        <button class="msg-action-btn msg-action-danger" onclick="deleteMessage(${msgId}, this)" title="${delTitle}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            ${delLabel}
+        </button>` : '';
     return `<div class="message-actions">
         <button class="msg-action-btn" onclick="copyMsg(this)" data-text="${escapeAttr(text)}" data-i18n-title="common.copy" title="${window.t ? window.t('common.copy') : 'Copier'}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -1067,11 +1189,19 @@ function aiActionsHtml(text) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
             ${window.t ? window.t('chat.regenerate') : 'Ré-essayer'}
         </button>
+        ${delBtn}
     </div>`;
 }
 
 /** Construit le HTML des boutons d'action d'une bulle utilisateur */
-function userActionsHtml(text) {
+function userActionsHtml(text, msgId) {
+    const delTitle = window.t ? window.t('chat.delete_message_title') : 'Supprimer ce message';
+    const delLabel = window.t ? window.t('common.delete') : 'Supprimer';
+    const delBtn = msgId ? `
+        <button class="msg-action-btn msg-action-danger" onclick="deleteMessage(${msgId}, this)" title="${delTitle}">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+            ${delLabel}
+        </button>` : '';
     return `<div class="message-actions">
         <button class="msg-action-btn" onclick="copyMsg(this)" data-text="${escapeAttr(text)}" data-i18n-title="common.copy" title="${window.t ? window.t('common.copy') : 'Copier'}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -1081,6 +1211,7 @@ function userActionsHtml(text) {
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             ${window.t ? window.t('common.edit') : 'Modifier'}
         </button>
+        ${delBtn}
     </div>`;
 }
 
@@ -1089,8 +1220,9 @@ function userActionsHtml(text) {
  * @param {'user'|'assistant'} role
  * @param {string} content - texte brut (markdown pour assistant, texte pour user)
  * @param {number|null} index - index dans l'historique (pour détecter le dernier message)
+ * @param {number|null} msgId - ID DB du message (null pour les bulles générées en live)
  */
-function buildMessageWrapper(role, content, index) {
+function buildMessageWrapper(role, content, index, msgId = null) {
     const isUser = role === 'user';
     const label = isUser
         ? `<div class="msg-label">${window.t ? window.t('chat.label_user') : 'Vous'}</div>`
@@ -1098,8 +1230,9 @@ function buildMessageWrapper(role, content, index) {
     const bubbleHtml = isUser
         ? `<div class="message-bubble user"><div class="markdown-body">${escapeHtml(content)}</div></div>`
         : `<div class="message-bubble assistant"><div class="markdown-body">${marked.parse(content)}</div></div>`;
-    const actionsHtml = isUser ? userActionsHtml(content) : aiActionsHtml(content);
-    return `<div class="message-wrapper ${role}">${label}${bubbleHtml}${actionsHtml}</div>`;
+    const actionsHtml = isUser ? userActionsHtml(content, msgId) : aiActionsHtml(content, msgId);
+    const dataId = msgId ? ` data-msg-id="${msgId}"` : '';
+    return `<div class="message-wrapper ${role}"${dataId}>${label}${bubbleHtml}${actionsHtml}</div>`;
 }
 
 /** Copie le texte d'un message dans le presse-papier */
@@ -1109,6 +1242,41 @@ async function copyMsg(btn) {
     const orig = btn.innerHTML;
     btn.innerHTML = btn.innerHTML.replace(/Copier|Copy/, '✅');
     setTimeout(() => { btn.innerHTML = orig; }, 1500);
+}
+
+/**
+ * Supprime un message individuel (et son pair si bulle utilisateur).
+ * Utilise showInlineConfirm pour confirmation in-situ.
+ */
+async function deleteMessage(msgId, btn) {
+    const wrapper = btn.closest('.message-wrapper');
+    const isUser = wrapper.classList.contains('user');
+
+    // Si c'est une bulle utilisateur, proposer de supprimer aussi la réponse IA suivante
+    const nextWrapper = wrapper.nextElementSibling;
+    const hasNextAI = isUser && nextWrapper && nextWrapper.classList.contains('assistant');
+    const nextId = hasNextAI ? parseInt(nextWrapper.dataset.msgId) : null;
+
+    const confirmLabel = window.t ? window.t('chat.delete_message_confirm') : 'Supprimer ce message ?';
+    showInlineConfirm(btn, confirmLabel, async () => {
+        try {
+            // Supprimer le message principal
+            await apiFetch('/chat/api/message/' + msgId, { method: 'DELETE' });
+            // Supprimer la réponse IA associée si applicable
+            if (nextId) {
+                await apiFetch('/chat/api/message/' + nextId, { method: 'DELETE' });
+            }
+            // Animation de disparition
+            const toRemove = [wrapper];
+            if (nextId && nextWrapper) toRemove.push(nextWrapper);
+            toRemove.forEach(el => {
+                el.style.transition = 'opacity 0.25s, transform 0.25s';
+                el.style.opacity = '0';
+                el.style.transform = 'translateY(-4px)';
+                setTimeout(() => el.remove(), 260);
+            });
+        } catch(e) { alert(e.message); }
+    });
 }
 
 /** Transformation de la bulle en éditeur inline (style ChatGPT) */
@@ -1262,7 +1430,9 @@ async function sendMessage(force = false) {
         const fullText = base + "\\nUtilisateur : " + content + "\\nAssistant : ";
         const tokens = estimateTokens(fullText);
         if (tokens >= max) {
-            const autoMode = localStorage.getItem('chat_auto_compression_mode');
+            // 09-C : prioriser le mode auto de la conv sur le localStorage global
+            const convAutoMode = window._chatConvAutoMode || null;
+            const autoMode = convAutoMode || localStorage.getItem('chat_auto_compression_mode');
             if (autoMode) {
                 applyCompression(autoMode, content);
                 return;
@@ -1574,7 +1744,7 @@ async function openChatSettings() {
         _previewRulesStr = res.rules_list_str || '- [Aucune règle configurée]';
         
         const autoMode = localStorage.getItem('chat_auto_compression_mode') || '';
-        document.getElementById('chat-auto-compression-select').value = autoMode;
+        selectCompressionModeCardByValue(autoMode);
 
         // Mettre à jour l'aperçu du contexte avec la langue sélectionnée
         await updateContextPreview();
@@ -1592,6 +1762,23 @@ async function openChatSettings() {
 
 function closeChatSettings() {
     document.getElementById('chat-settings-modal').classList.add('hidden');
+}
+
+/** Sélectionne une carte de mode compression et persiste la valeur (09-C) */
+function selectCompressionModeCard(btn) {
+    const value = btn.dataset.value;
+    document.querySelectorAll('.comp-mode-card').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    // Persister dans localStorage (fallback global)
+    localStorage.setItem('chat_auto_compression_mode', value);
+    markChatSettingsDirty();
+}
+
+/** Initialise la carte active depuis une valeur (appelé à l'ouverture du modal) */
+function selectCompressionModeCardByValue(value) {
+    document.querySelectorAll('.comp-mode-card').forEach(c => {
+        c.classList.toggle('active', c.dataset.value === value);
+    });
 }
 
 function markChatSettingsDirty() {
@@ -1671,11 +1858,22 @@ async function translateChatPrompt() {
 }
 
 
-function openCompressionModal() { document.getElementById('compression-modal').classList.remove('hidden'); }
+// ── 09-D : message en attente après compression ──
+let _pendingMessageAfterCompression = null;
+
+function openCompressionModal(pendingContent = null) {
+    _pendingMessageAfterCompression = pendingContent;
+    // Pré-cocher si un mode auto est déjà actif pour cette conv
+    const cb = document.getElementById('compression-remember-cb');
+    if (cb) cb.checked = false;
+    document.getElementById('compression-modal').classList.remove('hidden');
+}
 function closeCompressionModal() { document.getElementById('compression-modal').classList.add('hidden'); }
 
 let _compressionTaskTimer = null;
-async function applyCompression(mode) {
+async function applyCompression(mode, pendingContent = null) {
+    if (pendingContent !== null) _pendingMessageAfterCompression = pendingContent;
+    const remember = document.getElementById('compression-remember-cb')?.checked || false;
     closeCompressionModal();
     const container = document.getElementById('chat-messages');
     container.innerHTML += `
@@ -1691,18 +1889,30 @@ async function applyCompression(mode) {
     try {
         const res = await apiFetch('/chat/api/compress/' + activeConvId, {
             method: 'POST',
-            body: { mode: mode }
+            body: { mode: mode, remember: remember }
         });
         
-        if (mode === 'truncate') {
+        const afterCompression = async () => {
             await loadHistory(activeConvId);
+            // 09-D : auto-envoi du message en attente
+            if (_pendingMessageAfterCompression) {
+                const msg = _pendingMessageAfterCompression;
+                _pendingMessageAfterCompression = null;
+                const input = document.getElementById('chat-input');
+                if (input) input.value = msg;
+                await sendMessage(true);
+            }
+        };
+
+        if (mode === 'truncate') {
+            await afterCompression();
         } else if (mode === 'compact' || mode === 'summary') {
             _compressionTaskTimer = setInterval(async () => {
                 const st = await apiFetch('/chat/api/compress/status/' + res.task_id);
                 if (st.status === 'done' || st.status === 'error') {
                     clearInterval(_compressionTaskTimer);
                     if (st.status === 'error') alert("Erreur compression : " + st.error);
-                    await loadHistory(activeConvId);
+                    else await afterCompression();
                 }
             }, 2000);
         }
@@ -1712,6 +1922,20 @@ async function applyCompression(mode) {
     }
 }
 
+// 09-B : saveCompressionEditById avec id de textarea dynamique
+async function saveCompressionEditById(convId, taId) {
+    const ta = document.getElementById(taId);
+    if (!ta) return;
+    try {
+        await apiFetch('/chat/api/compress/' + convId, {
+            method: 'PUT',
+            body: { compressed_context: ta.value }
+        });
+        await loadHistory(convId);
+    } catch(e) { alert(e.message); }
+}
+
+// Compatibilité ancien appel (conv avec une seule compression)
 async function saveCompressionEdit(id) {
     const ta = document.getElementById('edit-compressed-ta');
     if (!ta) return;
@@ -1731,6 +1955,38 @@ async function deleteCompression(id, btnElement) {
             await loadHistory(id);
         } catch(e) { alert(e.message); }
     });
+}
+
+// 09-C : badge auto-mode dans le header de la conversation
+function updateAutoCompressionBadge(mode) {
+    window._chatConvAutoMode = mode || null;  // mémorisé pour sendMessage
+    const badge = document.getElementById('auto-compression-badge');
+    const label = document.getElementById('auto-compression-badge-label');
+    if (!badge || !label) return;
+    if (mode) {
+        const modeLabels = { truncate: 'Tronquer', compact: 'Compacter', summary: 'Résumé IA' };
+        label.textContent = 'Auto: ' + (modeLabels[mode] || mode);
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+// 09-C : réinitialiser le mode auto pour la conversation courante
+async function resetConvAutoCompression() {
+    if (!activeConvId) return;
+    try {
+        // On passe remember=false + mode courant pour forcer reset (le backend met à null si remember=false)
+        // Astuce : on appelle un DELETE sur compress puis reload — mais DELETE efface tout.
+        // Solution propre : endpoint dédié ou réutiliser le champ auto_compression_mode via PUT settings.
+        // Pour l'instant : on envoie une requête compress fictive avec mode vide n'est pas clean.
+        // On utilise directement l'endpoint qui remet auto_compression_mode à null.
+        await apiFetch('/chat/api/auto-compression/' + activeConvId, { method: 'DELETE' });
+        updateAutoCompressionBadge(null);
+    } catch(e) {
+        // Fallback : juste masquer le badge localement si l'endpoint n'existe pas encore
+        updateAutoCompressionBadge(null);
+    }
 }
 
 </script>

@@ -114,8 +114,10 @@ class ChatConversation(Base):
     compression_mode = Column(String, nullable=True) # 'compact', 'summary'
     compressed_context = Column(Text, nullable=True)
     compressed_at = Column(DateTime, nullable=True)
+    auto_compression_mode = Column(String, nullable=True)  # mode auto mémorisé pour cette conv
     
     messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan")
+    compressions = relationship("ChatCompression", back_populates="conversation", cascade="all, delete-orphan", order_by="ChatCompression.compressed_at")
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
@@ -126,6 +128,20 @@ class ChatMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     conversation = relationship("ChatConversation", back_populates="messages")
+
+
+class ChatCompression(Base):
+    """Historique de toutes les compressions d'une conversation (09-B)."""
+    __tablename__ = "chat_compressions"
+    id              = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("chat_conversations.id"))
+    mode            = Column(String)   # 'compact' | 'summary' | 'truncate'
+    content         = Column(Text)     # résumé compressé
+    compressed_at   = Column(DateTime, default=datetime.utcnow)  # timestamp cutoff
+    created_at      = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("ChatConversation", back_populates="compressions")
+
 
 class MetaAnalysisConfig(Base):
     __tablename__ = "meta_analysis_configs"

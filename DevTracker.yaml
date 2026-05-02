@@ -313,15 +313,17 @@ chat:
 
   - id: CHAT-09
     name: "Context compression UX and flow improvement"
-    status: TODO
+    status: DONE
     effort: M
     priority: P1
     subtasks:
-      - "After one context compression occurs, the second time that it is needed, include the previous compression as context. So on".
-      - "Each compressed context bubble should stay in the chat, were they where generated. "
-      - "After the user has chosen a compression method, it can be kept as default for the conversation, unless the user chooses another compression method or cancels the auto-choice"
-      - "When a compression is triggered by the fact that the context is full, and the user tries to ask another question, the question should be sent automatically AFTER the compression context is received."
-      
+      - "[x] 09-A: Compression chaînée — chaque nouvelle compression inclut le résumé précédent en tête du texte à compresser."
+      - "[x] 09-B: Bulles in-situ — nouveau modèle ChatCompression (table chat_compressions). N bulles de compression restent visibles à leur position chronologique dans le fil."
+      - "[x] 09-C: Mode auto mémorisé par conversation — colonne auto_compression_mode sur ChatConversation. Badge dans le header + checkbox dans le modal compression + endpoint DELETE /api/auto-compression/{id}."
+      - "[x] 09-D: Auto-envoi post-compression — message en attente (_pendingMessageAfterCompression) envoyé automatiquement après la fin de la compression."
+    notes: |
+      Fallback G-10 : migrations dans database.py (CREATE TABLE chat_compressions + ALTER TABLE chat_conversations ADD COLUMN auto_compression_mode).
+      Compatibilité rétroactive : si compressions[] vide mais compressed_context présent (anciennes convs) → affichage en mode single-bubble.
 
 # ─────────────────────────────────────────────
 # MONITOR

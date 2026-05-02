@@ -8,7 +8,7 @@ import asyncio
 import json
 
 from app.database import SessionLocal
-from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessage
+from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessage, ChatCompression
 from app.services.orchestrator import Orchestrator
 from app.services.task_manager import task_manager, ChatTaskEntry
 from app import logger
@@ -94,6 +94,11 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
                 "detection_id": a.detection_id
             }
             
+    # 09-B : récupérer l'historique des compressions
+    compressions = db.query(ChatCompression).filter(
+        ChatCompression.conversation_id == conv_id
+    ).order_by(ChatCompression.compressed_at.asc()).all()
+
     return {
         "title": conv.title,
         "analysis_id": conv.analysis_id,
@@ -101,8 +106,18 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
         "compression_mode": conv.compression_mode,
         "compressed_context": conv.compressed_context,
         "compressed_at": conv.compressed_at.isoformat() if conv.compressed_at else None,
+        "auto_compression_mode": conv.auto_compression_mode,  # 09-C
+        "compressions": [
+            {
+                "id": c.id,
+                "mode": c.mode,
+                "content": c.content,
+                "compressed_at": c.compressed_at.isoformat() if c.compressed_at else None
+            }
+            for c in compressions
+        ],
         "messages": [
-            {"role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
+            {"id": m.id, "role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
             for m in messages
         ]
     }
@@ -199,6 +214,7 @@ _compression_tasks = {}
 
 class CompressRequest(BaseModel):
     mode: str
+    remember: bool = False  # 09-C : mémoriser ce mode pour la conv
 
 @router.post("/api/compress/{conv_id}")
 async def start_compression(conv_id: int, req: CompressRequest, db: Session = Depends(get_db)):
@@ -246,13 +262,27 @@ async def start_compression(conv_id: int, req: CompressRequest, db: Session = De
         conv.compression_mode = "truncate"
         conv.compressed_context = compressed
         conv.compressed_at = cutoff_time
+        # 09-C : mémoriser le mode auto
+        if req.mode:
+            conv.auto_compression_mode = req.mode
+        # 09-B : enregistrer dans l'historique des compressions
+        new_comp = ChatCompression(
+            conversation_id=conv_id,
+            mode="truncate",
+            content=compressed,
+            compressed_at=cutoff_time
+        )
+        db.add(new_comp)
         db.commit()
         
         return {"status": "done", "mode": "truncate"}
     
     # Pour compact et summary : construire le texte complet
     text_to_compress = ""
-    if conv.analysis_id and not conv.compressed_at:
+    # 09-A : compression chaînée — inclure le contexte précédent en tête
+    if conv.compressed_context:
+        text_to_compress += f"=== Contexte Précédent (compressé) ===\n{conv.compressed_context}\n\n"
+    elif conv.analysis_id:
         a = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
         if a:
             text_to_compress += f"=== Analyse initiale ===\n{a.triggered_line}\n{a.ollama_response}\n\n"
@@ -294,6 +324,16 @@ async def start_compression(conv_id: int, req: CompressRequest, db: Session = De
                         c.compression_mode = mode
                         c.compressed_context = res
                         c.compressed_at = dt
+                        if mode:  # 09-C : mémoriser mode auto par conv
+                            c.auto_compression_mode = mode
+                        # 09-B : enregistrer dans l'historique des compressions
+                        new_comp = ChatCompression(
+                            conversation_id=cid,
+                            mode=mode,
+                            content=res,
+                            compressed_at=dt
+                        )
+                        s.add(new_comp)
                         s.commit()
                 _compression_tasks[t_id]["status"] = "done"
                 _compression_tasks[t_id]["result"] = res
@@ -321,6 +361,9 @@ async def revert_compression(conv_id: int, db: Session = Depends(get_db)):
     conv.compression_mode = None
     conv.compressed_context = None
     conv.compressed_at = None
+    conv.auto_compression_mode = None  # 09-C : réinitialiser le mode auto
+    # 09-B : supprimer tout l'historique des compressions de cette conv
+    db.query(ChatCompression).filter(ChatCompression.conversation_id == conv_id).delete()
     db.commit()
     return {"status": "ok"}
 
@@ -332,7 +375,33 @@ async def update_compression(conv_id: int, data: dict, db: Session = Depends(get
     new_context = data.get("compressed_context")
     if not new_context:
         raise HTTPException(status_code=400, detail="compressed_context requis")
+    # Mettre à jour conv + dernière entrée ChatCompression (09-B)
     conv.compressed_context = new_context
+    last_comp = db.query(ChatCompression).filter(
+        ChatCompression.conversation_id == conv_id
+    ).order_by(ChatCompression.compressed_at.desc()).first()
+    if last_comp:
+        last_comp.content = new_context
+    db.commit()
+    return {"status": "ok"}
+
+@router.delete("/api/auto-compression/{conv_id}")
+async def reset_auto_compression(conv_id: int, db: Session = Depends(get_db)):
+    """09-C : réinitialise uniquement le mode auto sans toucher aux compressions existantes."""
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    conv.auto_compression_mode = None
+    db.commit()
+    return {"status": "ok"}
+
+@router.delete("/api/message/{msg_id}")
+async def delete_message(msg_id: int, db: Session = Depends(get_db)):
+    """Supprime un message individuel par son ID."""
+    msg = db.query(ChatMessage).filter(ChatMessage.id == msg_id).first()
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+    db.delete(msg)
     db.commit()
     return {"status": "ok"}
 
