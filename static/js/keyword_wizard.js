@@ -371,10 +371,10 @@ function _renderConfigPhase() {
                     </label>
                 </div>
                 <div class="kw-quick-profiles" style="display:flex;gap:0.4rem;flex-wrap:wrap">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(2)" style="font-size:0.75rem;padding:0.2rem 0.5rem">⏱️ Quick (2 min)</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(10)" style="font-size:0.75rem;padding:0.2rem 0.5rem">🚀 Fast (10 min)</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(60)" style="font-size:0.75rem;padding:0.2rem 0.5rem">🔍 Extended (1h)</button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(1440)" style="font-size:0.75rem;padding:0.2rem 0.5rem">📅 Complete (1j)</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(2)" style="font-size:0.75rem;padding:0.2rem 0.5rem">⏱️ <span data-i18n="kw.profile_quick">Rapide (2 min)</span></button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(10)" style="font-size:0.75rem;padding:0.2rem 0.5rem">🚀 <span data-i18n="kw.profile_fast">Normal (10 min)</span></button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(60)" style="font-size:0.75rem;padding:0.2rem 0.5rem">🔍 <span data-i18n="kw.profile_extended">Étendu (1h)</span></button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(1440)" style="font-size:0.75rem;padding:0.2rem 0.5rem">📅 <span data-i18n="kw.profile_complete">Complet (1j)</span></button>
                 </div>
             </div>
             ` : ''}

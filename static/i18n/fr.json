@@ -474,7 +474,11 @@
     "resume_info": "L'analyse est en cours. Vous pouvez modifier la date de fin ou la granularité.",
     "stop_btn": "Arrêter",
     "mode_live": "Capture en direct (Futur)",
-    "mode_history": "Analyse historique (Passé)"
+    "mode_history": "Analyse historique (Passé)",
+    "profile_quick": "Rapide (2 min)",
+    "profile_fast": "Normal (10 min)",
+    "profile_extended": "Étendu (1h)",
+    "profile_complete": "Complet (1j)"
   },
   "notifications": {
     "alert": "Alerte",
