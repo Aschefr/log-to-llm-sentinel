@@ -427,11 +427,33 @@ advanced_analysis:
 # ─────────────────────────────────────────────
 auto_learning:
   - id: AL-01
-    name: "AI-suggested exclusion patterns during auto-learning"
-    status: TODO
+    name: "AI-suggested exclusion patterns (Discovery)"
+    status: DONE
     effort: L
     priority: P2
-    notes: "AI should propose noise patterns to exclude, not just positive keywords. Low sensitity. maximum exclude key-words = 2, 2 word wide ("heartbeat check" is ok, "heartbeat response signal" is not)"
+    notes: "AI should propose noise patterns to exclude, not just positive keywords."
+    subtasks:
+      - "[x] AL-01a: DB Schema & Rule model integration for exclusions"
+      - "[x] AL-01b: Phase 1/2 prompt updates for dual detection"
+      - "[x] AL-01c: UI display of suggested exclusions in the wizard"
+
+  - id: AL-02
+    name: "Learning Pipeline Robustness & Validation"
+    status: DONE
+    effort: M
+    priority: P2
+    notes: "Ensure high-quality outputs through validation and recovery loops."
+    subtasks:
+      - "[x] AL-02a: Cross-validation mechanism (pertinence check)"
+      - "[x] AL-02b: Failure recovery via automatic re-generation (Shuffle-retry)"
+      - "[x] AL-02c: Short-keyword distillation from long phrases"
+
+  - id: AL-03
+    name: "Adding quick time duration profil in the modale"
+    status: DONE
+    effort: M
+    priority: P2
+    notes: "Under the time windows definition of the autolearning, add buttons for 'Quick (2 min), Fast (10 min), Extended (1 hour), Completes (1 day)'"
 
 # ─────────────────────────────────────────────
 # RULES PAGE
@@ -527,3 +549,32 @@ bugs:
         status: DONE
         notes: "Root cause = stale last_position + file recreation, not encoding. Nextcloud uses single-line JSON objects which are fine when position tracking works correctly."
 
+  - id: BUG-02
+    name: "Spurious 'Auto-learning started' notification when updating rule during active session"
+    status: DONE
+    effort: S
+    priority: P2
+    notes: |
+      Symptom: While auto-learning is active, opening the settings modal, changing any value, and clicking 
+      "Update" triggers an unwanted "Auto-learning started" notification.
+      Expected: Saving rule settings should not trigger a start notification if a session is already in progress.
+      Root cause: Modal save button probably calls _launchSession or similar logic that sends the notification 
+      without checking if it's a re-save of an active session.
+      Fix: Updated kwTabSwitch and _updateLaunchBtn in keyword_wizard.js to show the normal Save button when a session is active.
+
+  - id: BUG-03
+    name: "The notification message must have the name of the current log to llm sentinel instance"
+    status: DONE
+    effort: S
+    priority: P0
+    notes: |
+      The instance name is defined in the config page. It must appears in all notifications.
+      Fix: Added instance_name prefix to subjects in _send_notification of keyword_learning_service.py.
+
+  - id: BUG-04
+    name: "The list of refined keywords must be shown in notification message during the retry sessions"
+    status: DONE
+    effort: S
+    priority: P0
+    notes: |
+      Currently the firt refinement shows the list of keywords. If the first is rejected, the refined keywords are not shown in the notification.

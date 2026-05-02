@@ -75,21 +75,14 @@ function kwTabSwitch(tab) {
         autoTab.setAttribute('aria-selected', 'true');
 
         // Swap buttons depending on session state
-        const _terminalStatuses = ['validated', 'error', 'reverted'];
-        const isTerminal = _activeSession && _terminalStatuses.includes(_activeSession.status);
-
-        if (isTerminal) {
-            // Session finished: keep normal Save button, hide Launch
-            // (user must click "Nouvelle session" to relaunch)
+        if (_activeSession) {
+            // Session running or finished: keep normal Save button, hide Launch
             if (origSave)  origSave.classList.remove('hidden');
             if (launchBtn) launchBtn.classList.add('hidden');
         } else {
             if (origSave)  origSave.classList.add('hidden');
             if (launchBtn) {
                 launchBtn.classList.remove('hidden');
-                if (_activeSession) {
-                    launchBtn.textContent = window.t ? window.t('kw.update_params') : '🔄 Mettre à jour les paramètres';
-                }
             }
         }
 
@@ -189,9 +182,24 @@ function _updateWizardSteps(data) {
             const pct = data.total_packets > 0 ? Math.round((data.completed_packets / data.total_packets) * 100) : 0;
             let label = window.t ? window.t('kw.progress_label') : 'Progression : {done}/{total} paquets ({pct}%)';
             label = label.replace('{done}', data.completed_packets).replace('{total}', data.total_packets).replace('{pct}', pct);
+            let kwsHtml = '';
+            if (data.raw_keywords && data.raw_keywords.length) {
+                kwsHtml += `<div class="kw-tags-row" style="margin-top:.4rem">
+                    ${data.raw_keywords.slice(0, 12).map(k => `<span class="kw-tag kw-tag--raw">${_esc(k)}</span>`).join('')}
+                    ${data.raw_keywords.length > 12 ? `<span class="kw-hint">+${data.raw_keywords.length - 12}</span>` : ''}
+                </div>`;
+            }
+            if (data.raw_exclusions && data.raw_exclusions.length) {
+                kwsHtml += `<div class="kw-tags-row" style="margin-top:.2rem">
+                    ${data.raw_exclusions.slice(0, 8).map(e => `<span class="kw-tag kw-tag--negative" style="text-decoration:line-through;opacity:0.7">${_esc(e)}</span>`).join('')}
+                    ${data.raw_exclusions.length > 8 ? `<span class="kw-hint">+${data.raw_exclusions.length - 8}</span>` : ''}
+                </div>`;
+            }
+
             progressEl.innerHTML = `
                 <div class="kw-hint" style="margin-bottom:.3rem">${label}</div>
                 <div class="kw-progress-bar-track"><div class="kw-progress-bar" style="width:${pct}%"></div></div>
+                ${kwsHtml}
             `;
             progressEl.style.display = 'block';
         } else if (data.status === 'refining') {
@@ -258,12 +266,8 @@ function _updateLaunchBtn() {
     btn.style.opacity = valid ? '1' : '0.45';
     btn.title = valid ? '' : (window.t ? window.t('kw.launch_no_path') : 'Renseignez le nom et le chemin du fichier log pour activer');
 
-    // Button text: "Update" when editing an active session, "Launch" otherwise
-    if (_activeSession) {
-        btn.textContent = window.t ? window.t('kw.update_params') : '🔄 Mettre à jour les paramètres';
-    } else {
-        btn.innerHTML = '<span aria-hidden="true">🤖 </span>' + (window.t ? window.t('kw.launch_full') : 'Auto-apprentissage : Lancer l\'analyse');
-    }
+    // Button text: always "Launch" (button is hidden if active session)
+    btn.innerHTML = '<span aria-hidden="true">🤖 </span>' + (window.t ? window.t('kw.launch_full') : 'Auto-apprentissage : Lancer l\'analyse');
 }
 
 /* ── Step indicator builder ─────────────────────────────────────────────── */
@@ -352,6 +356,28 @@ function _renderConfigPhase() {
                 <span style="opacity:.5">→</span>
                 <input type="datetime-local" id="kw-period-end"   value="${endVal}" class="kw-input">
             </div>
+            ${!startDisabled ? `
+            <div style="margin-top:1rem; padding: 0.75rem; background: rgba(0,0,0,0.15); border: 1px solid var(--border); border-radius: 6px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom: 0.6rem;">
+                    <label style="display:flex; align-items:center; gap:0.6rem; cursor:pointer; margin:0; user-select:none; padding: 0.2rem; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background='transparent'">
+                        <div class="toggle-switch" style="pointer-events:none; margin:0">
+                            <input type="checkbox" id="kw-profile-mode" checked>
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                            <span id="kw-mode-live-label" style="display:inline-flex; align-items:center; gap:0.4rem">🔴 <span data-i18n="kw.mode_live">Capture en direct (Futur)</span></span>
+                            <span id="kw-mode-hist-label" class="hidden" style="display:inline-flex; align-items:center; gap:0.4rem">🕰️ <span data-i18n="kw.mode_history">Analyse historique (Passé)</span></span>
+                        </span>
+                    </label>
+                </div>
+                <div class="kw-quick-profiles" style="display:flex;gap:0.4rem;flex-wrap:wrap">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(2)" style="font-size:0.75rem;padding:0.2rem 0.5rem">⏱️ Quick (2 min)</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(10)" style="font-size:0.75rem;padding:0.2rem 0.5rem">🚀 Fast (10 min)</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(60)" style="font-size:0.75rem;padding:0.2rem 0.5rem">🔍 Extended (1h)</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="_applyKwProfile(1440)" style="font-size:0.75rem;padding:0.2rem 0.5rem">📅 Complete (1j)</button>
+                </div>
+            </div>
+            ` : ''}
             <label class="kw-label" style="margin-top:.75rem">
                 ${window.t ? window.t('kw.granularity_label') : 'Granularité (taille d\'un paquet)'}
                 <span id="kw-granularity-hint" class="kw-hint"></span>
@@ -374,12 +400,71 @@ function _renderConfigPhase() {
         _updateEstimate();
     });
 
+    const modeSwitch = document.getElementById('kw-profile-mode');
+    if (modeSwitch) {
+        modeSwitch.addEventListener('change', (e) => {
+            const labelLive = document.getElementById('kw-mode-live-label');
+            const labelHist = document.getElementById('kw-mode-hist-label');
+            if (e.target.checked) {
+                if (labelLive) labelLive.classList.remove('hidden');
+                if (labelHist) labelHist.classList.add('hidden');
+            } else {
+                if (labelLive) labelLive.classList.add('hidden');
+                if (labelHist) labelHist.classList.remove('hidden');
+            }
+            
+            // Auto-apply current duration to shift dates appropriately
+            const startVal = document.getElementById('kw-period-start')?.value;
+            const endVal = document.getElementById('kw-period-end')?.value;
+            if (startVal && endVal && window._applyKwProfile) {
+                const diffMs = new Date(endVal) - new Date(startVal);
+                if (diffMs > 0) {
+                    const diffMinutes = Math.round(diffMs / 60000);
+                    window._applyKwProfile(diffMinutes);
+                }
+            }
+        });
+    }
+
     _refreshGranularitySelect();
     _fetchMaxChars();
 
     // If editing a session, show progress immediately
     if (session) _updateWizardSteps(session);
 }
+
+window._applyKwProfile = function(minutes) {
+    const toLocal = d => {
+        const p = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+    };
+    const now = new Date();
+    
+    const modeSwitch = document.getElementById('kw-profile-mode');
+    const isLive = modeSwitch ? modeSwitch.checked : true;
+    
+    let start, end;
+    if (isLive) {
+        start = now;
+        end = new Date(now.getTime() + minutes * 60000);
+    } else {
+        start = new Date(now.getTime() - minutes * 60000);
+        end = now;
+    }
+    
+    const startInput = document.getElementById('kw-period-start');
+    const endInput   = document.getElementById('kw-period-end');
+    
+    if (startInput && !startInput.disabled) {
+        startInput.value = toLocal(start);
+    }
+    if (endInput) {
+        endInput.value = toLocal(end);
+    }
+    
+    _refreshGranularitySelect();
+    _updateEstimate();
+};
 
 function _durationS() {
     const s = document.getElementById('kw-period-start');
@@ -532,6 +617,11 @@ async function _launchSession() {
     // rules.js _pollAllLearningSessions() will pick up the new session automatically.
     document.getElementById('rule-modal').classList.add('hidden');
     kwWizardClose();
+    
+    // If we are on the monitor page, refresh the rules list to show the auto-learning panel
+    if (window.loadMonitorRules) {
+        window.loadMonitorRules();
+    }
 
     // Remove this session from the completed-session cache in rules.js (if any)
     // so that re-launching the same rule's session is properly re-polled.
@@ -582,6 +672,11 @@ function _updateRuleCard(ruleId, data) {
             <div class="kw-tags-row" style="margin-top:.3rem">
                 ${data.raw_keywords.slice(0, 12).map(k => `<span class="kw-tag kw-tag--raw">${_esc(k)}</span>`).join('')}
                 ${data.raw_keywords.length > 12 ? `<span class="kw-hint">+${data.raw_keywords.length - 12}</span>` : ''}
+            </div>` : ''}
+            ${data.raw_exclusions && data.raw_exclusions.length ? `
+            <div class="kw-tags-row" style="margin-top:.2rem">
+                ${data.raw_exclusions.slice(0, 8).map(e => `<span class="kw-tag kw-tag--negative" style="text-decoration:line-through;opacity:0.7">${_esc(e)}</span>`).join('')}
+                ${data.raw_exclusions.length > 8 ? `<span class="kw-hint">+${data.raw_exclusions.length - 8}</span>` : ''}
             </div>` : ''}
         ` : ''}
         ${data.status === 'scanning' || data.status === 'refining' ? `

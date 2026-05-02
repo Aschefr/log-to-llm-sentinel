@@ -28,6 +28,7 @@ class RevaluateRequest(BaseModel):
 
 class ValidateRequest(BaseModel):
     keywords: list[str]
+    exclusions: list[str] = []
 
 
 def _parse_dt(s: str) -> datetime:
@@ -84,8 +85,8 @@ async def validate(session_id: int, body: ValidateRequest):
     data = kls.get_session_status(session_id)
     if data is None:
         raise HTTPException(status_code=404, detail="session_not_found")
-    await kls.validate_session(session_id, body.keywords)
-    return {"status": "validated", "keywords": body.keywords}
+    await kls.validate_session(session_id, body.keywords, body.exclusions)
+    return {"status": "validated", "keywords": body.keywords, "exclusions": body.exclusions}
 
 
 @router.post("/{session_id}/revert")

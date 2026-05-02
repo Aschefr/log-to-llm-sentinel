@@ -120,8 +120,16 @@
             padding: 1.2rem; background: rgba(255,255,255,0.02);
             border: 1px solid var(--border); border-radius: 14px;
             cursor: pointer; margin-bottom: 0.6rem;
+            transition: all 0.2s;
         }
-        .log-item.selected { border-color: var(--accent); background: rgba(16, 185, 129, 0.1); }
+        .log-item.selected { border-color: var(--accent) !important; background: rgba(16, 185, 129, 0.1) !important; }
+        .log-item.most-recent { border-color: var(--warning); background: rgba(245, 158, 11, 0.05); }
+
+        .badge-recent {
+            background: var(--warning); color: black; font-size: 0.7rem; 
+            font-weight: 800; padding: 2px 6px; border-radius: 4px; 
+            margin-right: 10px; display: inline-block; vertical-align: middle;
+        }
 
         .final-card { background: rgba(16, 185, 129, 0.03); border: 1px solid rgba(16, 185, 129, 0.2); padding: 2.5rem; border-radius: 24px; margin-top: 2rem; }
         .debug-card { background: rgba(129, 140, 248, 0.03); border: 1px solid rgba(129, 140, 248, 0.2); padding: 2.5rem; border-radius: 24px; margin-top: 2rem; }
@@ -246,7 +254,8 @@
                 step4_title: "Résultat",
                 final_start: "🚀 Script de transfert",
                 final_stop: "🛑 Arrêt global",
-                final_health: "🏥 Santé du système"
+                final_health: "🏥 Santé du système",
+                badge_recent: "PLUS RÉCENT ⭐"
             },
             en: {
                 header_title: "Webhook Assistant",
@@ -267,7 +276,8 @@
                 step4_title: "Ready!",
                 final_start: "🚀 Forwarding Script",
                 final_stop: "🛑 Global Stop",
-                final_health: "🏥 System Health"
+                final_health: "🏥 System Health",
+                badge_recent: "MOST RECENT ⭐"
             }
         };
 
@@ -319,30 +329,66 @@
             state.app = document.getElementById('app-name').value;
             let cmd = '...';
             if (state.logType === 'docker') {
-                cmd = `docker ps -a --format "{{.Names}}" | grep -i "${state.app || '.*'}"`;
+                cmd = `sudo docker ps -a --format "{{.Names}}" | grep -i "${state.app || '.*'}"`;
             } else {
-                if (state.platform === 'unraid') cmd = `find /mnt/user/appdata -iname "*${state.app}*" -name "*.log"`;
-                else if (state.platform === 'linux') cmd = `find /var/lib/docker/volumes -iname "*${state.app}*" -name "*.log"`;
-                else if (state.platform === 'windows') cmd = `Get-ChildItem -Path "$env:LOCALAPPDATA" -Recurse -Filter "*${state.app}*.log" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName`;
+                if (state.platform === 'unraid') cmd = `sudo find /mnt/user/appdata -iname "*${state.app}*" -name "*.log" -exec ls -lht {} + 2>/dev/null`;
+                else if (state.platform === 'linux') cmd = `sudo find /var/lib/docker/volumes -iname "*${state.app}*" -name "*.log" -exec ls -lht {} + 2>/dev/null`;
+                else if (state.platform === 'windows') cmd = `Get-ChildItem -Path "$env:LOCALAPPDATA" -Recurse -Filter "*${state.app}*.log" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object LastWriteTime, @{Name="Size(MB)";Expression={[math]::Round($_.Length / 1MB, 2)}}, FullName | Format-Table -AutoSize`;
             }
             document.getElementById('cmd-locate').innerText = cmd;
         }
 
         function processResults() {
             const val = document.getElementById('search-results').value;
-            const lines = val.split('\n').map(l => l.trim()).filter(l => l.length > 0);
             const list = document.getElementById('list-logs');
             list.innerHTML = '';
-            if (lines.length) {
+            
+            const lines = val.split('\n').filter(l => l.trim().length > 0);
+            const found = [];
+
+            lines.forEach(line => {
+                const pathMatch = line.match(/([a-zA-Z]:\\[^ \n]+|\/[^ \n]+)/);
+                if (!pathMatch) return;
+
+                const path = pathMatch[0];
+                if (!path.toLowerCase().includes('.log')) return;
+
+                const metaMatch = line.match(/([0-9]+[.,]?[0-9]*[KMG]) +([a-z.\-]+ +[0-9]+ +[0-9:]+)/i);
+                let meta = '';
+                if (metaMatch) {
+                    meta = `<span style="color:var(--accent); font-size:0.85rem; margin-right:1rem;">[${metaMatch[1]} - ${metaMatch[2]}]</span>`;
+                }
+
+                found.push({ path, html: meta + path });
+            });
+
+            const unique = [];
+            const seen = new Set();
+            found.forEach(item => {
+                if (!seen.has(item.path)) {
+                    unique.push(item);
+                    seen.add(item.path);
+                }
+            });
+
+            if (unique.length) {
                 document.getElementById('log-selector').classList.remove('hidden');
-                lines.forEach(line => {
+                unique.forEach((item, idx) => {
                     const div = document.createElement('div');
                     div.className = 'log-item';
-                    div.innerText = line;
+                    
+                    if (idx === 0) {
+                        div.classList.add('most-recent');
+                        const label = i18n[state.lang].badge_recent;
+                        div.innerHTML = `<span class="badge-recent">${label}</span> ` + item.html;
+                    } else {
+                        div.innerHTML = item.html;
+                    }
+
                     div.onclick = () => {
                         document.querySelectorAll('.log-item').forEach(i => i.classList.remove('selected'));
                         div.classList.add('selected');
-                        state.log = line;
+                        state.log = item.path;
                         document.getElementById('btn-to-3').classList.remove('hidden');
                     };
                     list.appendChild(div);
@@ -352,7 +398,6 @@
 
         function validateWebhook() {
             let url = document.getElementById('webhook-url').value;
-            // Auto-clean if full curl command is pasted
             const match = url.match(/http[s]?:\/\/[^ '"]+/);
             if (match) {
                 url = match[0];

@@ -55,19 +55,21 @@ failures, critical errors, performance degradation, security issues.
 
 Analyzed time window: {window}
 
-Analyze these log lines and return ONLY a JSON list of SHORT keywords to detect anomalies.
+Analyze these log lines and return BOTH a list of SHORT keywords to detect anomalies, AND a list of noise patterns to ignore.
 
 STRICT RULES:
 - Maximum 15 keywords
-- Each keyword: 1 to 3 words MAX (no full sentences)
+- Maximum 2 exclusions (noise patterns)
+- Each keyword and exclusion: 1 to 3 words MAX (no full sentences)
 - Keywords must be GENERIC: they must match future occurrences of the same event type
+- Exclusions must have low sensitivity: target highly frequent, predictable, non-actionable noise
 - Remove variable numbers (counters, PIDs, timestamps, IDs)
 - Avoid overly generic terms: info, log, time, started, stopping, message, repeated
-- VALID examples: "restart counter", "job worker", "out of memory", "connection refused"
-- INVALID examples: "restart counter is at 2361", "Background job will stop at 14:32"
+- VALID keywords: "restart counter", "job worker", "out of memory", "connection refused"
+- VALID exclusions: "heartbeat check", "cron ping"
 
-Return ONLY raw JSON, no surrounding text.
-Format: ["keyword1", "keyword2", ...]
+Return ONLY raw JSON. No markdown code blocks, no preamble, no explanation.
+Format: {{"keywords": ["keyword1", "keyword2"], "exclusions": ["noise1"]}}
 
 --- LOG LINES ---
 {lines}
@@ -75,32 +77,32 @@ Format: ["keyword1", "keyword2", ...]
 
 _PROMPT_PHASE2 = """\
 You are a system log monitoring expert.
-Below is a list of {n_raw} candidate keywords extracted from {n_packets} log time-windows:
+Below is a list of candidate keywords and exclusions extracted from {n_packets} log time-windows:
 {raw_keywords}
 
 Representative log sample (beginning + end of file):
 {sample}
 
-Goal: monitor this system in production and alert the user ONLY on actionable events.
+Goal: monitor this system in production and alert the user ONLY on actionable events, while filtering out noise.
 
 STRICT RULES — you MUST follow ALL of these:
-1. SELECT keywords ONLY from the candidate list above. DO NOT invent new terms.
-2. Each retained keyword: 1 to 3 words MAX. If a candidate is longer, shorten it to its essential part.
+1. SELECT keywords and exclusions ONLY from the candidate lists above. DO NOT invent new terms.
+2. Each retained keyword/exclusion: 1 to 3 words MAX. Shorten if needed.
 3. Remove noisy, overly generic, or redundant candidates.
-4. Keep ONLY those signaling real, actionable problems visible in the logs.
-5. Maximum 15 final keywords.
+4. Keep ONLY keywords signaling real, actionable problems, and exclusions targeting high-volume noise.
+5. Maximum 15 final keywords, maximum 2 final exclusions.
 
-Respond ONLY with JSON:
-{{"keywords": ["word1", "word2"], "rationale": {{"word1": "short reason"}}}}
+Respond ONLY with raw JSON. No markdown code blocks, no surrounding text.
+{{"keywords": ["word1"], "exclusions": ["noise1"], "rationale": {{"word1": "short reason", "noise1": "short reason"}}}}
 """
 
 _PROMPT_VALIDATE = """\
 You are a log monitoring expert reviewing a keyword refinement result.
 
-Original candidate list ({n_raw} keywords extracted from real logs):
+Original candidate lists (extracted from real logs):
 {raw_keywords}
 
-Refined list proposed:
+Refined lists proposed:
 {refined_keywords}
 
 Is the refined list relevant and faithful to the original candidates?
@@ -110,15 +112,16 @@ Answer with YES or NO only. No explanation.
 # Shufflable sections for retry (P_B and P_C will be randomly ordered)
 _REPHRASE_SECTION_CONSTRAINTS = """\
 STRICT CONSTRAINTS (mandatory):
-- Select ONLY from the candidate list. DO NOT invent new terms.
-- Each keyword: 1 to 3 words MAX. Shorten if longer.
+- Select ONLY from the candidate lists. DO NOT invent new terms.
+- Each keyword/exclusion: 1 to 3 words MAX. Shorten if longer.
 - Remove generic noise. Keep actionable signals.
-- Max 15 keywords total.
-Respond ONLY with JSON: {{"keywords": [...], "rationale": {{...}}}}
+- Max 15 keywords total, max 2 exclusions total.
+Respond ONLY with raw JSON. No markdown code blocks, no preamble.
+Format: {{"keywords": [...], "exclusions": [...], "rationale": {{...}}}}
 """
 
 _REPHRASE_SECTION_CANDIDATES = """\
-Section {idx}. Candidate keywords extracted from real log windows:
+Section {idx}. Candidate keywords and exclusions extracted from real log windows:
 {raw_keywords}
 """
 
@@ -128,8 +131,8 @@ Section {idx}. Representative log file excerpt:
 """
 
 _REPHRASE_SECTION_TASK = """\
-Task: Refine the candidate list above into a final keyword set for production log monitoring.
-Respond ONLY with JSON: {{"keywords": [...], "rationale": {{...}}}}
+Task: Refine the candidates above into final keyword and exclusion sets for production log monitoring.
+Respond ONLY with JSON: {{"keywords": [...], "exclusions": [...], "rationale": {{...}}}}
 """
 
 _PROMPT_EXTRACT_PHRASES = """\
@@ -161,6 +164,59 @@ def _parse_line_ts(line: str) -> Optional[datetime]:
             except ValueError:
                 continue
     return None
+
+
+def _extract_json_phase1(text: str) -> tuple[list, list]:
+    """Extract dict with keywords and exclusions from LLM response."""
+    text = text.strip()
+    
+    def _from_dict(val: dict) -> tuple[list, list]:
+        # Try primary keys, then synonyms
+        kws = val.get('keywords') or val.get('positive_matches') or val.get('positive') or []
+        excs = val.get('exclusions') or val.get('negative_matches') or val.get('negative') or val.get('noise') or []
+        return [str(k) for k in kws if k], [str(e) for e in excs if e]
+
+    try:
+        code_block = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL | re.IGNORECASE)
+        text_to_parse = code_block.group(1) if code_block else text
+        val = json.loads(text_to_parse)
+        if isinstance(val, dict):
+            return _from_dict(val)
+    except Exception:
+        pass
+        
+    for m in re.finditer(r'(\{.*?\})', text, re.DOTALL):
+        try:
+            val = json.loads(m.group(1))
+            if isinstance(val, dict):
+                kws, excs = _from_dict(val)
+                if kws or excs:
+                    return kws, excs
+        except Exception:
+            continue
+            
+    # Fallback: simple bullet points if JSON failed
+    kws = []
+    excs = []
+    in_excs = False
+    for line in text.splitlines():
+        l = line.strip().lower()
+        if 'exclusion' in l or 'negative' in l or 'noise' in l or 'ignore' in l:
+            in_excs = True
+        elif 'keyword' in l or 'positive' in l or 'monitor' in l:
+            in_excs = False
+        
+        # Improve bullet regex to require a space after the bullet and allow backticks / trailing explanations
+        m = re.match(r'^[\s]*[\-\*•][\s]+(?:\*\*)?["\'`]?([^"\'`\(\)\:\-\*]+)["\'`]?(?:\*\*)?(?:[\s\:\-\(].*)?$', line.strip())
+        if m:
+            item = m.group(1).strip()
+            if item.lower() in ('keywords', 'exclusions', 'positive', 'negative', 'noise', 'monitor', 'ignore'):
+                continue
+            if len(item) > 0 and len(item) < 60:
+                if in_excs: excs.append(item)
+                else: kws.append(item)
+                
+    return kws, excs
 
 
 def _extract_json_list(text: str) -> list:
@@ -201,20 +257,65 @@ def _extract_json_list(text: str) -> list:
     return []
 
 
-def _extract_json_phase2(text: str) -> tuple[list, dict]:
-    """Extract keywords list and rationale dict from phase-2 LLM response."""
+def _extract_json_phase2(text: str) -> tuple[list, list, dict]:
+    """Extract keywords list, exclusions list and rationale dict from phase-2 LLM response."""
     text = text.strip()
+    
+    def _from_dict(val: dict) -> tuple[list, list, dict]:
+        kws = val.get('keywords') or val.get('positive') or []
+        excs = val.get('exclusions') or val.get('negative') or val.get('noise') or []
+        rat = val.get('rationale') or {}
+        if isinstance(rat, str):
+            rat = {"global": rat}
+        elif not isinstance(rat, dict):
+            rat = {}
+        return ([str(k) for k in kws if k], [str(e) for e in excs if e], {str(k): str(v) for k, v in rat.items()})
+
     try:
-        val = json.loads(text)
+        code_block = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL | re.IGNORECASE)
+        text_to_parse = code_block.group(1) if code_block else text
+        val = json.loads(text_to_parse)
         if isinstance(val, dict):
-            kws = val.get('keywords', [])
-            rat = val.get('rationale', {})
-            return ([str(k) for k in kws], {str(k): str(v) for k, v in rat.items()})
+            return _from_dict(val)
     except Exception:
         pass
-    # Fallback: extract keywords array only
+        
+    for m in re.finditer(r'(\{.*?\})', text, re.DOTALL):
+        try:
+            val = json.loads(m.group(1))
+            if isinstance(val, dict):
+                kws, excs, rat = _from_dict(val)
+                if kws or excs:
+                    return kws, excs, rat
+        except Exception:
+            continue
+            
+    # Fallback 1: extract keywords array only
     kws = _extract_json_list(text)
-    return kws, {}
+    if kws:
+        return kws, [], {}
+        
+    # Fallback 2: bullet points
+    kws = []
+    excs = []
+    in_excs = False
+    for line in text.splitlines():
+        l = line.strip().lower()
+        if 'exclusion' in l or 'negative' in l or 'noise' in l or 'ignore' in l:
+            in_excs = True
+        elif 'keyword' in l or 'positive' in l or 'monitor' in l:
+            in_excs = False
+            
+        m = re.match(r'^[\s]*[\-\*•][\s]+(?:\*\*)?["\'`]?([^"\'`\(\)\:\-\*]+)["\'`]?(?:\*\*)?(?:[\s\:\-\(].*)?$', line.strip())
+        if m:
+            item = m.group(1).strip()
+            if item.lower() in ('keywords', 'exclusions', 'positive', 'negative', 'noise', 'monitor', 'ignore'):
+                continue
+            if len(item) < 60:
+                if in_excs: excs.append(item)
+                else: kws.append(item)
+                
+    return kws, excs, {}
 
 
 def _read_window(path: str, t_start: datetime, t_end: datetime,
@@ -401,7 +502,7 @@ async def _validate_refined_list(ollama, raw_kws: list, refined_kws: list,
     return is_yes
 
 
-async def _refine_with_shuffle(ollama, all_raw: list, sample: str,
+async def _refine_with_shuffle(ollama, all_raw: dict, sample: str,
                                 ollama_url: str, ollama_model: str,
                                 ollama_think: bool, ollama_temp: float,
                                 ollama_ctx: int, log_path: str,
@@ -434,15 +535,16 @@ async def _refine_with_shuffle(ollama, all_raw: list, sample: str,
             timeout=180.0
         )
     except asyncio.TimeoutError:
-        resp = json.dumps({'keywords': all_raw[:15], 'rationale': {}})
+        resp = json.dumps({'keywords': all_raw.get('keywords', [])[:15], 'exclusions': all_raw.get('exclusions', [])[:2], 'rationale': {}})
 
-    kws, rationale = _extract_json_phase2(resp)
+    kws, excs, rationale = _extract_json_phase2(resp)
     kws = kws[:15]
+    excs = excs[:2]
     _log_exchange(log_path,
                   f"RETRY (shuffle #{attempt}) — PHASE 2 reformulation",
                   prompt, resp,
-                  f"New candidate list: {kws}")
-    return kws, rationale
+                  f"New candidates: KWs: {kws} | Excs: {excs}")
+    return kws, excs, rationale
 
 
 async def _extract_keywords_from_phrases(ollama, phrases: list,
@@ -517,6 +619,10 @@ async def _send_notification(rule_id: Optional[int], subject: str, body: str):
         config_dict = _get_config_dict(cfg)
     finally:
         db.close()
+
+    instance_name = config_dict.get("instance_name", "").strip()
+    if instance_name:
+        subject = f"[{instance_name}] {subject}"
 
     from app.services.notification_service import NotificationService
     notifier = NotificationService()
@@ -646,6 +752,7 @@ async def _run_session(session_id: int):
                 KeywordLearningSession.id == session_id).first()
             resume_from = s.completed_packets if s else 0
             all_raw = json.loads(s.raw_keywords_json or '[]') if s else []
+            all_raw_excs = json.loads(s.raw_exclusions_json or '[]') if s else []
             log_entries = json.loads(s.ollama_log_json or '[]') if s else []
         finally:
             db.close()
@@ -764,7 +871,7 @@ async def _run_session(session_id: int):
                     timeout=120.0
                 )
             except asyncio.TimeoutError:
-                response = '[]'
+                response = '{"keywords":[], "exclusions":[]}'
 
             # Log raw response for debugging
             app_logger.debug(
@@ -772,15 +879,15 @@ async def _run_session(session_id: int):
                 f'Session {session_id} paquet {packet_idx+1} — réponse brute ({len(response)} car.) : '
                 f'{response[:300].replace(chr(10), " ")}{"…" if len(response) > 300 else ""}'
             )
-            packet_kws = _extract_json_list(response)
+            packet_kws, packet_excs = _extract_json_phase1(response)
             app_logger.debug(
                 'KeywordLearning',
-                f'Session {session_id} paquet {packet_idx+1} — {len(packet_kws)} mot(s)-clé(s) extraits : {packet_kws}'
+                f'Session {session_id} paquet {packet_idx+1} — {len(packet_kws)} mot(s)-clé(s), {len(packet_excs)} exclusion(s) extraits'
             )
             _log_exchange(sess_log,
                           f"PHASE 1 — Packet {packet_idx+1}/{n_packets} ({window_label})",
                           prompt, response,
-                          f"Extracted: {packet_kws}")
+                          f"Extracted KWs: {packet_kws} | Excs: {packet_excs}")
 
             # Accumulate unique keywords
             for kw in packet_kws:
@@ -788,12 +895,19 @@ async def _run_session(session_id: int):
                 if kw_clean and kw_clean not in [k.lower() for k in all_raw]:
                     all_raw.append(kw.strip())
             all_raw = all_raw[:40]  # cap phase-1 at 40
+            
+            for exc in packet_excs:
+                exc_clean = exc.strip().lower()
+                if exc_clean and exc_clean not in [e.lower() for e in all_raw_excs]:
+                    all_raw_excs.append(exc.strip())
+            all_raw_excs = all_raw_excs[:20]
 
             log_entries.append({
                 'packet_idx': packet_idx,
                 'window': window_label,
                 'chars': len(text),
                 'keywords': packet_kws,
+                'exclusions': packet_excs,
             })
 
             # First packet notification
@@ -819,15 +933,16 @@ async def _run_session(session_id: int):
             '[Sentinel] 📋 Liste initiale de mots-clés',
             f'**{len(all_raw)} candidat(s)** extraits de {n_packets} paquets :\n'
             + (', '.join(f'`{k}`' for k in all_raw) if all_raw else '_aucun_')
+            + (f'\n\n**{len(all_raw_excs)} exclusion(s)** :\n' + ', '.join(f'`{e}`' for e in all_raw_excs) if all_raw_excs else '')
         )
 
         # Guard: if no candidates at all, don't hallucinate — abort cleanly
-        if not all_raw:
+        if not all_raw and not all_raw_excs:
             _db_update(
                 session_id,
                 status='error',
                 error_message=(
-                    'Aucun mot-clé candidat trouvé sur l\'ensemble de la période. '
+                    'Aucun candidat (mot-clé ou exclusion) trouvé sur l\'ensemble de la période. '
                     'Vérifiez que le fichier contient bien des logs sur cette période '
                     'et que les timestamps sont lisibles.'
                 )
@@ -839,9 +954,8 @@ async def _run_session(session_id: int):
 
         sample = _read_sample(log_path, max_chars)
         prompt2 = _PROMPT_PHASE2.format(
-            n_raw=len(all_raw),
             n_packets=n_packets,
-            raw_keywords=json.dumps(all_raw),
+            raw_keywords=json.dumps({'keywords': all_raw, 'exclusions': all_raw_excs}),
             sample=sample,
         )
 
@@ -857,18 +971,20 @@ async def _run_session(session_id: int):
                 timeout=180.0
             )
         except asyncio.TimeoutError:
-            response2 = json.dumps({'keywords': all_raw[:15], 'rationale': {}})
+            response2 = json.dumps({'keywords': all_raw[:15], 'exclusions': all_raw_excs[:2], 'rationale': {}})
 
-        final_kws, rationale = _extract_json_phase2(response2)
+        final_kws, final_excs, rationale = _extract_json_phase2(response2)
         final_kws = final_kws[:15]
+        final_excs = final_excs[:2]
         _log_exchange(sess_log, "PHASE 2 — Initial refinement", prompt2, response2,
-                      f"Initial refined list: {final_kws}")
+                      f"Initial refined KWs: {final_kws} | Excs: {final_excs}")
 
         await _send_notification(
             rule_id,
             '[Sentinel] ✂️ Liste raffinée (validation en cours…)',
             f'**Candidats retenus :** {" | ".join(f"`{k}`" for k in final_kws)}\n'
-            f'_Validation croisée Ollama en cours…_'
+            + (f'**Exclusions retenues :** {" | ".join(f"`{e}`" for e in final_excs)}\n' if final_excs else '')
+            + f'_Validation croisée Ollama en cours…_'
         )
 
         # ── Double-validation loop (max 3 attempts) ───────────────────────────
@@ -877,13 +993,22 @@ async def _run_session(session_id: int):
 
         for val_attempt in range(1, MAX_VALIDATION + 1):
             # STEP 2: cross-validate YES/NO
+            if val_attempt > 1:
+                msg_body = f'**Nouvelle liste à valider :**\n'
+                msg_body += f'Mots-clés : {" | ".join(f"`{k}`" for k in final_kws)}\n'
+                if final_excs:
+                    msg_body += f'Exclusions : {" | ".join(f"`{e}`" for e in final_excs)}\n'
+                msg_body += f'\n_Ollama vérifie la pertinence de cette nouvelle liste..._'
+            else:
+                msg_body = f'Ollama vérifie la pertinence de la liste raffinée par rapport aux candidats bruts.'
+
             await _send_notification(
                 rule_id,
                 f'[Sentinel] 🔍 Validation croisée ({val_attempt}/{MAX_VALIDATION})…',
-                f'Ollama vérifie la pertinence de la liste raffinée par rapport aux candidats bruts.'
+                msg_body
             )
             is_valid = await _validate_refined_list(
-                ollama, all_raw, final_kws,
+                ollama, {'keywords': all_raw, 'exclusions': all_raw_excs}, {'keywords': final_kws, 'exclusions': final_excs},
                 ollama_url, ollama_model, ollama_think, ollama_temp, ollama_ctx,
                 sess_log, val_attempt
             )
@@ -915,12 +1040,13 @@ async def _run_session(session_id: int):
                     f'La liste n\'était pas pertinente. Nouvel essai avec une présentation différente.'
                 )
                 try:
-                    final_kws, rationale = await _refine_with_shuffle(
-                        ollama, all_raw, sample,
+                    final_kws, final_excs, rationale = await _refine_with_shuffle(
+                        ollama, {'keywords': all_raw, 'exclusions': all_raw_excs}, sample,
                         ollama_url, ollama_model, ollama_think, ollama_temp, ollama_ctx,
                         sess_log, val_attempt
                     )
                     final_kws = final_kws[:15]
+                    final_excs = final_excs[:2]
                 except Exception as shuffle_err:
                     # Log in session file so user can see it
                     _log_exchange(sess_log,
@@ -958,6 +1084,7 @@ async def _run_session(session_id: int):
         _db_update(
             session_id,
             final_keywords_json=json.dumps(final_kws),
+            final_exclusions_json=json.dumps(final_excs),
             refine_rationale_json=json.dumps(rationale),
         )
 
@@ -968,6 +1095,7 @@ async def _run_session(session_id: int):
             rule_id,
             '[Sentinel] ✂️ Liste raffinée (validée)',
             f'**Mots-clés retenus :** {" | ".join(f"`{k}`" for k in final_kws)}\n'
+            + (f'**Exclusions :** {" | ".join(f"`{e}`" for e in final_excs)}\n' if final_excs else '')
             + (f'\n{rationale_lines}' if rationale_lines else '')
         )
 
@@ -975,7 +1103,7 @@ async def _run_session(session_id: int):
         _log_footer(sess_log, success=True, keywords=final_kws)
 
         # ── Auto-validate ─────────────────────────────────────────────────────
-        await _do_validate(session_id, final_kws)
+        await _do_validate(session_id, final_kws, final_excs)
 
     except Exception as e:
         import traceback
@@ -993,8 +1121,10 @@ async def _run_session(session_id: int):
 
 
 
-async def _do_validate(session_id: int, keywords: list[str]):
+async def _do_validate(session_id: int, keywords: list[str], exclusions: list[str] = None):
     """Apply keywords to the rule and mark session as validated."""
+    if exclusions is None:
+        exclusions = []
     rule_id = None
     db = SessionLocal()
     try:
@@ -1007,8 +1137,10 @@ async def _do_validate(session_id: int, keywords: list[str]):
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             if rule:
                 rule.set_keywords(keywords)
+                rule.set_excluded_patterns(exclusions)
                 db.commit()
         s.final_keywords_json = json.dumps(keywords)
+        s.final_exclusions_json = json.dumps(exclusions)
         s.status = 'validated'
         s.validated_at = datetime.utcnow()
         db.commit()
@@ -1020,7 +1152,8 @@ async def _do_validate(session_id: int, keywords: list[str]):
         '[Sentinel] ✅ Mots-clés validés automatiquement',
         f'**Mots-clés appliqués à la règle :**\n'
         f'{" | ".join(f"`{k}`" for k in keywords)}\n\n'
-        f'_Vous pouvez réviser ou annuler ce résultat depuis la page Règles._'
+        + (f'**Exclusions appliquées :**\n{" | ".join(f"`{e}`" for e in exclusions)}\n\n' if exclusions else '')
+        + f'_Vous pouvez réviser ou annuler ce résultat depuis la page Règles._'
     )
 
 
@@ -1088,9 +1221,9 @@ async def revaluate_session(session_id: int, current_keywords: list[str]):
     await _do_validate(session_id, final_kws)
 
 
-async def validate_session(session_id: int, keywords: list[str]):
+async def validate_session(session_id: int, keywords: list[str], exclusions: list[str] = None):
     """Manual validation with a custom keyword list."""
-    await _do_validate(session_id, keywords)
+    await _do_validate(session_id, keywords, exclusions)
 
 
 async def revert_session(session_id: int) -> list[str]:
@@ -1140,6 +1273,8 @@ def get_session_status(session_id: int) -> Optional[dict]:
             'current_packet_keywords': current_preview,
             'raw_keywords': json.loads(s.raw_keywords_json or '[]'),
             'final_keywords': json.loads(s.final_keywords_json or '[]'),
+            'raw_exclusions': json.loads(s.raw_exclusions_json or '[]'),
+            'final_exclusions': json.loads(s.final_exclusions_json or '[]'),
             'refine_rationale': json.loads(s.refine_rationale_json or '{}'),
             'previous_keywords': json.loads(s.previous_keywords_json or '[]'),
             'error_message': s.error_message,

@@ -171,6 +171,8 @@ class KeywordLearningSession(Base):
     completed_packets      = Column(Integer, default=0)
     raw_keywords_json      = Column(Text, default="[]")              # candidats bruts accumulés
     final_keywords_json    = Column(Text, default="[]")              # après raffinement
+    raw_exclusions_json    = Column(Text, default="[]")              # exclusions brutes
+    final_exclusions_json  = Column(Text, default="[]")              # exclusions retenues
     previous_keywords_json = Column(Text, default="[]")             # keywords avant learning (revert)
     refine_rationale_json  = Column(Text, default="{}")             # {keyword: raison}
     ollama_log_json        = Column(Text, default="[]")              # [{packet_idx, window, chars, keywords}]
