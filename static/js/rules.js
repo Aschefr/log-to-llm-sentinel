@@ -154,62 +154,29 @@ async function _fetchAndApplySession(ruleId, sessionId) {
         const isActive = ['pending', 'scanning', 'refining'].includes(data.status);
         const isDone   = ['validated', 'reverted', 'error'].includes(data.status);
 
-        // ── First render: build the stable structure ─────────────────────────
-        const prevStatus = card.dataset.status;
-        if (!prevStatus || prevStatus !== data.status) {
-            card.dataset.status = data.status;
-            card.innerHTML = `
-                <div class="kw-card-status" id="klc-status-${ruleId}"></div>
-                <div id="klc-progress-${ruleId}" style="display:none;margin:.3rem 0 .4rem">
-                    <div class="kw-progress-bar-track">
-                        <div class="kw-progress-bar" id="klc-pbar-${ruleId}" style="width:0%"></div>
-                    </div>
-                </div>
-                <div id="klc-tags-${ruleId}" class="kw-tags-row" style="margin-top:.25rem;display:none"></div>
-                <div id="klc-actions-${ruleId}" class="kw-actions" style="margin-top:.4rem">
-                    ${isActive ? `<button type="button" class="btn btn-danger btn-sm" onclick="kwStopSession(${sessionId})">⏹ ${_t('kw.stop_btn','Arrêter')}</button>` : ''}
-                    ${data.status === 'validated' ? `<button type="button" class="btn btn-secondary btn-sm" onclick="kwRevertSession(${sessionId})">↩️ ${_t('kw.revert_btn','Annuler les changements')}</button>` : ''}
-                    ${isDone ? `<a href="/api/keyword-learning/${sessionId}/log" download class="btn btn-secondary btn-sm" title="Télécharger le log complet des échanges Ollama">📥 Log session</a>` : ''}
-                </div>
-
-            `;
-        }
-
-        // ── Targeted updates (no flicker) ─────────────────────────────────────
-        const statusEl   = document.getElementById(`klc-status-${ruleId}`);
-        const progressEl = document.getElementById(`klc-progress-${ruleId}`);
-        const pbarEl     = document.getElementById(`klc-pbar-${ruleId}`);
-        const tagsEl     = document.getElementById(`klc-tags-${ruleId}`);
-
-        if (statusEl) statusEl.textContent = STATUS[data.status] || data.status;
-
-        if (data.status === 'scanning') {
-            if (progressEl) progressEl.style.display = 'block';
-            if (pbarEl) pbarEl.style.width = pct + '%';
-
-            // Update tags only if content changed
-            const kws = data.raw_keywords || [];
-            const newTagsHtml = kws.length
-                ? kws.slice(0, 10).map(k => `<span class="kw-tag kw-tag--raw">${escapeHtml(k)}</span>`).join('')
-                  + (kws.length > 10 ? `<span class="kw-hint" style="align-self:center">+${kws.length - 10}</span>` : '')
-                : '';
-            if (tagsEl) {
-                if (tagsEl.dataset.kwHash !== newTagsHtml.length.toString()) {
-                    tagsEl.innerHTML = newTagsHtml;
-                    tagsEl.dataset.kwHash = newTagsHtml.length.toString();
-                }
-                tagsEl.style.display = kws.length ? 'flex' : 'none';
-            }
-        } else if (data.status === 'validated' && data.final_keywords && data.final_keywords.length) {
-            if (progressEl) progressEl.style.display = 'none';
-            if (tagsEl) {
-                tagsEl.innerHTML = data.final_keywords.map(k => `<span class="kw-tag">${escapeHtml(k)}</span>`).join('');
-                tagsEl.style.display = 'flex';
-            }
-        } else {
-            if (progressEl) progressEl.style.display = 'none';
-            if (tagsEl) tagsEl.style.display = 'none';
-        }
+        // ── Render exact same layout as Monitor ──────────────────────────────
+        card.innerHTML = `
+            <span class="info-label">🤖 ${window.t ? window.t('monitor.autolearn_title') : 'Auto-learning'}</span>
+            <div class="kw-card-status">${STATUS[data.status] || data.status}</div>
+            ${data.status === 'scanning' ? `
+            <div style="margin:.3rem 0 .4rem">
+                <div class="kw-progress-bar-track"><div class="kw-progress-bar" style="width:${pct}%"></div></div>
+            </div>` : ''}
+            ${data.status === 'scanning' && data.raw_keywords?.length ? `
+            <div class="kw-tags-row" style="margin-top:.25rem;display:flex">
+                ${data.raw_keywords.slice(0, 8).map(k => `<span class="kw-tag kw-tag--raw">${escapeHtml(k)}</span>`).join('')}
+                ${data.raw_keywords.length > 8 ? `<span class="kw-hint" style="align-self:center">+${data.raw_keywords.length - 8}</span>` : ''}
+            </div>` : ''}
+            ${data.status === 'validated' && data.final_keywords?.length ? `
+            <div class="kw-tags-row" style="margin-top:.25rem;display:flex">
+                ${data.final_keywords.map(k => `<span class="kw-tag">${escapeHtml(k)}</span>`).join('')}
+            </div>` : ''}
+            <div class="kw-actions" style="margin-top:.4rem">
+                ${isActive ? `<button type="button" class="btn btn-danger btn-sm" onclick="kwStopSession(${sessionId})">⏹ ${_t('kw.stop_btn','Stop')}</button>` : ''}
+                ${data.status === 'validated' ? `<button type="button" class="btn btn-secondary btn-sm" onclick="kwRevertSession(${sessionId})">↩️ ${_t('kw.revert_btn','Revert')}</button>` : ''}
+                ${isDone ? `<a href="/api/keyword-learning/${sessionId}/log" download class="btn btn-secondary btn-sm">📥 Log</a>` : ''}
+            </div>
+        `;
 
         return isDone;
     } catch { return false; }

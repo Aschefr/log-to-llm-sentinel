@@ -311,20 +311,26 @@ function _renderPreview(configId) {
 
         const entriesHtml = activeEntries.map((e) => {
             const entryIdx = e._origIdx;
-            const sevColor = e.severity === 'CRITICAL' ? 'var(--danger)' : e.severity === 'WARNING' ? 'var(--warning)' : 'var(--info)';
             const kwBadges = e.keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('');
+            const sevLower = e.severity ? e.severity.toLowerCase() : 'info';
             return `
-            <div id="entry-${configId}-${ruleIdx}-${entryIdx}" style="padding:0.6rem; border:1px solid rgba(255,255,255,0.06); border-radius:5px; background:rgba(255,255,255,0.02); display:flex; flex-direction:column; gap:0.35rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center; gap:0.5rem; flex-wrap:wrap;">
-                    <span style="font-size:0.75rem; color:var(--text-secondary);">${new Date(e.date).toLocaleString()}</span>
-                    <span style="font-size:0.75rem; font-weight:600; color:${sevColor};">${e.severity}</span>
-                    <a href="/monitor?search=${encodeURIComponent(e.detection_id)}" class="btn btn-secondary btn-sm" style="padding:0.1rem 0.4rem; font-size:0.7rem;">🔍 ${e.detection_id}</a>
-                    <button type="button" onclick="_deletePreviewEntry(${configId},${ruleIdx},${entryIdx})" title="${window.t('meta.exclude_btn')}" style="margin-left:auto; background:none; border:1px solid var(--danger); color:var(--danger); border-radius:3px; padding:0.1rem 0.4rem; font-size:0.75rem; cursor:pointer; line-height:1;">× ${window.t('meta.exclude_btn')}</button>
+            <div class="meta-preview-entry" id="entry-${configId}-${ruleIdx}-${entryIdx}" onclick="this.classList.toggle('expanded')">
+                <div class="meta-preview-entry-summary">
+                    <div class="meta-preview-header">
+                        <a href="/monitor?search=${encodeURIComponent(e.detection_id)}" class="btn btn-secondary btn-sm meta-preview-id-btn" style="padding:0.1rem 0.4rem; font-size:0.7rem;" onclick="event.stopPropagation()">🔍 #${escapeHtml(e.detection_id)}</a>
+                        <span class="severity-badge ${sevLower}" style="font-size:0.6rem; padding:0.15rem 0.4rem;">${escapeHtml(e.severity)}</span>
+                        <button type="button" class="btn btn-sm btn-danger meta-preview-exclude-btn meta-exclude-desktop" onclick="event.stopPropagation(); _deletePreviewEntry(${configId},${ruleIdx},${entryIdx})">× ${window.t('meta.exclude_btn')}</button>
+                    </div>
+                    <div class="meta-preview-time">${new Date(e.date).toLocaleString()}</div>
+                    ${kwBadges ? `<div class="meta-preview-kws">${kwBadges}</div>` : ''}
+                    <div class="meta-preview-ai-snippet">${escapeHtml(e.short_ia)}</div>
                 </div>
-                <div style="font-family:monospace; font-size:0.78rem; background:rgba(0,0,0,0.3); padding:0.3rem 0.5rem; border-radius:3px; white-space:pre-wrap; word-break:break-all;">${escapeHtml(e.triggered_line)}</div>
-                <div style="font-size:0.78rem; color:var(--text-secondary); font-style:italic;">IA : ${escapeHtml(e.short_ia)}</div>
-                ${kwBadges ? `<div style="display:flex; flex-wrap:wrap; gap:0.25rem;">${kwBadges}</div>` : ''}
-                <textarea placeholder="${window.t('meta.annotation_placeholder')}" data-config="${configId}" data-rule="${ruleIdx}" data-entry="${entryIdx}" onchange="_updateAnnotation(this)" style="width:100%; font-size:0.78rem; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:3px; color:var(--text-primary); padding:0.3rem; resize:vertical; min-height:40px; font-family:inherit; margin-top:0.1rem;">${e.annotation || ''}</textarea>
+                <div class="meta-preview-entry-details">
+                    <div class="meta-preview-line">${escapeHtml(e.triggered_line)}</div>
+                    <div class="meta-preview-ai-full">IA : ${escapeHtml(e.short_ia)}</div>
+                    <textarea placeholder="${window.t('meta.annotation_placeholder')}" data-config="${configId}" data-rule="${ruleIdx}" data-entry="${entryIdx}" onclick="event.stopPropagation()" onchange="_updateAnnotation(this)">${e.annotation || ''}</textarea>
+                    <button type="button" class="btn btn-sm btn-danger meta-preview-exclude-btn meta-exclude-mobile" onclick="event.stopPropagation(); _deletePreviewEntry(${configId},${ruleIdx},${entryIdx})">× ${window.t('meta.exclude_btn')}</button>
+                </div>
             </div>`;
         }).join('');
 
@@ -349,13 +355,16 @@ function _renderPreview(configId) {
         return `
         <div class="card" style="padding:1rem; border-left:3px solid var(--accent);">
             <div style="font-weight:600; margin-bottom:0.75rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
-                <div style="display:flex; align-items:center; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem;">
                     <span>📌 ${escapeHtml(ruleCtx.rule_name)}</span>
                     ${excludedBadge}
                 </div>
-                <span style="font-size:0.8rem; color:var(--text-secondary);">${activeEntries.length} ${window.t('meta.entries_count')}</span>
+                <div style="display:flex; align-items:center; gap:0.5rem;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); _toggleAllTiles(${configId}, ${ruleIdx})" style="font-size:0.7rem; padding:0.15rem 0.4rem;">↕ ${window.t('meta.toggle_tiles') || 'Tout plier/déplier'}</button>
+                    <span style="font-size:0.8rem; color:var(--text-secondary);">${activeEntries.length} ${window.t('meta.entries_count')}</span>
+                </div>
             </div>
-            <div style="display:flex; flex-direction:column; gap:0.5rem;">${entriesHtml}</div>
+            <div class="meta-preview-grid" id="meta-preview-grid-${configId}-${ruleIdx}">${entriesHtml}</div>
         </div>`;
     }).join('');
 
@@ -363,6 +372,19 @@ function _renderPreview(configId) {
         setTimeout(() => highlightDOMText(container, data.matched_keywords), 10);
     }
 }
+
+window._toggleAllTiles = function(configId, ruleIdx) {
+    const grid = document.getElementById(`meta-preview-grid-${configId}-${ruleIdx}`);
+    if (!grid) return;
+    const tiles = grid.querySelectorAll('.meta-preview-entry');
+    if (tiles.length === 0) return;
+    
+    const hasClosed = Array.from(tiles).some(t => !t.classList.contains('expanded'));
+    tiles.forEach(t => {
+        if (hasClosed) t.classList.add('expanded');
+        else t.classList.remove('expanded');
+    });
+};
 
 function _savePreviewState(configId) {
     if (!_previewData[configId]) return;

@@ -19,11 +19,11 @@ global_rules:
   - id: G-03
     rule: "Interface with existing debug system. Add filters as needed."
   - id: G-04
-    rule: "Debug logs in French (dev language). App UI uses English for i18n."
+    rule: "Debug logs in French (dev language)."
   - id: G-05
     rule: "Preserve existing visual style: badges, colors, fonts."
   - id: G-06
-    rule: "Auto-refresh individual elements. No F5 needed."
+    rule: "Auto-refresh individuals elements. No F5 needed."
   - id: G-07
     rule: |
       NEVER use PowerShell Set-Content / Get-Content to modify i18n JSON files.
@@ -142,23 +142,40 @@ ux_global:
     priority: P3
 
   - id: UX-02
-    name: "Flexible theme system (light/dark toggle + accent color)"
+    name: "Flexible theme system (light/dark toggle)"
     status: TODO
     effort: XL
-    priority: P3
+    priority: P2
     subtasks:
       - "Theme toggle UI component (header)"
-      - "CSS custom properties refactor for accent/dominant color"
-      - "Light theme variant CSS"
+      - "Light (but not too 'bright') theme variant CSS"
       - "Persist choice (localStorage)"
-      - "Accent color picker UI"
 
   - id: UX-03
     name: "Update theme file for new flexibility"
     status: TODO
     effort: M
-    priority: P3
+    priority: P2
     deps: [UX-02]
+
+  - id: UX-04
+    name: "Responsive design improvements"
+    status: DONE
+    effort: M
+    priority: P2
+    subtasks:
+      - "Dashboard ; improve analysis button layouts (Re-try, Send notification, Monitor, Deepen with AI)"
+      - "Rules ; hamburger menu show the list of pages too low in the view, not in the same place as when openened in other pages"
+      - "Rules ; Horizontal scrolling is currently possible as buttons and texts don't shrink or re-arrange properly"
+      - "Rules ; Update the auto-learn tile to be the same as the Monitor view, with the same auto-refresh feature."
+      - "Modal view for rules configuration ; Doesn't adapt for mobile expence."
+      - "Monitor ; Key-words list in too narrow and could use the horizontal space. I believe their is 2 hiden column, one for the rule informations and one for the buttons (edit and delete). This is good in principle but doesnt translate well in mobile viewport"
+      - "Monitor ; Improve analysis button layouts (Re-try, Send notification, Monitor, Deepen with AI)"
+      - "Log Chat ; The bottom panel that contains the prompt field should always be visibles without need to scroll down, however high the user scrolls up"
+      - "Log Chat ; The Chat setting modal is not currently designed for mobile viewport. It also appears too high and the top part of it is hidden behind the header.
+      - "Meta-analysis ; Only for mobile viewport, show the preview of pending data in form of a grid of tiles that opens in large when clicked."
+      - "Configuration ; Only for mobile viewport, expand the width of the tiles to fit the horitzontal space."
+
 
 # ─────────────────────────────────────────────
 # DASHBOARD
@@ -293,6 +310,18 @@ chat:
           Contains: current datetime, selected lang, platform description,
           monitored log files list with custom prompts,
           instruction for direct/concise responses.
+
+  - id: CHAT-09
+    name: "Context compression UX and flow improvement"
+    status: TODO
+    effort: M
+    priority: P1
+    subtasks:
+      - "After one context compression occurs, the second time that it is needed, include the previous compression as context. So on".
+      - "Each compressed context bubble should stay in the chat, were they where generated. "
+      - "After the user has chosen a compression method, it can be kept as default for the conversation, unless the user chooses another compression method or cancels the auto-choice"
+      - "When a compression is triggered by the fact that the context is full, and the user tries to ask another question, the question should be sent automatically AFTER the compression context is received."
+      
 
 # ─────────────────────────────────────────────
 # MONITOR
@@ -578,3 +607,9 @@ bugs:
     priority: P0
     notes: |
       Currently the firt refinement shows the list of keywords. If the first is rejected, the refined keywords are not shown in the notification.
+
+  - id: BUG-05
+    name: "Configuration, Ollama section, in the model list, the option 'Other' doesn't have a proper text and is visible as 'config.option_option'"
+    status: DONE
+    effort: S
+    priority: P0
