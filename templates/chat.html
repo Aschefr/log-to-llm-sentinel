@@ -353,6 +353,23 @@
     background: rgba(239, 68, 68, 0.1);
 }
 
+/* Mobile : bouton delete toujours visible (pas de hover touch) */
+@media (hover: none), (max-width: 768px) {
+    .conv-item .delete-chat-btn {
+        opacity: 0.55;       /* discret mais visible */
+        min-width: 36px;     /* zone tactile confortable */
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .conv-item .delete-chat-btn:active {
+        opacity: 1;
+        color: var(--danger);
+        background: rgba(239, 68, 68, 0.15);
+    }
+}
+
 .conv-item:hover {
     background: rgba(255,255,255,0.05);
 }
@@ -506,28 +523,50 @@
 
 .chat-input-wrapper {
     display: flex;
-    gap: 1rem;
+    gap: 0.75rem;
     background: var(--bg-secondary);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 0.75rem;
     padding: 0.5rem;
-    align-items: flex-end;
+    align-items: flex-end;   /* ancre tous les enfants en bas pendant l'agrandissement */
     box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
+/* Bouton sidebar dans la barre de saisie */
+.chat-input-wrapper .chat-sidebar-toggle {
+    flex-shrink: 0;
+    align-self: flex-end;
+    margin-bottom: 0.15rem;
+}
+
 .chat-input-wrapper textarea {
-    flex: 1;
+    flex: 1 1 auto;   /* peut grandir ET rétrécir */
+    min-width: 0;     /* CRITIQUE : empêche le débordement flex */
     background: transparent;
     border: none;
     color: var(--text-primary);
-    padding: 0.5rem;
+    padding: 0.5rem 0.25rem;
     resize: none;
     font-family: inherit;
     font-size: 1rem;
+    line-height: 1.5;
+    max-height: 180px;   /* textarea ne grossit pas indéfiniment */
+    overflow-y: auto;
+    align-self: center;
 }
 
 .chat-input-wrapper textarea:focus {
     outline: none;
+}
+
+/* Bouton Envoyer/Arrêter — ancré en bas, ne rétrécit jamais */
+#send-btn {
+    flex-shrink: 0;
+    align-self: flex-end;
+    white-space: nowrap;
+    min-width: 90px;
+    height: 38px;
+    padding: 0 1rem;
 }
 
 .chat-disclaimer {
@@ -608,10 +647,29 @@
     opacity: 0.45;
     padding: 0 0.25rem;
     user-select: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
 }
 
-.message-wrapper.user .msg-label { text-align: right; }
-.message-wrapper.assistant .msg-label { text-align: left; }
+.message-wrapper.user .msg-label  { flex-direction: row-reverse; text-align: right; }
+.message-wrapper.assistant .msg-label { flex-direction: row; text-align: left; }
+
+/* Timestamp discret sur chaque bulle */
+.msg-time {
+    font-size: 0.65rem;
+    font-weight: 400;
+    font-family: monospace;
+    letter-spacing: 0;
+    text-transform: none;
+    opacity: 0.75;
+}
+.msg-time::before {
+    content: '·';
+    margin-right: 0.25rem;
+    opacity: 0.6;
+}
+
 
 /* Edit mode : surligner l'input */
 .chat-input-wrapper.editing {
@@ -726,14 +784,38 @@
     .chat-header { padding: 0.75rem 1rem; }
     .chat-messages-container { padding: 1rem; gap: 1rem; }
     .message-bubble { max-width: 95%; }
-    .chat-input-wrapper { flex-direction: row; gap: 0.5rem; }
-    .chat-input-wrapper textarea { flex: 1; width: auto; }
     .chat-footer { padding: 0.75rem; }
 
+    /* ── Barre de saisie mobile ── */
+    .chat-input-wrapper {
+        gap: 0.4rem;
+        padding: 0.4rem 0.5rem;
+        align-items: center;   /* boutons centrés verticalement */
+    }
+    .chat-input-wrapper textarea {
+        font-size: 0.9rem;
+        padding: 0.4rem 0.2rem;
+        min-height: 48px;      /* 2 lignes visibles → placeholder complet */
+        align-self: center;    /* centrer verticalement dans le wrapper */
+    }
+    /* Bouton sidebar compact sur mobile (icône seule, padding réduit) */
+    .chat-input-wrapper .chat-sidebar-toggle {
+        padding: 0.3rem;
+        min-width: 34px;
+        justify-content: center;
+        align-self: center;    /* hérite du centre du wrapper */
+    }
+    #send-btn {
+        min-width: 78px;
+        font-size: 0.85rem;
+        padding: 0 0.65rem;
+        align-self: center;    /* hérite du centre du wrapper */
+    }
+
     .chat-page-container {
-        top: 50px; /* Shorter navbar on mobile */
-        height: calc(100dvh - 50px);
-        bottom: auto;
+        top: 50px;
+        bottom: 0;           /* ancré au bas du visual viewport */
+        height: auto;        /* laisse top+bottom déterminer la hauteur */
     }
     .conv-item { padding: 0.6rem 0.75rem; }
 }
@@ -827,8 +909,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const input = document.getElementById('chat-input');
     if (input) {
         input.addEventListener('input', function() {
+            const MAX_H = 180;
             this.style.height = 'auto';
-            this.style.height = (this.scrollHeight) + 'px';
+            this.style.height = Math.min(this.scrollHeight, MAX_H) + 'px';
             if (typeof updateContextBar === 'function') updateContextBar();
         });
         input.addEventListener('keydown', e => {
@@ -839,6 +922,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     }
 });
+
+// ── Clavier mobile : maintenir le footer de saisie visible ───────────────────
+// Quand le clavier virtuel s'ouvre, l'API visualViewport se réduit.
+// On force le scroll du footer dans le viewport visible.
+if (window.visualViewport) {
+    let _kbScrollTimer = null;
+    window.visualViewport.addEventListener('resize', () => {
+        // Annuler le debounce précédent
+        clearTimeout(_kbScrollTimer);
+        _kbScrollTimer = setTimeout(() => {
+            const footer = document.querySelector('.chat-footer');
+            const input  = document.getElementById('chat-input');
+            if (!footer || document.activeElement !== input) return;
+            // Scroller le footer en bas du viewport visible
+            footer.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }, 80); // petit délai pour laisser le clavier finir son animation
+    });
+}
 
 
 // ── CHAT-07: Context management ──────────────────────────────────────────────
@@ -948,6 +1049,14 @@ async function selectConversation(id) {
     document.getElementById('chat-interface').classList.remove('hidden');
     renderConversationList();
 
+    // Sur mobile : fermer le panneau des conversations après sélection
+    if (window.innerWidth <= 768) {
+        const sidebar = document.getElementById('chat-sidebar');
+        const overlay = document.getElementById('chat-sidebar-overlay');
+        if (sidebar) sidebar.classList.remove('open');
+        if (overlay) overlay.classList.remove('open');
+    }
+
     await loadHistory(id);
 }
 
@@ -1039,7 +1148,7 @@ async function loadHistory(id) {
                     <strong>${window.t('chat.analysis_context')} #${detectionId || '...'}</strong><br>
                     <code style="display:block; margin-top:0.5rem; opacity:0.8; font-size:0.8rem;">${escapeHtml(data.analysis.triggered_line)}</code>
                     <hr style="opacity:0.1; margin:0.75rem 0;">
-                    <div class="markdown-body" style="font-size:0.9rem;">${marked.parse(data.analysis.ollama_response)}</div>
+                    <div class="markdown-body" style="font-size:0.9rem;">${parseMd(data.analysis.ollama_response)}</div>
                     ${detectionId ? `
                     <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid rgba(255,255,255,0.08); display:flex; justify-content:flex-end;">
                         <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?search=${encodeURIComponent(detectionId)}'" title="${window.t ? window.t('common.view_in_monitor') : 'Afficher dans Monitor'}">
@@ -1070,9 +1179,9 @@ async function loadHistory(id) {
             
             // Truncated messages: dimmed styling
             if (isTruncatedMsg) {
-                html += `<div style="opacity: 0.35;">${buildMessageWrapper(m.role, m.content, i, m.id)}</div>`;
+                html += `<div style="opacity: 0.35;">${buildMessageWrapper(m.role, m.content, i, m.id, m.created_at)}</div>`;
             } else {
-                html += buildMessageWrapper(m.role, m.content, i, m.id);
+                html += buildMessageWrapper(m.role, m.content, i, m.id, m.created_at);
             }
         });
         
@@ -1083,6 +1192,8 @@ async function loadHistory(id) {
         }
         
         container.innerHTML = html;
+        // Appliquer KaTeX sur toutes les bulles de la vue chargée
+        container.querySelectorAll('.markdown-body').forEach(el => renderMath(el));
         container.scrollTop = container.scrollHeight;
 
         // Après le rendu de l'historique, vérifier si une génération est en cours.
@@ -1161,6 +1272,35 @@ function handleSendOrStop() {
 
 // ── Fonctions utilitaires pour les bulles de message ─────────────────────────
 
+/**
+ * Applique KaTeX sur un élément DOM après insertion.
+ * Reconnaît $$...$$ (display) et $...$ (inline).
+ * @param {Element} el - Le nœud DOM sur lequel appliquer KaTeX.
+ */
+function renderMath(el) {
+    if (!el || typeof renderMathInElement === 'undefined') return;
+    try {
+        renderMathInElement(el, {
+            delimiters: [
+                { left: '$$', right: '$$', display: true },
+                { left: '$',  right: '$',  display: false },
+                { left: '\\[', right: '\\]', display: true },
+                { left: '\\(', right: '\\)', display: false }
+            ],
+            throwOnError: false,   // afficher l'erreur inline sans crasher
+            trust: false
+        });
+    } catch(e) { /* KaTeX pas encore chargé (defer) — silencieux */ }
+}
+
+/**
+ * Convertit du markdown en HTML, puis rend les formules KaTeX sur l'élément cible.
+ * Utilisation : el.innerHTML = marked.parse(text); renderMath(el);
+ */
+function parseMd(text) {
+    return marked.parse(text || '');
+}
+
 /** Échappe une chaîne pour l'injection dans un attribut HTML data-* */
 function escapeAttr(s) {
     // Dans un attribut HTML data-text="...", on n'a besoin que d'entités HTML.
@@ -1216,20 +1356,48 @@ function userActionsHtml(text, msgId) {
 }
 
 /**
+ * Formate un timestamp ISO en label relatif et lisible.
+ * - Aujourd'hui    → "20:15"
+ * - Hier           → "hier\xa020:15"
+ * - Autre jour     → "02/05\xa020:15"
+ */
+function formatMsgTime(isoStr) {
+    if (!isoStr) return '';
+    const d = new Date(isoStr);
+    if (isNaN(d)) return '';
+    const now = new Date();
+    const hh = d.getHours().toString().padStart(2, '0');
+    const mm = d.getMinutes().toString().padStart(2, '0');
+    const time = `${hh}:${mm}`;
+    const todayStr = now.toDateString();
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === todayStr) return time;
+    if (d.toDateString() === yesterday.toDateString()) return `hier\xa0${time}`;
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    return `${day}/${month}\xa0${time}`;
+}
+
+/**
  * Construit un wrapper de message avec bulle + boutons d'action.
  * @param {'user'|'assistant'} role
  * @param {string} content - texte brut (markdown pour assistant, texte pour user)
- * @param {number|null} index - index dans l'historique (pour détecter le dernier message)
+ * @param {number|null} index - index dans l'historique
  * @param {number|null} msgId - ID DB du message (null pour les bulles générées en live)
+ * @param {string|null} timestamp - ISO date string du message
  */
-function buildMessageWrapper(role, content, index, msgId = null) {
+function buildMessageWrapper(role, content, index, msgId = null, timestamp = null) {
     const isUser = role === 'user';
+    const timeStr = formatMsgTime(timestamp);
+    const timeHtml = timeStr
+        ? ` <span class="msg-time">${timeStr}</span>`
+        : '';
     const label = isUser
-        ? `<div class="msg-label">${window.t ? window.t('chat.label_user') : 'Vous'}</div>`
-        : `<div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'}</div>`;
+        ? `<div class="msg-label">${window.t ? window.t('chat.label_user') : 'Vous'}${timeHtml}</div>`
+        : `<div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'}${timeHtml}</div>`;
     const bubbleHtml = isUser
         ? `<div class="message-bubble user"><div class="markdown-body">${escapeHtml(content)}</div></div>`
-        : `<div class="message-bubble assistant"><div class="markdown-body">${marked.parse(content)}</div></div>`;
+        : `<div class="message-bubble assistant"><div class="markdown-body">${parseMd(content)}</div></div>`;
     const actionsHtml = isUser ? userActionsHtml(content, msgId) : aiActionsHtml(content, msgId);
     const dataId = msgId ? ` data-msg-id="${msgId}"` : '';
     return `<div class="message-wrapper ${role}"${dataId}>${label}${bubbleHtml}${actionsHtml}</div>`;
@@ -1356,7 +1524,7 @@ async function confirmEdit(btn) {
 
     // Ajouter la bulle utilisateur éditée
     const userDiv = document.createElement('div');
-    userDiv.innerHTML = buildMessageWrapper('user', newText, null);
+    userDiv.innerHTML = buildMessageWrapper('user', newText, null, null, new Date().toISOString());
     container.appendChild(userDiv.firstElementChild);
     container.scrollTop = container.scrollHeight;
 
@@ -1385,8 +1553,10 @@ async function _triggerGeneration(content) {
     const aiWrapper = document.createElement('div');
     aiWrapper.className = 'message-wrapper assistant';
     aiWrapper.id = 'streaming-wrapper';
+    const _trigNow = new Date().toISOString();
+    const _trigTimeHtml = `<span class="msg-time">${formatMsgTime(_trigNow)}</span>`;
     aiWrapper.innerHTML = `
-        <div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'}</div>
+        <div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'} ${_trigTimeHtml}</div>
         <div class="message-bubble assistant" id="streaming-ai">
             <div class="thinking-state">
                 <span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span>
@@ -1455,15 +1625,17 @@ async function sendMessage(force = false) {
     
     // Bulle utilisateur avec actions
     const userWrapper = document.createElement('div');
-    userWrapper.innerHTML = buildMessageWrapper('user', content, null);
+    userWrapper.innerHTML = buildMessageWrapper('user', content, null, null, new Date().toISOString());
     container.appendChild(userWrapper.firstElementChild);
 
     // Bulle IA en attente (streaming)
     const aiWrapper = document.createElement('div');
     aiWrapper.className = 'message-wrapper assistant';
     aiWrapper.id = 'streaming-wrapper';
+    const _aiNow = new Date().toISOString();
+    const _aiTimeHtml = `<span class="msg-time">${formatMsgTime(_aiNow)}</span>`;
     aiWrapper.innerHTML = `
-        <div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'}</div>
+        <div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'} ${_aiTimeHtml}</div>
         <div class="message-bubble assistant" id="streaming-ai">
             <div class="thinking-state">
                 <span class="thinking-dot"></span>
@@ -1539,7 +1711,7 @@ async function readStream(taskId, fromPos, signal) {
                 <span class="thinking-dot"></span><span class="thinking-dot"></span><span class="thinking-dot"></span>
                 <span style="margin-left:0.5rem; opacity:0.7; font-size:0.9rem;">${window.t('chat.thinking')}</span>
             </div>
-            <div class="markdown-body">${_streamFullText ? marked.parse(_streamFullText) : ''}</div>
+            <div class="markdown-body">${_streamFullText ? parseMd(_streamFullText) : ''}</div>
         `;
         if (container) container.appendChild(aiBubble);
     }
@@ -1578,13 +1750,16 @@ async function readStream(taskId, fromPos, signal) {
                         if (thinkingState) thinkingState.style.display = 'none';
                         _streamFullText += evt.text;
                         _streamPos = evt.pos ?? (_streamPos + 1);
-                        aiContent.innerHTML = marked.parse(_streamFullText);
+                        aiContent.innerHTML = parseMd(_streamFullText);
+                        renderMath(aiContent);
                         if (container) container.scrollTop = container.scrollHeight;
                         if (typeof updateContextBar === 'function') updateContextBar(_streamFullText);
                     }
                     if (evt.done) {
                         // Génération terminée : finaliser la bulle avec boutons d'action
                         const finalText = _streamFullText;
+                        // Rendu KaTeX final (certaines formules peuvent être incomplètes en cours de stream)
+                        renderMath(aiContent);
                         const wrapper = document.getElementById('streaming-wrapper') || aiBubble.closest('.message-wrapper');
                         if (wrapper) {
                             wrapper.removeAttribute('id');
