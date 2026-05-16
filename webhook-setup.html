@@ -250,8 +250,9 @@
                 type_docker: "🐳 Docker Logs",
                 placeholder_results: "Collez le résultat ici...",
                 btn_generate: "Générer",
+                step3_title: "Sentinel",
                 step3_warning: "Collez uniquement l'URL (ex: http://...), pas la commande curl entière.",
-                step4_title: "Résultat",
+                step4_title: "Installation & Santé",
                 final_start: "🚀 Script de transfert",
                 final_stop: "🛑 Arrêt global",
                 final_health: "🏥 Santé du système",
@@ -272,8 +273,9 @@
                 type_docker: "🐳 Docker Logs",
                 placeholder_results: "Paste results here...",
                 btn_generate: "Generate",
+                step3_title: "Sentinel",
                 step3_warning: "Paste only the URL (ex: http://...), not the entire curl command.",
-                step4_title: "Ready!",
+                step4_title: "Installation & Health",
                 final_start: "🚀 Forwarding Script",
                 final_stop: "🛑 Global Stop",
                 final_health: "🏥 System Health",
@@ -307,7 +309,7 @@
 
         function selectPlatform(p) {
             state.platform = p;
-            document.querySelectorAll('.platform-btn').forEach(b => b.classList.toggle('selected', b.id === 'btn-' + p));
+            document.querySelectorAll('#step-0 .platform-btn').forEach(b => b.classList.toggle('selected', b.id === 'btn-' + p));
             if (p === 'windows') {
                 setLogType('file');
                 document.getElementById('btn-type-docker').style.display = 'none';
@@ -346,21 +348,31 @@
             const lines = val.split('\n').filter(l => l.trim().length > 0);
             const found = [];
 
-            lines.forEach(line => {
-                const pathMatch = line.match(/([a-zA-Z]:\\[^ \n]+|\/[^ \n]+)/);
-                if (!pathMatch) return;
+            if (state.logType === 'docker') {
+                // Docker mode: each line = container name
+                lines.forEach(line => {
+                    const name = line.trim();
+                    if (!name || name.startsWith('root@') || name.startsWith('$')) return;
+                    found.push({ path: name, html: `🐳 <strong>${name}</strong>` });
+                });
+            } else {
+                // File mode: parse paths
+                lines.forEach(line => {
+                    const pathMatch = line.match(/([a-zA-Z]:\\[^\n]+?\.log[^ \n]*|\/[^ \n]+)/i);
+                    if (!pathMatch) return;
 
-                const path = pathMatch[0];
-                if (!path.toLowerCase().includes('.log')) return;
+                    const path = pathMatch[0];
+                    if (!path.toLowerCase().includes('.log')) return;
 
-                const metaMatch = line.match(/([0-9]+[.,]?[0-9]*[KMG]) +([a-z.\-]+ +[0-9]+ +[0-9:]+)/i);
-                let meta = '';
-                if (metaMatch) {
-                    meta = `<span style="color:var(--accent); font-size:0.85rem; margin-right:1rem;">[${metaMatch[1]} - ${metaMatch[2]}]</span>`;
-                }
+                    const metaMatch = line.match(/([0-9]+[.,]?[0-9]*[KMG]) +([a-z.\-]+ +[0-9]+ +[0-9:]+)/i);
+                    let meta = '';
+                    if (metaMatch) {
+                        meta = `<span style="color:var(--accent); font-size:0.85rem; margin-right:1rem;">[${metaMatch[1]} - ${metaMatch[2]}]</span>`;
+                    }
 
-                found.push({ path, html: meta + path });
-            });
+                    found.push({ path, html: meta + path });
+                });
+            }
 
             const unique = [];
             const seen = new Set();
