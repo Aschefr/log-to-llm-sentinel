@@ -131,6 +131,11 @@ async def receive_logs(rule_id_or_token: str, request: Request, db: Session = De
         buf.append(s)
     _append_to_disk(token, stamped)
 
+    # Mettre à jour la date de dernière ligne reçue et réinitialiser le statut d'inactivité (MON-14 & MON-15)
+    rule.last_line_received_at = datetime.utcnow()
+    rule.inactivity_notified = False
+    db.commit()
+
     await _orchestrator.handle_new_lines(rule, lines)
     
     return {"status": "ok", "lines_received": len(lines)}
