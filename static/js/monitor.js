@@ -279,6 +279,11 @@ function renderTabContent(rule) {
                 <strong>📊 ${window.t ? window.t('monitor.recent_analyses_llm') : 'Recent Analyses (LLM)'}</strong>
             </span>
             <div class="monitor-analyses-filters" onclick="event.stopPropagation()">
+                ${rule.unviewed_count > 0 ? `
+                <button class="btn btn-secondary btn-sm btn-mark-all-read" onclick="markAllAnalysesAsViewed(${rule.id}, this)" style="margin-right: 0.75rem; padding: 0.15rem 0.5rem; font-size: 0.75rem; line-height: 1;">
+                    ✓ ${window.t ? window.t('monitor.mark_all_read') : 'Tout marquer comme lu'}
+                </button>
+                ` : ''}
                 <span class="filter-badge ${!monitorAnalysesSeverity ? 'active' : ''}" onclick="filterMonitorAnalyses(${rule.id}, null)">Total: ${rule.stats?.total || 0}</span>
                 <span class="filter-badge critical ${monitorAnalysesSeverity === 'critical' ? 'active' : ''}" onclick="filterMonitorAnalyses(${rule.id}, 'critical')">${window.t('dashboard.critical')}: ${rule.stats?.critical || 0}</span>
                 <span class="filter-badge warning ${monitorAnalysesSeverity === 'warning' ? 'active' : ''}" onclick="filterMonitorAnalyses(${rule.id}, 'warning')">${window.t('dashboard.warning')}: ${rule.stats?.warning || 0}</span>
@@ -1048,3 +1053,20 @@ async function _renderAutolearnStatus(ruleId, sessionId) {
         return isDone;
     } catch { return false; }
 }
+
+async function markAllAnalysesAsViewed(ruleId, btn) {
+    if (btn) btn.disabled = true;
+    try {
+        await apiFetch(`/api/monitor/rules/${ruleId}/view-all`, { method: 'POST' });
+        const rule = monitorRules.find(r => r.id === ruleId);
+        if (rule) {
+            rule.unviewed_count = 0;
+            renderTabs();
+            renderTabContent(rule);
+        }
+    } catch (e) {
+        console.error("Failed to mark all as read:", e);
+        if (btn) btn.disabled = false;
+    }
+}
+

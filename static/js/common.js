@@ -438,6 +438,10 @@ function renderAnalysisCard(a, opts = {}) {
     const collapsedCls = collapsed ? ' collapsed' : '';
     const toggleArrow = collapsed ? '▶' : '▼';
 
+    const isUnread = a.viewed === false || a.viewed === 0;
+    const unreadCls = isUnread ? ' unread' : '';
+    const unreadIndicator = isUnread ? `<span class="unread-dot-indicator" title="${_t('monitor.unviewed_tooltip', 'Non consultée')}">●</span>` : '';
+
     // Keywords summary for collapsed header
     const kwSummary = collapsed && a.matched_keywords?.length
         ? `<span class="analysis-kw-summary">${a.matched_keywords.slice(0,3).map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('')}${a.matched_keywords.length > 3 ? `<span class="log-kw-badge">+${a.matched_keywords.length - 3}</span>` : ''}</span>`
@@ -459,7 +463,7 @@ function renderAnalysisCard(a, opts = {}) {
         : '';
 
     return `
-    <div class="${cardClass}${collapsedCls}" id="analysis-card-${a.id}">
+    <div class="${cardClass}${collapsedCls}${unreadCls}" id="analysis-card-${a.id}">
         <div class="analysis-header" onclick="toggleAnalysisCardGeneric(event, this.parentElement)" style="cursor: pointer;">
             <div>
                 <span class="collapse-toggle">${toggleArrow}</span>
@@ -467,6 +471,7 @@ function renderAnalysisCard(a, opts = {}) {
                 ${a.detection_id ? `<span class="detection-id-badge" style="margin-left:0.5rem">#${escapeHtml(a.detection_id)}</span>` : ''}
                 <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
                 <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                ${unreadIndicator}
             </div>
             <div class="analysis-actions">
                 ${kwSummary}
@@ -503,6 +508,14 @@ async function markAnalysisAsViewed(analysisId) {
     try {
         await apiFetch(`/api/monitor/analyses/${analysisId}/view`, { method: 'POST' });
         
+        // Remove unread visual markers instantly
+        const card = document.getElementById(`analysis-card-${analysisId}`);
+        if (card) {
+            card.classList.remove('unread');
+            const dot = card.querySelector('.unread-dot-indicator');
+            if (dot) dot.remove();
+        }
+
         // If on the monitor page, decrement local unviewed count and re-render tabs
         if (typeof activeRuleId !== 'undefined' && activeRuleId !== null) {
             if (typeof monitorRules !== 'undefined' && Array.isArray(monitorRules)) {

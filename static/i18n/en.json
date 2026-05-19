@@ -180,7 +180,8 @@
         "activity_normal": "Activity normal",
         "inactivity_tracking": "Inactivity tracking",
         "excluded_filter": "Exclusion filter",
-        "unviewed_tooltip": "Unviewed analyses"
+        "unviewed_tooltip": "Unviewed analyses",
+        "mark_all_read": "Mark all as read"
     },
     "chat": {
         "title": "AI Analysis Center",

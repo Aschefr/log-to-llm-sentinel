@@ -552,6 +552,26 @@ body {
 .analysis-card.collapsed .analysis-header { margin-bottom: 0; }
 .analysis-card.collapsed { opacity: 0.85; }
 .analysis-card.collapsed:hover { opacity: 1; }
+
+.analysis-card.unread {
+    border-left: 4px solid var(--accent) !important;
+    background: rgba(99, 102, 241, 0.03);
+}
+[data-theme="light"] .analysis-card.unread {
+    background: rgba(79, 70, 229, 0.02);
+}
+.unread-dot-indicator {
+    color: var(--accent);
+    margin-left: 0.5rem;
+    font-size: 0.8rem;
+    vertical-align: middle;
+    animation: unreadPulse 2s infinite;
+}
+@keyframes unreadPulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
+}
 .analysis-footer { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
 .collapse-toggle { font-size: 0.7rem; margin-right: 0.5rem; color: var(--text-secondary); }
 

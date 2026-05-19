@@ -136,6 +136,19 @@ def mark_analysis_viewed(analysis_id: int):
         db.close()
 
 
+@router.post("/rules/{rule_id}/view-all")
+def mark_all_analyses_viewed(rule_id: int):
+    """Marque toutes les analyses d'une règle comme consultées/lues."""
+    db = SessionLocal()
+    try:
+        db.query(Analysis).filter(Analysis.rule_id == rule_id, Analysis.viewed == False).update({Analysis.viewed: True})
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
+
+
 
 @router.get("/buffer/{rule_id}")
 def get_buffer_status(rule_id: int):
@@ -204,6 +217,7 @@ def get_rule_analyses(rule_id: int, limit: int = Query(20)):
                 "severity": a.severity,
                 "ollama_response": a.ollama_response,
                 "notified": a.notified,
+                "viewed": a.viewed,
                 "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
             }
             for a in analyses
@@ -234,6 +248,7 @@ def search_by_detection_id(id: str = Query(..., description="ID de détection à
                 "severity": analysis.severity,
                 "ollama_response": analysis.ollama_response,
                 "notified": analysis.notified,
+                "viewed": analysis.viewed,
                 "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
             }
         }

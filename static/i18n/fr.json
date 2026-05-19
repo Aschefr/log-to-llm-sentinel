@@ -180,7 +180,8 @@
         "activity_normal": "Activité normale",
         "inactivity_tracking": "Suivi d'inactivité",
         "excluded_filter": "Filtre d'exclusion",
-        "unviewed_tooltip": "Analyses non consultées"
+        "unviewed_tooltip": "Analyses non consultées",
+        "mark_all_read": "Tout marquer comme lu"
     },
     "chat": {
         "title": "Centre d'Analyse IA",

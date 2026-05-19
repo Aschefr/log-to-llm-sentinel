@@ -94,6 +94,7 @@ def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = 
                 "ollama_response": a.ollama_response,
                 "severity": a.severity,
                 "detection_id": a.detection_id,
+                "viewed": a.viewed,
                 "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
                 "matched_keywords": _json.loads(a.matched_keywords_json) if a.matched_keywords_json else [],
             }
