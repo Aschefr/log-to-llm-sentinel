@@ -212,6 +212,8 @@ async function loadConfig() {
         document.getElementById('notification-method').value = config.notification_method || 'smtp';
         document.getElementById('apprise-url').value = config.apprise_url || '';
         document.getElementById('apprise-max-chars').value = config.apprise_max_chars || 1900;
+        const discordMaxEl = document.getElementById('discord-max-chars');
+        if (discordMaxEl) discordMaxEl.value = config.apprise_max_chars || 1900;
         const discordEl = document.getElementById('discord-webhook-url');
         if (discordEl) discordEl.value = config.discord_webhook_url || '';
         document.getElementById('max-log-chars').value = config.max_log_chars || 5000;
@@ -671,7 +673,9 @@ async function saveConfig(messageEl, isAutoSave = false) {
         apprise_tags: (document.getElementById('apprise-tags-select').value === '__custom__') 
             ? document.getElementById('apprise-tags').value 
             : document.getElementById('apprise-tags-select').value,
-        apprise_max_chars: parseInt(document.getElementById('apprise-max-chars').value) || 1900,
+        apprise_max_chars: (document.getElementById('notification-method').value === 'discord')
+            ? (parseInt(document.getElementById('discord-max-chars').value) || 1900)
+            : (parseInt(document.getElementById('apprise-max-chars').value) || 1900),
         discord_webhook_url: document.getElementById('discord-webhook-url') ? document.getElementById('discord-webhook-url').value : '',
         max_log_chars: parseInt(document.getElementById('max-log-chars').value) || 5000,
         monitor_log_lines: parseInt(document.getElementById('monitor-log-lines').value) || 60,
@@ -764,10 +768,16 @@ window.setAppriseMax = (val) => {
     const input = document.getElementById('apprise-max-chars');
     if (input) {
         input.value = val;
-        // Trigger save if auto-save is enabled
         input.dispatchEvent(new Event('input'));
     }
+    const inputD = document.getElementById('discord-max-chars');
+    if (inputD) {
+        inputD.value = val;
+        inputD.dispatchEvent(new Event('input'));
+    }
 }
+
+window.setDiscordMax = window.setAppriseMax;
 
 function setupMaintenance() {
     const retentionSelect = document.getElementById('retention-period');

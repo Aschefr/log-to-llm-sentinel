@@ -376,7 +376,7 @@ class MetaAnalysisService:
         
         notify_body = body_html
 
-        if global_cfg.notification_method == "apprise":
+        if global_cfg.notification_method in ("apprise", "discord"):
             notify_body = f"""### 📊 {nt('meta_title', lang)} : {config.name}
 **{nt('period', lang)}:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
 **{nt('events_analyzed', lang)}:** {result.analyses_count}
@@ -434,4 +434,6 @@ class MetaAnalysisService:
             "notification_method": global_cfg.notification_method,
             "apprise_url": global_cfg.apprise_url,
             "apprise_tags": global_cfg.apprise_tags,
+            "apprise_max_chars": global_cfg.apprise_max_chars or 1900,
+            "discord_webhook_url": global_cfg.discord_webhook_url or "",
         })

@@ -615,3 +615,12 @@ bugs:
     status: DONE
     effort: S
     priority: P0
+
+  - id: BUG-06
+    name: "Align Discord notification character limits and Ollama-based AI summarization with Apprise"
+    status: DONE
+    effort: S
+    priority: P0
+    notes: |
+      Symptom: In Discord notification method, the character limit checks and Ollama-based AI summarization before sending were missing. Also, the configuration page lacked a character limit input for Discord.
+      Fix: Unified the formatting (Markdown instead of HTML) and character limit summarization logic for both Discord and Apprise across all notification vectors (Orchestrator log alerts, MetaAnalysis reports, Watcher inactivity alerts, and Rule test endpoints). Added a dedicated character limit input in the Discord configuration UI section, automatically synchronized with apprise_max_chars.

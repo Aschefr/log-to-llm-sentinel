@@ -181,6 +181,8 @@ async def lifespan(app: FastAPI):
                                         "smtp_recipient": config.smtp_recipient, "smtp_tls": config.smtp_tls,
                                         "smtp_ssl_mode": config.smtp_ssl_mode, "notification_method": config.notification_method,
                                         "apprise_url": config.apprise_url, "apprise_tags": config.apprise_tags,
+                                        "apprise_max_chars": config.apprise_max_chars if config.apprise_max_chars is not None else 1900,
+                                        "discord_webhook_url": config.discord_webhook_url if config.discord_webhook_url is not None else "",
                                         "debug_mode": config.debug_mode,
                                     }
                                     try:

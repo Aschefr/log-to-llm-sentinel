@@ -277,11 +277,19 @@ async def test_rule(rule_id: int, request: Request):
             "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
             "ollama_url": config.ollama_url if config and config.ollama_url else "http://ollama:11434",
             "ollama_model": config.ollama_model if config and config.ollama_model else "gemma4:e4b",
+            "ollama_temp": config.ollama_temp if config else 0.1,
+            "ollama_ctx": config.ollama_ctx if config else 4096,
+            "ollama_think": config.ollama_think if config else True,
             "system_prompt": config.system_prompt if config else "",
             "notification_method": config.notification_method if config else "smtp",
             "apprise_url": config.apprise_url if config else "",
             "apprise_tags": config.apprise_tags if config else "",
+            "apprise_max_chars": config.apprise_max_chars if config else 1900,
             "debug_mode": config.debug_mode if config else False,
+            "discord_webhook_url": config.discord_webhook_url if config else "",
+            "ollama_prompt_lang": config.ollama_prompt_lang if config else "fr",
+            "site_lang": config.site_lang if config else "fr",
+            "instance_name": config.instance_name if config else "",
         }
 
         cleaned_context = [clean_log_line(l) for l in last_lines[:-1]]
@@ -348,21 +356,36 @@ async def test_rule(rule_id: int, request: Request):
             notifier = NotificationService()
             subject = f"[Sentinel TEST] Alerte {severity.upper()} : {rule.name}"
             
-            body = f"""
-            <h2>🧪 Test Log to LLM Sentinel</h2>
-            <p><strong>Règle:</strong> {rule.name}</p>
-            <p><strong>Ligne déclenchante:</strong> <code>{last_line}</code></p>
-            <p><strong>Analyse Ollama:</strong></p>
-            <blockquote>{response}</blockquote>
-            <p><strong>Sévérité:</strong> {severity}</p>
-            <hr><p><em>Ceci est un test manuel depuis l'interface Log to LLM Sentinel.</em></p>
-            """
+            lang = config_dict.get("site_lang", "fr")
+            # Si Apprise ou Discord, on prépare une version Markdown plus lisible
+            if config_dict.get("notification_method") in ("apprise", "discord"):
+                body = f"""### 🧪 Test Log to LLM Sentinel : {rule.name}
+**{nt('severity', lang)}:** {severity.upper()}
+
+**Ligne déclenchante:**
+`{last_line}`
+
+**Analyse Ollama:**
+{response}
+
+_Ceci est un test manuel depuis l'interface Log to LLM Sentinel._
+"""
+            else:
+                body = f"""
+                <h2>🧪 Test Log to LLM Sentinel</h2>
+                <p><strong>Règle:</strong> {rule.name}</p>
+                <p><strong>Ligne déclenchante:</strong> <code>{last_line}</code></p>
+                <p><strong>Analyse Ollama:</strong></p>
+                <blockquote>{response}</blockquote>
+                <p><strong>Sévérité:</strong> {severity}</p>
+                <hr><p><em>Ceci est un test manuel depuis l'interface Log to LLM Sentinel.</em></p>
+                """
 
             # Gestion du résumé IA si nécessaire
             max_chars = config_dict.get("apprise_max_chars", 1900)
             notify_body = body
 
-            if config_dict.get("notification_method") == "apprise" and len(body) > max_chars:
+            if config_dict.get("notification_method") in ("apprise", "discord") and len(body) > max_chars:
                 logger.debug("TestRule", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
                 summary_prompt = f"Résume cette analyse de log :\n{response}"
                 async with orchestrator._ollama_semaphore:
@@ -379,14 +402,14 @@ async def test_rule(rule_id: int, request: Request):
                     except asyncio.TimeoutError:
                         summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (60s)"
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
-                    notify_body = f"""
-                    <h2>🧪 Test Log to LLM Sentinel (Résumé)</h2>
-                    <p><strong>Règle:</strong> {rule.name}</p>
-                    <p><strong>Résumé:</strong></p>
-                    <blockquote>{summary}</blockquote>
-                    <p><strong>Sévérité:</strong> {severity}</p>
-                    <p><em>(Analyse complète disponible dans l'interface)</em></p>
-                    """
+                    notify_body = f"""### 🧪 Test Log to LLM Sentinel (Résumé) : {rule.name}
+**{nt('severity', lang)}:** {severity.upper()}
+
+**Résumé:**
+{summary}
+
+_(Analyse complète disponible dans l'interface)_
+"""
 
             try:
                 ok = notifier.send(subject, notify_body, config_dict)

@@ -138,6 +138,7 @@ class Orchestrator:
                 "max_log_chars": config.max_log_chars if config else 5000,
                 "debug_mode": config.debug_mode if config else False,
                 "instance_name": config.instance_name if config else "",
+                "discord_webhook_url": config.discord_webhook_url if config else "",
             }
 
             max_chars = config_dict.get("max_log_chars", 5000)
@@ -286,8 +287,8 @@ class Orchestrator:
         <p><strong>{nt('severity', lang)}:</strong> {severity.upper()}</p>
         """
         
-        # Si Apprise, on prépare une version plus lisible pour Discord/Telegram (souvent Markdown)
-        if config.get("notification_method") == "apprise":
+        # Si Apprise ou Discord, on prépare une version plus lisible pour Discord/Telegram (souvent Markdown)
+        if config.get("notification_method") in ("apprise", "discord"):
             body = f"""### {severity_emoji} {nt('alert', lang)} Sentinel : {rule.name}
 **ID:** `{detection_id or 'N/A'}` | **{nt('severity', lang)}:** {severity.upper()}
 **{nt('keywords', lang)}:** {', '.join(matched_keywords) if matched_keywords else 'N/A'}
@@ -304,7 +305,7 @@ class Orchestrator:
         notify_body = body
         lang = config.get("ollama_prompt_lang", "fr")
 
-        if config.get("notification_method") == "apprise" and len(body) > max_chars:
+        if config.get("notification_method") in ("apprise", "discord") and len(body) > max_chars:
             logger.debug("Notification", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
             summary_prompt = nt('summary_prompt', lang).format(max_chars=max_chars - 500, response=response)
             async with self._ollama_semaphore:
