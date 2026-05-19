@@ -66,7 +66,9 @@ class Analysis(Base):
     ollama_response = Column(Text)
     severity = Column(String, default="info")
     notified = Column(Boolean, default=False)
+    viewed = Column(Boolean, default=False)
     analyzed_at = Column(DateTime, server_default=func.now())
+
 
 
 class GlobalConfig(Base):

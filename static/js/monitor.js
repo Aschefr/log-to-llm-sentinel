@@ -81,16 +81,37 @@ async function loadMonitorRules() {
 
 function renderTabs() {
     const tabs = document.getElementById('monitor-tabs');
-    tabs.innerHTML = monitorRules.map(r => `
-        <button class="monitor-tab" id="tab-${r.id}" onclick="selectTab(${r.id})">
-            ${escapeHtml(r.name)}
-        </button>
-    `).join('') + `
+    if (!tabs) return;
+    tabs.innerHTML = monitorRules.map(r => {
+        const stats = r.stats || { critical: 0, warning: 0, info: 0 };
+        const unviewed = r.unviewed_count || 0;
+        
+        let badgesHtml = '';
+        if (stats.critical > 0 || stats.warning > 0 || stats.info > 0 || unviewed > 0) {
+            badgesHtml = `
+                <span class="tab-badges">
+                    ${stats.critical > 0 ? `<span class="tab-badge critical" title="${window.t ? window.t('dashboard.critical') : 'Critical'}: ${stats.critical}">${stats.critical}</span>` : ''}
+                    ${stats.warning > 0 ? `<span class="tab-badge warning" title="${window.t ? window.t('dashboard.warning') : 'Warning'}: ${stats.warning}">${stats.warning}</span>` : ''}
+                    ${stats.info > 0 ? `<span class="tab-badge info" title="${window.t ? window.t('dashboard.info') : 'Info'}: ${stats.info}">${stats.info}</span>` : ''}
+                    ${unviewed > 0 ? `<span class="tab-badge unviewed" title="${window.t ? window.t('monitor.unviewed_tooltip') : 'Analyses non consultées'}: ${unviewed}">${unviewed}</span>` : ''}
+                </span>
+            `;
+        }
+
+        const isActive = r.id === activeRuleId ? ' active' : '';
+        return `
+            <button class="monitor-tab${isActive}" id="tab-${r.id}" onclick="selectTab(${r.id})">
+                <span class="tab-name">${escapeHtml(r.name)}</span>
+                ${badgesHtml}
+            </button>
+        `;
+    }).join('') + `
         <button class="monitor-tab monitor-tab-add" onclick="openAddRuleModal()" title="${window.t ? window.t('monitor.add_rule') : 'Add rule'}">
             +
         </button>
     `;
 }
+
 
 function openAddRuleModal() {
     resetForm();
@@ -750,6 +771,9 @@ async function loadMonitorAnalyses(ruleId, severityFilter = null, resetList = tr
 
         if (resetList) {
             container.innerHTML = cards;
+            if (analyses.length > 0) {
+                markAnalysisAsViewed(analyses[0].id);
+            }
         } else {
             // Append (pagination)
             const showMoreBtn = container.querySelector('.monitor-show-more');
@@ -873,6 +897,7 @@ async function searchById() {
                 })}
             </div>
         `;
+        markAnalysisAsViewed(a.id);
     } catch (e) {
         resultPanel.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</div>`;
     }

@@ -67,7 +67,9 @@ def init_db():
             compressed_at DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""",
+        "ALTER TABLE analyses ADD COLUMN viewed BOOLEAN DEFAULT 0",
     ]
+
     with engine.connect() as conn:
         for sql in migrations:
             try:

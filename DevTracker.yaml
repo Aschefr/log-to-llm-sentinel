@@ -419,6 +419,14 @@ monitor:
     priority: P1
     notes: "Currently, clicking on the text collapse the panel. I would like to be able to select text for copy-paste. Only the top part of the panel (the header) should be clickable to collapse/expand the panel should collapse/expand."
 
+  - id: MON-17
+    name: "Afficher le nombre de détections et d'analyses non consultées sur les onglets des règles"
+    status: DONE
+    effort: M
+    priority: P1
+    notes: "A côté du nom des onglets des différentes règles, afficher le nombre de détections avec leurs criticité, ainsi que le nombres d'analyses non consulté par l'utilisateur."
+    files: [app/models.py, app/database.py, app/routers/monitor.py, static/js/common.js, static/js/monitor.js, static/css/style.css, static/i18n/fr.json, static/i18n/en.json]
+
 
 # ─────────────────────────────────────────────
 # META-ANALYSIS

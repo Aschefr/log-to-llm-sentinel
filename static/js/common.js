@@ -494,12 +494,50 @@ function renderAnalysisCard(a, opts = {}) {
     </div>`;
 }
 
+// Cache of viewed analysis IDs to avoid duplicate network requests
+const _viewedAnalysesCache = new Set();
+
+async function markAnalysisAsViewed(analysisId) {
+    if (!analysisId || _viewedAnalysesCache.has(analysisId)) return;
+    _viewedAnalysesCache.add(analysisId);
+    try {
+        await apiFetch(`/api/monitor/analyses/${analysisId}/view`, { method: 'POST' });
+        
+        // If on the monitor page, decrement local unviewed count and re-render tabs
+        if (typeof activeRuleId !== 'undefined' && activeRuleId !== null) {
+            if (typeof monitorRules !== 'undefined' && Array.isArray(monitorRules)) {
+                const rule = monitorRules.find(r => r.id === activeRuleId);
+                if (rule && rule.unviewed_count > 0) {
+                    rule.unviewed_count--;
+                    if (typeof renderTabs === 'function') {
+                        renderTabs();
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Failed to mark analysis as viewed:", e);
+        _viewedAnalysesCache.delete(analysisId);
+    }
+}
+
 function toggleAnalysisCardGeneric(event, card) {
     if (event.target.closest('button, a, .btn')) return;
-    card.classList.toggle('collapsed');
+    const isCollapsed = card.classList.toggle('collapsed');
     const toggle = card.querySelector('.collapse-toggle');
-    if (toggle) toggle.textContent = card.classList.contains('collapsed') ? '▶' : '▼';
+    if (toggle) toggle.textContent = isCollapsed ? '▶' : '▼';
+
+    if (!isCollapsed) {
+        const idAttr = card.id;
+        if (idAttr && idAttr.startsWith('analysis-card-')) {
+            const analysisId = parseInt(idAttr.replace('analysis-card-', ''));
+            if (!isNaN(analysisId)) {
+                markAnalysisAsViewed(analysisId);
+            }
+        }
+    }
 }
+
 /* ── Server Time Display ── */
 function updateServerTime() {
     const el = document.getElementById('server-time-display');

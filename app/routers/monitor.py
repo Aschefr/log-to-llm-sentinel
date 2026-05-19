@@ -78,6 +78,13 @@ def get_monitored_rules():
                 stats_dict[rule_id][severity] += count
             stats_dict[rule_id]["total"] += count
 
+        # Récupération du nombre d'analyses non consultées par règle
+        unviewed_query = db.query(
+            Analysis.rule_id,
+            func.count(Analysis.id).label("count")
+        ).filter(Analysis.viewed == False).group_by(Analysis.rule_id).all()
+        unviewed_dict = {rule_id: count for rule_id, count in unviewed_query}
+
         # Récupération de la dernière analyse par règle
         last_analysis_query = db.query(
             Analysis.rule_id,
@@ -100,6 +107,7 @@ def get_monitored_rules():
                     "notify_severity_threshold": r.notify_severity_threshold or "info",
                     "notify_on_match": r.notify_on_match,
                     "stats": stats_dict.get(r.id, {"total": 0, "info": 0, "warning": 0, "critical": 0}),
+                    "unviewed_count": unviewed_dict.get(r.id, 0),
                     "last_learning_session_id": r.last_learning_session_id,
                     "last_line_received_at": r.last_line_received_at.isoformat() + "Z" if r.last_line_received_at else None,
                     "last_analysis_at": last_analysis_dict.get(r.id).isoformat() + "Z" if last_analysis_dict.get(r.id) else None,
@@ -111,6 +119,22 @@ def get_monitored_rules():
         }
     finally:
         db.close()
+
+
+@router.post("/analyses/{analysis_id}/view")
+def mark_analysis_viewed(analysis_id: int):
+    """Marque une analyse comme consultée/lue."""
+    db = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="analysis_not_found")
+        analysis.viewed = True
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+
 
 
 @router.get("/buffer/{rule_id}")

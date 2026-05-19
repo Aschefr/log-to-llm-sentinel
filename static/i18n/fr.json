@@ -179,7 +179,8 @@
         "inactivity_detected": "Inactivité détectée",
         "activity_normal": "Activité normale",
         "inactivity_tracking": "Suivi d'inactivité",
-        "excluded_filter": "Filtre d'exclusion"
+        "excluded_filter": "Filtre d'exclusion",
+        "unviewed_tooltip": "Analyses non consultées"
     },
     "chat": {
         "title": "Centre d'Analyse IA",

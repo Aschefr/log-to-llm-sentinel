@@ -179,7 +179,8 @@
         "inactivity_detected": "Inactivity detected",
         "activity_normal": "Activity normal",
         "inactivity_tracking": "Inactivity tracking",
-        "excluded_filter": "Exclusion filter"
+        "excluded_filter": "Exclusion filter",
+        "unviewed_tooltip": "Unviewed analyses"
     },
     "chat": {
         "title": "AI Analysis Center",
