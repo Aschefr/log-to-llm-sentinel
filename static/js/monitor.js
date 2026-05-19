@@ -87,13 +87,12 @@ function renderTabs() {
         const unviewed = r.unviewed_count || 0;
         
         let badgesHtml = '';
-        if (stats.critical > 0 || stats.warning > 0 || stats.info > 0 || unviewed > 0) {
+        if (stats.critical > 0 || stats.warning > 0 || stats.info > 0) {
             badgesHtml = `
                 <span class="tab-badges">
                     ${stats.critical > 0 ? `<span class="tab-badge critical" title="${window.t ? window.t('dashboard.critical') : 'Critical'}: ${stats.critical}">${stats.critical}</span>` : ''}
                     ${stats.warning > 0 ? `<span class="tab-badge warning" title="${window.t ? window.t('dashboard.warning') : 'Warning'}: ${stats.warning}">${stats.warning}</span>` : ''}
                     ${stats.info > 0 ? `<span class="tab-badge info" title="${window.t ? window.t('dashboard.info') : 'Info'}: ${stats.info}">${stats.info}</span>` : ''}
-                    ${unviewed > 0 ? `<span class="tab-badge unviewed" title="${window.t ? window.t('monitor.unviewed_tooltip') : 'Analyses non consultées'}: ${unviewed}">${unviewed}</span>` : ''}
                 </span>
             `;
         }
@@ -1061,6 +1060,12 @@ async function markAllAnalysesAsViewed(ruleId, btn) {
         const rule = monitorRules.find(r => r.id === ruleId);
         if (rule) {
             rule.unviewed_count = 0;
+            if (rule.stats) {
+                rule.stats.total = 0;
+                rule.stats.critical = 0;
+                rule.stats.warning = 0;
+                rule.stats.info = 0;
+            }
             renderTabs();
             renderTabContent(rule);
         }

@@ -520,8 +520,23 @@ async function markAnalysisAsViewed(analysisId) {
         if (typeof activeRuleId !== 'undefined' && activeRuleId !== null) {
             if (typeof monitorRules !== 'undefined' && Array.isArray(monitorRules)) {
                 const rule = monitorRules.find(r => r.id === activeRuleId);
-                if (rule && rule.unviewed_count > 0) {
-                    rule.unviewed_count--;
+                if (rule) {
+                    let severity = null;
+                    if (card) {
+                        const badge = card.querySelector('.severity-badge');
+                        if (badge) {
+                            if (badge.classList.contains('critical')) severity = 'critical';
+                            else if (badge.classList.contains('warning')) severity = 'warning';
+                            else if (badge.classList.contains('info')) severity = 'info';
+                        }
+                    }
+                    if (rule.unviewed_count > 0) {
+                        rule.unviewed_count--;
+                    }
+                    if (severity && rule.stats && rule.stats[severity] > 0) {
+                        rule.stats[severity]--;
+                        if (rule.stats.total > 0) rule.stats.total--;
+                    }
                     if (typeof renderTabs === 'function') {
                         renderTabs();
                     }

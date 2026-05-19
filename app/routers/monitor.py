@@ -63,12 +63,12 @@ def get_monitored_rules():
         from sqlalchemy import func
         from app.models import Analysis
         
-        # Récupération des statistiques par règle
+        # Récupération des statistiques par règle (uniquement non consultées)
         stats_query = db.query(
             Analysis.rule_id,
             Analysis.severity,
             func.count(Analysis.id).label("count")
-        ).group_by(Analysis.rule_id, Analysis.severity).all()
+        ).filter(Analysis.viewed == False).group_by(Analysis.rule_id, Analysis.severity).all()
         
         stats_dict = {}
         for rule_id, severity, count in stats_query:
