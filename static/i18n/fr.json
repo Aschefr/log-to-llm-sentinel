@@ -51,7 +51,10 @@
         "live_log_line": "Log en direct :",
         "last_trigger": "Dernier déclenchement :",
         "confirm_clear_all": "Voulez-vous vraiment effacer TOUTES les analyses du système ?",
-        "rule_label": "Règle:"
+        "rule_label": "Règle:",
+        "mttr_label": "MTTR (Retour moyen à la normale)",
+        "reset_mttr_title": "Réinitialiser le MTTR",
+        "confirm_reset_mttr": "Voulez-vous vraiment réinitialiser le MTTR ? Cela effacera les durées de résolution passées de ce calcul."
     },
     "rules": {
         "title": "Gestion des Règles",
@@ -112,7 +115,26 @@
         "label_source": "Source des logs",
         "webhook_hint": "Utilise cette URL pour envoyer des logs à Sentinel avec une requête HTTP POST. Tu peux tester immédiatement avant même d'enregistrer la règle !",
         "webhook_copied": "✅ Copié !",
-        "label_inactivity_notify": "Envoyer une alerte si inactif"
+        "label_inactivity_notify": "Envoyer une alerte si inactif",
+        "label_resolution_title": "Surveillance du retour à la normale",
+        "label_resolution_enable": "Activer la détection de la résolution",
+        "label_resolution_mode": "Mode de résolution",
+        "resolution_mode_timeout": "Timeout d'inactivité (temps sans erreur)",
+        "resolution_mode_pattern": "Mot-clé de succès (log spécifique)",
+        "resolution_mode_both": "Timeout OU Mot-clé de succès",
+        "label_resolution_timeout": "Minutes d'inactivité nécessaires",
+        "label_resolution_patterns": "Patterns de résolution",
+        "placeholder_resolution_patterns": "Nouveau pattern...",
+        "resolution_patterns_hint": "Mots-clés dans les logs qui déclencheront l'analyse de retour à la normale.",
+        "label_resolution_ai_enabled": "Validation IA",
+        "label_resolution_notify_search": "Notifier lors de la recherche de résolution par l'IA",
+        "label_resolution_notify_resolved": "Notifier lors de la résolution du problème",
+        "resolution_patterns_ai_hint": "🤖 Ces patterns sont enrichis automatiquement par l'IA lors de chaque résolution de problème validée.",
+        "resolution_patterns_count": "{count} pattern(s)",
+        "resolution_patterns_add": "Ajouter",
+        "resolution_patterns_clear_all": "Tout effacer",
+        "resolution_patterns_confirm_clear": "Supprimer tous les patterns de résolution ?",
+        "resolution_patterns_empty": "Aucun pattern défini. Ajoutez-en manuellement ou laissez l'IA les apprendre."
     },
     "monitor": {
         "title": "Monitor",
@@ -181,7 +203,20 @@
         "inactivity_tracking": "Suivi d'inactivité",
         "excluded_filter": "Filtre d'exclusion",
         "unviewed_tooltip": "Analyses non consultées",
-        "mark_all_read": "Tout marquer comme lu"
+        "mark_all_read": "Tout marquer comme lu",
+        "status_normal": "Normal",
+        "status_alert": "En Alerte",
+        "status_resolving": "Vérification IA...",
+        "panel_alert_status": "État de l'alerte",
+        "btn_resolve_manually": "✅ Marquer comme résolu",
+        "badge_resolved": "Résolu",
+        "since": "depuis",
+        "resolution_box_title": "Retour à la normale",
+        "resolved_at_label": "Résolu le :",
+        "alert_duration_label": "Durée de l'alerte :",
+        "resolution_line_label": "Ligne de résolution :",
+        "resolution_patterns_label": "Motifs détectés :",
+        "resolution_ai_conclusion": "Conclusion de l'IA :"
     },
     "chat": {
         "title": "Centre d'Analyse IA",
@@ -516,7 +551,13 @@
         "ia_synthesis": "Synthèse IA",
         "summary_of_synthesis": "Résumé de la synthèse",
         "full_synthesis_available": "*(Synthèse complète dans l'interface)*",
-        "meta_summary_prompt": "Résume la méta-analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\nConserve les tendances principales et les points critiques.\nUtilise des puces (bullet points).\nLimite-toi à {max_chars} caractères maximum.\n\nAnalyse à résumer :\n{response}"
+        "meta_summary_prompt": "Résume la méta-analyse suivante de manière très lisible pour une notification mobile (Discord/Telegram).\nConserve les tendances principales et les points critiques.\nUtilise des puces (bullet points).\nLimite-toi à {max_chars} caractères maximum.\n\nAnalyse à résumer :\n{response}",
+        "resolution_resolved_subject": "[Résolu] {rule_name} — retour à la normale",
+        "resolution_resolved_body": "La règle \"{rule_name}\" est revenue à la normale après {duration}.",
+        "resolution_ai_searching": "[Vérification IA] Analyse de résolution en cours pour {rule_name}...",
+        "resolution_ai_confirmed": "L'IA a confirmé la résolution avec {confidence}% de confiance.",
+        "resolution_ai_denied": "L'IA n'a pas confirmé la résolution pour {rule_name}. Surveillance maintenue.",
+        "resolution_manual": "Résolution manuelle par l'utilisateur."
     },
     "api_errors": {
         "orchestrator_not_configured": "Orchestrateur non configuré",

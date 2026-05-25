@@ -97,9 +97,18 @@ function renderTabs() {
             `;
         }
 
+        const alertStatus = r.alert_status || 'normal';
+        let statusTitle = window.t ? window.t('monitor.status_normal') : 'Normal';
+        if (alertStatus === 'alert') {
+            statusTitle = window.t ? window.t('monitor.status_alert') : 'In Alert';
+        } else if (alertStatus === 'resolving') {
+            statusTitle = window.t ? window.t('monitor.status_resolving') : 'Resolving';
+        }
+
         const isActive = r.id === activeRuleId ? ' active' : '';
         return `
-            <button class="monitor-tab${isActive}" id="tab-${r.id}" onclick="selectTab(${r.id})">
+            <button class="monitor-tab${isActive}" id="tab-${r.id}" onclick="selectTab(${r.id})" title="${statusTitle}">
+                <span class="rule-status-dot status-${alertStatus}"></span>
                 <span class="tab-name">${escapeHtml(r.name)}</span>
                 ${badgesHtml}
             </button>
@@ -225,11 +234,26 @@ function renderTabContent(rule) {
         </div>
         ` : ''}
 
-        <div style="display: flex; gap: 1rem; margin-bottom: 0.5rem;">
+        <div style="display: flex; gap: 1rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
             <!-- Buffer anti-spam -->
-            <div class="monitor-buffer-status" id="buffer-status-${rule.id}" style="flex: 1; margin-bottom: 0;">
+            <div class="monitor-buffer-status" id="buffer-status-${rule.id}" style="flex: 1; min-width: 250px; margin-bottom: 0;">
                 <span class="buffer-dot idle" id="buffer-dot-${rule.id}"></span>
                 <span id="buffer-label-${rule.id}">${window.t ? window.t('monitor.buffer_inactive') : 'Inactive buffer'}</span>
+            </div>
+            
+            <!-- Recovery status panel (MON-18) -->
+            <div class="monitor-buffer-status" id="resolution-status-panel-${rule.id}" style="flex: 1; min-width: 250px; margin-bottom: 0; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span class="rule-status-dot status-${rule.alert_status || 'normal'}" id="resolution-dot-${rule.id}"></span>
+                    <span>
+                        <span style="opacity: 0.7;" data-i18n="monitor.panel_alert_status">État de l'alerte</span> : 
+                        <strong id="resolution-text-${rule.id}" class="status-text-${rule.alert_status || 'normal'}">
+                            ${rule.alert_status === 'alert' ? (window.t ? window.t('monitor.status_alert') : 'En Alerte') : rule.alert_status === 'resolving' ? (window.t ? window.t('monitor.status_resolving') : 'Vérification IA...') : (window.t ? window.t('monitor.status_normal') : 'Normal')}
+                        </strong>
+                        <span id="resolution-duration-${rule.id}" style="font-size: 0.8rem; opacity: 0.6; margin-left: 0.25rem;"></span>
+                    </span>
+                </div>
+                <button class="btn btn-secondary btn-sm ${rule.alert_status !== 'normal' ? '' : 'hidden'}" id="btn-manual-resolve-${rule.id}" onclick="triggerManualResolve(${rule.id}, this)" data-i18n="monitor.btn_resolve_manually">✅ Marquer comme résolu</button>
             </div>
         </div>
 
@@ -316,9 +340,9 @@ function startPolling(rule) {
     fetchBuffer();
     tailIntervals[rule.id] = setInterval(fetchAndRender, 3000);
     bufferIntervals[rule.id] = setInterval(fetchBuffer, 2000);
-    // MON-12: Auto-refresh analyses every 15s
+    // MON-12: Auto-refresh analyses every 15s (polling new arrivals)
     analysisIntervals[rule.id] = setInterval(() => {
-        if (!isFrozen) loadMonitorAnalyses(rule.id, monitorAnalysesSeverity, false);
+        if (!isFrozen) pollNewAnalyses(rule.id);
     }, 15000);
 }
 
@@ -420,6 +444,17 @@ async function fetchLogs(rule) {
         const lc = document.getElementById(`linecount-${rule.id}`);
         if (lc) lc.textContent = `(${res.lines.length} ${window.t ? window.t('monitor.lines_label') : 'lines'}, ${matched} ${window.t ? window.t('monitor.matched_label') : 'matched'})`;
 
+        // Réappliquer le filtre mot-clé actif d'abord pour calculer la hauteur finale du conteneur
+        applyKeywordFilter(rule.id);
+        updateFilterLabel(rule.id);
+        
+        // S'assurer que les badges reflètent bien l'état actif
+        document.querySelectorAll('.kw-filter-btn').forEach(b => {
+            const bKw = decodeURIComponent(b.dataset.kw || '');
+            b.classList.toggle('active', bKw === activeKeywordFilter);
+        });
+
+        // Effectuer le défilement/restauration sur la hauteur finale filtrée
         if (autoOpenLine && selectedLineText) {
             const selectedEl = viewer.querySelector('.log-line.selected');
             if (selectedEl) {
@@ -437,16 +472,6 @@ async function fetchLogs(rule) {
             // User had scrolled up — restore their position
             viewer.scrollTop = savedScrollTop;
         }
-
-        // Réappliquer le filtre mot-clé actif
-        applyKeywordFilter(rule.id);
-        updateFilterLabel(rule.id);
-        
-        // S'assurer que les badges reflètent bien l'état actif
-        document.querySelectorAll('.kw-filter-btn').forEach(b => {
-            const bKw = decodeURIComponent(b.dataset.kw || '');
-            b.classList.toggle('active', bKw === activeKeywordFilter);
-        });
 
     } catch (e) {
         viewer.innerHTML = `<em class="no-logs" style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}</em>`;
@@ -557,6 +582,49 @@ async function fetchBufferStatus(ruleId) {
         } else {
             dot.className = 'buffer-dot idle';
             label.textContent = window.t ? window.t('monitor.buffer_inactive') : 'Inactive buffer';
+        }
+
+        // Update recovery status panel (MON-18)
+        const resDot = document.getElementById(`resolution-dot-${ruleId}`);
+        const resText = document.getElementById(`resolution-text-${ruleId}`);
+        const resDuration = document.getElementById(`resolution-duration-${ruleId}`);
+        const resBtn = document.getElementById(`btn-manual-resolve-${ruleId}`);
+
+        if (resDot && resText) {
+            const status = buf.alert_status || 'normal';
+            resDot.className = `rule-status-dot status-${status}`;
+            
+            let statusText = window.t ? window.t('monitor.status_normal') : 'Normal';
+            if (status === 'alert') {
+                statusText = window.t ? window.t('monitor.status_alert') : 'In Alert';
+            } else if (status === 'resolving') {
+                statusText = window.t ? window.t('monitor.status_resolving') : 'AI Checking...';
+            }
+            resText.textContent = statusText;
+            resText.className = `status-text-${status}`;
+
+            if (status !== 'normal' && buf.alert_started_at) {
+                const elapsedMs = new Date() - new Date(buf.alert_started_at);
+                const totalSec = Math.floor(elapsedMs / 1000);
+                const hrs = Math.floor(totalSec / 3600);
+                const mins = Math.floor((totalSec % 3600) / 60);
+                const secs = totalSec % 60;
+                
+                const sinceText = window.t ? window.t('monitor.since') : 'since';
+                let timeStr = '';
+                if (hrs > 0) {
+                    timeStr = `${hrs}h ${mins}m`;
+                } else {
+                    timeStr = `${mins}m ${secs}s`;
+                }
+                if (resDuration) resDuration.textContent = `(${sinceText} ${timeStr})`;
+            } else {
+                if (resDuration) resDuration.textContent = '';
+            }
+
+            if (resBtn) {
+                resBtn.classList.toggle('hidden', status === 'normal');
+            }
         }
 
         // Update timestamps (MON-14)
@@ -671,6 +739,40 @@ async function onLineClick(el, ruleId) {
             <span class="detail-label">${window.t ? window.t('monitor.llm_response') : 'LLM Response'}</span>
             <div class="detail-value analysis-response markdown-body">${relatedAnalysis.ollama_response ? marked.parse(relatedAnalysis.ollama_response) : '—'}</div>
         </div>
+        ${relatedAnalysis.resolution_status === 'resolved' ? `
+        <div class="detail-row">
+            <span class="detail-label">${window.t ? window.t('monitor.resolution_box_title') : 'Retour à la normale'}</span>
+            <div class="detail-value" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-left: 3px solid var(--success); padding: 0.6rem 0.8rem; border-radius: 4px; font-size: 0.85rem; display: flex; flex-direction: column; gap: 0.35rem;">
+                <div><span style="opacity: 0.7; font-weight: 500;">${window.t ? window.t('monitor.resolved_at_label') : 'Résolu le :'}</span> <span>${formatDate(relatedAnalysis.resolved_at)}</span></div>
+                <div><span style="opacity: 0.7; font-weight: 500;">${window.t ? window.t('monitor.alert_duration_label') : 'Durée de l\'alerte :'}</span> <span>${(() => {
+                    const start = new Date(relatedAnalysis.analyzed_at);
+                    const end = new Date(relatedAnalysis.resolved_at);
+                    const diffMs = end - start;
+                    if (diffMs <= 0) return 'N/A';
+                    const totalSec = Math.floor(diffMs / 1000);
+                    const hrs = Math.floor(totalSec / 3600);
+                    const mins = Math.floor((totalSec % 3600) / 60);
+                    const secs = totalSec % 60;
+                    if (hrs > 0) return `${hrs}h ${mins}m`;
+                    if (mins > 0) return `${mins}m ${secs}s`;
+                    return `${secs}s`;
+                })()}</span></div>
+                ${relatedAnalysis.resolution_line ? `
+                <div style="margin-top: 0.25rem;"><span style="opacity: 0.7; font-weight: 500;">${window.t ? window.t('monitor.resolution_line_label') : 'Ligne de résolution :'}</span> <code style="word-break: break-all; font-size: 0.78rem; display: block; margin-top: 0.15rem; background: rgba(255,255,255,0.05); padding: 0.25rem 0.5rem; border-radius: 3px;">${escapeHtml(relatedAnalysis.resolution_line)}</code></div>
+                ` : ''}
+                ${relatedAnalysis.resolution_patterns && relatedAnalysis.resolution_patterns.length > 0 ? `
+                <div><span style="opacity: 0.7; font-weight: 500;">${window.t ? window.t('monitor.resolution_patterns_label') : 'Motifs détectés :'}</span> <span>${relatedAnalysis.resolution_patterns.map(p => `<span class="log-kw-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.72rem; padding: 0.05rem 0.3rem; border-radius: 3px;">${escapeHtml(p)}</span>`).join(' ')}</span></div>
+                ` : ''}
+                ${relatedAnalysis.resolution_ai_explanation ? `
+                <div style="margin-top: 0.4rem; border-top: 1px dashed rgba(16, 185, 129, 0.15); padding-top: 0.4rem;">
+                    <span style="opacity: 0.7; font-weight: 500;">${window.t ? window.t('monitor.resolution_ai_conclusion') : 'Conclusion de l\'IA :'}</span>
+                    ${relatedAnalysis.resolution_ai_confidence ? ` <span class="severity-badge info" style="background: rgba(59, 130, 246, 0.15); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.35); font-size: 0.7rem; padding: 0.05rem 0.25rem; font-weight: normal; vertical-align: middle;">${relatedAnalysis.resolution_ai_confidence}%</span>` : ''}
+                    <div style="margin-top: 0.15rem; font-style: italic; font-size: 0.8rem; opacity: 0.85;">${escapeHtml(relatedAnalysis.resolution_ai_explanation)}</div>
+                </div>
+                ` : ''}
+            </div>
+        </div>
+        ` : ''}
         <div class="detail-actions" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${relatedAnalysis.id}, this)">🔄 ${window.t('common.retry')}</button>
@@ -722,6 +824,88 @@ function filterMonitorAnalyses(ruleId, severity) {
     monitorAnalysesSeverity = severity;
     monitorAnalysesOffset = 0;
     loadMonitorAnalyses(ruleId, severity, true);
+}
+
+async function pollNewAnalyses(ruleId) {
+    const container = document.getElementById(`monitor-analyses-${ruleId}`);
+    if (!container) return;
+
+    const cards = container.querySelectorAll('.analysis-card');
+    if (cards.length === 0) {
+        loadMonitorAnalyses(ruleId, monitorAnalysesSeverity, true);
+        return;
+    }
+
+    const currentIds = Array.from(cards).map(c => {
+        const idAttr = c.id || '';
+        return parseInt(idAttr.replace('analysis-card-', ''));
+    }).filter(id => !isNaN(id));
+
+    const maxId = currentIds.length > 0 ? Math.max(...currentIds) : 0;
+
+    try {
+        let url = `/api/dashboard/recent?limit=10&rule_id=${ruleId}&offset=0`;
+        if (monitorAnalysesSeverity) {
+            url += `&severity=${monitorAnalysesSeverity}`;
+        }
+
+        const res = await apiFetch(url);
+        const analyses = res.analyses || res;
+
+        // Update existing cards if their resolution state changed
+        analyses.forEach(a => {
+            const existingCard = document.getElementById(`analysis-card-${a.id}`);
+            if (existingCard) {
+                const hasResolvedBadge = existingCard.querySelector('.resolved-badge') !== null;
+                const isResolvedInApi = a.resolution_status === 'resolved';
+
+                if (isResolvedInApi !== hasResolvedBadge) {
+                    const isCollapsed = existingCard.classList.contains('collapsed');
+                    const newCardHtml = renderAnalysisCard(a, {
+                        collapsed: isCollapsed,
+                        showDelete: true,
+                        showCopy: true,
+                        showRuleName: false,
+                    });
+
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = newCardHtml;
+                    const newCardElement = tempDiv.firstElementChild;
+                    existingCard.replaceWith(newCardElement);
+                }
+            }
+        });
+
+        // Find analyses that are newer than maxId
+        const newAnalyses = analyses.filter(a => a.id > maxId);
+        if (newAnalyses.length === 0) return;
+
+        // Render cards for new analyses
+        const newCardsHtml = newAnalyses.map(a => {
+            return renderAnalysisCard(a, {
+                collapsed: true,
+                showDelete: true,
+                showCopy: true,
+                showRuleName: false,
+                cardClass: 'analysis-card newly-added-highlight'
+            });
+        }).join('');
+
+        // Prepend them to the container
+        container.insertAdjacentHTML('afterbegin', newCardsHtml);
+
+        // Adjust the offset so offset paging remains correct
+        monitorAnalysesOffset += newAnalyses.length;
+
+        // Auto-mark the first new one as viewed
+        markAnalysisAsViewed(newAnalyses[0].id);
+
+        // Force reload rule list stats to update badge counts in tabs
+        loadMonitorRules();
+
+    } catch (e) {
+        console.error("Failed to poll new analyses:", e);
+    }
 }
 
 async function loadMonitorAnalyses(ruleId, severityFilter = null, resetList = true) {
@@ -1072,6 +1256,21 @@ async function markAllAnalysesAsViewed(ruleId, btn) {
     } catch (e) {
         console.error("Failed to mark all as read:", e);
         if (btn) btn.disabled = false;
+    }
+}
+
+async function triggerManualResolve(ruleId, btnElement) {
+    if (btnElement.classList.contains('disabled')) return;
+    btnElement.classList.add('disabled');
+    btnElement.textContent = window.t ? window.t('common.loading') : 'Loading...';
+    try {
+        await apiFetch(`/api/monitor/rules/${ruleId}/resolve`, { method: 'POST' });
+        await loadMonitorRules();
+        selectTab(ruleId);
+    } catch (e) {
+        alert((window.t ? window.t('common.error') : 'Error') + ': ' + e.message);
+        btnElement.classList.remove('disabled');
+        btnElement.innerHTML = window.t ? window.t('monitor.btn_resolve_manually') : '✅ Mark as resolved';
     }
 }
 

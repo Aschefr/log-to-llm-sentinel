@@ -443,7 +443,7 @@ function renderAnalysisCard(a, opts = {}) {
     const unreadIndicator = isUnread ? `<span class="unread-dot-indicator" title="${_t('monitor.unviewed_tooltip', 'Non consultée')}">●</span>` : '';
 
     // Keywords summary for collapsed header
-    const kwSummary = collapsed && a.matched_keywords?.length
+    const kwSummary = a.matched_keywords?.length
         ? `<span class="analysis-kw-summary">${a.matched_keywords.slice(0,3).map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('')}${a.matched_keywords.length > 3 ? `<span class="log-kw-badge">+${a.matched_keywords.length - 3}</span>` : ''}</span>`
         : '';
 
@@ -462,6 +462,63 @@ function renderAnalysisCard(a, opts = {}) {
         ? `<strong>${_t('dashboard.rule_label', 'Rule:')} ${escapeHtml(a.rule_name)}</strong>`
         : '';
 
+    const resolvedBadge = a.resolution_status === 'resolved' ? `<span class="resolved-badge">${_t('monitor.badge_resolved', 'Résolu')}</span>` : '';
+
+    let resolutionBlock = '';
+    if (a.resolution_status === 'resolved' && a.resolved_at && a.analyzed_at) {
+        const start = new Date(a.analyzed_at);
+        const end = new Date(a.resolved_at);
+        const diffMs = end - start;
+        let durationStr = 'N/A';
+        if (diffMs > 0) {
+            const totalSec = Math.floor(diffMs / 1000);
+            const hrs = Math.floor(totalSec / 3600);
+            const mins = Math.floor((totalSec % 3600) / 60);
+            const secs = totalSec % 60;
+            if (hrs > 0) {
+                durationStr = `${hrs}h ${mins}m`;
+            } else if (mins > 0) {
+                durationStr = `${mins}m ${secs}s`;
+            } else {
+                durationStr = `${secs}s`;
+            }
+        }
+        
+        let detailsHtml = `
+            <div><span class="detail-label">${_t('monitor.resolved_at_label', 'Résolu le :')}</span> <span>${formatDate(a.resolved_at)}</span></div>
+            <div><span class="detail-label">${_t('monitor.alert_duration_label', 'Durée de l\'alerte :')}</span> <span>${durationStr}</span></div>
+        `;
+
+        if (a.resolution_line) {
+            detailsHtml += `
+            <div style="flex-basis: 100%; margin-top: 0.25rem;"><span class="detail-label">${_t('monitor.resolution_line_label', 'Ligne de résolution :')}</span> <code class="resolution-line-code" style="word-break: break-all; font-size: 0.78rem; display: block; margin-top: 0.15rem; background: rgba(255,255,255,0.05); padding: 0.25rem 0.5rem; border-radius: 3px;">${escapeHtml(a.resolution_line)}</code></div>
+            `;
+        }
+
+        if (a.resolution_patterns && a.resolution_patterns.length > 0) {
+            detailsHtml += `
+            <div style="flex-basis: 100%; margin-top: 0.25rem;"><span class="detail-label">${_t('monitor.resolution_patterns_label', 'Motifs détectés :')}</span> <span>${a.resolution_patterns.map(p => `<span class="log-kw-badge" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.3); font-size: 0.72rem; padding: 0.05rem 0.3rem; border-radius: 3px;">${escapeHtml(p)}</span>`).join(' ')}</span></div>
+            `;
+        }
+
+        if (a.resolution_ai_explanation) {
+            const confBadge = a.resolution_ai_confidence ? ` <span class="severity-badge info" style="background: rgba(59, 130, 246, 0.15); color: var(--info); border: 1px solid rgba(59, 130, 246, 0.35); font-size: 0.7rem; padding: 0.05rem 0.25rem; font-weight: normal; vertical-align: middle;">${a.resolution_ai_confidence}%</span>` : '';
+            detailsHtml += `
+            <div style="flex-basis: 100%; margin-top: 0.4rem; border-top: 1px dashed rgba(16, 185, 129, 0.15); padding-top: 0.4rem;"><span class="detail-label">${_t('monitor.resolution_ai_conclusion', 'Conclusion de l\'IA :')}</span>${confBadge}<div style="margin-top: 0.15rem; font-style: italic; font-size: 0.8rem; opacity: 0.85;">${escapeHtml(a.resolution_ai_explanation)}</div></div>
+            `;
+        }
+
+        resolutionBlock = `
+        <div class="analysis-resolution-box" style="margin-bottom: 0.8rem;">
+            <div class="resolution-title">
+                <span aria-hidden="true">🟢 </span><span data-i18n="monitor.resolution_box_title">${_t('monitor.resolution_box_title', 'Retour à la normale')}</span>
+            </div>
+            <div class="resolution-details" style="display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; font-size: 0.82rem;">
+                ${detailsHtml}
+            </div>
+        </div>`;
+    }
+
     return `
     <div class="${cardClass}${collapsedCls}${unreadCls}" id="analysis-card-${a.id}">
         <div class="analysis-header" onclick="toggleAnalysisCardGeneric(event, this.parentElement)" style="cursor: pointer;">
@@ -471,6 +528,7 @@ function renderAnalysisCard(a, opts = {}) {
                 ${a.detection_id ? `<span class="detection-id-badge" style="margin-left:0.5rem">#${escapeHtml(a.detection_id)}</span>` : ''}
                 <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
                 <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                ${resolvedBadge}
                 ${unreadIndicator}
             </div>
             <div class="analysis-actions">
@@ -487,6 +545,7 @@ function renderAnalysisCard(a, opts = {}) {
             </div>` : ''}
             <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
             <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
+            ${resolutionBlock}
             <div class="analysis-footer">
                 <div style="display: flex; gap: 0.5rem;">
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); retryAnalysis(${a.id}, this)">🔄 ${_t('common.retry', 'Retry')}</button>

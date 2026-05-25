@@ -25,6 +25,85 @@ function _generateUUID() {
     });
 }
 
+/* ── Resolution Pattern Tags ───────────────────────────────────────────────── */
+let _resolutionPatterns = [];
+
+function _resTagT(key, fallback) {
+    return window.t ? window.t(key) : fallback;
+}
+
+function _escHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+/** Sync internal array → hidden input + UI */
+function _resTagsSync() {
+    const hidden = document.getElementById('rule-resolution-patterns');
+    if (hidden) hidden.value = _resolutionPatterns.join(',');
+
+    const countEl = document.getElementById('resolution-patterns-count');
+    const clearBtn = document.getElementById('resolution-patterns-clear-all');
+    const emptyEl = document.getElementById('resolution-patterns-empty');
+    const n = _resolutionPatterns.length;
+
+    if (countEl) {
+        countEl.style.display = n > 0 ? 'inline' : 'none';
+        countEl.textContent = _resTagT('rules.resolution_patterns_count', '{count} pattern(s)').replace('{count}', n);
+    }
+    if (clearBtn) clearBtn.style.display = n > 0 ? 'inline-flex' : 'none';
+    if (emptyEl) emptyEl.style.display = n === 0 ? 'inline' : 'none';
+}
+
+/** Render all tags from _resolutionPatterns */
+function _resTagsRender() {
+    const box = document.getElementById('resolution-patterns-tags');
+    if (!box) return;
+    // Keep the empty placeholder
+    const emptyEl = box.querySelector('#resolution-patterns-empty');
+    box.innerHTML = '';
+    if (emptyEl) box.appendChild(emptyEl);
+
+    _resolutionPatterns.forEach((p, idx) => {
+        const tag = document.createElement('span');
+        tag.className = 'res-tag';
+        tag.innerHTML = `${_escHtml(p)}<button type="button" class="res-tag-remove" data-idx="${idx}" title="Remove">✕</button>`;
+        tag.querySelector('.res-tag-remove').addEventListener('click', (e) => {
+            e.preventDefault();
+            _resolutionPatterns.splice(idx, 1);
+            _resTagsRender();
+        });
+        box.insertBefore(tag, emptyEl);
+    });
+    _resTagsSync();
+}
+
+/** Set patterns and render */
+function resTagsSet(patterns) {
+    _resolutionPatterns = (patterns || []).filter(p => p && p.trim()).map(p => p.trim());
+    _resTagsRender();
+}
+
+/** Add one or more patterns (comma-separated string accepted) */
+function resTagsAdd(input) {
+    const parts = input.split(',').map(p => p.trim()).filter(p => p);
+    let added = 0;
+    parts.forEach(p => {
+        if (!_resolutionPatterns.includes(p)) {
+            _resolutionPatterns.push(p);
+            added++;
+        }
+    });
+    if (added) _resTagsRender();
+}
+
+/** Clear all patterns */
+function resTagsClear() {
+    _resolutionPatterns = [];
+    _resTagsRender();
+}
+
 /* ── Keyword suggestions ───────────────────────────────────────────────────── */
 const TYPICAL_KEYWORDS = [
     'error', 'exception', 'fatal', 'critical', 'warning', 'warn',
@@ -145,6 +224,87 @@ function setupRuleModal(opts = {}) {
         });
     }
 
+    const resEnable = document.getElementById('rule-resolution-enable');
+    const resSettings = document.getElementById('resolution-settings-container');
+    const resMode = document.getElementById('rule-resolution-mode');
+    const resTimeoutCont = document.getElementById('resolution-timeout-container');
+    const resPatternsCont = document.getElementById('resolution-patterns-container');
+    const resAiEnable = document.getElementById('rule-resolution-ai-enabled');
+    const resAiOptions = document.getElementById('resolution-ai-options');
+
+    function updateResolutionUI() {
+        if (!resEnable) return;
+        resSettings.style.display = resEnable.checked ? 'flex' : 'none';
+        
+        if (resEnable.checked && resMode) {
+            const mode = resMode.value;
+            if (mode === 'timeout') {
+                if (resTimeoutCont) resTimeoutCont.classList.remove('hidden');
+                if (resPatternsCont) resPatternsCont.classList.add('hidden');
+            } else if (mode === 'pattern') {
+                if (resTimeoutCont) resTimeoutCont.classList.add('hidden');
+                if (resPatternsCont) resPatternsCont.classList.remove('hidden');
+            } else {
+                if (resTimeoutCont) resTimeoutCont.classList.remove('hidden');
+                if (resPatternsCont) resPatternsCont.classList.remove('hidden');
+            }
+        }
+        
+        if (resAiEnable && resAiOptions) {
+            if (resAiEnable.checked) {
+                resAiOptions.classList.remove('hidden');
+            } else {
+                resAiOptions.classList.add('hidden');
+            }
+        }
+    }
+    window.updateResolutionUI = updateResolutionUI;
+
+    if (resEnable) resEnable.addEventListener('change', updateResolutionUI);
+    if (resMode) resMode.addEventListener('change', updateResolutionUI);
+    if (resAiEnable) resAiEnable.addEventListener('change', updateResolutionUI);
+    
+    // Initial display sync
+    updateResolutionUI();
+
+    // ── Resolution pattern tags wiring ──
+    const addBtn = document.getElementById('resolution-pattern-add-btn');
+    const addInput = document.getElementById('resolution-pattern-input');
+    const clearAllBtn = document.getElementById('resolution-patterns-clear-all');
+
+    if (addBtn && addInput) {
+        addBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (addInput.value.trim()) {
+                resTagsAdd(addInput.value);
+                addInput.value = '';
+                addInput.focus();
+            }
+        });
+        addInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addBtn.click();
+            }
+        });
+    }
+    if (clearAllBtn) {
+        clearAllBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (typeof showInlineConfirm === 'function') {
+                showInlineConfirm(
+                    clearAllBtn,
+                    _resTagT('rules.resolution_patterns_confirm_clear', 'Delete all resolution patterns?'),
+                    () => { resTagsClear(); }
+                );
+            } else {
+                resTagsClear();
+            }
+        });
+    }
+    // Initial render (empty for new rule)
+    _resTagsRender();
+
     setupKeywordSuggestions();
 }
 
@@ -254,6 +414,20 @@ function resetForm() {
     }
     const exclEl = document.getElementById('rule-excluded-patterns');
     if (exclEl) exclEl.value = '';
+
+    // MON-18
+    const resEnable = document.getElementById('rule-resolution-enable');
+    if (resEnable) {
+        resEnable.checked = true;
+        document.getElementById('rule-resolution-mode').value = 'timeout';
+        document.getElementById('rule-resolution-timeout').value = '30';
+        resTagsClear();
+        document.getElementById('rule-resolution-ai-enabled').checked = false;
+        document.getElementById('rule-resolution-notify-search').checked = false;
+        document.getElementById('rule-resolution-notify-resolved').checked = true;
+        if (window.updateResolutionUI) window.updateResolutionUI();
+    }
+
     document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_new_title') : 'New rule';
     closeFileBrowser();
 
@@ -295,6 +469,13 @@ async function saveRule() {
         inactivity_notify: document.getElementById('rule-inactivity-notify') ? document.getElementById('rule-inactivity-notify').checked : true,
         excluded_patterns: ((document.getElementById('rule-excluded-patterns') || {}).value || '')
             .split(',').map(p => p.trim()).filter(p => p),
+        // MON-18
+        resolution_mode: document.getElementById('rule-resolution-enable').checked ? document.getElementById('rule-resolution-mode').value : 'disabled',
+        resolution_timeout_minutes: parseInt(document.getElementById('rule-resolution-timeout').value) || 30,
+        resolution_patterns: [..._resolutionPatterns],
+        resolution_ai_enabled: document.getElementById('rule-resolution-ai-enabled').checked,
+        resolution_notify_search: document.getElementById('rule-resolution-notify-search').checked,
+        resolution_notify_resolved: document.getElementById('rule-resolution-notify-resolved').checked,
     };
 
     // If on manual tab, clear the learning session link so the auto tab
@@ -374,6 +555,21 @@ async function editRule(id) {
 
         const exclEl = document.getElementById('rule-excluded-patterns');
         if (exclEl) exclEl.value = (rule.excluded_patterns || []).join(', ');
+
+        // MON-18
+        const resEnable = document.getElementById('rule-resolution-enable');
+        if (resEnable) {
+            const hasRes = rule.resolution_mode !== 'disabled';
+            resEnable.checked = hasRes;
+            document.getElementById('rule-resolution-mode').value = hasRes ? rule.resolution_mode : 'timeout';
+            document.getElementById('rule-resolution-timeout').value = rule.resolution_timeout_minutes || 30;
+            resTagsSet(rule.resolution_patterns || []);
+            document.getElementById('rule-resolution-ai-enabled').checked = rule.resolution_ai_enabled || false;
+            document.getElementById('rule-resolution-notify-search').checked = rule.resolution_notify_search || false;
+            document.getElementById('rule-resolution-notify-resolved').checked = rule.resolution_notify_resolved !== false;
+            if (window.updateResolutionUI) window.updateResolutionUI();
+        }
+
         document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_edit_title') : 'Edit rule';
         // Hide quick templates in edit mode
         const tpl = document.getElementById('modal-quick-templates');

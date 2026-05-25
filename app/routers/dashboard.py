@@ -56,6 +56,24 @@ def get_stats():
         warning_count = db.query(Analysis).filter(Analysis.severity == "warning").count()
         info_count = db.query(Analysis).filter(Analysis.severity == "info").count()
 
+        # MTTR Calculation (MON-18)
+        resolved_analyses = db.query(Analysis).filter(
+            Analysis.resolution_status == "resolved",
+            Analysis.resolved_at != None,
+            Analysis.exclude_from_mttr != True
+        ).all()
+        mttr_minutes = 0.0
+        if resolved_analyses:
+            total_duration = 0.0
+            count_resolved = 0
+            for a in resolved_analyses:
+                if a.resolved_at and a.analyzed_at:
+                    duration = (a.resolved_at - a.analyzed_at).total_seconds()
+                    total_duration += duration
+                    count_resolved += 1
+            if count_resolved > 0:
+                mttr_minutes = round((total_duration / count_resolved) / 60.0, 1)
+
         return {
             "total_rules": total_rules,
             "active_rules": active_rules,
@@ -64,6 +82,7 @@ def get_stats():
             "critical_count": critical_count,
             "warning_count": warning_count,
             "info_count": info_count,
+            "mttr_minutes": mttr_minutes,
         }
     finally:
         db.close()
@@ -97,6 +116,12 @@ def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = 
                 "viewed": a.viewed,
                 "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
                 "matched_keywords": _json.loads(a.matched_keywords_json) if a.matched_keywords_json else [],
+                "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
+                "resolution_status": a.resolution_status,
+                "resolution_line": a.resolution_line,
+                "resolution_patterns": _json.loads(a.resolution_patterns_json) if a.resolution_patterns_json else [],
+                "resolution_ai_explanation": a.resolution_ai_explanation,
+                "resolution_ai_confidence": a.resolution_ai_confidence,
             }
             for a, rule_name in results
         ]
@@ -137,3 +162,18 @@ def delete_all_analyses():
         return {"status": "ok"}
     finally:
         db.close()
+
+
+@router.post("/reset-mttr")
+def reset_mttr():
+    db = SessionLocal()
+    try:
+        db.query(Analysis).filter(Analysis.resolution_status == "resolved").update(
+            {Analysis.exclude_from_mttr: True},
+            synchronize_session=False
+        )
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
+

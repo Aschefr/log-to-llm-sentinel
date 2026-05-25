@@ -89,6 +89,9 @@ from app.services.meta_service import MetaAnalysisService
 # ── Instances globales ──
 orchestrator = Orchestrator()
 meta_service = MetaAnalysisService(orchestrator=orchestrator)
+from app.services.resolution_service import ResolutionService
+resolution_service = ResolutionService(orchestrator=orchestrator)
+orchestrator.resolution_service = resolution_service
 
 log_watcher = LogWatcher(on_new_lines=orchestrator.handle_new_lines)
 watcher_task = None
@@ -107,10 +110,14 @@ async def lifespan(app: FastAPI):
 
     # Partager l'orchestrateur avec les routers (pour accès aux buffers et Ollama)
     monitor_router.set_orchestrator(orchestrator)
+    monitor_router.set_resolution_service(resolution_service)
     chat_router.set_orchestrator(orchestrator)
     config.set_orchestrator(orchestrator)
     rules.set_orchestrator(orchestrator)
     webhook_router.set_orchestrator(orchestrator)
+
+    # Restaurer les états d'alerte pour la résolution
+    resolution_service.restore_states_from_db()
 
     # Démarre le watcher en background
     watcher_task = asyncio.create_task(log_watcher.start())
@@ -196,10 +203,19 @@ async def lifespan(app: FastAPI):
             finally:
                 db.close()
 
+    async def _resolution_checker():
+        while True:
+            await asyncio.sleep(60)  # Check every 60 seconds
+            try:
+                await resolution_service.check_timeout_resolutions()
+            except Exception as e:
+                print(f"[Main] Erreur resolution checker: {e}")
+
     asyncio.create_task(_cleanup_tasks())
     asyncio.create_task(_run_meta_analyses_loop())
     asyncio.create_task(_daily_update_check())
     asyncio.create_task(_inactivity_checker())
+    asyncio.create_task(_resolution_checker())
 
     yield
 

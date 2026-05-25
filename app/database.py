@@ -68,6 +68,23 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""",
         "ALTER TABLE analyses ADD COLUMN viewed BOOLEAN DEFAULT 0",
+        # MON-18: Resolution surveillance
+        "ALTER TABLE rules ADD COLUMN alert_status VARCHAR DEFAULT 'normal'",
+        "ALTER TABLE rules ADD COLUMN alert_started_at DATETIME DEFAULT NULL",
+        "ALTER TABLE rules ADD COLUMN resolution_mode VARCHAR DEFAULT 'timeout'",
+        "ALTER TABLE rules ADD COLUMN resolution_timeout_minutes INTEGER DEFAULT 30",
+        "ALTER TABLE rules ADD COLUMN resolution_patterns_json TEXT DEFAULT '[]'",
+        "ALTER TABLE rules ADD COLUMN resolution_ai_enabled BOOLEAN DEFAULT 0",
+        "ALTER TABLE rules ADD COLUMN resolution_notify_search BOOLEAN DEFAULT 0",
+        "ALTER TABLE rules ADD COLUMN resolution_notify_resolved BOOLEAN DEFAULT 1",
+        "ALTER TABLE analyses ADD COLUMN resolved_at DATETIME DEFAULT NULL",
+        "ALTER TABLE analyses ADD COLUMN resolution_status VARCHAR DEFAULT NULL",
+        "ALTER TABLE analyses ADD COLUMN resolution_line TEXT DEFAULT NULL",
+        "ALTER TABLE analyses ADD COLUMN resolution_patterns_json TEXT DEFAULT '[]'",
+        "ALTER TABLE analyses ADD COLUMN resolution_ai_explanation TEXT DEFAULT NULL",
+        "ALTER TABLE analyses ADD COLUMN resolution_ai_confidence INTEGER DEFAULT NULL",
+        "ALTER TABLE analyses ADD COLUMN exclude_from_mttr BOOLEAN DEFAULT 0",
+        "UPDATE analyses SET resolved_at = datetime(analyzed_at, '+5 minutes'), exclude_from_mttr = 1 WHERE resolution_status = 'resolved' AND resolved_at IS NULL",
     ]
 
     with engine.connect() as conn:

@@ -26,8 +26,10 @@ class Orchestrator:
     def __init__(self):
         self.ollama = OllamaService()
         self.notifier = NotificationService()
+        self.resolution_service = None
         self._buffers = {}  # rule_id -> {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
         self._ollama_semaphore = asyncio.Semaphore(1)
+
     async def handle_new_lines(self, rule: Rule, lines: List[str]):
         """Traite les nouvelles lignes pour une règle donnée."""
         db = SessionLocal()
@@ -37,6 +39,10 @@ class Orchestrator:
                 return
 
             logger.debug("Orchestrator", f"Régle '{db_rule.name}' — {len(lines)} nouvelle(s) ligne(s) reçue(s)")
+
+            # Hook de détection de résolution (retour à la normale)
+            if self.resolution_service:
+                await self.resolution_service.on_new_lines(db_rule, lines)
 
             keywords = db_rule.get_keywords()
             if not keywords:
@@ -252,7 +258,14 @@ class Orchestrator:
                 logger.debug("Orchestrator", f"Notification ignorée: la sévérité '{severity}' est inférieure au seuil '{rule.notify_severity_threshold}'.")
 
         if should_notify:
-            await self.trigger_notification(analysis, rule, config, db)
+            try:
+                await self.trigger_notification(analysis, rule, config, db)
+            except Exception as e:
+                logger.error("Orchestrator", f"Erreur lors de l'envoi de la notification d'alerte : {e}")
+
+        # Hook de signalement d'erreur pour la résolution
+        if self.resolution_service:
+            await self.resolution_service.on_error_detected(rule.id)
             
     async def trigger_notification(self, analysis: Analysis, rule: Rule, config: dict, db) -> bool:
         """Envoie manuellement ou automatiquement une notification pour une analyse existante."""

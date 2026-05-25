@@ -51,7 +51,10 @@
         "live_log_line": "Live log:",
         "last_trigger": "Last trigger:",
         "confirm_clear_all": "Are you sure you want to delete ALL analyses from the system?",
-        "rule_label": "Rule:"
+        "rule_label": "Rule:",
+        "mttr_label": "MTTR (Mean Time to Resolution)",
+        "reset_mttr_title": "Reset MTTR",
+        "confirm_reset_mttr": "Are you sure you want to reset the MTTR? This will clear all past resolution durations from this calculation."
     },
     "rules": {
         "title": "Rule Management",
@@ -112,7 +115,26 @@
         "label_source": "Source of logs",
         "webhook_hint": "Use this URL to send logs to Sentinel via an HTTP POST request. You can test it immediately, even before saving the rule!",
         "webhook_copied": "✅ Copied!",
-        "label_inactivity_notify": "Send an alert if inactive"
+        "label_inactivity_notify": "Send an alert if inactive",
+        "label_resolution_title": "Resolution Monitoring",
+        "label_resolution_enable": "Enable resolution detection",
+        "label_resolution_mode": "Resolution mode",
+        "resolution_mode_timeout": "Inactivity timeout (time without error)",
+        "resolution_mode_pattern": "Success keyword (specific log)",
+        "resolution_mode_both": "Timeout OR Success keyword",
+        "label_resolution_timeout": "Required inactivity minutes",
+        "label_resolution_patterns": "Resolution patterns",
+        "placeholder_resolution_patterns": "New pattern...",
+        "resolution_patterns_hint": "Keywords in logs that will trigger resolution check.",
+        "label_resolution_ai_enabled": "AI Validation",
+        "label_resolution_notify_search": "Notify during AI resolution check",
+        "label_resolution_notify_resolved": "Notify on resolution",
+        "resolution_patterns_ai_hint": "🤖 These patterns are automatically enriched by the AI each time a problem resolution is validated.",
+        "resolution_patterns_count": "{count} pattern(s)",
+        "resolution_patterns_add": "Add",
+        "resolution_patterns_clear_all": "Clear all",
+        "resolution_patterns_confirm_clear": "Delete all resolution patterns?",
+        "resolution_patterns_empty": "No patterns defined. Add them manually or let the AI learn them."
     },
     "monitor": {
         "title": "Monitor",
@@ -181,7 +203,20 @@
         "inactivity_tracking": "Inactivity tracking",
         "excluded_filter": "Exclusion filter",
         "unviewed_tooltip": "Unviewed analyses",
-        "mark_all_read": "Mark all as read"
+        "mark_all_read": "Mark all as read",
+        "status_normal": "Normal",
+        "status_alert": "In Alert",
+        "status_resolving": "AI Checking...",
+        "panel_alert_status": "Alert Status",
+        "btn_resolve_manually": "✅ Mark as resolved",
+        "badge_resolved": "Resolved",
+        "since": "since",
+        "resolution_box_title": "Resolution",
+        "resolved_at_label": "Resolved at:",
+        "alert_duration_label": "Alert duration:",
+        "resolution_line_label": "Resolution line:",
+        "resolution_patterns_label": "Detected patterns:",
+        "resolution_ai_conclusion": "AI conclusion:"
     },
     "chat": {
         "title": "AI Analysis Center",
@@ -516,7 +551,13 @@
         "ia_synthesis": "AI Synthesis",
         "summary_of_synthesis": "Synthesis summary",
         "full_synthesis_available": "*(Full synthesis available in the interface)*",
-        "meta_summary_prompt": "Summarize the following meta-analysis for a mobile notification (Discord/Telegram).\nKeep the main trends and critical points.\nUse bullet points.\nLimit to {max_chars} characters maximum.\n\nAnalysis to summarize:\n{response}"
+        "meta_summary_prompt": "Summarize the following meta-analysis for a mobile notification (Discord/Telegram).\nKeep the main trends and critical points.\nUse bullet points.\nLimit to {max_chars} characters maximum.\n\nAnalysis to summarize:\n{response}",
+        "resolution_resolved_subject": "[Resolved] {rule_name} — back to normal",
+        "resolution_resolved_body": "Rule \"{rule_name}\" is back to normal after {duration}.",
+        "resolution_ai_searching": "[AI Check] Resolution analysis in progress for {rule_name}...",
+        "resolution_ai_confirmed": "AI confirmed resolution with {confidence}% confidence.",
+        "resolution_ai_denied": "AI did not confirm resolution for {rule_name}. Monitoring continues.",
+        "resolution_manual": "Manual resolution by user."
     },
     "api_errors": {
         "orchestrator_not_configured": "Orchestrator not configured",

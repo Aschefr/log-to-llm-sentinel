@@ -6,7 +6,7 @@
 # Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low)
 
 project: log-to-llm-sentinel
-updated: 2026-04-29
+updated: 2026-05-25
 
 # ─────────────────────────────────────────────
 # GLOBAL RULES (apply to ALL tasks)
@@ -426,6 +426,69 @@ monitor:
     priority: P1
     notes: "A côté du nom des onglets des différentes règles, afficher le nombre de détections avec leurs criticité, ainsi que le nombres d'analyses non consulté par l'utilisateur."
     files: [app/models.py, app/database.py, app/routers/monitor.py, static/js/common.js, static/js/monitor.js, static/css/style.css, static/i18n/fr.json, static/i18n/en.json]
+
+  - id: MON-18
+    name: "Surveillance du retour à la normale"
+    status: DONE
+    effort: XL
+    priority: P1
+    notes: |
+      Permettre de détecter et notifier le retour à la normale d'un service/règle suite à une erreur.
+      Objectif : Éviter la fatigue des alertes et savoir quand un problème s'est résolu (auto-guérison ou action manuelle).
+    subtasks:
+      - id: MON-18a
+        name: "Configuration de la détection de rétablissement (par règle)"
+        status: DONE
+        notes: |
+          Ajouter dans la modale de configuration de chaque règle une section 'Surveillance de résolution' :
+          1) Mode temporel : absence d'erreur pendant X minutes (slider/input configurable).
+          2) Mode pattern : détection d'un log spécifique de succès (ex: 'connected', 'success', 'restored').
+          3) Toggle : Activer/désactiver la validation IA de la résolution (optionnel, désactivé par défaut).
+          4) Toggle notification : 'Notifier lors de la recherche de résolution par l'IA' (on/off).
+          5) Toggle notification : 'Notifier lors de la résolution confirmée' (on/off).
+          Tout le fonctionnement de base (modes temporel/pattern) est automatique et ne nécessite aucune intervention.
+      - id: MON-18b
+        name: "Moteur de détection de résolution"
+        status: DONE
+        notes: "Dans l'Orchestrateur, suivre l'état de chaque règle (Alerte vs Normal). Si un événement de résolution est détecté ou si la durée d'inactivité de l'erreur est atteinte, changer le statut de l'alerte à 'Résolu'. Si la validation IA est activée, le passage en 'Résolu' est conditionné à la confirmation de l'IA (MON-18f)."
+      - id: MON-18c
+        name: "Notifications de retour à la normale"
+        status: DONE
+        notes: |
+          Envoyer une notification de type '[Résolu] [NomInstance] ...' via Discord/Apprise/SMTP lorsque le statut repasse à normal, avec la durée totale de l'incident.
+          Les notifications respectent les toggles configurés par règle :
+          - Si 'notifier recherche IA' est actif → notification intermédiaire '[Analyse en cours] L'IA vérifie la résolution de...'.
+          - Si 'notifier résolution confirmée' est actif → notification finale '[Résolu] ...' avec durée de l'incident.
+      - id: MON-18d
+        name: "UI / Dashboard & Monitor"
+        status: DONE
+        notes: "Afficher visuellement l'état courant de la règle (Normal / En Alerte / Résolution en cours) sur le Dashboard et les onglets du Monitor. Ajouter un bouton de résolution manuelle ('Marquer comme résolu') pour l'utilisateur. Si la validation IA est en cours, afficher un indicateur de progression."
+      - id: MON-18e
+        name: "Historique et statistiques de rétablissement"
+        status: DONE
+        notes: "Enregistrer la date de résolution dans la base de données (colonne resolved_at et status dans les détections/analyses) et afficher le temps moyen de résolution (MTTR) sur le Dashboard."
+      - id: MON-18f
+        name: "Validation IA de la résolution (optionnel)"
+        status: DONE
+        notes: |
+          Lorsque le moteur détecte une résolution potentielle (pattern ou timeout), et si l'option IA est activée :
+          1) L'Orchestrateur envoie à Ollama le contexte complet : l'erreur initiale, les logs récents autour de la résolution potentielle, et la raison du déclenchement (pattern trouvé ou timeout atteint).
+          2) Ollama répond avec un verdict structuré : { "resolved": true/false, "confidence": 0-100, "explanation": "..." }.
+          3) Si resolved=true → le statut passe à 'Résolu' et la notification de résolution est envoyée (si activée).
+          4) Si resolved=false → le statut reste en 'Alerte', le moteur continue la surveillance, et l'explication IA est stockée dans l'historique.
+          5) Utilise le même modèle Ollama que les analyses classiques.
+          6) Tout ceci est transparent et automatique pour l'utilisateur — aucune action manuelle requise.
+      - id: MON-18g
+        name: "Auto-apprentissage des mots-clés de résolution (optionnel)"
+        status: DONE
+        notes: |
+          Inspiré du système d'auto-apprentissage de mots-clés existant (AL-01/02/03) :
+          1) Lorsque l'IA valide une résolution, elle extrait les mots-clés/patterns caractéristiques du retour à la normale (ex: 'connection restored', 'service started', 'healthy').
+          2) Ces mots-clés sont proposés automatiquement comme patterns de résolution pour la règle concernée (mode pattern de MON-18a).
+          3) Au fil du temps, la détection de résolution s'affine : les résolutions futures peuvent être détectées sans appel IA (performance + rapidité).
+          4) L'utilisateur peut consulter, valider ou rejeter les mots-clés appris dans la section configuration de la règle (même UX que le wizard de mots-clés existant).
+          5) Optionnel : désactivable par règle. Activé par défaut si la validation IA (MON-18f) est activée.
+    files: [app/models.py, app/database.py, app/services/orchestrator.py, app/services/resolution_service.py, app/routers/monitor.py, static/js/monitor.js, templates/dashboard.html, static/i18n/fr.json, static/i18n/en.json]
 
 
 # ─────────────────────────────────────────────

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query, Request
-from typing import Optional
+from typing import Optional, Any
 import json
 import asyncio
 from datetime import datetime
@@ -14,10 +14,15 @@ router = APIRouter(prefix="/api/monitor", tags=["monitor"])
 
 # Référence à l'orchestrateur partagé (accès aux buffers en mémoire)
 _orchestrator: Optional[Orchestrator] = None
+_resolution_service: Optional[Any] = None
 
 def set_orchestrator(orch: Orchestrator):
     global _orchestrator
     _orchestrator = orch
+
+def set_resolution_service(res_service):
+    global _resolution_service
+    _resolution_service = res_service
 
 
 @router.post("/notify/{analysis_id}")
@@ -113,6 +118,15 @@ def get_monitored_rules():
                     "last_analysis_at": last_analysis_dict.get(r.id).isoformat() + "Z" if last_analysis_dict.get(r.id) else None,
                     "inactivity_warning_enabled": r.inactivity_warning_enabled,
                     "inactivity_period_hours": r.inactivity_period_hours,
+                    # MON-18
+                    "alert_status": r.alert_status or "normal",
+                    "alert_started_at": r.alert_started_at.isoformat() + "Z" if r.alert_started_at else None,
+                    "resolution_mode": r.resolution_mode or "timeout",
+                    "resolution_timeout_minutes": r.resolution_timeout_minutes or 30,
+                    "resolution_patterns": r.get_resolution_patterns(),
+                    "resolution_ai_enabled": r.resolution_ai_enabled or False,
+                    "resolution_notify_search": r.resolution_notify_search or False,
+                    "resolution_notify_resolved": r.resolution_notify_resolved or False,
                 }
                 for r in rules
             ]
@@ -164,6 +178,8 @@ def get_buffer_status(rule_id: int):
         inactivity_warning_enabled = rule.inactivity_warning_enabled if rule else False
         inactivity_period_hours = rule.inactivity_period_hours if rule else 12
         inactivity_notify = rule.inactivity_notify if rule else True
+        alert_status = rule.alert_status or "normal" if rule else "normal"
+        alert_started_at = rule.alert_started_at.isoformat() + "Z" if rule and rule.alert_started_at else None
         
         from sqlalchemy import func
         from app.models import Analysis
@@ -179,7 +195,9 @@ def get_buffer_status(rule_id: int):
             "last_analysis_at": last_analysis_at,
             "inactivity_warning_enabled": inactivity_warning_enabled,
             "inactivity_period_hours": inactivity_period_hours,
-            "inactivity_notify": inactivity_notify
+            "inactivity_notify": inactivity_notify,
+            "alert_status": alert_status,
+            "alert_started_at": alert_started_at
         }
 
     return {
@@ -192,7 +210,9 @@ def get_buffer_status(rule_id: int):
         "last_analysis_at": last_analysis_at,
         "inactivity_warning_enabled": inactivity_warning_enabled,
         "inactivity_period_hours": inactivity_period_hours,
-        "inactivity_notify": inactivity_notify
+        "inactivity_notify": inactivity_notify,
+        "alert_status": alert_status,
+        "alert_started_at": alert_started_at
     }
 
 
@@ -219,6 +239,12 @@ def get_rule_analyses(rule_id: int, limit: int = Query(20)):
                 "notified": a.notified,
                 "viewed": a.viewed,
                 "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
+                "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
+                "resolution_status": a.resolution_status,
+                "resolution_line": a.resolution_line,
+                "resolution_patterns": json.loads(a.resolution_patterns_json or "[]"),
+                "resolution_ai_explanation": a.resolution_ai_explanation,
+                "resolution_ai_confidence": a.resolution_ai_confidence,
             }
             for a in analyses
         ]
@@ -228,7 +254,7 @@ def get_rule_analyses(rule_id: int, limit: int = Query(20)):
 
 @router.get("/search")
 def search_by_detection_id(id: str = Query(..., description="ID de détection à rechercher")):
-    """Retrouve une analyse par son detection_id."""
+    """Retrouve une critique par son detection_id."""
     db = SessionLocal()
     try:
         analysis = db.query(Analysis).filter(Analysis.detection_id == id).first()
@@ -250,6 +276,12 @@ def search_by_detection_id(id: str = Query(..., description="ID de détection à
                 "notified": analysis.notified,
                 "viewed": analysis.viewed,
                 "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
+                "resolved_at": analysis.resolved_at.isoformat() if analysis.resolved_at else None,
+                "resolution_status": analysis.resolution_status,
+                "resolution_line": analysis.resolution_line,
+                "resolution_patterns": json.loads(analysis.resolution_patterns_json or "[]"),
+                "resolution_ai_explanation": analysis.resolution_ai_explanation,
+                "resolution_ai_confidence": analysis.resolution_ai_confidence,
             }
         }
     finally:
@@ -500,3 +532,34 @@ async def chat_analysis(data: dict, request: Request):
         return {"status": "ok", "response": response}
     finally:
         db.close()
+
+
+@router.post("/rules/{rule_id}/resolve")
+async def resolve_rule_manually(rule_id: int):
+    """Résolution manuelle par l'utilisateur."""
+    if _resolution_service is None:
+        raise HTTPException(status_code=500, detail="resolution_service_not_initialized")
+    
+    await _resolution_service.mark_resolved_manually(rule_id)
+    return {"status": "ok", "message": "Règle marquée comme résolue"}
+
+
+@router.get("/rules/{rule_id}/resolution-status")
+def get_resolution_status(rule_id: int):
+    """Retourne l'état de résolution courant d'une règle."""
+    if _resolution_service is None:
+        raise HTTPException(status_code=500, detail="resolution_service_not_initialized")
+
+    state = _resolution_service._alert_states.get(rule_id)
+    if not state:
+        return {
+            "status": "normal",
+            "started_at": None,
+            "last_error_at": None
+        }
+
+    return {
+        "status": state.get("status", "normal"),
+        "started_at": state.get("started_at").isoformat() + "Z" if state.get("started_at") else None,
+        "last_error_at": state.get("last_error_at").isoformat() + "Z" if state.get("last_error_at") else None,
+    }

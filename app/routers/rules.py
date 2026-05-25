@@ -31,6 +31,14 @@ class RuleCreate(BaseModel):
     inactivity_warning_enabled: bool = True
     inactivity_period_hours: int = 1
     inactivity_notify: bool = True
+    # MON-18
+    alert_status: str = "normal"
+    resolution_mode: str = "timeout"
+    resolution_timeout_minutes: int = 30
+    resolution_patterns: List[str] = []
+    resolution_ai_enabled: bool = False
+    resolution_notify_search: bool = False
+    resolution_notify_resolved: bool = True
 
 
 class RuleUpdate(BaseModel):
@@ -48,6 +56,14 @@ class RuleUpdate(BaseModel):
     inactivity_warning_enabled: Optional[bool] = None
     inactivity_period_hours: Optional[int] = None
     inactivity_notify: Optional[bool] = None
+    # MON-18
+    alert_status: Optional[str] = None
+    resolution_mode: Optional[str] = None
+    resolution_timeout_minutes: Optional[int] = None
+    resolution_patterns: Optional[List[str]] = None
+    resolution_ai_enabled: Optional[bool] = None
+    resolution_notify_search: Optional[bool] = None
+    resolution_notify_resolved: Optional[bool] = None
 
 
 @router.get("")
@@ -81,6 +97,15 @@ def get_rules():
                 "last_line_received_at": r.last_line_received_at.isoformat() + "Z" if r.last_line_received_at else None,
                 "last_detection_id": None,
                 "last_analysis_severity": None,
+                # MON-18
+                "alert_status": r.alert_status or "normal",
+                "alert_started_at": r.alert_started_at.isoformat() + "Z" if r.alert_started_at else None,
+                "resolution_mode": r.resolution_mode or "timeout",
+                "resolution_timeout_minutes": r.resolution_timeout_minutes or 30,
+                "resolution_patterns": r.get_resolution_patterns(),
+                "resolution_ai_enabled": r.resolution_ai_enabled or False,
+                "resolution_notify_search": r.resolution_notify_search or False,
+                "resolution_notify_resolved": r.resolution_notify_resolved or False,
             }
             
             last_analysis = db.query(Analysis).filter(Analysis.rule_id == r.id).order_by(Analysis.analyzed_at.desc()).first()
@@ -120,6 +145,15 @@ def get_rule(rule_id: int):
             "inactivity_period_hours": rule.inactivity_period_hours,
             "inactivity_notify": rule.inactivity_notify,
             "last_line_received_at": rule.last_line_received_at.isoformat() + "Z" if rule.last_line_received_at else None,
+            # MON-18
+            "alert_status": rule.alert_status or "normal",
+            "alert_started_at": rule.alert_started_at.isoformat() + "Z" if rule.alert_started_at else None,
+            "resolution_mode": rule.resolution_mode or "timeout",
+            "resolution_timeout_minutes": rule.resolution_timeout_minutes or 30,
+            "resolution_patterns": rule.get_resolution_patterns(),
+            "resolution_ai_enabled": rule.resolution_ai_enabled or False,
+            "resolution_notify_search": rule.resolution_notify_search or False,
+            "resolution_notify_resolved": rule.resolution_notify_resolved or False,
         }
     finally:
         db.close()
@@ -141,9 +175,17 @@ def create_rule(rule_data: RuleCreate):
             inactivity_warning_enabled=rule_data.inactivity_warning_enabled,
             inactivity_period_hours=rule_data.inactivity_period_hours,
             inactivity_notify=rule_data.inactivity_notify,
+            # MON-18
+            alert_status=rule_data.alert_status,
+            resolution_mode=rule_data.resolution_mode,
+            resolution_timeout_minutes=rule_data.resolution_timeout_minutes,
+            resolution_ai_enabled=rule_data.resolution_ai_enabled,
+            resolution_notify_search=rule_data.resolution_notify_search,
+            resolution_notify_resolved=rule_data.resolution_notify_resolved,
         )
         rule.set_keywords(rule_data.keywords)
         rule.set_excluded_patterns(rule_data.excluded_patterns)
+        rule.set_resolution_patterns(rule_data.resolution_patterns)
         db.add(rule)
         db.commit()
         db.refresh(rule)
@@ -189,6 +231,21 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.inactivity_period_hours = rule_data.inactivity_period_hours
         if rule_data.inactivity_notify is not None:
             rule.inactivity_notify = rule_data.inactivity_notify
+        # MON-18
+        if rule_data.alert_status is not None:
+            rule.alert_status = rule_data.alert_status
+        if rule_data.resolution_mode is not None:
+            rule.resolution_mode = rule_data.resolution_mode
+        if rule_data.resolution_timeout_minutes is not None:
+            rule.resolution_timeout_minutes = rule_data.resolution_timeout_minutes
+        if rule_data.resolution_patterns is not None:
+            rule.set_resolution_patterns(rule_data.resolution_patterns)
+        if rule_data.resolution_ai_enabled is not None:
+            rule.resolution_ai_enabled = rule_data.resolution_ai_enabled
+        if rule_data.resolution_notify_search is not None:
+            rule.resolution_notify_search = rule_data.resolution_notify_search
+        if rule_data.resolution_notify_resolved is not None:
+            rule.resolution_notify_resolved = rule_data.resolution_notify_resolved
 
         db.commit()
         return {"id": rule.id, "message": "Règle mise à jour"}

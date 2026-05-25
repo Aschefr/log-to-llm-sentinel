@@ -41,6 +41,22 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+
+    const resetMttrBtn = document.getElementById('reset-mttr-btn');
+    if (resetMttrBtn) {
+        resetMttrBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            showInlineConfirm(resetMttrBtn, window.t ? window.t('dashboard.confirm_reset_mttr') : 'Are you sure you want to reset the MTTR?', async () => {
+                try {
+                    await apiFetch('/api/dashboard/reset-mttr', { method: 'POST' });
+                    loadStats();
+                } catch (error) {
+                    console.error('Erreur réinitialisation MTTR:', error);
+                    alert(window.t ? window.t('common.error') : 'Erreur lors de la réinitialisation');
+                }
+            });
+        });
+    }
 });
 
 async function loadStats() {
@@ -50,6 +66,11 @@ async function loadStats() {
         document.getElementById('active-rules').textContent = stats.active_rules;
         document.getElementById('total-analyses').textContent = stats.total_analyses;
         document.getElementById('today-analyses').textContent = stats.today_analyses;
+        
+        const mttrEl = document.getElementById('mttr-stat');
+        if (mttrEl) {
+            mttrEl.textContent = stats.mttr_minutes ? `${stats.mttr_minutes} min` : '—';
+        }
         
         document.getElementById('critical-count').textContent = stats.critical_count;
         document.getElementById('warning-count').textContent = stats.warning_count;
@@ -257,10 +278,22 @@ async function loadRulesStatus() {
             return;
         }
 
-        container.innerHTML = rules.map(rule => `
+        container.innerHTML = rules.map(rule => {
+            const alertStatus = rule.alert_status || 'normal';
+            let statusTitle = window.t ? window.t('monitor.status_normal') : 'Normal';
+            if (alertStatus === 'alert') {
+                statusTitle = window.t ? window.t('monitor.status_alert') : 'In Alert';
+            } else if (alertStatus === 'resolving') {
+                statusTitle = window.t ? window.t('monitor.status_resolving') : 'Resolving';
+            }
+            
+            return `
             <div class="rule-card">
                 <div class="rule-info">
-                    <h3 style="margin: 0; font-size: 1rem;">${escapeHtml(rule.name)}</h3>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                        <span class="rule-status-dot status-${alertStatus}" title="${statusTitle}"></span>
+                        <h3 style="margin: 0; font-size: 1rem;">${escapeHtml(rule.name)}</h3>
+                    </div>
                     <p style="margin-bottom: 0.5rem; font-size: 0.8rem; opacity: 0.8;">📁 ${escapeHtml(rule.log_file_path)}</p>
                     <div class="rule-last-line" style="margin-bottom: 0.5rem;">
                         <strong style="font-size:0.75rem; opacity:0.7; text-transform:uppercase; letter-spacing:0.05em;">${window.t('dashboard.live_log_line')}</strong>
@@ -278,7 +311,8 @@ async function loadRulesStatus() {
                     </div>` : `<div style="font-size:0.75rem; opacity:0.45; margin-top:0.3rem;">${window.t('dashboard.no_detection')}</div>`}
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (error) {
         console.error('Erreur chargement état des logs:', error);
         const container = document.getElementById('rules-status-list');

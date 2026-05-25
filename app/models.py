@@ -30,6 +30,16 @@ class Rule(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
+    # ── Resolution surveillance (MON-18) ──
+    alert_status = Column(String, default="normal")          # 'normal' | 'alert' | 'resolving'
+    alert_started_at = Column(DateTime, nullable=True)       # Timestamp du passage en alerte
+    resolution_mode = Column(String, default="timeout")      # 'timeout' | 'pattern' | 'both'
+    resolution_timeout_minutes = Column(Integer, default=30) # Durée sans erreur → résolu
+    resolution_patterns_json = Column(Text, default="[]")    # Patterns de résolution (ex: ["connected", "restored"])
+    resolution_ai_enabled = Column(Boolean, default=False)   # Validation IA optionnelle
+    resolution_notify_search = Column(Boolean, default=False)# Notifier quand l'IA cherche
+    resolution_notify_resolved = Column(Boolean, default=True)# Notifier quand résolu
+
     def get_keywords(self):
         import json
         try:
@@ -52,6 +62,17 @@ class Rule(Base):
         import json
         self.excluded_patterns_json = json.dumps(patterns)
 
+    def get_resolution_patterns(self):
+        import json
+        try:
+            return json.loads(self.resolution_patterns_json) if self.resolution_patterns_json else []
+        except json.JSONDecodeError:
+            return []
+
+    def set_resolution_patterns(self, patterns):
+        import json
+        self.resolution_patterns_json = json.dumps(patterns)
+
 
 class Analysis(Base):
     __tablename__ = "analyses"
@@ -68,6 +89,15 @@ class Analysis(Base):
     notified = Column(Boolean, default=False)
     viewed = Column(Boolean, default=False)
     analyzed_at = Column(DateTime, server_default=func.now())
+    resolved_at = Column(DateTime, nullable=True)    # Quand la résolution a été confirmée
+    resolution_status = Column(String, nullable=True) # 'pending' | 'resolved' | 'false_positive'
+    resolution_line = Column(Text, nullable=True)
+    resolution_patterns_json = Column(Text, default="[]")
+    resolution_ai_explanation = Column(Text, nullable=True)
+    resolution_ai_confidence = Column(Integer, nullable=True)
+    exclude_from_mttr = Column(Boolean, default=False)
+
+
 
 
 
