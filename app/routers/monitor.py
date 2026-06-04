@@ -555,11 +555,129 @@ def get_resolution_status(rule_id: int):
         return {
             "status": "normal",
             "started_at": None,
-            "last_error_at": None
+            "last_error_at": None,
+            "max_severity": "info",
         }
 
     return {
         "status": state.get("status", "normal"),
         "started_at": state.get("started_at").isoformat() + "Z" if state.get("started_at") else None,
         "last_error_at": state.get("last_error_at").isoformat() + "Z" if state.get("last_error_at") else None,
+        "max_severity": state.get("max_severity", "info"),
     }
+
+
+@router.get("/rules/{rule_id}/resolution-history")
+def get_resolution_history(rule_id: int, limit: int = Query(20), outcome: str = Query(None)):
+    """Retourne l'historique pagine des verdicts de resolution d'une regle.
+    Optionnel : filtrer par outcome (accepted, rejected_ai, rejected_low_confidence, manual, false_positive_user)."""
+    from app.models import ResolutionVerdict
+    db = SessionLocal()
+    try:
+        q = db.query(ResolutionVerdict).filter(ResolutionVerdict.rule_id == rule_id)
+        if outcome:
+            q = q.filter(ResolutionVerdict.outcome == outcome)
+        total = q.count()
+        verdicts = q.order_by(ResolutionVerdict.created_at.desc()).limit(limit).all()
+        return {
+            "total": total,
+            "verdicts": [
+                {
+                    "id": v.id,
+                    "trigger": v.trigger,
+                    "outcome": v.outcome,
+                    "ai_resolved": v.ai_resolved,
+                    "ai_confidence": v.ai_confidence,
+                    "ai_explanation": v.ai_explanation,
+                    "max_severity": v.max_severity,
+                    "resolution_line": v.resolution_line,
+                    "resolution_patterns": json.loads(v.resolution_patterns_json or "[]"),
+                    "context_lines": json.loads(v.context_lines_json or "[]"),
+                    "created_at": v.created_at.isoformat() + "Z" if v.created_at else None,
+                }
+                for v in verdicts
+            ]
+        }
+    finally:
+        db.close()
+
+
+@router.post("/verdicts/{verdict_id}/mark-false-positive")
+async def mark_verdict_false_positive(verdict_id: int):
+    """Marque un verdict comme faux-positif, decremente les poids des patterns impliques,
+    et remet la regle en alerte si elle est actuellement 'normal'."""
+    from app.models import ResolutionVerdict
+    db = SessionLocal()
+    try:
+        verdict = db.query(ResolutionVerdict).filter(ResolutionVerdict.id == verdict_id).first()
+        if not verdict:
+            raise HTTPException(status_code=404, detail="verdict_not_found")
+
+        rule = db.query(Rule).filter(Rule.id == verdict.rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="rule_not_found")
+
+        # Mise a jour du verdict
+        verdict.outcome = "false_positive_user"
+        
+        # Decrementation du poids des patterns impliques
+        patterns = json.loads(verdict.resolution_patterns_json or "[]")
+        for pattern in patterns:
+            rule.decrement_pattern_weight(pattern)
+
+        # Si la regle est actuellement 'normal' suite a ce verdict accepte, on la remet en alerte
+        if rule.alert_status == "normal" and verdict.outcome in ("accepted", "accepted_no_ai", "manual"):
+            rule.alert_status = "alert"
+            if _resolution_service and verdict.rule_id in _resolution_service._alert_states:
+                _resolution_service._alert_states[verdict.rule_id]["status"] = "alert"
+
+        db.commit()
+        return {"status": "ok", "patterns_decremented": patterns}
+    finally:
+        db.close()
+
+
+@router.get("/rules/{rule_id}/weighted-patterns")
+def get_weighted_patterns(rule_id: int):
+    """Retourne les patterns de resolution enrichis (poids, last_validated_at, error_keywords)."""
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="rule_not_found")
+        weighted = rule.get_weighted_resolution_patterns()
+        return {"rule_id": rule_id, "patterns": weighted, "count": len(weighted)}
+    finally:
+        db.close()
+
+
+@router.delete("/rules/{rule_id}/patterns/{pattern}")
+def delete_single_pattern(rule_id: int, pattern: str):
+    """Supprime un pattern de resolution specifique (via son nom encode en URL)."""
+    from urllib.parse import unquote
+    pattern_decoded = unquote(pattern)
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="rule_not_found")
+        before = len(rule.get_weighted_resolution_patterns())
+        rule.remove_pattern(pattern_decoded)
+        after = len(rule.get_weighted_resolution_patterns())
+        db.commit()
+        return {"status": "ok", "removed": pattern_decoded, "count_before": before, "count_after": after}
+    finally:
+        db.close()
+
+
+@router.post("/rules/{rule_id}/audit-patterns")
+async def audit_patterns(rule_id: int):
+    """Demande au LLM d'auditer la pertinence des patterns de resolution d'une regle.
+    Supprime automatiquement les patterns juges non pertinents."""
+    if _resolution_service is None:
+        raise HTTPException(status_code=500, detail="resolution_service_not_initialized")
+
+    result = await _resolution_service.audit_patterns_with_ai(rule_id)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result)
+    return result

@@ -241,19 +241,43 @@ function renderTabContent(rule) {
                 <span id="buffer-label-${rule.id}">${window.t ? window.t('monitor.buffer_inactive') : 'Inactive buffer'}</span>
             </div>
             
-            <!-- Recovery status panel (MON-18) -->
-            <div class="monitor-buffer-status" id="resolution-status-panel-${rule.id}" style="flex: 1; min-width: 250px; margin-bottom: 0; display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                    <span class="rule-status-dot status-${rule.alert_status || 'normal'}" id="resolution-dot-${rule.id}"></span>
-                    <span>
-                        <span style="opacity: 0.7;" data-i18n="monitor.panel_alert_status">État de l'alerte</span> : 
-                        <strong id="resolution-text-${rule.id}" class="status-text-${rule.alert_status || 'normal'}">
-                            ${rule.alert_status === 'alert' ? (window.t ? window.t('monitor.status_alert') : 'En Alerte') : rule.alert_status === 'resolving' ? (window.t ? window.t('monitor.status_resolving') : 'Vérification IA...') : (window.t ? window.t('monitor.status_normal') : 'Normal')}
-                        </strong>
-                        <span id="resolution-duration-${rule.id}" style="font-size: 0.8rem; opacity: 0.6; margin-left: 0.25rem;"></span>
-                    </span>
+            <div class="monitor-buffer-status" id="resolution-status-panel-${rule.id}" style="flex: 1; min-width: 250px; margin-bottom: 0;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span class="rule-status-dot status-${rule.alert_status || 'normal'}" id="resolution-dot-${rule.id}"></span>
+                        <span>
+                            <span style="opacity: 0.7;" data-i18n="monitor.panel_alert_status">État de l'alerte</span> : 
+                            <strong id="resolution-text-${rule.id}" class="status-text-${rule.alert_status || 'normal'}">
+                                ${rule.alert_status === 'alert' ? (window.t ? window.t('monitor.status_alert') : 'En Alerte') : rule.alert_status === 'resolving' ? (window.t ? window.t('monitor.status_resolving') : 'Vérification IA...') : (window.t ? window.t('monitor.status_normal') : 'Normal')}
+                            </strong>
+                            <span id="resolution-duration-${rule.id}" style="font-size: 0.8rem; opacity: 0.6; margin-left: 0.25rem;"></span>
+                        </span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+                        <!-- Badges de résumé des verdicts (toujours visibles) -->
+                        <span id="verdict-summary-${rule.id}" style="display: flex; gap: 0.3rem; align-items: center;"></span>
+                        <!-- Bouton historique IA -->
+                        <button class="btn btn-secondary btn-sm" style="padding: 0.15rem 0.5rem; font-size: 0.75rem;" onclick="toggleResolutionHistory(${rule.id})" id="btn-history-${rule.id}">
+                            📋 ${window.t ? window.t('monitor.resolution_history_btn') : 'Voir l\'historique IA'}
+                        </button>
+                        <button class="btn btn-secondary btn-sm ${rule.alert_status !== 'normal' ? '' : 'hidden'}" id="btn-manual-resolve-${rule.id}" onclick="triggerManualResolve(${rule.id}, this)" data-i18n="monitor.btn_resolve_manually">✅ Marquer comme résolu</button>
+                    </div>
                 </div>
-                <button class="btn btn-secondary btn-sm ${rule.alert_status !== 'normal' ? '' : 'hidden'}" id="btn-manual-resolve-${rule.id}" onclick="triggerManualResolve(${rule.id}, this)" data-i18n="monitor.btn_resolve_manually">✅ Marquer comme résolu</button>
+                <!-- Accordéon historique verdicts (replié par défaut) -->
+                <div id="resolution-history-panel-${rule.id}" class="hidden" style="margin-top: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.6rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                        <div style="font-size: 0.78rem; opacity: 0.6; font-weight: 500;">
+                            🤖 ${window.t ? window.t('monitor.resolution_history_title') : 'Historique IA de résolution'}
+                        </div>
+                        <button class="btn btn-secondary btn-sm" style="padding: 0.1rem 0.45rem; font-size: 0.7rem;" onclick="auditPatternsWithAI(${rule.id}, this)" id="btn-audit-patterns-${rule.id}" title="${window.t ? window.t('monitor.audit_patterns_btn_title') : 'Demander a l\'IA d\'evaluer la pertinence des patterns'}">
+                            🧹 ${window.t ? window.t('monitor.audit_patterns_btn') : 'Audit IA'}
+                        </button>
+                    </div>
+                    <div id="audit-result-${rule.id}" class="hidden" style="margin-bottom: 0.5rem; font-size: 0.78rem; padding: 0.4rem 0.6rem; border-radius: 5px; background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.15);"></div>
+                    <div id="resolution-history-list-${rule.id}" style="max-height: 280px; overflow-y: auto;">
+                        <em style="opacity: 0.5; font-size: 0.8rem;">${window.t ? window.t('common.loading') : 'Chargement...'}</em>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -322,7 +346,11 @@ function renderTabContent(rule) {
     if (rule.last_learning_session_id) {
         _loadMonitorAutolearn(rule.id, rule.last_learning_session_id);
     }
-    // Charger les analyses immédiatement
+    // MON-19: Charger les badges de resume des verdicts si la resolution est active
+    if (rule.resolution_mode && rule.resolution_mode !== 'disabled') {
+        loadAndRefreshVerdictSummary(rule.id);
+    }
+    // Charger les analyses immediatement
     loadMonitorAnalyses(rule.id);
 }
 
@@ -1274,3 +1302,230 @@ async function triggerManualResolve(ruleId, btnElement) {
     }
 }
 
+// ─── Historique des verdicts de résolution (MON-19/MON-20) ────────────────
+
+async function toggleResolutionHistory(ruleId) {
+    const panel = document.getElementById(`resolution-history-panel-${ruleId}`);
+    if (!panel) return;
+    const isHidden = panel.classList.toggle('hidden');
+    if (!isHidden) {
+        await loadResolutionHistory(ruleId);
+    }
+}
+
+async function loadResolutionHistory(ruleId, limit = 20) {
+    const listEl = document.getElementById(`resolution-history-list-${ruleId}`);
+    if (!listEl) return;
+    listEl.innerHTML = `<em style="opacity:0.5;font-size:0.8rem;">${window.t ? window.t('common.loading') : 'Chargement...'}</em>`;
+    try {
+        const data = await apiFetch(`/api/monitor/rules/${ruleId}/resolution-history?limit=${limit}`);
+        const verdicts = data.verdicts || [];
+
+        // Mettre a jour les badges de resume
+        updateVerdictSummaryBadges(ruleId, verdicts, data.total);
+
+        if (verdicts.length === 0) {
+            listEl.innerHTML = `<em style="opacity:0.45;font-size:0.8rem;">${window.t ? window.t('monitor.resolution_history_empty') : 'Aucun verdict enregistre.'}</em>`;
+            return;
+        }
+
+        listEl.innerHTML = verdicts.map(v => renderVerdictRow(v, ruleId)).join('');
+    } catch (e) {
+        listEl.innerHTML = `<em style="color:var(--danger);font-size:0.8rem;">${escapeHtml(e.message)}</em>`;
+    }
+}
+
+async function loadAndRefreshVerdictSummary(ruleId) {
+    try {
+        const data = await apiFetch(`/api/monitor/rules/${ruleId}/resolution-history?limit=50`);
+        updateVerdictSummaryBadges(ruleId, data.verdicts || [], data.total || 0);
+    } catch (e) {}
+}
+
+function updateVerdictSummaryBadges(ruleId, verdicts, total) {
+    const summaryEl = document.getElementById(`verdict-summary-${ruleId}`);
+    if (!summaryEl || total === 0) return;
+
+    const accepted = verdicts.filter(v => ['accepted', 'accepted_no_ai', 'manual'].includes(v.outcome)).length;
+    const rejected = verdicts.filter(v => ['rejected_ai', 'rejected_low_confidence'].includes(v.outcome)).length;
+    const fp = verdicts.filter(v => v.outcome === 'false_positive_user').length;
+
+    const badges = [];
+    if (accepted > 0) badges.push(`<span title="${window.t ? window.t('monitor.resolution_summary_accepted') : 'acceptees'}" style="font-size:0.7rem;padding:0.05rem 0.3rem;border-radius:3px;background:rgba(16,185,129,0.15);color:var(--success);border:1px solid rgba(16,185,129,0.3);">✅ ${accepted}</span>`);
+    if (rejected > 0) badges.push(`<span title="${window.t ? window.t('monitor.resolution_summary_rejected') : 'rejetees'}" style="font-size:0.7rem;padding:0.05rem 0.3rem;border-radius:3px;background:rgba(245,158,11,0.15);color:var(--warning);border:1px solid rgba(245,158,11,0.3);">⚠️ ${rejected}</span>`);
+    if (fp > 0) badges.push(`<span title="${window.t ? window.t('monitor.resolution_summary_fp') : 'faux-positifs'}" style="font-size:0.7rem;padding:0.05rem 0.3rem;border-radius:3px;background:rgba(239,68,68,0.15);color:var(--danger);border:1px solid rgba(239,68,68,0.3);">🚫 ${fp}</span>`);
+    summaryEl.innerHTML = badges.join('');
+}
+
+function getOutcomeLabel(outcome) {
+    const map = {
+        'accepted': window.t ? window.t('monitor.verdict_outcome_accepted') : 'Accepte',
+        'accepted_no_ai': window.t ? window.t('monitor.verdict_outcome_accepted_no_ai') : 'Accepte (sans IA)',
+        'rejected_ai': window.t ? window.t('monitor.verdict_outcome_rejected_ai') : 'Rejete par l\'IA',
+        'rejected_low_confidence': window.t ? window.t('monitor.verdict_outcome_rejected_low_confidence') : 'Rejete (confiance basse)',
+        'manual': window.t ? window.t('monitor.verdict_outcome_manual') : 'Manuel',
+        'false_positive_user': window.t ? window.t('monitor.verdict_outcome_false_positive_user') : 'Faux-positif',
+    };
+    return map[outcome] || outcome;
+}
+
+function getOutcomeStyle(outcome) {
+    if (['accepted', 'accepted_no_ai', 'manual'].includes(outcome)) {
+        return 'background:rgba(16,185,129,0.12);color:var(--success);border:1px solid rgba(16,185,129,0.25);';
+    } else if (['rejected_ai', 'rejected_low_confidence'].includes(outcome)) {
+        return 'background:rgba(245,158,11,0.12);color:var(--warning);border:1px solid rgba(245,158,11,0.25);';
+    } else if (outcome === 'false_positive_user') {
+        return 'background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.25);';
+    }
+    return 'background:rgba(255,255,255,0.05);border:1px solid var(--border);';
+}
+
+function renderVerdictRow(v, ruleId) {
+    const isFp = v.outcome === 'false_positive_user';
+    const canMarkFp = !isFp && ['accepted', 'accepted_no_ai', 'manual'].includes(v.outcome);
+    const outcomeStyle = getOutcomeStyle(v.outcome);
+
+    const severityBadge = v.max_severity
+        ? `<span class="severity-badge ${escapeHtml(v.max_severity)}" style="font-size:0.65rem;padding:0.05rem 0.25rem;vertical-align:middle;">${escapeHtml(v.max_severity)}</span>`
+        : '';
+
+    const confidenceBadge = v.ai_confidence !== null && v.ai_confidence !== undefined
+        ? `<span title="${window.t ? window.t('monitor.verdict_confidence_label') : 'Confiance IA'}" style="font-size:0.68rem;opacity:0.75;">${v.ai_confidence}%</span>`
+        : '';
+
+    const patternsHtml = v.resolution_patterns && v.resolution_patterns.length > 0
+        ? v.resolution_patterns.map(p => `<span class="log-kw-badge" style="font-size:0.68rem;padding:0.05rem 0.25rem;background:rgba(99,102,241,0.1);color:var(--primary);border:1px solid rgba(99,102,241,0.2);">${escapeHtml(p)}</span>`).join(' ')
+        : '';
+
+    return `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:0.4rem;padding:0.35rem 0.5rem;border-radius:5px;margin-bottom:0.3rem;font-size:0.79rem;${outcomeStyle}">
+        <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap;margin-bottom:0.15rem;">
+                <span style="font-weight:600;">${escapeHtml(getOutcomeLabel(v.outcome))}</span>
+                ${confidenceBadge}
+                ${severityBadge}
+                <span style="opacity:0.5;font-size:0.72rem;margin-left:auto;white-space:nowrap;">${v.created_at ? formatDate(v.created_at) : ''}</span>
+            </div>
+            ${patternsHtml ? `<div style="margin-bottom:0.1rem;">${patternsHtml}</div>` : ''}
+            ${v.trigger ? `<div style="opacity:0.65;font-size:0.73rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(v.trigger)}</div>` : ''}
+        </div>
+        <div style="display:flex;gap:0.25rem;align-items:center;flex-shrink:0;">
+            <button class="btn btn-secondary btn-sm" style="padding:0.1rem 0.35rem;font-size:0.7rem;" onclick="openVerdictModal(${JSON.stringify(v).replace(/"/g, '&quot;')}, ${ruleId})" title="Détail">🔍</button>
+            ${canMarkFp ? `<button class="btn btn-secondary btn-sm" style="padding:0.1rem 0.35rem;font-size:0.7rem;color:var(--danger);" onclick="markVerdictFalsePositive(${v.id}, ${ruleId}, this)" title="${window.t ? window.t('monitor.verdict_mark_fp') : 'Marquer faux-positif'}">🚫</button>` : ''}
+        </div>
+    </div>`;
+}
+
+async function markVerdictFalsePositive(verdictId, ruleId, btnEl) {
+    const confirmMsg = window.t ? window.t('monitor.verdict_mark_fp_confirm') : 'Marquer ce verdict comme faux-positif ?';
+    showInlineConfirm(btnEl, confirmMsg, async () => {
+        try {
+            await apiFetch(`/api/monitor/verdicts/${verdictId}/mark-false-positive`, { method: 'POST' });
+            await loadResolutionHistory(ruleId);
+        } catch (e) {
+            alert((window.t ? window.t('common.error') : 'Error') + ': ' + e.message);
+        }
+    });
+}
+
+function openVerdictModal(verdict, ruleId) {
+    // Creer ou reutiliser le modal
+    let modal = document.getElementById('verdict-detail-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'verdict-detail-modal';
+        modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);';
+        modal.innerHTML = '<div id="verdict-modal-inner" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;max-width:700px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.5);"></div>';
+        modal.addEventListener('click', e => { if (e.target === modal) modal.classList.add('hidden'); });
+        document.body.appendChild(modal);
+    }
+    modal.classList.remove('hidden');
+
+    const canMarkFp = !['false_positive_user'].includes(verdict.outcome) && ['accepted', 'accepted_no_ai', 'manual'].includes(verdict.outcome);
+    const contextLines = verdict.context_lines || [];
+    const patternsHtml = verdict.resolution_patterns && verdict.resolution_patterns.length > 0
+        ? verdict.resolution_patterns.map(p => `<code style="background:rgba(99,102,241,0.1);color:var(--primary);border-radius:3px;padding:0.1rem 0.3rem;font-size:0.8rem;">${escapeHtml(p)}</code>`).join(' ')
+        : '<em style="opacity:0.5;">—</em>';
+
+    document.getElementById('verdict-modal-inner').innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+            <strong style="font-size:1rem;">🤖 ${window.t ? window.t('monitor.resolution_history_title') : 'Verdict IA'}</strong>
+            <button class="btn-icon" onclick="document.getElementById('verdict-detail-modal').classList.add('hidden')">✕</button>
+        </div>
+        <div style="display:grid;gap:0.5rem;font-size:0.85rem;">
+            <div style="display:flex;gap:0.5rem;align-items:center;padding:0.4rem 0.6rem;border-radius:6px;${getOutcomeStyle(verdict.outcome)}">
+                <strong>${escapeHtml(getOutcomeLabel(verdict.outcome))}</strong>
+                ${verdict.ai_confidence !== null && verdict.ai_confidence !== undefined ? `<span style="opacity:0.7;">${verdict.ai_confidence}%</span>` : ''}
+                ${verdict.max_severity ? `<span class="severity-badge ${escapeHtml(verdict.max_severity)}" style="font-size:0.7rem;">${escapeHtml(verdict.max_severity)}</span>` : ''}
+                <span style="opacity:0.5;margin-left:auto;font-size:0.78rem;">${verdict.created_at ? formatDate(verdict.created_at) : ''}</span>
+            </div>
+            <div><span style="opacity:0.6;font-size:0.8rem;">${window.t ? window.t('monitor.verdict_trigger_label') : 'Déclencheur'}</span><div style="margin-top:0.15rem;">${escapeHtml(verdict.trigger || '—')}</div></div>
+            <div><span style="opacity:0.6;font-size:0.8rem;">Patterns</span><div style="margin-top:0.15rem;">${patternsHtml}</div></div>
+            ${verdict.resolution_line ? `<div><span style="opacity:0.6;font-size:0.8rem;">${window.t ? window.t('monitor.resolution_line_label') : 'Ligne de résolution'}</span><code style="display:block;margin-top:0.2rem;font-size:0.77rem;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:4px;padding:0.35rem 0.5rem;word-break:break-all;">${escapeHtml(verdict.resolution_line)}</code></div>` : ''}
+            ${verdict.ai_explanation ? `<div><span style="opacity:0.6;font-size:0.8rem;">${window.t ? window.t('monitor.resolution_ai_conclusion') : 'Conclusion IA'}</span><div style="margin-top:0.2rem;font-style:italic;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:4px;padding:0.4rem 0.6rem;font-size:0.82rem;">${escapeHtml(verdict.ai_explanation)}</div></div>` : ''}
+            ${contextLines.length > 0 ? `
+            <details style="margin-top:0.25rem;">
+                <summary style="cursor:pointer;opacity:0.65;font-size:0.8rem;">${window.t ? window.t('monitor.verdict_context_label') : 'Logs contextuels'} (${contextLines.length} lignes)</summary>
+                <pre style="margin-top:0.4rem;background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:5px;padding:0.5rem 0.75rem;font-size:0.74rem;line-height:1.5;max-height:200px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;">${contextLines.map(l => escapeHtml(l)).join('\n')}</pre>
+            </details>` : ''}
+        </div>
+        <div style="margin-top:1rem;display:flex;justify-content:flex-end;gap:0.5rem;">
+            ${canMarkFp ? `<button class="btn btn-secondary btn-sm" style="color:var(--danger);" onclick="markVerdictFalsePositive(${verdict.id}, ${ruleId}, this); document.getElementById('verdict-detail-modal').classList.add('hidden');">🚫 ${window.t ? window.t('monitor.verdict_mark_fp') : 'Marquer faux-positif'}</button>` : ''}
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('verdict-detail-modal').classList.add('hidden');">${window.t ? window.t('monitor.resolution_history_close') : 'Fermer'}</button>
+        </div>
+    `;
+}
+
+// ─── Audit IA des patterns (MON-21) ──────────────────────────────────────
+
+async function auditPatternsWithAI(ruleId, btnEl) {
+    if (btnEl.disabled) return;
+    btnEl.disabled = true;
+    const origHtml = btnEl.innerHTML;
+    btnEl.innerHTML = `⏳ ${window.t ? window.t('common.loading') : 'Analyse...'}`;
+
+    const resultEl = document.getElementById(`audit-result-${ruleId}`);
+
+    try {
+        const data = await apiFetch(`/api/monitor/rules/${ruleId}/audit-patterns`, { method: 'POST' });
+
+        if (resultEl) {
+            resultEl.classList.remove('hidden');
+
+            const kept = data.kept || [];
+            const removed = data.removed || [];
+            const explanation = data.explanation || '';
+
+            let html = `<div style="margin-bottom:0.3rem;font-weight:600;">🧹 ${window.t ? window.t('monitor.audit_result_title') : 'Resultat de l\'audit IA'}</div>`;
+
+            if (removed.length > 0) {
+                html += `<div style="margin-bottom:0.2rem;color:var(--danger);">❌ ${window.t ? window.t('monitor.audit_removed') : 'Supprimes'} (${removed.length}): ${removed.map(p => `<code style="background:rgba(239,68,68,0.1);padding:0.05rem 0.25rem;border-radius:3px;">${escapeHtml(p)}</code>`).join(' ')}</div>`;
+            }
+
+            if (kept.length > 0) {
+                html += `<div style="margin-bottom:0.2rem;color:var(--success);">✅ ${window.t ? window.t('monitor.audit_kept') : 'Conserves'} (${kept.length}): ${kept.map(p => `<code style="background:rgba(16,185,129,0.1);padding:0.05rem 0.25rem;border-radius:3px;">${escapeHtml(p)}</code>`).join(' ')}</div>`;
+            }
+
+            if (explanation) {
+                html += `<div style="margin-top:0.2rem;font-style:italic;opacity:0.75;">${escapeHtml(explanation)}</div>`;
+            }
+
+            if (removed.length === 0 && kept.length === 0) {
+                html += `<div style="opacity:0.6;">${window.t ? window.t('monitor.audit_no_change') : 'Aucun changement suggere.'}</div>`;
+            }
+
+            resultEl.innerHTML = html;
+        }
+
+        // Rafraichir les badges et l'historique
+        await loadAndRefreshVerdictSummary(ruleId);
+
+    } catch (e) {
+        if (resultEl) {
+            resultEl.classList.remove('hidden');
+            resultEl.innerHTML = `<span style="color:var(--danger);">❌ ${escapeHtml(e.message)}</span>`;
+        }
+    } finally {
+        btnEl.disabled = false;
+        btnEl.innerHTML = origHtml;
+    }
+}

@@ -695,3 +695,77 @@ bugs:
     notes: |
       Symptom: In Discord notification method, the character limit checks and Ollama-based AI summarization before sending were missing. Also, the configuration page lacked a character limit input for Discord.
       Fix: Unified the formatting (Markdown instead of HTML) and character limit summarization logic for both Discord and Apprise across all notification vectors (Orchestrator log alerts, MetaAnalysis reports, Watcher inactivity alerts, and Rule test endpoints). Added a dedicated character limit input in the Discord configuration UI section, automatically synchronized with apprise_max_chars.
+
+  - id: MON-19
+    name: "Resolution severity filtering: respect rule notify_severity_threshold for all resolution notifications"
+    status: DONE
+    effort: M
+    priority: P1
+    notes: |
+      Problem: ResolutionService._send_notification_for() was sending 'search', 'denied', and 'resolved'
+      notifications regardless of the rule's notify_severity_threshold. If the user set threshold to 'critical',
+      they still received resolution notifications for 'info' or 'warning' incidents.
+      Fix: Added _should_notify_for_rule() and _get_max_severity_for_rule() helpers to ResolutionService.
+      max_severity is now tracked in _alert_states and updated by on_error_detected(severity=...).
+      Option 1 chosen: ALL resolution notifications are filtered (search + denied + resolved).
+      Files: resolution_service.py, orchestrator.py (passes severity to on_error_detected).
+
+  - id: MON-20
+    name: "Resolution detection reliability: structured verdict history, weighted patterns, false-positive tracking"
+    status: DONE
+    effort: L
+    priority: P1
+    notes: |
+      Problem: Resolution attempts (accepted, rejected, low-confidence) were not persisted. False positives
+      were not tracked. Resolution patterns had no weight/confidence scoring.
+      Fix:
+        1. New table resolution_verdicts (models.py + database.py migration) — traces every resolution
+           attempt with trigger, outcome, confidence, context logs, and matched patterns.
+        2. Rule.resolution_patterns_json format enriched: [{pattern, weight, error_keywords}] with
+           full backward compatibility. New methods: get_weighted_resolution_patterns(),
+           increment_pattern_weight(), decrement_pattern_weight().
+        3. _try_resolve() now records a verdict for all 5 outcomes: accepted, rejected_ai,
+           rejected_low_confidence, accepted_no_ai, manual.
+        4. Dynamic confidence threshold: if pattern weight >= 3, AI confidence threshold drops 50% -> 30%.
+        5. Patterns sorted by weight (highest first) during on_new_lines() matching.
+        6. New API endpoints: GET /api/monitor/rules/{id}/resolution-history,
+           POST /api/monitor/verdicts/{id}/mark-false-positive.
+        7. UI (monitor.js): compact verdict summary badges always visible, collapsible AI history
+           accordion, and a modal popup for full verdict detail (context logs + AI response).
+      Files: models.py, database.py, resolution_service.py, monitor.py, monitor.js, fr.json, en.json.
+
+  - id: MON-21
+    name: "Pattern lifecycle: temporal decay, weighted display in UI, AI audit"
+    status: DONE
+    effort: L
+    priority: P1
+    notes: |
+      Implements 3 complementary mechanisms for pattern lifecycle management:
+
+      1. TEMPORAL DECAY (Option 1):
+         - Each pattern now has a `last_validated_at` timestamp in its enriched format.
+         - increment_pattern_weight() sets last_validated_at to now on each validation.
+         - New method decay_stale_patterns() in ResolutionService: decrements weight of patterns
+           not validated in PATTERN_DECAY_DAYS (14d). Removes patterns at weight 0.
+         - Scheduled as _pattern_decay_checker() in main.py every PATTERN_DECAY_INTERVAL_HOURS (6h).
+         - Patterns without last_validated_at (migration) get initialized to now on first decay cycle.
+
+      2. WEIGHTED DISPLAY IN UI (Option 2):
+         - API response for GET /rules and GET /rules/{id} now includes resolution_patterns_weighted
+           (enriched format with pattern, weight, last_validated_at, error_keywords).
+         - rule_modal.js: pattern tags now show a weight badge (circle with number for weight > 1)
+           and relative time since last validation (e.g. "3d", "12h").
+         - CSS: .res-tag-weight and .res-tag-time classes added.
+         - Individual pattern deletion also removes from weighted array.
+
+      3. AI AUDIT (Option 3):
+         - New method audit_patterns_with_ai(rule_id) in ResolutionService: sends patterns + rule
+           context + recent log lines to the LLM, asks it to classify each as RELEVANT or IRRELEVANT.
+         - Auto-applies removals. Returns kept/removed/explanation.
+         - New API endpoint: POST /api/monitor/rules/{id}/audit-patterns.
+         - New method remove_pattern(pattern) on Rule model for targeted deletion.
+         - UI: "Audit IA" button in the resolution history accordion panel. Shows results inline
+           with color-coded removed/kept lists and AI explanation.
+
+      Files: models.py, resolution_service.py, main.py, rules.py, monitor.py, rule_modal.js,
+             monitor.js, style.css, fr.json, en.json.

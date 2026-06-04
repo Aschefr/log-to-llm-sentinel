@@ -85,6 +85,21 @@ def init_db():
         "ALTER TABLE analyses ADD COLUMN resolution_ai_confidence INTEGER DEFAULT NULL",
         "ALTER TABLE analyses ADD COLUMN exclude_from_mttr BOOLEAN DEFAULT 0",
         "UPDATE analyses SET resolved_at = datetime(analyzed_at, '+5 minutes'), exclude_from_mttr = 1 WHERE resolution_status = 'resolved' AND resolved_at IS NULL",
+        # MON-19 / MON-20: Resolution verdict tracing + severity filtering
+        """CREATE TABLE IF NOT EXISTS resolution_verdicts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rule_id INTEGER NOT NULL,
+            trigger TEXT,
+            ai_resolved BOOLEAN,
+            ai_confidence INTEGER,
+            ai_explanation TEXT,
+            outcome TEXT NOT NULL,
+            max_severity TEXT,
+            context_lines_json TEXT DEFAULT '[]',
+            resolution_line TEXT,
+            resolution_patterns_json TEXT DEFAULT '[]',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
     ]
 
     with engine.connect() as conn:

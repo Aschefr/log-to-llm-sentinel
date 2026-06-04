@@ -265,7 +265,7 @@ class Orchestrator:
 
         # Hook de signalement d'erreur pour la résolution
         if self.resolution_service:
-            await self.resolution_service.on_error_detected(rule.id)
+            await self.resolution_service.on_error_detected(rule.id, severity=severity)
             
     async def trigger_notification(self, analysis: Analysis, rule: Rule, config: dict, db) -> bool:
         """Envoie manuellement ou automatiquement une notification pour une analyse existante."""

@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, Text, 
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
+import json as _json
 
 from app.database import Base
 
@@ -63,15 +64,98 @@ class Rule(Base):
         self.excluded_patterns_json = json.dumps(patterns)
 
     def get_resolution_patterns(self):
-        import json
+        """Retourne une liste simple de strings pour la compatibilite avec le code existant."""
         try:
-            return json.loads(self.resolution_patterns_json) if self.resolution_patterns_json else []
-        except json.JSONDecodeError:
+            data = _json.loads(self.resolution_patterns_json) if self.resolution_patterns_json else []
+            if not data:
+                return []
+            # Format enrichi : [{"pattern": ..., "weight": ..., "error_keywords": [...]}]
+            if isinstance(data[0], dict):
+                return [item["pattern"] for item in data if item.get("pattern")]
+            # Format legacy : ["pattern1", "pattern2"]
+            return [str(p) for p in data if p]
+        except Exception:
+            return []
+
+    def get_weighted_resolution_patterns(self):
+        """Retourne la liste enrichie avec poids et mots-cles d'erreur associes."""
+        try:
+            data = _json.loads(self.resolution_patterns_json) if self.resolution_patterns_json else []
+            if not data:
+                return []
+            if isinstance(data[0], dict):
+                return data
+            # Migration depuis le format legacy
+            return [{"pattern": str(p), "weight": 1, "error_keywords": []} for p in data if p]
+        except Exception:
             return []
 
     def set_resolution_patterns(self, patterns):
-        import json
-        self.resolution_patterns_json = json.dumps(patterns)
+        """Accepte une liste de strings (format legacy) ou d'objets enrichis."""
+        if patterns and isinstance(patterns[0], str):
+            # Conversion depuis format legacy : preserve le poids existant si disponible
+            existing = {item["pattern"]: item for item in self.get_weighted_resolution_patterns()}
+            enriched = []
+            for p in patterns:
+                if p in existing:
+                    enriched.append(existing[p])
+                else:
+                    enriched.append({"pattern": p, "weight": 1, "error_keywords": []})
+            self.resolution_patterns_json = _json.dumps(enriched)
+        else:
+            self.resolution_patterns_json = _json.dumps(patterns)
+
+    def set_weighted_resolution_patterns(self, weighted_patterns):
+        """Enregistre directement la liste enrichie."""
+        self.resolution_patterns_json = _json.dumps(weighted_patterns)
+
+    def increment_pattern_weight(self, pattern: str, error_keywords: list = None):
+        """Incremente le poids d'un pattern existant ou l'ajoute avec weight=1.
+        Met a jour last_validated_at a la date courante."""
+        weighted = self.get_weighted_resolution_patterns()
+        now_iso = datetime.utcnow().isoformat() + "Z"
+        found = False
+        for item in weighted:
+            if item.get("pattern", "").lower() == pattern.lower():
+                item["weight"] = item.get("weight", 1) + 1
+                item["last_validated_at"] = now_iso
+                if error_keywords:
+                    existing_kw = item.get("error_keywords", [])
+                    for kw in error_keywords:
+                        if kw.lower() not in [e.lower() for e in existing_kw]:
+                            existing_kw.append(kw)
+                    item["error_keywords"] = existing_kw
+                found = True
+                break
+        if not found:
+            weighted.append({
+                "pattern": pattern,
+                "weight": 1,
+                "error_keywords": error_keywords or [],
+                "last_validated_at": now_iso
+            })
+        self.set_weighted_resolution_patterns(weighted)
+
+    def decrement_pattern_weight(self, pattern: str):
+        """Decremente le poids d'un pattern (faux-positif utilisateur). Supprime si poids <= 0."""
+        weighted = self.get_weighted_resolution_patterns()
+        updated = []
+        for item in weighted:
+            if item.get("pattern", "").lower() == pattern.lower():
+                new_weight = item.get("weight", 1) - 1
+                if new_weight > 0:
+                    item["weight"] = new_weight
+                    updated.append(item)
+                # Supprime si poids <= 0
+            else:
+                updated.append(item)
+        self.set_weighted_resolution_patterns(updated)
+
+    def remove_pattern(self, pattern: str):
+        """Supprime un pattern specifique de la liste."""
+        weighted = self.get_weighted_resolution_patterns()
+        updated = [item for item in weighted if item.get("pattern", "").lower() != pattern.lower()]
+        self.set_weighted_resolution_patterns(updated)
 
 
 class Analysis(Base):
@@ -79,9 +163,9 @@ class Analysis(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     rule_id = Column(Integer, index=True)
-    detection_id = Column(String, index=True, nullable=True)  # UUID court de détection
+    detection_id = Column(String, index=True, nullable=True)  # UUID court de detection
     triggered_line = Column(Text, nullable=False)
-    matched_keywords_json = Column(Text, default="[]")  # mots-clés ayant déclenché la règle
+    matched_keywords_json = Column(Text, default="[]")  # mots-cles ayant declenche la regle
     context_before_json = Column(Text, default="[]")
     context_after_json = Column(Text, default="[]")
     ollama_response = Column(Text)
@@ -89,13 +173,32 @@ class Analysis(Base):
     notified = Column(Boolean, default=False)
     viewed = Column(Boolean, default=False)
     analyzed_at = Column(DateTime, server_default=func.now())
-    resolved_at = Column(DateTime, nullable=True)    # Quand la résolution a été confirmée
+    resolved_at = Column(DateTime, nullable=True)    # Quand la resolution a ete confirmee
     resolution_status = Column(String, nullable=True) # 'pending' | 'resolved' | 'false_positive'
     resolution_line = Column(Text, nullable=True)
     resolution_patterns_json = Column(Text, default="[]")
     resolution_ai_explanation = Column(Text, nullable=True)
     resolution_ai_confidence = Column(Integer, nullable=True)
     exclude_from_mttr = Column(Boolean, default=False)
+
+
+class ResolutionVerdict(Base):
+    """Trace chaque tentative de resolution (acceptee, rejetee, faux-positif).
+    Permet l'audit complet des echanges IA internes lies au retour a la normale."""
+    __tablename__ = "resolution_verdicts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    rule_id = Column(Integer, index=True)
+    trigger = Column(String)                          # Ex : "Pattern match: 'restored'" ou "Timeout (30 min)"
+    ai_resolved = Column(Boolean, nullable=True)      # True/False/None (None = pas de validation IA)
+    ai_confidence = Column(Integer, nullable=True)    # 0-100
+    ai_explanation = Column(Text, nullable=True)      # Explication brute de l'IA
+    outcome = Column(String)                          # 'accepted' | 'rejected_ai' | 'rejected_low_confidence' | 'accepted_no_ai' | 'manual' | 'false_positive_user'
+    max_severity = Column(String, nullable=True)      # Severite max de l'alerte au moment du verdict
+    context_lines_json = Column(Text, default="[]")   # Lignes de log envoyees a l'IA pour audit
+    resolution_line = Column(Text, nullable=True)     # Ligne qui a declenche la tentative de resolution
+    resolution_patterns_json = Column(Text, default="[]")  # Patterns ayant matche
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 

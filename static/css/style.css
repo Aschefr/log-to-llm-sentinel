@@ -2917,4 +2917,26 @@ select.kw-input option {
     border-color: rgba(16, 185, 129, 0.6);
 }
 
+/* ── Weight & time badges inside resolution pattern tags ── */
+.res-tag-weight {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(99, 102, 241, 0.2);
+    color: var(--accent);
+    border-radius: 50%;
+    min-width: 16px;
+    height: 16px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    margin-left: 0.1rem;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.res-tag-time {
+    font-size: 0.62rem;
+    opacity: 0.5;
+    font-weight: 400;
+    margin-left: 0.05rem;
+}
 

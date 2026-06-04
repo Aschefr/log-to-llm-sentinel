@@ -211,11 +211,23 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 print(f"[Main] Erreur resolution checker: {e}")
 
+    async def _pattern_decay_checker():
+        from app.services.resolution_service import PATTERN_DECAY_INTERVAL_HOURS
+        interval = PATTERN_DECAY_INTERVAL_HOURS * 3600
+        await asyncio.sleep(300)  # Attendre 5 min apres le demarrage avant le premier check
+        while True:
+            try:
+                await resolution_service.decay_stale_patterns()
+            except Exception as e:
+                print(f"[Main] Erreur pattern decay: {e}")
+            await asyncio.sleep(interval)
+
     asyncio.create_task(_cleanup_tasks())
     asyncio.create_task(_run_meta_analyses_loop())
     asyncio.create_task(_daily_update_check())
     asyncio.create_task(_inactivity_checker())
     asyncio.create_task(_resolution_checker())
+    asyncio.create_task(_pattern_decay_checker())
 
     yield
 

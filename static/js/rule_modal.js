@@ -27,6 +27,7 @@ function _generateUUID() {
 
 /* ── Resolution Pattern Tags ───────────────────────────────────────────────── */
 let _resolutionPatterns = [];
+let _resolutionPatternsWeighted = [];  // Format enrichi [{pattern, weight, last_validated_at, error_keywords}]
 
 function _resTagT(key, fallback) {
     return window.t ? window.t(key) : fallback;
@@ -68,10 +69,33 @@ function _resTagsRender() {
     _resolutionPatterns.forEach((p, idx) => {
         const tag = document.createElement('span');
         tag.className = 'res-tag';
-        tag.innerHTML = `${_escHtml(p)}<button type="button" class="res-tag-remove" data-idx="${idx}" title="Remove">✕</button>`;
+
+        // Chercher les infos de poids dans la version enrichie
+        const wInfo = _resolutionPatternsWeighted.find(
+            w => (w.pattern || '').toLowerCase() === p.toLowerCase()
+        );
+        const weight = wInfo ? (wInfo.weight || 1) : 1;
+        const lastValidated = wInfo ? wInfo.last_validated_at : null;
+
+        let weightBadge = '';
+        if (weight > 1) {
+            weightBadge = `<span class="res-tag-weight" title="${_resTagT('monitor.verdict_pattern_weight', 'Poids')}: ${weight}">${weight}</span>`;
+        }
+
+        let timeHint = '';
+        if (lastValidated) {
+            const ago = _relativeTime(lastValidated);
+            timeHint = `<span class="res-tag-time" title="${lastValidated}">${ago}</span>`;
+        }
+
+        tag.innerHTML = `${_escHtml(p)}${weightBadge}${timeHint}<button type="button" class="res-tag-remove" data-idx="${idx}" title="Remove">✕</button>`;
         tag.querySelector('.res-tag-remove').addEventListener('click', (e) => {
             e.preventDefault();
             _resolutionPatterns.splice(idx, 1);
+            // Supprimer aussi de la version enrichie
+            _resolutionPatternsWeighted = _resolutionPatternsWeighted.filter(
+                w => (w.pattern || '').toLowerCase() !== p.toLowerCase()
+            );
             _resTagsRender();
         });
         box.insertBefore(tag, emptyEl);
@@ -80,8 +104,9 @@ function _resTagsRender() {
 }
 
 /** Set patterns and render */
-function resTagsSet(patterns) {
+function resTagsSet(patterns, weighted) {
     _resolutionPatterns = (patterns || []).filter(p => p && p.trim()).map(p => p.trim());
+    _resolutionPatternsWeighted = weighted || [];
     _resTagsRender();
 }
 
@@ -101,7 +126,26 @@ function resTagsAdd(input) {
 /** Clear all patterns */
 function resTagsClear() {
     _resolutionPatterns = [];
+    _resolutionPatternsWeighted = [];
     _resTagsRender();
+}
+
+/** Relative time helper for last_validated_at */
+function _relativeTime(isoStr) {
+    try {
+        const dt = new Date(isoStr);
+        const now = new Date();
+        const diffMs = now - dt;
+        if (diffMs < 0) return '';
+        const diffMin = Math.floor(diffMs / 60000);
+        if (diffMin < 60) return `${diffMin}m`;
+        const diffH = Math.floor(diffMin / 60);
+        if (diffH < 24) return `${diffH}h`;
+        const diffD = Math.floor(diffH / 24);
+        return `${diffD}d`;
+    } catch (e) {
+        return '';
+    }
 }
 
 /* ── Keyword suggestions ───────────────────────────────────────────────────── */
@@ -422,6 +466,7 @@ function resetForm() {
         document.getElementById('rule-resolution-mode').value = 'timeout';
         document.getElementById('rule-resolution-timeout').value = '30';
         resTagsClear();
+        _resolutionPatternsWeighted = [];
         document.getElementById('rule-resolution-ai-enabled').checked = false;
         document.getElementById('rule-resolution-notify-search').checked = false;
         document.getElementById('rule-resolution-notify-resolved').checked = true;
@@ -563,7 +608,7 @@ async function editRule(id) {
             resEnable.checked = hasRes;
             document.getElementById('rule-resolution-mode').value = hasRes ? rule.resolution_mode : 'timeout';
             document.getElementById('rule-resolution-timeout').value = rule.resolution_timeout_minutes || 30;
-            resTagsSet(rule.resolution_patterns || []);
+            resTagsSet(rule.resolution_patterns || [], rule.resolution_patterns_weighted || []);
             document.getElementById('rule-resolution-ai-enabled').checked = rule.resolution_ai_enabled || false;
             document.getElementById('rule-resolution-notify-search').checked = rule.resolution_notify_search || false;
             document.getElementById('rule-resolution-notify-resolved').checked = rule.resolution_notify_resolved !== false;
