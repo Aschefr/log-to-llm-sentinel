@@ -6,7 +6,7 @@
 # Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low)
 
 project: log-to-llm-sentinel
-updated: 2026-05-25
+updated: 2026-06-11
 
 # ─────────────────────────────────────────────
 # GLOBAL RULES (apply to ALL tasks)
@@ -129,6 +129,18 @@ infrastructure:
         subject = nt('your_key', lang)
       To add a new translated string: add the key in the "notifications" section of the language JSON files in static/i18n/ (e.g., en.json, fr.json).
       The site language is synced from the frontend header to GlobalConfig.site_lang via PUT /api/config/site-lang.
+
+  - id: INFRA-13
+    name: "Syslog Server Ingestion & Relay (Unraid Remote Syslog)"
+    status: DONE
+    effort: L
+    priority: P0
+    files: [app/services/syslog_receiver.py, app/models.py, app/database.py, app/main.py, app/routers/config.py, app/routers/monitor.py, app/routers/rules.py, templates/config.html, static/js/config.js, templates/_rule_modal.html, static/js/rule_modal.js, static/js/monitor.js, docker-compose.yml, static/i18n/fr.json, static/i18n/en.json]
+    notes: |
+      Allows Sentinel to act as a syslog UDP server (listening on port 514 inside the container, exposed as 10514)
+      and relay the raw syslog datagrams to a secondary backup server (e.g., secondary Unraid server).
+      Supports multi-source rule routing via hostname prefix [SYSLOG]:hostname.
+      Keeps ring buffers and disk logs under /app/data/syslog/ for tail monitor screen.
 
 
 # ─────────────────────────────────────────────

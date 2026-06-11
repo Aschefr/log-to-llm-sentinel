@@ -100,6 +100,8 @@ def init_db():
             resolution_patterns_json TEXT DEFAULT '[]',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )""",
+        "ALTER TABLE global_config ADD COLUMN syslog_enabled BOOLEAN DEFAULT 0",
+        "ALTER TABLE global_config ADD COLUMN syslog_forward_addr VARCHAR DEFAULT NULL",
     ]
 
     with engine.connect() as conn:

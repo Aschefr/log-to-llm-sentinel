@@ -116,6 +116,12 @@ async def lifespan(app: FastAPI):
     rules.set_orchestrator(orchestrator)
     webhook_router.set_orchestrator(orchestrator)
 
+    # Initialiser et démarrer le récepteur Syslog (UDP 514)
+    from app.services.syslog_receiver import syslog_receiver, set_orchestrator as set_syslog_orchestrator
+    set_syslog_orchestrator(orchestrator)
+    asyncio.create_task(syslog_receiver.start())
+    print("[Main] SyslogReceiver démarré en background")
+
     # Restaurer les états d'alerte pour la résolution
     resolution_service.restore_states_from_db()
 
@@ -233,6 +239,8 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     log_watcher.stop()
+    from app.services.syslog_receiver import syslog_receiver
+    asyncio.create_task(syslog_receiver.stop())
     if watcher_task:
         watcher_task.cancel()
         try:

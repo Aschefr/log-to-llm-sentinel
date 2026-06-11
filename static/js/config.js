@@ -233,6 +233,17 @@ async function loadConfig() {
         const autoDeleteEl = document.getElementById('auto-delete-analyses');
         if (autoDeleteEl) autoDeleteEl.checked = config.auto_delete_analyses === true;
         
+        const syslogEnabledEl = document.getElementById('syslog-enabled');
+        if (syslogEnabledEl) syslogEnabledEl.checked = config.syslog_enabled === true;
+        const syslogForwardAddrEl = document.getElementById('syslog-forward-addr');
+        if (syslogForwardAddrEl) syslogForwardAddrEl.value = config.syslog_forward_addr || '';
+        
+        const syslogCurrentIpEl = document.getElementById('syslog-current-ip');
+        if (syslogCurrentIpEl) {
+            const displayIp = (config.server_ip && config.server_ip !== 'localhost') ? config.server_ip : (window.location.hostname || 'IP_HOTE');
+            syslogCurrentIpEl.textContent = displayIp;
+        }
+
         const retentionDays = config.auto_delete_retention_days || 30;
         const retentionSelect = document.getElementById('retention-period');
         const retentionCustom = document.getElementById('retention-days-custom');
@@ -685,6 +696,8 @@ async function saveConfig(messageEl, isAutoSave = false) {
         ollama_prompt_lang: (document.getElementById('ollama-prompt-lang') || {}).value || 'fr',
         instance_name: document.getElementById('instance-name') ? document.getElementById('instance-name').value : '',
         auto_delete_analyses: document.getElementById('auto-delete-analyses') ? document.getElementById('auto-delete-analyses').checked : false,
+        syslog_enabled: document.getElementById('syslog-enabled') ? document.getElementById('syslog-enabled').checked : false,
+        syslog_forward_addr: document.getElementById('syslog-forward-addr') ? document.getElementById('syslog-forward-addr').value.trim() : '',
     };
 
     const retSelect = document.getElementById('retention-period');

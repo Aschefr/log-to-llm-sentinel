@@ -164,6 +164,30 @@ def mark_all_analyses_viewed(rule_id: int):
 
 
 
+@router.get("/syslog/tail/{hostname}")
+def tail_syslog(
+    hostname: str,
+    lines: int = Query(60, description="Nombre de lignes"),
+    keywords: Optional[str] = Query(None, description="Mots-clés pour colorisation")
+):
+    """Retourne les dernières lignes reçues par syslog pour un hôte donné (ring buffer mémoire, persisté sur disque)."""
+    from app.services.syslog_receiver import _get_buffer
+    buf = _get_buffer(hostname)
+    
+    kw_list = [kw.strip().lower() for kw in keywords.split(",") if kw.strip()] if keywords else []
+    
+    tail = list(buf)[-lines:]
+    result = []
+    for raw in tail:
+        matched_kws = [kw for kw in kw_list if kw in raw.lower()] if kw_list else []
+        result.append({
+            "text": raw,
+            "matched": len(matched_kws) > 0,
+            "matched_keywords": matched_kws
+        })
+    return {"lines": result}
+
+
 @router.get("/buffer/{rule_id}")
 def get_buffer_status(rule_id: int):
     """Retourne l'état actuel du buffer anti-spam pour une règle."""

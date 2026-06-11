@@ -236,6 +236,8 @@ class GlobalConfig(Base):
     auto_delete_analyses = Column(Boolean, default=False)
     auto_delete_retention_days = Column(Integer, default=30)
     discord_webhook_url = Column(String, nullable=True)
+    syslog_enabled = Column(Boolean, default=False)
+    syslog_forward_addr = Column(String, nullable=True)  # Format 'IP:port' or 'IP' (default port 514)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 class ChatConversation(Base):

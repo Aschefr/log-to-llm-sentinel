@@ -32,6 +32,10 @@
                          role="tab" aria-selected="false">
                         🔗 Webhook API
                     </div>
+                    <div class="source-card kw-tab" data-source="syslog"
+                         role="tab" aria-selected="false">
+                        📨 Syslog Server
+                    </div>
                 </div>
             </div>
             <div class="form-group" id="path-group">
@@ -71,6 +75,22 @@
                 <div class="webhook-url-box" style="display:flex;gap:0.5rem;align-items:center;background:var(--surface-sunken);padding:0.75rem;border-radius:var(--radius-md);">
                     <code id="webhook-curl-cmd" style="flex:1;word-break:break-all;font-size:0.85rem;color:var(--primary-light);"></code>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="copyModalWebhookUrl(this)" title="Copier l'URL">📋 Copier</button>
+                </div>
+            </div>
+            <div class="form-group hidden" id="syslog-group">
+                <label for="syslog-hostname">Hostname du serveur Syslog</label>
+                <input type="text" id="syslog-hostname" placeholder="ex: Tower">
+                <div class="form-hint">
+                    Le hostname envoyé par le serveur dans son en-tête syslog (ex: <i>Tower</i> pour votre Unraid). Sentinel filtrera les messages de cette source. Utilisez <code>*</code> pour un récepteur général (fourre-tout).
+                </div>
+                
+                <div class="syslog-instruction-box" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); padding: 0.75rem; border-radius: 0.5rem; font-size: 0.8rem; margin-top: 0.75rem; border-left: 3px solid var(--accent);">
+                    <strong data-i18n="rules.syslog_info_title" style="display: block; margin-bottom: 0.35rem; color: var(--text-primary);">Configuration de l'envoi depuis votre source (ex: Unraid) :</strong>
+                    <div style="color: var(--text-secondary);">
+                        <span data-i18n="config.syslog_info_ip">Adresse IP :</span> <code id="syslog-rule-current-ip" style="background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: monospace;">...</code> &bull; 
+                        <span data-i18n="config.syslog_info_port">Port :</span> <code style="background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: monospace;">10514</code> &bull; 
+                        <span data-i18n="config.syslog_info_proto">Protocole :</span> <code style="background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: monospace;">UDP</code>
+                    </div>
                 </div>
             </div>
             <div class="form-group">

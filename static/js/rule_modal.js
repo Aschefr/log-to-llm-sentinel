@@ -212,6 +212,18 @@ function setupRuleModal(opts = {}) {
 
     setupFileBrowser();
 
+    const syslogRuleCurrentIpEl = document.getElementById('syslog-rule-current-ip');
+    if (syslogRuleCurrentIpEl) {
+        apiFetch('/api/config')
+            .then(config => {
+                const displayIp = (config.server_ip && config.server_ip !== 'localhost') ? config.server_ip : (window.location.hostname || 'IP_HOTE');
+                syslogRuleCurrentIpEl.textContent = displayIp;
+            })
+            .catch(() => {
+                syslogRuleCurrentIpEl.textContent = window.location.hostname || 'IP_HOTE';
+            });
+    }
+
     if (closeBtn) closeBtn.addEventListener('click', () => { modal.classList.add('hidden'); if (_ruleModalOnSave) _ruleModalOnSave(); });
     if (cancelBtn) cancelBtn.addEventListener('click', () => { modal.classList.add('hidden'); if (_ruleModalOnSave) _ruleModalOnSave(); });
 
@@ -234,7 +246,9 @@ function setupRuleModal(opts = {}) {
     const sourceCards = document.querySelectorAll('.source-card');
     const pathGroup = document.getElementById('path-group');
     const webhookGroup = document.getElementById('webhook-group');
+    const syslogGroup = document.getElementById('syslog-group');
     const pathInputEl = document.getElementById('rule-path');
+    const syslogHostnameEl = document.getElementById('syslog-hostname');
 
     sourceCards.forEach(card => {
         card.addEventListener('click', () => {
@@ -244,7 +258,9 @@ function setupRuleModal(opts = {}) {
             if (card.dataset.source === 'webhook') {
                 pathGroup.classList.add('hidden');
                 webhookGroup.classList.remove('hidden');
+                if (syslogGroup) syslogGroup.classList.add('hidden');
                 pathInputEl.removeAttribute('required');
+                if (syslogHostnameEl) syslogHostnameEl.removeAttribute('required');
                 pathInputEl.value = ''; // Clear value so it doesn't cause hidden validation issues
 
                 // Générer un UUID si aucun token n'est encore défini (utile pour Nouvelle règle)
@@ -252,10 +268,19 @@ function setupRuleModal(opts = {}) {
                     window._currentWebhookToken = _generateUUID();
                 }
                 updateModalWebhookUrl();
+            } else if (card.dataset.source === 'syslog') {
+                pathGroup.classList.add('hidden');
+                webhookGroup.classList.add('hidden');
+                if (syslogGroup) syslogGroup.classList.remove('hidden');
+                pathInputEl.removeAttribute('required');
+                if (syslogHostnameEl) syslogHostnameEl.setAttribute('required', 'required');
+                pathInputEl.value = '';
             } else {
                 pathGroup.classList.remove('hidden');
                 webhookGroup.classList.add('hidden');
+                if (syslogGroup) syslogGroup.classList.add('hidden');
                 pathInputEl.setAttribute('required', 'required');
+                if (syslogHostnameEl) syslogHostnameEl.removeAttribute('required');
             }
         });
     });
@@ -436,10 +461,17 @@ function resetForm() {
 
     const localCard = document.querySelector('.source-card[data-source="local"]');
     if (localCard) {
-        localCard.classList.add('kw-tab--active');
+        localCard.click();
         document.getElementById('path-group').classList.remove('hidden');
         document.getElementById('webhook-group').classList.add('hidden');
+        const syslogGroup = document.getElementById('syslog-group');
+        if (syslogGroup) syslogGroup.classList.add('hidden');
         document.getElementById('rule-path').setAttribute('required', 'required');
+        const syslogHostnameEl = document.getElementById('syslog-hostname');
+        if (syslogHostnameEl) {
+            syslogHostnameEl.value = '';
+            syslogHostnameEl.removeAttribute('required');
+        }
     }
     document.getElementById('rule-keywords').value = '';
     document.getElementById('rule-context').value = '';
@@ -493,10 +525,13 @@ async function saveRule() {
     const id = document.getElementById('rule-id').value;
     const activeCard = document.querySelector('.source-card.kw-tab--active');
     const isWebhook = activeCard && activeCard.dataset.source === 'webhook';
+    const isSyslog = activeCard && activeCard.dataset.source === 'syslog';
 
     let logFilePath = document.getElementById('rule-path').value;
     if (isWebhook) {
         logFilePath = '[WEBHOOK]:' + (window._currentWebhookToken || _generateUUID());
+    } else if (isSyslog) {
+        logFilePath = '[SYSLOG]:' + (document.getElementById('syslog-hostname').value.trim() || '*');
     }
 
     const data = {
@@ -572,6 +607,14 @@ async function editRule(id) {
             if (webhookCard) {
                 window._currentWebhookToken = rule.log_file_path.split(':')[1] || rule.id;
                 webhookCard.click();
+            }
+        } else if (rule.log_file_path && rule.log_file_path.startsWith('[SYSLOG]')) {
+            const syslogCard = document.querySelector('.source-card[data-source="syslog"]');
+            if (syslogCard) {
+                syslogCard.click();
+                const hostname = rule.log_file_path.split(':')[1] || '*';
+                const syslogHostnameEl = document.getElementById('syslog-hostname');
+                if (syslogHostnameEl) syslogHostnameEl.value = hostname;
             }
         } else {
             const localCard = document.querySelector('.source-card[data-source="local"]');

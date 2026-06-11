@@ -291,6 +291,40 @@
             </div>
 
             <div class="collapsible-section" style="margin-top: 1.5rem;">
+                <div class="section-header" onclick="toggleSection('syslog-settings-container', 'syslog-arrow')">
+                    <h3 style="margin: 0;"><span aria-hidden="true">📨 </span><span data-i18n="config.syslog_title">Récepteur Syslog &amp; Relais</span></h3>
+                    <svg id="syslog-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
+                </div>
+                <div id="syslog-settings-container" class="config-subsection hidden">
+                    <div class="form-group checkbox-group" style="margin-bottom: 1rem;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="syslog-enabled">
+                            <span class="toggle-slider"></span>
+                            <span class="toggle-label" data-i18n="config.syslog_enabled">Activer le récepteur Syslog (UDP 514)</span>
+                        </label>
+                    </div>
+
+                    <div class="syslog-info-box" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.25rem; font-size: 0.85rem; border-left: 3px solid var(--accent);">
+                        <strong data-i18n="config.syslog_info_title" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary);">Configuration de la source de logs (ex: Unraid) :</strong>
+                        <ul style="margin: 0 0 0.5rem 1rem; padding: 0; list-style-type: disc; color: var(--text-secondary);">
+                            <li style="margin-bottom: 0.25rem;"><span data-i18n="config.syslog_info_ip">Adresse IP :</span> <code id="syslog-current-ip" style="background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: monospace;">...</code></li>
+                            <li style="margin-bottom: 0.25rem;"><span data-i18n="config.syslog_info_port">Port :</span> <code style="background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: monospace;">10514</code></li>
+                            <li><span data-i18n="config.syslog_info_proto">Protocole :</span> <code style="background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: monospace;">UDP</code></li>
+                        </ul>
+                        <div class="form-hint" style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);" data-i18n="config.syslog_info_note">
+                            Note : Sentinel écoute sur le port 514 à l'intérieur de son conteneur Docker. Celui-ci est redirigé vers le port hôte 10514 dans votre fichier docker-compose.yml.
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="syslog-forward-addr" data-i18n="config.syslog_forward_addr">Adresse de redirection (Relais Syslog)</label>
+                        <input type="text" id="syslog-forward-addr" placeholder="ex: 192.168.1.50:514">
+                        <div class="form-hint" data-i18n="config.syslog_forward_addr_hint">Adresse IP et Port (optionnel, défaut 514) vers lequel renvoyer les paquets Syslog bruts (ex: votre second serveur Unraid). Laisser vide pour désactiver la redirection.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="collapsible-section" style="margin-top: 1.5rem;">
                 <div class="section-header" onclick="toggleSection('maintenance-container', 'maintenance-arrow')">
                     <h3 style="margin: 0;"><span aria-hidden="true">🧹 </span><span data-i18n="config.maintenance_title">Maintenance &amp; Stockage</span></h3>
                     <svg id="maintenance-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>

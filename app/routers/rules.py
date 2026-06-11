@@ -191,6 +191,14 @@ def create_rule(rule_data: RuleCreate):
         db.add(rule)
         db.commit()
         db.refresh(rule)
+
+        # Recharger les règles Syslog
+        try:
+            from app.services.syslog_receiver import syslog_receiver
+            syslog_receiver.load_config()
+        except Exception:
+            pass
+
         return {"id": rule.id, "message": "Règle créée"}
     finally:
         db.close()
@@ -250,6 +258,14 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.resolution_notify_resolved = rule_data.resolution_notify_resolved
 
         db.commit()
+
+        # Recharger les règles Syslog
+        try:
+            from app.services.syslog_receiver import syslog_receiver
+            syslog_receiver.load_config()
+        except Exception:
+            pass
+
         return {"id": rule.id, "message": "Règle mise à jour"}
     finally:
         db.close()
@@ -264,6 +280,14 @@ def delete_rule(rule_id: int):
             raise HTTPException(status_code=404, detail="rule_not_found")
         db.delete(rule)
         db.commit()
+
+        # Recharger les règles Syslog
+        try:
+            from app.services.syslog_receiver import syslog_receiver
+            syslog_receiver.load_config()
+        except Exception:
+            pass
+
         return {"message": "Règle supprimée"}
     finally:
         db.close()

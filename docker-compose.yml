@@ -9,6 +9,7 @@ services:
     container_name: log-to-llm-sentinel
     ports:
       - 10911:10911 # Web interface access
+      - 10514:514/udp # Syslog receiver port
     volumes:
       # 1. MANDATORY: Application data (database, settings, history)
       # WARNING: DO NOT REMOVE THIS VOLUME!
@@ -23,6 +24,7 @@ services:
       - PYTHONUNBUFFERED=1
       # IMPORTANT: List all container paths that the UI file browser should explore.
       - SENTINEL_BROWSE_ROOTS=/logs,/app/data,/docker-logs,/system-logs
+      - SENTINEL_HOST_IP=${SENTINEL_HOST_IP:-}
     restart: unless-stopped
 
   # ==============================================================================

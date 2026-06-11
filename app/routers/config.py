@@ -7,6 +7,7 @@ from app.models import GlobalConfig
 from app.services.notification_service import NotificationService
 from app.services.ollama_service import OllamaService
 
+import os
 import json
 import urllib.request
 import urllib.error
@@ -87,6 +88,8 @@ class ConfigUpdate(BaseModel):
     discord_webhook_url: Optional[str] = None
     auto_delete_analyses: Optional[bool] = None
     auto_delete_retention_days: Optional[int] = None
+    syslog_enabled: Optional[bool] = None
+    syslog_forward_addr: Optional[str] = None
 
 
 @router.get("")
@@ -125,13 +128,16 @@ def get_config():
             "discord_webhook_url": config.discord_webhook_url or '',
             "auto_delete_analyses": config.auto_delete_analyses,
             "auto_delete_retention_days": config.auto_delete_retention_days,
+            "syslog_enabled": config.syslog_enabled,
+            "syslog_forward_addr": config.syslog_forward_addr or '',
+            "server_ip": os.environ.get("SENTINEL_HOST_IP") or "localhost",
         }
     finally:
         db.close()
 
 
 @router.put("")
-def update_config(config_data: ConfigUpdate):
+async def update_config(config_data: ConfigUpdate):
     db = SessionLocal()
     try:
         config = db.query(GlobalConfig).first()
@@ -140,7 +146,7 @@ def update_config(config_data: ConfigUpdate):
             db.add(config)
 
         from app import logger
-        logger.debug("ConfigRouter", f"Données reçues: {config_data.dict(exclude={'smtp_password'})}")
+        logger.debug(f"[ConfigRouter] Données reçues: {config_data.dict(exclude={'smtp_password'})}")
 
         if config_data.smtp_host is not None:
             config.smtp_host = config_data.smtp_host
@@ -194,8 +200,20 @@ def update_config(config_data: ConfigUpdate):
             config.auto_delete_analyses = config_data.auto_delete_analyses
         if config_data.auto_delete_retention_days is not None:
             config.auto_delete_retention_days = config_data.auto_delete_retention_days
+        if config_data.syslog_enabled is not None:
+            config.syslog_enabled = config_data.syslog_enabled
+        if config_data.syslog_forward_addr is not None:
+            config.syslog_forward_addr = config_data.syslog_forward_addr
 
         db.commit()
+
+        # Recharger le récepteur Syslog
+        try:
+            from app.services.syslog_receiver import syslog_receiver
+            await syslog_receiver.reload()
+        except Exception as ex:
+            logger.error(f"[ConfigRouter] Erreur lors du rechargement de SyslogReceiver : {ex}")
+
         return {"message": "Configuration mise à jour"}
     finally:
         db.close()
@@ -242,6 +260,8 @@ def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
         "discord_webhook_url": (config.discord_webhook_url or '') if config else '',
         "auto_delete_analyses": config.auto_delete_analyses if config else False,
         "auto_delete_retention_days": config.auto_delete_retention_days if config else 30,
+        "syslog_enabled": config.syslog_enabled if config else False,
+        "syslog_forward_addr": (config.syslog_forward_addr or '') if config else '',
     }
 
 

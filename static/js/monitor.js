@@ -423,6 +423,12 @@ async function fetchLogs(rule) {
             res = await apiFetch(
                 `/api/webhook/tail/${encodeURIComponent(token)}?lines=${monitorLogLines}&keywords=${encodeURIComponent(kwParam)}`
             );
+        } else if (rule.log_file_path && rule.log_file_path.startsWith('[SYSLOG]:')) {
+            // Syslog rule → use in-memory syslog buffer tail
+            const hostname = rule.log_file_path.split(':')[1];
+            res = await apiFetch(
+                `/api/monitor/syslog/tail/${encodeURIComponent(hostname)}?lines=${monitorLogLines}&keywords=${encodeURIComponent(kwParam)}`
+            );
         } else {
             // File-based rule → read from disk
             res = await apiFetch(
