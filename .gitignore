@@ -33,3 +33,7 @@ data/*.db*
 *.pyc
 __pycache__/
 
+data/syslog/Exposed.log
+data/syslog/.log
+.env
+.env

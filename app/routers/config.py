@@ -146,7 +146,7 @@ async def update_config(config_data: ConfigUpdate):
             db.add(config)
 
         from app import logger
-        logger.debug(f"[ConfigRouter] Données reçues: {config_data.dict(exclude={'smtp_password'})}")
+        logger.debug("ConfigRouter", f"Données reçues: {config_data.dict(exclude={'smtp_password'})}")
 
         if config_data.smtp_host is not None:
             config.smtp_host = config_data.smtp_host
@@ -212,7 +212,7 @@ async def update_config(config_data: ConfigUpdate):
             from app.services.syslog_receiver import syslog_receiver
             await syslog_receiver.reload()
         except Exception as ex:
-            logger.error(f"[ConfigRouter] Erreur lors du rechargement de SyslogReceiver : {ex}")
+            logger.error("ConfigRouter", f"Erreur lors du rechargement de SyslogReceiver : {ex}")
 
         return {"message": "Configuration mise à jour"}
     finally:
