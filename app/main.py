@@ -188,6 +188,8 @@ async def lifespan(app: FastAPI):
                                     instance_prefix = f"[{config.instance_name}] " if config.instance_name else ""
                                     subject = instance_prefix + nt('inactivity_subject', lang).format(rule_name=rule.name)
                                     body = nt('inactivity_body', lang).format(rule_name=rule.name, hours=rule.inactivity_period_hours, last_received=rule.last_line_received_at.strftime('%Y-%m-%d %H:%M:%S'))
+                                    if config.notification_method in ("apprise", "discord"):
+                                        body = body.replace("<p>", "").replace("</p>", "\n").replace("<b>", "**").replace("</b>", "**").strip()
                                     config_dict = {
                                         "smtp_host": config.smtp_host, "smtp_port": config.smtp_port,
                                         "smtp_user": config.smtp_user, "smtp_password": config.smtp_password,
