@@ -45,6 +45,11 @@ def _resolve_log_path(log_path: str) -> str:
         safe = "".join(c for c in token if c.isalnum() or c in "-_")
         webhook_dir = Path(os.environ.get("SENTINEL_DATA_DIR", "/app/data")) / "webhooks"
         return str(webhook_dir / f"{safe}.log")
+    if log_path and log_path.startswith('[SYSLOG]:'):
+        hostname = log_path.split(':', 1)[1]
+        safe = "".join(c for c in hostname if c.isalnum() or c in "-_")
+        syslog_dir = Path(os.environ.get("SENTINEL_DATA_DIR", "/app/data")) / "syslog"
+        return str(syslog_dir / f"{safe}.log")
     return log_path
 
 # ── Prompts ────────────────────────────────────────────────────────────────────

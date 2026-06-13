@@ -536,8 +536,17 @@ Retourne UNIQUEMENT l'objet JSON brut, sans formatage markdown ni bloc de code.
         db = SessionLocal()
         try:
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
-            if rule and rule.log_file_path and not rule.log_file_path.startswith("[WEBHOOK]:"):
-                context_lines = _read_tail_lines(rule.log_file_path, n=30)
+            if rule and rule.log_file_path:
+                resolved_path = rule.log_file_path
+                if rule.log_file_path.startswith("[WEBHOOK]:"):
+                    token = rule.log_file_path.split(':', 1)[1]
+                    safe = "".join(c for c in token if c.isalnum() or c in "-_")
+                    resolved_path = os.path.join(os.environ.get("SENTINEL_DATA_DIR", "/app/data"), "webhooks", f"{safe}.log")
+                elif rule.log_file_path.startswith("[SYSLOG]:"):
+                    hostname = rule.log_file_path.split(':', 1)[1]
+                    safe = "".join(c for c in hostname if c.isalnum() or c in "-_")
+                    resolved_path = os.path.join(os.environ.get("SENTINEL_DATA_DIR", "/app/data"), "syslog", f"{safe}.log")
+                context_lines = _read_tail_lines(resolved_path, n=30)
         finally:
             db.close()
 

@@ -1,9 +1,10 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
-## [1.2.281] - 2026-06-13
+## [1.2.282] - 2026-06-13
 
 ### Fixed
+- **Syslog Path Resolution in Services**: Resolved `[SYSLOG]:hostname` formatted rule paths to actual server log files (`/app/data/syslog/<hostname>.log`) in both the keyword auto-learning service and the manual resolution service, preventing "File not found" errors when processing syslog sources.
 - **Keyword Auto-Learning Syslog Source**: Fixed a bug where the auto-learning wizard failed to activate or launch when the Syslog source card was selected.
 - **Config Update Endpoint**: Resolved config update endpoint failure causing UI "unknown error" warnings on settings page.
 - **Browser Cache Busting**: Appended static query parameters in script references to ensure latest Javascript fixes load immediately without requiring manual cache refresh (CTRL+F5).
