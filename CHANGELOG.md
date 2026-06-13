@@ -1,6 +1,12 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## [1.2.281] - 2026-06-13
+
+### Fixed
+- **Keyword Auto-Learning Syslog Source**: Fixed a bug where the auto-learning wizard failed to activate or launch when the Syslog source card was selected.
+- **Config Update Endpoint**: Resolved config update endpoint failure causing UI "unknown error" warnings on settings page.
+- **Browser Cache Busting**: Appended static query parameters in script references to ensure latest Javascript fixes load immediately without requiring manual cache refresh (CTRL+F5).
 
 ## [1.1.0] - 2026-06-11
 

@@ -240,9 +240,11 @@ function _wizardBody() { return document.getElementById('kw-wizard-body'); }
 function _watchFormValidation() {
     const nameInput = document.getElementById('rule-name');
     const pathInput = document.getElementById('rule-path');
+    const syslogHostInput = document.getElementById('syslog-hostname');
     const check = () => _updateLaunchBtn();
     if (nameInput) nameInput.addEventListener('input', check);
     if (pathInput) pathInput.addEventListener('input', check);
+    if (syslogHostInput) syslogHostInput.addEventListener('input', check);
     // Also watch when the file browser selects a path
     if (pathInput) new MutationObserver(check).observe(pathInput, { attributes: true, attributeFilter: ['value'] });
     // Re-check when source tabs are clicked (local ↔ webhook)
@@ -256,10 +258,15 @@ function _updateLaunchBtn() {
     const btn  = document.getElementById('kw-launch-main-btn');
     if (!btn) return;
 
-    // Webhook mode: path is empty but token exists → valid
+    // Webhook / Syslog mode: path is empty but token/hostname exists → valid
     const activeSource = document.querySelector('.source-card.kw-tab--active');
     const isWebhook = activeSource && activeSource.dataset.source === 'webhook';
-    const hasSource = isWebhook ? !!window._currentWebhookToken : path.trim().length > 0;
+    const isSyslog  = activeSource && activeSource.dataset.source === 'syslog';
+    const hasSource = isWebhook
+        ? !!window._currentWebhookToken
+        : isSyslog
+            ? !!(document.getElementById('syslog-hostname') || {}).value?.trim()
+            : path.trim().length > 0;
 
     const valid = name.trim().length > 0 && hasSource;
     btn.disabled = !valid;
@@ -530,10 +537,13 @@ async function _fetchMaxChars() {
 async function _launchSession() {
     const activeSource = document.querySelector('.source-card.kw-tab--active');
     const isWebhook = activeSource && activeSource.dataset.source === 'webhook';
+    const isSyslog  = activeSource && activeSource.dataset.source === 'syslog';
 
     const logPath  = isWebhook
         ? '[WEBHOOK]:' + (window._currentWebhookToken || '')
-        : ((document.getElementById('rule-path') || {}).value || '');
+        : isSyslog
+            ? '[SYSLOG]:' + ((document.getElementById('syslog-hostname') || {}).value?.trim() || '*')
+            : ((document.getElementById('rule-path') || {}).value || '');
     const ruleName = (document.getElementById('rule-name') || {}).value || '';
     if (!logPath || !ruleName) return;
 
