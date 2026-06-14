@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupNotificationMethodToggle();
     setupMaintenance();
     setupLangSwitcher();
+    setupBackupAndRestore();
 });
 
 function setupLangSwitcher() {
@@ -856,4 +857,64 @@ async function fetchMaintenanceStats() {
     } catch (e) {
         usageVal.textContent = 'Erreur';
     }
+}
+
+function setupBackupAndRestore() {
+    const exportBtn = document.getElementById('export-btn');
+    const exportHistory = document.getElementById('export-history');
+    const importFile = document.getElementById('import-file');
+    const importFileLabel = document.getElementById('import-file-label');
+    const importBtn = document.getElementById('import-btn');
+
+    if (!exportBtn || !importFile || !importBtn) return;
+
+    exportBtn.addEventListener('click', () => {
+        const withHistory = exportHistory ? exportHistory.checked : false;
+        window.location.href = `/api/config/export?with_history=${withHistory}`;
+    });
+
+    importFile.addEventListener('change', () => {
+        const file = importFile.files[0];
+        if (file) {
+            if (importFileLabel) importFileLabel.textContent = file.name;
+            importBtn.disabled = false;
+        } else {
+            if (importFileLabel) importFileLabel.textContent = window.t ? window.t('config.select_backup_file') : 'Sélectionner le fichier ZIP de sauvegarde';
+            importBtn.disabled = true;
+        }
+    });
+
+    importBtn.addEventListener('click', async () => {
+        const file = importFile.files[0];
+        if (!file) return;
+
+        const confirmMsg = window.t ? window.t('config.import_confirm_prompt') : 'Attention : L\'importation écrasera TOUTE la configuration actuelle. Continuer ?';
+        showInlineConfirm(importBtn, confirmMsg, async () => {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const oldText = importBtn.textContent;
+            importBtn.disabled = true;
+            importBtn.textContent = window.t ? window.t('config.importing') : 'Restauration en cours...';
+
+            try {
+                const response = await fetch('/api/config/import', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (!response.ok) {
+                    throw new Error(result.detail || 'Erreur lors de l\'importation');
+                }
+                
+                alert(result.message || 'Importation réussie.');
+                window.location.reload();
+            } catch (e) {
+                alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
+                importBtn.disabled = false;
+                importBtn.textContent = oldText;
+            }
+        });
+    });
 }

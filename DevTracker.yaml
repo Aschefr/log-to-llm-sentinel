@@ -142,6 +142,15 @@ infrastructure:
       Supports multi-source rule routing via hostname prefix [SYSLOG]:hostname.
       Keeps ring buffers and disk logs under /app/data/syslog/ for tail monitor screen.
 
+  - id: INFRA-14
+    name: "Configuration ZIP Import/Export (with/without history)"
+    status: DONE
+    effort: M
+    priority: P1
+    files: [app/routers/config.py, templates/config.html, static/js/config.js, static/i18n/fr.json, static/i18n/en.json]
+    notes: |
+      Allows backing up and transferring instances by zipping sqlite database configuration and operational history (or configurations only) and importing them back cleanly.
+
 
 # ─────────────────────────────────────────────
 # UX TRANSVERSALE

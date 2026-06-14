@@ -369,6 +369,44 @@
                     </div>
                 </div>
             </div>
+
+            <div class="collapsible-section" style="margin-top: 1.5rem;">
+                <div class="section-header" onclick="toggleSection('backup-container', 'backup-arrow')">
+                    <h3 style="margin: 0;"><span aria-hidden="true">💾 </span><span data-i18n="config.backup_title">Sauvegarde &amp; Restauration</span></h3>
+                    <svg id="backup-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
+                </div>
+                <div id="backup-container" class="config-subsection hidden">
+                    <div style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px dashed var(--border);">
+                        <h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 0.9rem;" data-i18n="config.export_title">Exporter la configuration</h4>
+                        <div class="form-group checkbox-group" style="margin-bottom: 1rem;">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="export-history">
+                                <span class="toggle-slider"></span>
+                                <span class="toggle-label" data-i18n="config.export_history_label">Inclure l'historique d'analyses et de chat</span>
+                            </label>
+                        </div>
+                        <button type="button" id="export-btn" class="btn btn-secondary btn-sm" style="width: 100%;">
+                            <span aria-hidden="true">📤 </span><span data-i18n="config.export_btn">Générer et télécharger l'export (ZIP)</span>
+                        </button>
+                    </div>
+
+                    <div>
+                        <h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 0.9rem;" data-i18n="config.import_title_sub">Importer une configuration</h4>
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <input type="file" id="import-file" accept=".zip" style="width: 100%; display: none;">
+                            <button type="button" class="btn btn-secondary btn-sm" style="width: 100%; margin-bottom: 0.5rem;" onclick="document.getElementById('import-file').click();">
+                                <span aria-hidden="true">📁 </span><span id="import-file-label" data-i18n="config.select_backup_file">Sélectionner le fichier ZIP de sauvegarde</span>
+                            </button>
+                        </div>
+                        <div class="alert alert-warning" style="background: rgba(230, 92, 0, 0.1); border: 1px solid var(--danger); padding: 0.75rem; border-radius: var(--radius-md); font-size: 0.8rem; color: var(--danger); margin-bottom: 1rem; border-left: 3px solid var(--danger);" data-i18n="config.import_warning">
+                            ⚠️ Attention : L'importation d'une sauvegarde écrasera complètement la configuration actuelle (et l'historique si présent dans le fichier). Cette action est irréversible.
+                        </div>
+                        <button type="button" id="import-btn" class="btn btn-primary btn-sm" style="width: 100%;" disabled>
+                            <span aria-hidden="true">📥 </span><span data-i18n="config.import_btn">Restaurer la sauvegarde</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <section class="config-section config-section-full">

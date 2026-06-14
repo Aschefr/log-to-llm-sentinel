@@ -413,7 +413,17 @@
         "discord_webhook": "URL Webhook Discord",
         "discord_webhook_placeholder": "https://discord.com/api/webhooks/...",
         "discord_help": "Collez l'URL du Webhook depuis les paramètres d'intégration de votre salon Discord.",
-        "test_discord": "Tester Discord"
+        "test_discord": "Tester Discord",
+        "backup_title": "Sauvegarde & Restauration",
+        "export_title": "Exporter la configuration",
+        "export_history_label": "Inclure l'historique d'analyses et de chat",
+        "export_btn": "Générer et télécharger l'export (ZIP)",
+        "import_title_sub": "Importer une configuration",
+        "select_backup_file": "Sélectionner le fichier ZIP de sauvegarde",
+        "import_warning": "⚠️ Attention : L'importation d'une sauvegarde écrasera complètement la configuration actuelle (et l'historique si présent dans le fichier). Cette action est irréversible.",
+        "import_btn": "Restaurer la sauvegarde",
+        "import_confirm_prompt": "Attention : L'importation écrasera TOUTE la configuration actuelle. Continuer ?",
+        "importing": "Restauration en cours..."
     },
     "common": {
         "retry": "Ré-essayer",

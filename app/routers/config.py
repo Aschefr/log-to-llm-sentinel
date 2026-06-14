@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
+import io
+import zipfile
 
 from app.database import SessionLocal
 from app.models import GlobalConfig
@@ -626,5 +628,177 @@ def cleanup_maintenance_data():
         db.rollback()
         logger.error("ConfigRouter", f"Erreur nettoyage: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.get("/export")
+def export_config(with_history: bool = False):
+    db = SessionLocal()
+    try:
+        from app.models import Rule, MetaAnalysisConfig, Analysis, ResolutionVerdict, ChatConversation, ChatMessage, ChatCompression, MetaAnalysisResult, KeywordLearningSession
+        from datetime import datetime
+        
+        def to_dict(obj):
+            if not obj: return {}
+            d = {}
+            for column in obj.__table__.columns:
+                val = getattr(obj, column.name)
+                if isinstance(val, datetime):
+                    d[column.name] = val.isoformat()
+                else:
+                    d[column.name] = val
+            return d
+
+        data = {
+            "metadata": {
+                "app_version": "1.2.284",
+                "exported_at": datetime.utcnow().isoformat(),
+                "with_history": with_history
+            },
+            "configuration": {
+                "global_config": [to_dict(c) for c in db.query(GlobalConfig).all()],
+                "rules": [to_dict(r) for r in db.query(Rule).all()],
+                "meta_analysis_configs": [to_dict(m) for m in db.query(MetaAnalysisConfig).all()]
+            }
+        }
+        
+        if with_history:
+            data["history"] = {
+                "analyses": [to_dict(a) for a in db.query(Analysis).all()],
+                "resolution_verdicts": [to_dict(rv) for rv in db.query(ResolutionVerdict).all()],
+                "chat_conversations": [to_dict(cc) for cc in db.query(ChatConversation).all()],
+                "chat_messages": [to_dict(cm) for cm in db.query(ChatMessage).all()],
+                "chat_compressions": [to_dict(cp) for cp in db.query(ChatCompression).all()],
+                "meta_analysis_results": [to_dict(mr) for mr in db.query(MetaAnalysisResult).all()],
+                "keyword_learning_sessions": [to_dict(kl) for kl in db.query(KeywordLearningSession).all()]
+            }
+        
+        # Build ZIP in memory
+        json_data = json.dumps(data, indent=2, ensure_ascii=False)
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            zip_file.writestr("backup.json", json_data)
+        
+        zip_buffer.seek(0)
+        date_str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        suffix = "full" if with_history else "config"
+        filename = f"sentinel_backup_{date_str}_{suffix}.zip"
+        
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error("ConfigRouter", f"Erreur export: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur export: {str(e)}")
+    finally:
+        db.close()
+
+
+@router.post("/import")
+async def import_config(file: UploadFile = File(...)):
+    if not file.filename.endswith(".zip"):
+        raise HTTPException(status_code=400, detail="Le fichier doit être une archive ZIP.")
+    
+    db = SessionLocal()
+    try:
+        # Read zip
+        contents = await file.read()
+        zip_buffer = io.BytesIO(contents)
+        try:
+            with zipfile.ZipFile(zip_buffer, "r") as zip_file:
+                if "backup.json" not in zip_file.namelist():
+                    raise HTTPException(status_code=400, detail="Archive ZIP invalide: 'backup.json' introuvable.")
+                json_data = zip_file.read("backup.json").decode("utf-8")
+        except zipfile.BadZipFile:
+            raise HTTPException(status_code=400, detail="Fichier ZIP corrompu ou invalide.")
+        
+        try:
+            data = json.loads(json_data)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Le fichier backup.json n'est pas un JSON valide.")
+        
+        from app.models import Rule, MetaAnalysisConfig, Analysis, ResolutionVerdict, ChatConversation, ChatMessage, ChatCompression, MetaAnalysisResult, KeywordLearningSession
+        from datetime import datetime
+        
+        def from_dict(model_cls, data_dict):
+            kwargs = {}
+            for column in model_cls.__table__.columns:
+                if column.name in data_dict:
+                    val = data_dict[column.name]
+                    if val is not None and column.type.python_type == datetime:
+                        try:
+                            dt_str = val.replace("Z", "")
+                            if "." in dt_str:
+                                dt_str = dt_str.split(".")[0]
+                            kwargs[column.name] = datetime.fromisoformat(dt_str)
+                        except Exception:
+                            kwargs[column.name] = None
+                    else:
+                        kwargs[column.name] = val
+            return model_cls(**kwargs)
+
+        config_data = data.get("configuration", {})
+        
+        # Begin transaction
+        # Clear existing configs
+        db.query(GlobalConfig).delete()
+        db.query(Rule).delete()
+        db.query(MetaAnalysisConfig).delete()
+        
+        # Restore configs
+        for row in config_data.get("global_config", []):
+            db.add(from_dict(GlobalConfig, row))
+            
+        for row in config_data.get("rules", []):
+            db.add(from_dict(Rule, row))
+            
+        for row in config_data.get("meta_analysis_configs", []):
+            db.add(from_dict(MetaAnalysisConfig, row))
+            
+        # Restore history if present
+        history_data = data.get("history", {})
+        if history_data:
+            # Clear existing history tables
+            db.query(ChatMessage).delete()
+            db.query(ChatCompression).delete()
+            db.query(ChatConversation).delete()
+            db.query(Analysis).delete()
+            db.query(ResolutionVerdict).delete()
+            db.query(MetaAnalysisResult).delete()
+            db.query(KeywordLearningSession).delete()
+            
+            # Restore in proper dependency order
+            for row in history_data.get("analyses", []):
+                db.add(from_dict(Analysis, row))
+            for row in history_data.get("resolution_verdicts", []):
+                db.add(from_dict(ResolutionVerdict, row))
+            for row in history_data.get("chat_conversations", []):
+                db.add(from_dict(ChatConversation, row))
+            for row in history_data.get("chat_messages", []):
+                db.add(from_dict(ChatMessage, row))
+            for row in history_data.get("chat_compressions", []):
+                db.add(from_dict(ChatCompression, row))
+            for row in history_data.get("meta_analysis_results", []):
+                db.add(from_dict(MetaAnalysisResult, row))
+            for row in history_data.get("keyword_learning_sessions", []):
+                db.add(from_dict(KeywordLearningSession, row))
+        
+        db.commit()
+        
+        # Reload syslog receiver if config changed
+        try:
+            from app.services.syslog_receiver import syslog_receiver
+            await syslog_receiver.reload()
+        except Exception as ex:
+            logger.error("ConfigRouter", f"Erreur lors du rechargement de SyslogReceiver après import : {ex}")
+            
+        return {"ok": True, "message": "Importation réussie."}
+    except Exception as e:
+        db.rollback()
+        logger.error("ConfigRouter", f"Erreur import: {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur d'importation: {str(e)}")
     finally:
         db.close()

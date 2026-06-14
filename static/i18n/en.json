@@ -413,7 +413,17 @@
         "discord_webhook": "Discord Webhook URL",
         "discord_webhook_placeholder": "https://discord.com/api/webhooks/...",
         "discord_help": "Paste the Webhook URL from your Discord channel integration settings.",
-        "test_discord": "Test Discord"
+        "test_discord": "Test Discord",
+        "backup_title": "Backup & Restore",
+        "export_title": "Export Configuration",
+        "export_history_label": "Include analysis and chat history",
+        "export_btn": "Generate and download backup (ZIP)",
+        "import_title_sub": "Import Configuration",
+        "select_backup_file": "Select backup ZIP file",
+        "import_warning": "⚠️ Warning: Importing a backup will completely overwrite the current configuration (and history if present in the file). This action is irreversible.",
+        "import_btn": "Restore backup",
+        "import_confirm_prompt": "Warning: Importing will overwrite ALL current configuration. Continue?",
+        "importing": "Restoring backup..."
     },
     "common": {
         "retry": "Retry",
