@@ -40,7 +40,15 @@ Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. 
 
 The easiest way to run Sentinel is using **Docker**. This ensures all components (Database, Web Server, and AI) work together perfectly.
 
-### 1. Prerequisites
+### Unraid (Community Applications)
+If you are using Unraid, Log-to-LLM Sentinel is available directly from the **Community Applications (CA)** store!
+1. Go to the **Apps** tab in your Unraid dashboard.
+2. Search for `Log-to-LLM Sentinel`.
+3. Click Install and configure your paths.
+   - **Note for Custom Logs**: By default, the template maps Unraid's Docker logs (`/var/lib/docker/containers`) and system logs (`/var/log`). If you want to monitor other specific logs (e.g., from a specific appdata folder), add a new Path mapping in the template settings, and then append the container path to the `SENTINEL_BROWSE_ROOTS` variable (e.g., `/logs,/app/data,/docker-logs,/system-logs,/custom-app-logs`).
+
+### Docker & Docker Compose
+#### 1. Prerequisites
 - Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Windows/Mac) or Docker Compose (Linux).
 - (Optional) Install [Ollama](https://ollama.com/) locally to use your GPU.
 

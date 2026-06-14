@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Log to LLM Sentinel{% endblock %}</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="stylesheet" href="/static/css/style.css?v=11">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -108,7 +109,7 @@
             </svg>
         </button>
         <div class="nav-brand">
-            <span class="nav-brand-title">🔍 Log to LLM Sentinel</span>
+            <span class="nav-brand-title" style="display: flex; align-items: center;"><img src="/static/logo.png" alt="Logo" style="height: 1.2em; vertical-align: middle; margin-right: 8px; border-radius: 4px;">Log to LLM Sentinel</span>
             <div class="nav-brand-meta">
                 <span class="nav-version">v{{ APP_VERSION }}</span>
                 <div id="version-update-badge" class="update-badge" onclick="checkAppUpdate()" title="">

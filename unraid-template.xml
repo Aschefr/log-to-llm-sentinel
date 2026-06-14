@@ -1,0 +1,90 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Log-to-LLM-Sentinel</Name>
+  <Repository>aschefr/log-to-llm-sentinel:latest</Repository>
+  <Registry>https://hub.docker.com/r/aschefr/log-to-llm-sentinel</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/aschefr/log-to-llm-sentinel/issues</Support>
+  <Project>https://github.com/aschefr/log-to-llm-sentinel</Project>
+  <Overview>Log-to-LLM Sentinel is an AI-powered log monitoring and analysis tool. It watches your logs and automatically uses local AI (Ollama) to detect, analyze, and alert you of anomalies in real-time.
+  
+  [b]Custom Log Volumes:[/b] If you want Sentinel to monitor specific logs not located in /var/log or /var/lib/docker, you can add a new Path in this template. Map your host directory to a container path (e.g. /custom-logs), and then add that path to the SENTINEL_BROWSE_ROOTS variable separated by a comma (e.g. /logs,/app/data,/docker-logs,/system-logs,/custom-logs).
+  </Overview>
+  <Category>Tools:Utilities;Network:Web</Category>
+  <WebUI>http://[IP]:[PORT:10911]/</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/Aschefr/log-to-llm-sentinel/main/static/logo.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled></DateInstalled>
+  <DonateText/>
+  <DonateLink/>
+  <Description>AI-powered Log Monitoring</Description>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish>
+      <Port>
+        <HostPort>10911</HostPort>
+        <ContainerPort>10911</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+      <Port>
+        <HostPort>10514</HostPort>
+        <ContainerPort>514</ContainerPort>
+        <Protocol>udp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>/mnt/user/appdata/log-to-llm-sentinel/data</HostDir>
+      <ContainerDir>/app/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/log-to-llm-sentinel/logs</HostDir>
+      <ContainerDir>/logs</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/var/lib/docker/containers</HostDir>
+      <ContainerDir>/docker-logs</ContainerDir>
+      <Mode>ro</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/var/log</HostDir>
+      <ContainerDir>/system-logs</ContainerDir>
+      <Mode>ro</Mode>
+    </Volume>
+  </Data>
+  <Environment>
+    <Variable>
+      <Value>1</Value>
+      <Name>PYTHONUNBUFFERED</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>/logs,/app/data,/docker-logs,/system-logs</Value>
+      <Name>SENTINEL_BROWSE_ROOTS</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value></Value>
+      <Name>SENTINEL_HOST_IP</Name>
+      <Mode/>
+    </Variable>
+  </Environment>
+  <Labels/>
+  <Config Name="WebUI Port" Target="10911" Default="10911" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">10911</Config>
+  <Config Name="Syslog Port" Target="514" Default="10514" Mode="udp" Description="UDP Syslog receiver port" Type="Port" Display="always" Required="false" Mask="false">10514</Config>
+  <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/log-to-llm-sentinel/data" Mode="rw" Description="Database and application settings" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/log-to-llm-sentinel/data</Config>
+  <Config Name="Shared Logs" Target="/logs" Default="/mnt/user/appdata/log-to-llm-sentinel/logs" Mode="rw" Description="Shared logs folder for temp files" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/log-to-llm-sentinel/logs</Config>
+  <Config Name="Docker Logs" Target="/docker-logs" Default="/var/lib/docker/containers" Mode="ro" Description="Read-only access to Unraid Docker logs" Type="Path" Display="always" Required="true" Mask="false">/var/lib/docker/containers</Config>
+  <Config Name="System Logs" Target="/system-logs" Default="/var/log" Mode="ro" Description="Read-only access to Unraid system logs" Type="Path" Display="always" Required="true" Mask="false">/var/log</Config>
+  <Config Name="Browse Roots" Target="SENTINEL_BROWSE_ROOTS" Default="/logs,/app/data,/docker-logs,/system-logs" Mode="" Description="Directories the UI file browser is allowed to explore" Type="Variable" Display="always" Required="true" Mask="false">/logs,/app/data,/docker-logs,/system-logs</Config>
+  <Config Name="Host IP" Target="SENTINEL_HOST_IP" Default="" Mode="" Description="Host IP for the Syslog relay / UI display (optional)" Type="Variable" Display="advanced" Required="false" Mask="false"></Config>
+</Container>
