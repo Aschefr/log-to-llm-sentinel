@@ -6,7 +6,7 @@
 # Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low)
 
 project: log-to-llm-sentinel
-updated: 2026-06-11
+updated: 2026-06-14
 
 # ─────────────────────────────────────────────
 # GLOBAL RULES (apply to ALL tasks)

@@ -184,6 +184,10 @@ class MetaAnalysisService:
                 return {"status": "error", "message": "Config introuvable"}
 
             global_cfg = db.query(GlobalConfig).first()
+            ollama = self.orchestrator.ollama if self.orchestrator else OllamaService()
+            ollama_url = (global_cfg.ollama_url or "http://ollama:11434") if global_cfg else "http://ollama:11434"
+            ollama_model = (global_cfg.ollama_model or "gemma4:e4b") if global_cfg else "gemma4:e4b"
+            lang = (global_cfg.ollama_prompt_lang or 'fr') if global_cfg else 'fr'
 
             is_manual = custom_context is not None
 
@@ -299,11 +303,6 @@ class MetaAnalysisService:
                     f"{meta_instruction}"
                 )
 
-            ollama = self.orchestrator.ollama if self.orchestrator else OllamaService()
-            ollama_url = global_cfg.ollama_url or "http://ollama:11434"
-            ollama_model = global_cfg.ollama_model or "gemma4:e4b"
-            lang = (global_cfg.ollama_prompt_lang or 'fr') if global_cfg else 'fr'
-            
             logger.debug("MetaAnalysisService", f"Envoi prompt méta-analyse (Taille: {len(prompt)} car., Contexte: {config.context_size})")
 
             if self.orchestrator:

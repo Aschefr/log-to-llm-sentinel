@@ -563,11 +563,15 @@ async function metaResultDeepen(resultId, configId) {
         const r = results.find(x => x.id === resultId);
         if (!r) return alert(window.t ? window.t('meta.result_not_found') : 'Result not found.');
         // Créer une conversation chat avec ce résultat comme contexte
-        const conv = await apiFetch('/api/chat/conversations', {
+        const conv = await apiFetch('/chat/api/create', {
             method: 'POST',
-            body: { title: `Méta-Analyse #${resultId}`, analysis_context: r.ollama_response }
+            body: {
+                title: `Méta-Analyse #${resultId}`,
+                raw_context_prompt: `Méta-Analyse #${resultId}`,
+                raw_context_response: r.ollama_response
+            }
         });
-        if (conv && conv.id) window.location.href = `/chat?conv=${conv.id}`;
+        if (conv && conv.id) window.location.href = `/chat?id=${conv.id}`;
     } catch(e) {
         alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
     }
