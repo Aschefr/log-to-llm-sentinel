@@ -1,5 +1,8 @@
 # Log-to-LLM Sentinel — Documentation utilisateur (Français)
 
-Cette section contiendra les traductions françaises de la documentation utilisateur de Sentinel.
+> [!IMPORTANT]
+> **Documentation en cours de rédaction** 🚧
+> La version française de cette documentation est actuellement en cours de création. Pour consulter le guide utilisateur complet dès maintenant, veuillez vous référer à la [version anglaise (English version)](../en/README.md).
 
-La documentation anglaise est disponible sous le dossier [docs/en/](../en/README.md).
+Cette section contiendra prochainement l'intégralité des guides et documentations traduits en français pour Sentinel.
+

@@ -1,5 +1,7 @@
 # Global Configuration
 
+![Global Configuration](../../../screenshots/log-to-llm-sentinel_config.png)
+
 The **Configuration** tab handles global integration credentials, LLM parameters, maintenance settings, and system backup/restoration.
 
 ---

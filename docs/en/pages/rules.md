@@ -1,5 +1,7 @@
 # Rules Management
 
+![Rules Management](../../../screenshots/log-to-llm-sentinel_rules.png)
+
 The **Rules** tab allows users to define what logs are monitored, set the parameters for AI analysis, and configure alert criteria.
 
 ---

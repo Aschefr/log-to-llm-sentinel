@@ -1,5 +1,7 @@
 # Meta-Analysis Page
 
+![Meta-Analysis](../../../screenshots/log-to-llm-sentinel_meta_analysis.png)
+
 **Meta-Analysis** allows users to schedule periodic syntheses of log data across multiple rules, creating a consolidated overview of service health.
 
 ---

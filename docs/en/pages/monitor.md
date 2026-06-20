@@ -1,5 +1,7 @@
 # Monitor Page
 
+![Monitor Page](../../../screenshots/log-to-llm-sentinel_monitor.png)
+
 The **Monitor** page is a real-time console designed for log streaming, filtering, and manual diagnostic interventions.
 
 ---

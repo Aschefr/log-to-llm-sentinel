@@ -1,5 +1,7 @@
 # AI Analysis Center (Log Chat)
 
+![AI Analysis Center](../../../screenshots/log-to-llm-sentinel_chat.png)
+
 The **AI Analysis Center** provides an interactive chat interface to troubleshoot and diagnose complex logs with the local LLM.
 
 ---

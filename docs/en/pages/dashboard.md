@@ -1,5 +1,7 @@
 # Dashboard Page
 
+![Dashboard](../../../screenshots/log-to-llm-sentinel_dashboard.png)
+
 The **Dashboard** is the home screen of Log-to-LLM Sentinel. It provides an immediate overview of the system's operational health, statistics, and recent notifications.
 
 ---
