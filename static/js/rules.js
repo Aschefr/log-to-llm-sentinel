@@ -39,9 +39,9 @@ async function loadRules() {
                     <h3>${escapeHtml(rule.name)}</h3>
                     <p>${rule.log_file_path && rule.log_file_path.startsWith('[WEBHOOK]') 
                         ? `<span class="chip" style="background:var(--primary);color:white;border:none">🔗 Webhook</span> 
-                           <button class="btn btn-secondary btn-sm" onclick="copyWebhookUrl('${rule.log_file_path.split(':')[1] || rule.id}', this)" title="Copier URL curl">📋 Copier URL</button>` 
+                           <button class="btn btn-secondary btn-sm" onclick="copyWebhookUrl('${rule.log_file_path.split(':')[1] || rule.id}', this)" title="${window.t('common.copy') || 'Copier'} URL curl">📋 ${window.t('common.copy') || 'Copier'} URL</button>` 
                         : `📁 ${escapeHtml(rule.log_file_path)}`}</p>
-                    <p>🔑 ${rule.keywords.join(', ') || '<em style="opacity:.5">Aucun mot-clé (apprentissage en cours…)</em>'}</p>
+                    <p>🔑 ${rule.keywords.join(', ') || `<em style="opacity:.5">${window.t('rules.no_keywords_learning') || 'Aucun mot-clé (apprentissage en cours…)'}</em>`}</p>
                     ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}
                     <p>${rule.enabled ? `✅ ${window.t ? window.t('rules.enabled_status') : 'Enabled'}` : `❌ ${window.t ? window.t('rules.disabled_status') : 'Disabled'}`} | 🔔 ${rule.notify_on_match ? `${window.t ? window.t('rules.notification_threshold') : 'Threshold:'} ${rule.notify_severity_threshold || 'info'}` : (window.t ? window.t('rules.notifications_disabled') : 'Notifications disabled')}</p>
                 </div>
@@ -62,7 +62,7 @@ async function loadRules() {
                     </div>
                     ${rule.last_learning_session_id ? `
                     <div class="kw-card-panel" id="rule-learning-${rule.id}">
-                        <span class="kw-hint" style="opacity:.6">⏳ Chargement de la session d'apprentissage…</span>
+                        <span class="kw-hint" style="opacity:.6">⏳ ${window.t('kw.loading_learning_session') || 'Chargement de la session d’apprentissage…'}</span>
                     </div>` : ''}
                 </div>
             </div>
@@ -148,7 +148,7 @@ async function _fetchAndApplySession(ruleId, sessionId) {
             refining:  '🧠 ' + _t('kw.card_refining',  'Raffinement IA en cours…'),
             validated: '✅ ' + _t('kw.card_validated', 'Apprentissage terminé'),
             reverted:  '↩️ ' + _t('kw.card_reverted',  'Annulé — mots-clés restaurés'),
-            error:     '⚠️ ' + _t('kw.card_error',     'Erreur : {msg}', { msg: data.error_message || 'Inconnue' }),
+            error:     '⚠️ ' + _t('kw.card_error',     'Erreur : {msg}', { msg: translateBackendError(data.error_message) || 'Inconnue' }),
         };
 
         const isActive = ['pending', 'scanning', 'refining'].includes(data.status);

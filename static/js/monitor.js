@@ -352,6 +352,7 @@ function renderTabContent(rule) {
     }
     // Charger les analyses immediatement
     loadMonitorAnalyses(rule.id);
+    window.i18n?.applyTranslations();
 }
 
 // ─── Polling ───────────────────────────────────────────────────────────────

@@ -158,9 +158,23 @@ async function loadConfigs() {
             const lastRun = c.last_run_at ? new Date(c.last_run_at).toLocaleString() : neverLabel;
             
             let scheduleText = '';
-            if (c.schedule_type === 'daily') scheduleText = `${window.t('meta.schedule_daily')} ${window.t('meta.schedule_hour').toLowerCase()} ${_scheduleUTCToLocal(c.schedule_time || '00:00')}`;
-            else if (c.schedule_type === 'weekly') scheduleText = `${window.t('meta.schedule_weekly')} (${window.t('meta.schedule_weekday')} ${c.schedule_day}) ${window.t('meta.schedule_hour').toLowerCase()} ${_scheduleUTCToLocal(c.schedule_time || '00:00')}`;
-            else if (c.schedule_type === 'monthly') scheduleText = `${window.t('meta.schedule_monthly')} ${window.t('meta.schedule_monthday').toLowerCase()} ${c.schedule_day} ${window.t('meta.schedule_hour').toLowerCase()} ${_scheduleUTCToLocal(c.schedule_time || '00:00')}`;
+            if (c.schedule_type === 'daily') {
+                scheduleText = `${window.t('meta.schedule_daily')} ${window.t('meta.schedule_hour').toLowerCase()} ${_scheduleUTCToLocal(c.schedule_time || '00:00')}`;
+            } else if (c.schedule_type === 'weekly') {
+                const dayNames = {
+                    1: window.t('meta.weekday_mon'),
+                    2: window.t('meta.weekday_tue'),
+                    3: window.t('meta.weekday_wed'),
+                    4: window.t('meta.weekday_thu'),
+                    5: window.t('meta.weekday_fri'),
+                    6: window.t('meta.weekday_sat'),
+                    7: window.t('meta.weekday_sun')
+                };
+                const dayName = dayNames[c.schedule_day] || c.schedule_day;
+                scheduleText = `${window.t('meta.schedule_weekly')} (${dayName}) ${window.t('meta.schedule_hour').toLowerCase()} ${_scheduleUTCToLocal(c.schedule_time || '00:00')}`;
+            } else if (c.schedule_type === 'monthly') {
+                scheduleText = `${window.t('meta.schedule_monthly')} ${window.t('meta.schedule_monthday').toLowerCase()} ${c.schedule_day} ${window.t('meta.schedule_hour').toLowerCase()} ${_scheduleUTCToLocal(c.schedule_time || '00:00')}`;
+            }
             
             // Calcul prochaine exécution (heure locale du navigateur)
             const _nr = c.enabled ? _computeNextRun(c) : null;
@@ -327,7 +341,7 @@ function _renderPreview(configId) {
                 </div>
                 <div class="meta-preview-entry-details">
                     <div class="meta-preview-line">${escapeHtml(e.triggered_line)}</div>
-                    <div class="meta-preview-ai-full">IA : ${escapeHtml(e.short_ia)}</div>
+                    <div class="meta-preview-ai-full">${window.t('monitor.llm_response') || 'IA'} : ${escapeHtml(e.short_ia)}</div>
                     <textarea placeholder="${window.t('meta.annotation_placeholder')}" data-config="${configId}" data-rule="${ruleIdx}" data-entry="${entryIdx}" onclick="event.stopPropagation()" onchange="_updateAnnotation(this)">${e.annotation || ''}</textarea>
                     <button type="button" class="btn btn-sm btn-danger meta-preview-exclude-btn meta-exclude-mobile" onclick="event.stopPropagation(); _deletePreviewEntry(${configId},${ruleIdx},${entryIdx})">× ${window.t('meta.exclude_btn')}</button>
                 </div>
@@ -772,9 +786,9 @@ async function triggerCustomMeta(id) {
     data.rules_context.forEach(ruleCtx => {
         ruleCtx.entries.forEach(e => {
             if (e._excluded) return;
-            let block = `[${e.date}] [SEVERITY: ${e.severity}] [R\u00e8gle: ${ruleCtx.rule_name}] [ID: ${e.detection_id}]\nLigne: ${e.triggered_line}\nIA unitaire: ${e.short_ia}`;
+            let block = `[${e.date}] [SEVERITY: ${e.severity}] [${window.t('notifications.rule')}: ${ruleCtx.rule_name}] [ID: ${e.detection_id}]\n${window.t('monitor.detail_line_label')}: ${e.triggered_line}\n${window.t('notifications.ollama_analysis')}: ${e.short_ia}`;
             if (e.annotation && e.annotation.trim()) {
-                block += `\n[ANNOTATION UTILISATEUR]: ${e.annotation.trim()}`;
+                block += `\n[${window.t('meta.user_annotation_label') || 'USER ANNOTATION'}]: ${e.annotation.trim()}`;
             }
             lines.push(block);
         });

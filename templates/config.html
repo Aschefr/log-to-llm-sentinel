@@ -180,7 +180,7 @@
                 <div class="form-hint" data-i18n="config.max_log_chars_hint">Évite de saturer le serveur avec des logs massifs.</div>
             </div>
             <div class="form-group">
-                <label for="ollama-prompt-lang">🌐 Langue des analyses Ollama</label>
+                <label for="ollama-prompt-lang">🌐 <span data-i18n="config.ollama_prompt_lang_label">Langue des analyses Ollama</span></label>
                 <select id="ollama-prompt-lang" style="display: none;">
                     <option value="fr">Français</option>
                     <option value="en">English</option>
@@ -202,7 +202,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="form-hint" style="margin-top: 0.5rem;">Langue utilisée dans les prompts d'analyse de logs et de méta-analyse. Les prompts d'auto-apprentissage restent en anglais (meilleure fiabilité).</div>
+                <div class="form-hint" style="margin-top: 0.5rem;" data-i18n="config.ollama_prompt_lang_hint">Langue utilisée dans les prompts d'analyse de logs et de méta-analyse. Les prompts d'auto-apprentissage restent en anglais (meilleure fiabilité).</div>
             </div>
             <div class="form-actions" style="margin-top: 0.5rem;">
                 <button type="button" id="test-ollama-btn" class="btn btn-secondary" data-i18n="config.test_ollama">Tester Ollama</button>
@@ -318,7 +318,7 @@
 
                     <div class="form-group">
                         <label for="syslog-forward-addr" data-i18n="config.syslog_forward_addr">Adresse de redirection (Relais Syslog)</label>
-                        <input type="text" id="syslog-forward-addr" placeholder="ex: 192.168.1.50:514">
+                        <input type="text" id="syslog-forward-addr" placeholder="ex: 192.168.1.50:514" data-i18n-placeholder="config.syslog_forward_addr_placeholder">
                         <div class="form-hint" data-i18n="config.syslog_forward_addr_hint">Adresse IP et Port (optionnel, défaut 514) vers lequel renvoyer les paquets Syslog bruts (ex: votre second serveur Unraid). Laisser vide pour désactiver la redirection.</div>
                     </div>
                 </div>

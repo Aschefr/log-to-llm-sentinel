@@ -670,3 +670,24 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentTheme = localStorage.getItem('theme') || 'dark';
     applyThemeIcon(currentTheme);
 });
+
+function translateBackendError(msg) {
+    if (!msg) return msg;
+    if (window.i18n?.getCurrentLang() !== 'en') return msg;
+
+    if (msg.startsWith("Fichier introuvable sur le serveur :")) {
+        return msg.replace("Fichier introuvable sur le serveur :", "File not found on the server:");
+    }
+    if (msg.startsWith("Fichier non lisible (permissions insuffisantes) :")) {
+        return msg.replace("Fichier non lisible (permissions insuffisantes) :", "File not readable (insufficient permissions):");
+    }
+    if (msg.startsWith("Aucun candidat (mot-clé ou exclusion) trouvé sur l'ensemble de la période.")) {
+        return "No candidate (keyword or exclusion) found over the entire period. Verify that the file contains logs during this period and that timestamps are readable.";
+    }
+    if (msg.startsWith("Ollama a rejeté la liste raffinée")) {
+        return msg.replace("Ollama a rejeté la liste raffinée", "Ollama rejected the refined list")
+                  .replace("fois de suite. La liste brute contenait :", "times in a row. The raw list contained:")
+                  .replace(". Consultez le fichier log de session pour les détails.", ". See session log file for details.");
+    }
+    return msg;
+}

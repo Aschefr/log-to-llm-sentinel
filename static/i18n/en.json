@@ -134,7 +134,17 @@
         "resolution_patterns_add": "Add",
         "resolution_patterns_clear_all": "Clear all",
         "resolution_patterns_confirm_clear": "Delete all resolution patterns?",
-        "resolution_patterns_empty": "No patterns defined. Add them manually or let the AI learn them."
+        "resolution_patterns_empty": "No patterns defined. Add them manually or let the AI learn them.",
+        "syslog_info_title": "Configuration to forward from your source (e.g., Unraid):",
+        "label_inactivity_warning": "Inactivity warning (No log received)",
+        "label_inactivity_hours": "hours",
+        "label_exclusions": "Negative keywords / Exclusion patterns",
+        "exclusions_hint": "If a line contains one of these terms (separated by commas), it is ignored — even if a positive keyword matches.",
+        "source_local": "Local File",
+        "source_webhook": "Webhook API",
+        "source_syslog": "Syslog Server",
+        "placeholder_exclusions": "com.docker.backend, GET /app/settings, healthcheck…",
+        "no_keywords_learning": "No keywords (learning in progress…)"
     },
     "monitor": {
         "title": "Monitor",
@@ -311,7 +321,12 @@
         "compression_desc_summary": "Smart AI summary. ~70%. Recommended.",
         "truncated_banner": "Context truncated",
         "truncated_info": "old messages excluded from context",
-        "truncated_detail": "Messages excluded from Ollama context"
+        "truncated_detail": "Messages excluded from Ollama context",
+        "delete_btn_title": "Delete conversation",
+        "disable_title": "Disable",
+        "mode_truncate": "Truncate",
+        "mode_compact": "Compact",
+        "mode_summary": "AI Summary"
     },
     "config": {
         "title": "Global Configuration",
@@ -423,7 +438,19 @@
         "import_warning": "⚠️ Warning: Importing a backup will completely overwrite the current configuration (and history if present in the file). This action is irreversible.",
         "import_btn": "Restore backup",
         "import_confirm_prompt": "Warning: Importing will overwrite ALL current configuration. Continue?",
-        "importing": "Restoring backup..."
+        "importing": "Restoring backup...",
+        "syslog_title": "Syslog Receiver & Relay",
+        "syslog_enabled": "Enable Syslog receiver (UDP 514)",
+        "syslog_forward_addr": "Forwarding Address (Syslog Relay)",
+        "syslog_forward_addr_hint": "IP Address and Port (optional, default 514) where raw Syslog packets will be forwarded (e.g., your backup Unraid server). Leave empty to disable relay.",
+        "syslog_info_title": "Log source configuration (e.g., Unraid):",
+        "syslog_info_ip": "IP Address:",
+        "syslog_info_port": "Port:",
+        "syslog_info_proto": "Protocol:",
+        "syslog_info_note": "Note: Sentinel listens on port 514 inside its Docker container. This is mapped to host port 10514 in your docker-compose.yml.",
+        "ollama_prompt_lang_label": "Ollama Analysis Language",
+        "ollama_prompt_lang_hint": "Language used in analysis and meta-analysis prompts. Self-learning prompts remain in English (better reliability).",
+        "syslog_forward_addr_placeholder": "e.g. 192.168.1.50:514"
     },
     "common": {
         "retry": "Retry",
@@ -531,7 +558,8 @@
         "period_to": "To",
         "reset_last_run": "Reset period",
         "reset_last_run_confirm": "Reset the last run date? The next period will restart from the schedule default.",
-        "toggle_tiles": "Expand/Collapse All"
+        "toggle_tiles": "Expand/Collapse All",
+        "user_annotation_label": "USER ANNOTATION"
     },
     "kw": {
         "tab_manual": "Manual Keywords",
@@ -573,7 +601,13 @@
         "profile_quick": "Quick (2 min)",
         "profile_fast": "Normal (10 min)",
         "profile_extended": "Extended (1h)",
-        "profile_complete": "Complete (1d)"
+        "profile_complete": "Complete (1d)",
+        "modify_period_hint": "Modify the period below and restart.",
+        "new_session": "New session",
+        "session_completed": "Session completed.",
+        "session_cancelled": "Session cancelled.",
+        "session_error": "Session in error.",
+        "loading_learning_session": "Loading learning session…"
     },
     "notifications": {
         "alert": "Alert",
@@ -627,15 +661,5 @@
         "path_must_be_absolute": "Path must be absolute",
         "error_unknown": "Unknown error",
         "error_api": "API error"
-    },
-    "config.syslog_title": "Syslog Receiver & Relay",
-    "config.syslog_enabled": "Enable Syslog receiver (UDP 514)",
-    "config.syslog_forward_addr": "Forwarding Address (Syslog Relay)",
-    "config.syslog_forward_addr_hint": "IP Address and Port (optional, default 514) where raw Syslog packets will be forwarded (e.g., your backup Unraid server). Leave empty to disable relay.",
-    "config.syslog_info_title": "Log source configuration (e.g., Unraid):",
-    "config.syslog_info_ip": "IP Address:",
-    "config.syslog_info_port": "Port:",
-    "config.syslog_info_proto": "Protocol:",
-    "config.syslog_info_note": "Note: Sentinel listens on port 514 inside its Docker container. This is mapped to host port 10514 in your docker-compose.yml.",
-    "rules.syslog_info_title": "Configuration to forward from your source (e.g., Unraid):"
+    }
 }

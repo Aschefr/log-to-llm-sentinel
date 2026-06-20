@@ -4,7 +4,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h2 id="modal-title">Nouvelle règle</h2>
-            <button id="close-modal" class="btn-close" type="button" title="Fermer">&times;</button>
+            <button id="close-modal" class="btn-close" type="button" title="Fermer" data-i18n-title="common.close">&times;</button>
         </div>
         <form id="rule-form">
             <input type="hidden" id="rule-id">
@@ -26,15 +26,15 @@
                 <div class="kw-tabs" role="tablist">
                     <div class="source-card kw-tab kw-tab--active" data-source="local"
                          role="tab" aria-selected="true">
-                        📁 Fichier Local
+                        📁 <span data-i18n="rules.source_local">Fichier Local</span>
                     </div>
                     <div class="source-card kw-tab" data-source="webhook"
                          role="tab" aria-selected="false">
-                        🔗 Webhook API
+                        🔗 <span data-i18n="rules.source_webhook">Webhook API</span>
                     </div>
                     <div class="source-card kw-tab" data-source="syslog"
                          role="tab" aria-selected="false">
-                        📨 Syslog Server
+                        📨 <span data-i18n="rules.source_syslog">Syslog Server</span>
                     </div>
                 </div>
             </div>
@@ -131,10 +131,10 @@
                 </div>
             </div>
             <div class="form-group">
-                <label for="rule-excluded-patterns">🚫 Patterns d'exclusion <span style="opacity:.6;font-size:.85em">(negative keywords)</span></label>
+                <label for="rule-excluded-patterns">🚫 <span data-i18n="rules.label_exclusions">Patterns d'exclusion</span> <span style="opacity:.6;font-size:.85em">(negative keywords)</span></label>
                 <input type="text" id="rule-excluded-patterns"
-                       placeholder="com.docker.backend, GET /app/settings, healthcheck…">
-                <div class="form-hint">
+                       placeholder="com.docker.backend, GET /app/settings, healthcheck…" data-i18n-placeholder="rules.placeholder_exclusions">
+                <div class="form-hint" data-i18n="rules.exclusions_hint">
                     Si une ligne contient l'un de ces termes (séparés par des virgules), elle est ignorée — même si un mot-clé positif correspond.
                     Utile pour filtrer les logs bruités (IPC Docker, health-checks, etc.).
                 </div>

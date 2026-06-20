@@ -210,7 +210,7 @@ function _updateWizardSteps(data) {
             progressEl.style.display = 'block';
         } else if (data.status === 'error') {
             let msg = window.t ? window.t('kw.card_error') : '⚠️ Erreur : {msg}';
-            msg = msg.replace('{msg}', data.error_message || 'Inconnue');
+            msg = msg.replace('{msg}', translateBackendError(data.error_message) || 'Inconnue');
             progressEl.innerHTML = `<div class="kw-hint" style="color:var(--danger)">${msg}</div>`;
             progressEl.style.display = 'block';
         } else {
@@ -345,12 +345,12 @@ function _renderConfigPhase() {
             <div id="kw-wizard-progress" style="display:none"></div>
             <div style="margin-bottom:.75rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
                 <span class="kw-hint" style="opacity:.75">
-                    ${session.status === 'validated' ? '✅ Session terminée.' : session.status === 'reverted' ? '↩️ Session annulée.' : '⚠️ Session en erreur.'}
-                    Modifiez la période ci-dessous et relancez.
+                    ${session.status === 'validated' ? '✅ ' + window.t('kw.session_completed') : session.status === 'reverted' ? '↩️ ' + window.t('kw.session_cancelled') : '⚠️ ' + window.t('kw.session_error')}
+                    ${window.t('kw.modify_period_hint')}
                 </span>
                 <button type="button" class="btn btn-secondary btn-sm"
                         onclick="_kwResetForNewSession()"
-                        style="white-space:nowrap">🔄 Nouvelle session</button>
+                        style="white-space:nowrap">🔄 ${window.t('kw.new_session')}</button>
             </div>
         ` : '<div id="kw-wizard-progress" style="display:none"></div>'}
         <div class="kw-config-grid">
@@ -438,6 +438,9 @@ function _renderConfigPhase() {
 
     // If editing a session, show progress immediately
     if (session) _updateWizardSteps(session);
+
+    // Apply translations to dynamic elements
+    window.i18n?.applyTranslations();
 }
 
 window._applyKwProfile = function(minutes) {
@@ -489,9 +492,20 @@ function _refreshGranularitySelect() {
     const suggested = _suggestGranularity(dur);
     const current   = parseInt(sel.value) || 0;
 
+    const getLabel = (lbl) => {
+        if (window.i18n?.getCurrentLang() === 'en') {
+            return lbl.replace('heures', 'hours')
+                      .replace('heure', 'hour')
+                      .replace('jour', 'day')
+                      .replace('semaines', 'weeks')
+                      .replace('semaine', 'week');
+        }
+        return lbl;
+    };
+
     sel.innerHTML = GRANULARITY_OPTIONS
         .filter(o => allowed.includes(o.value))
-        .map(o => `<option value="${o.value}">${o.label}${o.value === suggested ? ' ★' : ''}</option>`)
+        .map(o => `<option value="${o.value}">${getLabel(o.label)}${o.value === suggested ? ' ★' : ''}</option>`)
         .join('');
 
     // Preserve explicit user choice only if still in allowed list;
@@ -502,7 +516,8 @@ function _refreshGranularitySelect() {
 
     const hint = document.getElementById('kw-granularity-hint');
     if (hint) {
-        const label = GRANULARITY_OPTIONS.find(o => o.value === suggested)?.label || '?';
+        const rawLabel = GRANULARITY_OPTIONS.find(o => o.value === suggested)?.label || '?';
+        const label = getLabel(rawLabel);
         const tpl   = window.t ? window.t('kw.granularity_suggestion') : '(suggestion : {label})';
         hint.textContent = tpl.replace('{label}', label);
     }

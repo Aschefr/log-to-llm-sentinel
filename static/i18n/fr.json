@@ -134,7 +134,17 @@
         "resolution_patterns_add": "Ajouter",
         "resolution_patterns_clear_all": "Tout effacer",
         "resolution_patterns_confirm_clear": "Supprimer tous les patterns de résolution ?",
-        "resolution_patterns_empty": "Aucun pattern défini. Ajoutez-en manuellement ou laissez l'IA les apprendre."
+        "resolution_patterns_empty": "Aucun pattern défini. Ajoutez-en manuellement ou laissez l'IA les apprendre.",
+        "syslog_info_title": "Configuration de l'envoi depuis votre source (ex: Unraid) :",
+        "label_inactivity_warning": "Avertissement d'inactivité (Aucun log reçu)",
+        "label_inactivity_hours": "heures",
+        "label_exclusions": "Patterns d'exclusion (negative keywords)",
+        "exclusions_hint": "Si une ligne contient l'un de ces termes (séparés par des virgules), elle est ignorée — même si un mot-clé positif correspond.",
+        "source_local": "Fichier Local",
+        "source_webhook": "Webhook API",
+        "source_syslog": "Syslog Server",
+        "placeholder_exclusions": "com.docker.backend, GET /app/settings, healthcheck…",
+        "no_keywords_learning": "Aucun mot-clé (apprentissage en cours…)"
     },
     "monitor": {
         "title": "Monitor",
@@ -282,7 +292,7 @@
         "btn_save": "Enregistrer",
         "btn_cancel": "Annuler",
         "context_preview_title": "Contexte auto-ajouté (Aperçu)",
-        "settings_btn": "Paramètres ⚙️",
+        "settings_btn": "Paramètres ⚙",
         "mode_de_reponse": "=== Contexte Automatique ===\nDate et heure actuelles : {datetime}\nLangue de réponse : {lang}\n\nLa plateforme de chat fait partie d'un environnement d'analyse de fichiers de log choisis par l'utilisateur.\nA titre informatif, voici les règles et fichiers surveillés :\n{rules_list}\n\n=== Mode de réponse (IMPORTANT) ===\nRéponds de manière directe, sans fioritures ni explications approfondies à moins que l'utilisateur ne le demande.",
         "generation_cancelled": "Génération annulée.",
         "error_create_conv": "Erreur lors de la création de la conversation :",
@@ -311,7 +321,12 @@
         "compression_desc_summary": "Résumé intelligent par l'IA. ~70%. Recommandé.",
         "truncated_banner": "Contexte tronqué",
         "truncated_info": "messages anciens exclus du contexte",
-        "truncated_detail": "Messages exclus du contexte Ollama"
+        "truncated_detail": "Messages exclus du contexte Ollama",
+        "delete_btn_title": "Supprimer la conversation",
+        "disable_title": "Désactiver",
+        "mode_truncate": "Tronquer",
+        "mode_compact": "Compacter",
+        "mode_summary": "Résumé IA"
     },
     "config": {
         "title": "Configuration Globale",
@@ -420,10 +435,22 @@
         "export_btn": "Générer et télécharger l'export (ZIP)",
         "import_title_sub": "Importer une configuration",
         "select_backup_file": "Sélectionner le fichier ZIP de sauvegarde",
-        "import_warning": "⚠️ Attention : L'importation d'une sauvegarde écrasera complètement la configuration actuelle (et l'historique si présent dans le fichier). Cette action est irréversible.",
+        "import_warning": "⚠ Attention : L'importation d'une sauvegarde écrasera complètement la configuration actuelle (et l'historique si présent dans le fichier). Cette action est irréversible.",
         "import_btn": "Restaurer la sauvegarde",
         "import_confirm_prompt": "Attention : L'importation écrasera TOUTE la configuration actuelle. Continuer ?",
-        "importing": "Restauration en cours..."
+        "importing": "Restauration en cours...",
+        "syslog_title": "Récepteur Syslog & Relais",
+        "syslog_enabled": "Activer le récepteur Syslog (UDP 514)",
+        "syslog_forward_addr": "Adresse de redirection (Relais Syslog)",
+        "syslog_forward_addr_hint": "Adresse IP et Port (optionnel, défaut 514) vers lequel renvoyer les paquets Syslog bruts (ex: votre second serveur Unraid). Laisser vide pour désactiver la redirection.",
+        "syslog_info_title": "Configuration de la source de logs (ex: Unraid) :",
+        "syslog_info_ip": "Adresse IP :",
+        "syslog_info_port": "Port :",
+        "syslog_info_proto": "Protocole :",
+        "syslog_info_note": "Note : Sentinel écoute sur le port 514 à l'intérieur de son conteneur Docker. Celui-ci est redirigé vers le port hôte 10514 dans votre fichier docker-compose.yml.",
+        "ollama_prompt_lang_label": "Langue des analyses Ollama",
+        "ollama_prompt_lang_hint": "Langue utilisée dans les prompts d'analyse de logs et de méta-analyse. Les prompts d'auto-apprentissage restent en anglais (meilleure fiabilité).",
+        "syslog_forward_addr_placeholder": "ex: 192.168.1.50:514"
     },
     "common": {
         "retry": "Ré-essayer",
@@ -531,7 +558,8 @@
         "period_to": "à",
         "reset_last_run": "Réinitialiser la période",
         "reset_last_run_confirm": "Réinitialiser la date du dernier run ? La prochaine période sera recalculée depuis le début du schedule.",
-        "toggle_tiles": "Tout plier/déplier"
+        "toggle_tiles": "Tout plier/déplier",
+        "user_annotation_label": "ANNOTATION UTILISATEUR"
     },
     "kw": {
         "tab_manual": "Mots-clés manuels",
@@ -573,7 +601,13 @@
         "profile_quick": "Rapide (2 min)",
         "profile_fast": "Normal (10 min)",
         "profile_extended": "Étendu (1h)",
-        "profile_complete": "Complet (1j)"
+        "profile_complete": "Complet (1j)",
+        "modify_period_hint": "Modifiez la période ci-dessous et relancez.",
+        "new_session": "Nouvelle session",
+        "session_completed": "Session terminée.",
+        "session_cancelled": "Session annulée.",
+        "session_error": "Session en erreur.",
+        "loading_learning_session": "Chargement de la session d’apprentissage…"
     },
     "notifications": {
         "alert": "Alerte",
@@ -627,15 +661,5 @@
         "path_must_be_absolute": "Le chemin doit être absolu",
         "error_unknown": "Erreur inconnue",
         "error_api": "Erreur API"
-    },
-    "config.syslog_title": "Récepteur Syslog & Relais",
-    "config.syslog_enabled": "Activer le récepteur Syslog (UDP 514)",
-    "config.syslog_forward_addr": "Adresse de redirection (Relais Syslog)",
-    "config.syslog_forward_addr_hint": "Adresse IP et Port (optionnel, défaut 514) vers lequel renvoyer les paquets Syslog bruts (ex: votre second serveur Unraid). Laisser vide pour désactiver la redirection.",
-    "config.syslog_info_title": "Configuration de la source de logs (ex: Unraid) :",
-    "config.syslog_info_ip": "Adresse IP :",
-    "config.syslog_info_port": "Port :",
-    "config.syslog_info_proto": "Protocole :",
-    "config.syslog_info_note": "Note : Sentinel écoute sur le port 514 à l'intérieur de son conteneur Docker. Celui-ci est redirigé vers le port hôte 10514 dans votre fichier docker-compose.yml.",
-    "rules.syslog_info_title": "Configuration de l'envoi depuis votre source (ex: Unraid) :"
+    }
 }
