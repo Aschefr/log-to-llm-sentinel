@@ -21,6 +21,10 @@ Sentinel detects critical log events, automatically collects surrounding applica
 * [**Inactivity Monitoring**](features/inactivity-monitoring.md) — Tracking log ingestion gaps to alert on dead processes.
 * [**Incident Resolution & AI Verdicts**](features/resolution-tracking.md) — Auto-detecting resolution states, auditing weight relevance, and AI confirmation rules.
 
+### 🛠️ Setup & Ingestion Wizards
+* **[Docker Configurator](../../docker-setup.html)** — Interactive wizard to generate custom `docker-compose.yml` configurations with GPU acceleration and journal bridges.
+* **[Webhook Assistant](../../webhook-setup.html)** — Multi-platform script generator (Linux, Unraid, Windows) to stream logs directly to Sentinel webhooks.
+
 ---
 
 ## Directory Translation Structure

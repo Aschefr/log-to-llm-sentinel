@@ -54,3 +54,9 @@ Sentinel listens on UDP port 514 inside the container (mapped to host port 10514
 * **Import Configuration**:
   * *Select Backup File*: Choose a previously exported ZIP file.
   * *Restore Backup Button*: Restores all rules, settings, and histories, overwriting current database entries.
+
+---
+
+## 5. Docker Setup Configurator
+To customize or regenerate your initial docker deployment parameters, use the built-in interactive **[Docker Configurator](../../../docker-setup.html)**. It generates custom `docker-compose.yml` templates pre-configured with the host Systemd journal bridge, custom log folder mounts, and local NVIDIA CUDA GPU accelerated Ollama setup instructions.
+

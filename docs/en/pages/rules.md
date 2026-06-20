@@ -15,6 +15,7 @@ Click the **+ New Rule** button to open the rule setup modal. The modal contains
      * *Show Hidden Files*: Checkbox to display files starting with a dot (`.`).
   2. **🔗 Webhook API**: Generates a unique HTTP URL to post logs directly to Sentinel.
      * *Copy URL Button*: Instantly copies a `curl` template to the clipboard for integration with external scripts.
+     * *Setup Guide*: Utilize the built-in [Webhook Assistant](../../../webhook-setup.html) to step-by-step configure and generate daemon log forwarder scripts for Linux, Unraid, or Windows hosts.
   3. **📨 Syslog Server**: Binds to the built-in UDP syslog receiver using a specified hostname or wildcard (`*`).
 
 ### Match Criteria
