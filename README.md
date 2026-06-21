@@ -4,8 +4,8 @@
 
 Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. Unlike traditional tools that just search for text, Sentinel uses **Ollama (Local LLM)** to understand *why* an error happened and tells you exactly what you need to know.
 
-> [!CAUTION]
-> **Disclaimer**: This application is entirely "vibe coded" and designed specifically to meet the creator's personal needs. Security has not been independently audited or verified, as the intended use case is strictly local. Use this software at your own risk.
+> [!WARNING]
+> **Disclaimer**: This application was originally designed to meet the creator's personal self-hosting needs. Security has not been independently audited, as the intended use case is strictly local/private network. Use this software at your own risk. Contributions to improve security, testing, and robustness are highly welcome!
 
 
 <p align="center">
@@ -111,7 +111,9 @@ For long-term monitoring, use **Meta-Analysis**:
 
 ---
 
-## 🏠 Home Assistant Integration
+## 🔌 Integrations
+
+### 🏠 Home Assistant Integration
 
 Sentinel can monitor your Home Assistant logs in real-time. Follow these steps to set up the integration:
 
@@ -190,8 +192,9 @@ automation:
 
 ---
 
-## Nextcloud integration
-Find the active nextcloud.log in Docker volumes:
+### ☁️ Nextcloud Integration
+
+Find the active `nextcloud.log` in Docker volumes:
 
 ```bash
 sudo find /var/lib/docker/volumes/ -name "nextcloud.log" -exec ls -lh {} +
@@ -203,6 +206,52 @@ Sentinel is highly customizable via the **Configuration** page:
 - **AI Model**: Choose your favorite model from Ollama (Gemma, Llama 3, Mistral...).
 - **Performance**: Adjust "Eco" or "GPU" profiles depending on your hardware.
 - **Privacy**: Fine-tune anti-spam delays and sensitivity thresholds.
+
+---
+
+## 💻 Local Development
+
+If you want to run Log to LLM Sentinel locally for development without Docker:
+
+### 1. Prerequisites
+- **Python**: Version 3.10 or higher.
+- **Ollama**: Installed and running locally (for the AI analysis).
+
+### 2. Setup
+1. Clone the repository and navigate to it:
+   ```bash
+   git clone https://github.com/Aschefr/log-to-llm-sentinel
+   cd log-to-llm-sentinel
+   ```
+2. Create and activate a Python virtual environment:
+   ```bash
+   python -m venv .venv
+   # On Windows (PowerShell)
+   .\.venv\Scripts\Activate.ps1
+   # On Linux/macOS
+   source .venv/bin/activate
+   ```
+3. Install the dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Copy the environment configuration template:
+   ```bash
+   cp .env.example .env
+   ```
+
+### 3. Run the Server
+Launch the FastAPI development server:
+```bash
+uvicorn app.main:app --reload
+```
+The application will be accessible at: 👉 **http://localhost:8000**
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
