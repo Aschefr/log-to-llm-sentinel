@@ -30,6 +30,8 @@ scratch/orphan_audit.txt
 scratch/
 data/sentinel.db*
 data/*.db*
+sentinel.db*
+*.db*
 *.pyc
 __pycache__/
 
