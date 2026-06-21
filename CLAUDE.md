@@ -62,4 +62,19 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ---
 
+## 5. Internationalisation (i18n)
+
+**Toutes les clés de traduction doivent toujours être synchronisées et traduites dans tous les fichiers de langue (`fr.json`, `en.json`...).**
+
+- Ne livrez jamais une version sans vérifier que la structure des fichiers de langue est identique.
+- Assurez-vous que les clés ajoutées dans une langue sont également ajoutées et traduites dans les autres langues avant tout commit, push ou publication.
+
+---
+
+## 6. Changelog
+
+- Le Changelog (`CHANGELOG.md`) doit **toujours** être rédigé en anglais pour les nouvelles versions.
+
+---
+
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
