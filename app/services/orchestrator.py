@@ -97,26 +97,30 @@ class Orchestrator:
 
     async def _flush_buffer(self, rule_id: int):
         """Attend le délai anti-spam puis traite toutes les lignes accumulées."""
+        # Phase 1 : lecture du délai (session DB courte, toujours libérée avant le sleep)
+        buffer_delay = 60
         db = SessionLocal()
         try:
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             if not rule or not rule.enabled:
                 return
-
             buffer_delay = rule.anti_spam_delay or 60
-            db.close() # Free the connection during the sleep
-            
-            await asyncio.sleep(buffer_delay)
+        finally:
+            db.close()  # Toujours fermée ici, avant le sleep — jamais de double-close
 
-            lines = self._buffers[rule_id]["lines"]
-            detection_id = self._buffers[rule_id]["detection_id"]
-            matched_keywords = list(self._buffers[rule_id]["matched_keywords"])
-            self._buffers[rule_id] = {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
+        await asyncio.sleep(buffer_delay)
 
-            if not lines:
-                return
-                
-            db = SessionLocal()
+        lines = self._buffers[rule_id]["lines"]
+        detection_id = self._buffers[rule_id]["detection_id"]
+        matched_keywords = list(self._buffers[rule_id]["matched_keywords"])
+        self._buffers[rule_id] = {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
+
+        if not lines:
+            return
+
+        # Phase 2 : traitement avec une nouvelle session DB propre
+        db = SessionLocal()
+        try:
             # Re-fetch rule to ensure it's still enabled after sleep
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             if not rule or not rule.enabled:
@@ -188,6 +192,7 @@ class Orchestrator:
             logger.error("Orchestrator", f"Erreur lors du flush buffer : {e}")
         finally:
             db.close()
+
 
     async def _process_match(self, rule: Rule, line: str, config: dict, db,
                               detection_id: str = None, matched_keywords: list = None):

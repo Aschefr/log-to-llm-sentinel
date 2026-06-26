@@ -295,30 +295,76 @@ function setupRuleModal(opts = {}) {
 
     const resEnable = document.getElementById('rule-resolution-enable');
     const resSettings = document.getElementById('resolution-settings-container');
-    const resMode = document.getElementById('rule-resolution-mode');
-    const resTimeoutCont = document.getElementById('resolution-timeout-container');
-    const resPatternsCont = document.getElementById('resolution-patterns-container');
     const resAiEnable = document.getElementById('rule-resolution-ai-enabled');
     const resAiOptions = document.getElementById('resolution-ai-options');
+
+    // ── Sélection de carte de mode ──
+    function _getResMode() {
+        const hidden = document.getElementById('rule-resolution-mode');
+        return hidden ? hidden.value : 'timeout';
+    }
+
+    function _setResMode(mode) {
+        const hidden = document.getElementById('rule-resolution-mode');
+        if (hidden) hidden.value = mode;
+
+        // Mettre à jour l'état visuel des cartes
+        document.querySelectorAll('#resolution-mode-cards .res-mode-card').forEach(card => {
+            card.classList.toggle('res-mode-card--active', card.dataset.mode === mode);
+        });
+
+        // Afficher/masquer les configs inline des cartes
+        const timeoutInline = document.getElementById('res-timeout-inline-config');
+        const bothInline = document.getElementById('res-both-inline-config');
+        if (timeoutInline) timeoutInline.style.display = (mode === 'timeout') ? 'flex' : 'none';
+        if (bothInline)    bothInline.style.display    = (mode === 'both')    ? 'flex' : 'none';
+
+        // Synchroniser le champ "both" avec le champ principal au changement de mode
+        const mainTimeout = document.getElementById('rule-resolution-timeout');
+        const bothTimeout = document.getElementById('rule-resolution-timeout-both');
+        if (bothTimeout && mainTimeout) {
+            if (mode === 'both') {
+                bothTimeout.value = mainTimeout.value;
+            }
+        }
+    }
+
+    // Clic sur une carte de mode
+    document.querySelectorAll('#resolution-mode-cards .res-mode-card').forEach(card => {
+        card.addEventListener('click', () => {
+            _setResMode(card.dataset.mode);
+            updateResolutionUI();
+        });
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                _setResMode(card.dataset.mode);
+                updateResolutionUI();
+            }
+        });
+    });
+
+    // Synchronisation bidirectionnelle timeout ↔ timeout-both
+    const mainTimeoutEl = document.getElementById('rule-resolution-timeout');
+    const bothTimeoutEl = document.getElementById('rule-resolution-timeout-both');
+    if (mainTimeoutEl && bothTimeoutEl) {
+        mainTimeoutEl.addEventListener('input', () => { bothTimeoutEl.value = mainTimeoutEl.value; });
+        bothTimeoutEl.addEventListener('input', () => { mainTimeoutEl.value = bothTimeoutEl.value; });
+    }
 
     function updateResolutionUI() {
         if (!resEnable) return;
         resSettings.style.display = resEnable.checked ? 'flex' : 'none';
-        
-        if (resEnable.checked && resMode) {
-            const mode = resMode.value;
-            if (mode === 'timeout') {
-                if (resTimeoutCont) resTimeoutCont.classList.remove('hidden');
-                if (resPatternsCont) resPatternsCont.classList.add('hidden');
-            } else if (mode === 'pattern') {
-                if (resTimeoutCont) resTimeoutCont.classList.add('hidden');
-                if (resPatternsCont) resPatternsCont.classList.remove('hidden');
-            } else {
-                if (resTimeoutCont) resTimeoutCont.classList.remove('hidden');
-                if (resPatternsCont) resPatternsCont.classList.remove('hidden');
+
+        if (resEnable.checked) {
+            const mode = _getResMode();
+            const resPatternsCont = document.getElementById('resolution-patterns-container');
+            if (resPatternsCont) {
+                const showPatterns = (mode === 'pattern' || mode === 'both');
+                resPatternsCont.style.display = showPatterns ? 'flex' : 'none';
             }
         }
-        
+
         if (resAiEnable && resAiOptions) {
             if (resAiEnable.checked) {
                 resAiOptions.classList.remove('hidden');
@@ -328,11 +374,11 @@ function setupRuleModal(opts = {}) {
         }
     }
     window.updateResolutionUI = updateResolutionUI;
+    window._setResMode = _setResMode;
 
     if (resEnable) resEnable.addEventListener('change', updateResolutionUI);
-    if (resMode) resMode.addEventListener('change', updateResolutionUI);
     if (resAiEnable) resAiEnable.addEventListener('change', updateResolutionUI);
-    
+
     // Initial display sync
     updateResolutionUI();
 
@@ -495,7 +541,7 @@ function resetForm() {
     const resEnable = document.getElementById('rule-resolution-enable');
     if (resEnable) {
         resEnable.checked = true;
-        document.getElementById('rule-resolution-mode').value = 'timeout';
+        if (window._setResMode) window._setResMode('timeout'); else document.getElementById('rule-resolution-mode').value = 'timeout';
         document.getElementById('rule-resolution-timeout').value = '30';
         resTagsClear();
         _resolutionPatternsWeighted = [];
@@ -649,7 +695,8 @@ async function editRule(id) {
         if (resEnable) {
             const hasRes = rule.resolution_mode !== 'disabled';
             resEnable.checked = hasRes;
-            document.getElementById('rule-resolution-mode').value = hasRes ? rule.resolution_mode : 'timeout';
+            const modeToSet = hasRes ? rule.resolution_mode : 'timeout';
+            if (window._setResMode) window._setResMode(modeToSet); else document.getElementById('rule-resolution-mode').value = modeToSet;
             document.getElementById('rule-resolution-timeout').value = rule.resolution_timeout_minutes || 30;
             resTagsSet(rule.resolution_patterns || [], rule.resolution_patterns_weighted || []);
             document.getElementById('rule-resolution-ai-enabled').checked = rule.resolution_ai_enabled || false;

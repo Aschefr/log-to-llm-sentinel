@@ -1,4 +1,4 @@
-﻿{
+{
     "_meta": {
         "lang": "en",
         "name": "English",
@@ -135,6 +135,19 @@
         "resolution_patterns_clear_all": "Clear all",
         "resolution_patterns_confirm_clear": "Delete all resolution patterns?",
         "resolution_patterns_empty": "No patterns defined. Add them manually or let the AI learn them.",
+        "label_resolution_subtitle": "Automatically detect when a problem is resolved.",
+        "label_resolution_trigger_mode": "Trigger mode",
+        "resolution_mode_timeout_short": "Inactivity timeout",
+        "resolution_mode_timeout_desc": "If no new error is detected for X minutes.",
+        "resolution_mode_timeout_unit": "min",
+        "resolution_mode_pattern_short": "Keyword in logs",
+        "resolution_mode_pattern_desc": "When a specific pattern appears in logs (e.g. \"connection OK\").",
+        "resolution_mode_both_short": "Both",
+        "resolution_mode_both_desc": "Timeout OR pattern — whichever condition is met first.",
+        "label_resolution_ai_desc": "AI verifies that the return to normal is genuine before closing the alert.",
+        "label_resolution_notify_search_desc": "Sends a notification when Sentinel begins the AI verification.",
+        "label_resolution_notify_resolved_desc": "Sends a closure notification when the problem is resolved.",
+        "label_resolution_valnotif": "Validation & Notifications",
         "syslog_info_title": "Configuration to forward from your source (e.g., Unraid):",
         "label_inactivity_warning": "Inactivity warning (No log received)",
         "label_inactivity_hours": "hours",

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 SYSLOG_REGEX = re.compile(r"^(?:<(\d+)>)?([A-Za-z]{3}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+([^\s]+)\s+(.*)$")
 
 _orchestrator = None
-_BUFFER_MAX = 500
+_BUFFER_MAX = 2000
 _syslog_buffers: Dict[str, deque] = {}
 _SYSLOG_LOG_DIR = Path(os.environ.get("SENTINEL_DATA_DIR", "/app/data")) / "syslog"
 
@@ -214,9 +214,12 @@ class SyslogReceiver:
                         db.commit()
 
                         # Ingest line into AI pipeline
-                        asyncio.run_coroutine_threadsafe(
-                            _orchestrator.handle_new_lines(db_rule, [message]),
-                            asyncio.get_event_loop()
+                        # datagram_received is an asyncio-native callback (NOT a separate OS thread),
+                        # so run_coroutine_threadsafe + get_event_loop() is wrong here and fails
+                        # silently on Python 3.10+. Use ensure_future to schedule on the running loop,
+                        # exactly like log_watcher.py does with `await on_new_lines(...)`.
+                        asyncio.ensure_future(
+                            _orchestrator.handle_new_lines(db_rule, [message])
                         )
                 except Exception as ex:
                     logger.error(f"Error executing orchestrator check for syslog line: {ex}")

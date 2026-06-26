@@ -185,72 +185,127 @@
             </div>
             <!-- Surveillance de résolution (MON-18) -->
             <div class="form-group checkbox-group" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 1rem; flex-direction: column; align-items: flex-start;">
-                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.5rem; width: 100%;">
+                <!-- En-tête principal -->
+                <div style="display: flex; align-items: flex-start; flex-direction: column; gap: 0.2rem; margin-bottom: 0.5rem; width: 100%;">
                     <label class="toggle-switch">
                         <input type="checkbox" id="rule-resolution-enable" checked>
                         <span class="toggle-slider"></span>
                         <span class="toggle-label" style="font-weight: 600;" data-i18n="rules.label_resolution_title">Surveillance du retour à la normale</span>
                     </label>
+                    <p class="res-section-subtitle" data-i18n="rules.label_resolution_subtitle">Détecter automatiquement quand un problème est résolu.</p>
                 </div>
-                <div id="resolution-settings-container" style="display: flex; flex-direction: column; gap: 0.75rem; width: 100%; padding-left: 1.5rem; margin-top: 0.5rem;">
-                    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
-                        <label for="rule-resolution-mode" data-i18n="rules.label_resolution_mode">Mode de résolution</label>
-                        <select id="rule-resolution-mode" style="min-width: 250px;">
-                            <option value="timeout" data-i18n="rules.resolution_mode_timeout">Timeout d'inactivité (temps sans erreur)</option>
-                            <option value="pattern" data-i18n="rules.resolution_mode_pattern">Mot-clé de succès (log spécifique)</option>
-                            <option value="both" data-i18n="rules.resolution_mode_both">Timeout OU Mot-clé de succès</option>
-                        </select>
+
+                <!-- Conteneur des paramètres (masqué si désactivé) -->
+                <div id="resolution-settings-container" style="display: flex; flex-direction: column; gap: 1rem; width: 100%; margin-top: 0.25rem;">
+
+                    <!-- ── Section 1 : Mode de déclenchement ── -->
+                    <div class="res-subsection">
+                        <div class="res-subsection-label" data-i18n="rules.label_resolution_trigger_mode">Mode de déclenchement</div>
+                        <div class="res-mode-cards" id="resolution-mode-cards">
+                            <!-- Carte Timeout -->
+                            <div class="res-mode-card res-mode-card--active" data-mode="timeout" tabindex="0" role="button">
+                                <div class="res-mode-card-icon">⏱</div>
+                                <div class="res-mode-card-body">
+                                    <div class="res-mode-card-title" data-i18n="rules.resolution_mode_timeout_short">Timeout d'inactivité</div>
+                                    <div class="res-mode-card-desc" data-i18n="rules.resolution_mode_timeout_desc">Si aucune nouvelle erreur n'est détectée pendant X minutes.</div>
+                                    <div class="res-mode-card-config" id="res-timeout-inline-config">
+                                        <input type="number" id="rule-resolution-timeout" min="1" max="1440" value="30" style="width: 68px; padding: 0.25rem 0.4rem; font-size: 0.82rem;" onclick="event.stopPropagation()">
+                                        <span class="res-timeout-unit" data-i18n="rules.resolution_mode_timeout_unit">min</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Carte Pattern -->
+                            <div class="res-mode-card" data-mode="pattern" tabindex="0" role="button">
+                                <div class="res-mode-card-icon">🔍</div>
+                                <div class="res-mode-card-body">
+                                    <div class="res-mode-card-title" data-i18n="rules.resolution_mode_pattern_short">Mot-clé dans les logs</div>
+                                    <div class="res-mode-card-desc" data-i18n="rules.resolution_mode_pattern_desc">Quand un pattern spécifique apparaît dans les logs.</div>
+                                </div>
+                            </div>
+                            <!-- Carte Les deux -->
+                            <div class="res-mode-card" data-mode="both" tabindex="0" role="button">
+                                <div class="res-mode-card-icon">⚡</div>
+                                <div class="res-mode-card-body">
+                                    <div class="res-mode-card-title" data-i18n="rules.resolution_mode_both_short">Les deux</div>
+                                    <div class="res-mode-card-desc" data-i18n="rules.resolution_mode_both_desc">Timeout OU pattern — selon le premier critère atteint.</div>
+                                    <div class="res-mode-card-config" id="res-both-inline-config" style="display:none;">
+                                        <input type="number" id="rule-resolution-timeout-both" min="1" max="1440" value="30" style="width: 68px; padding: 0.25rem 0.4rem; font-size: 0.82rem;" onclick="event.stopPropagation()">
+                                        <span class="res-timeout-unit" data-i18n="rules.resolution_mode_timeout_unit">min</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Input caché qui stocke la valeur réelle (rétrocompatibilité JS) -->
+                        <input type="hidden" id="rule-resolution-mode" value="timeout">
                     </div>
-                    <div id="resolution-timeout-container" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                        <label for="rule-resolution-timeout" data-i18n="rules.label_resolution_timeout">Minutes d'inactivité nécessaires</label>
-                        <input type="number" id="rule-resolution-timeout" min="1" max="1440" value="30" style="width: 80px; padding: 0.3rem 0.5rem;">
-                    </div>
-                    <div id="resolution-patterns-container" style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
-                        <!-- Header row: label + counter + clear-all -->
-                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                            <label style="margin: 0; font-weight: 600;" data-i18n="rules.label_resolution_patterns">Patterns de résolution</label>
+
+                    <!-- ── Section 2 : Patterns de résolution (conditionnel) ── -->
+                    <div id="resolution-patterns-container" class="res-subsection">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.4rem;">
+                            <div class="res-subsection-label" style="margin-bottom: 0;" data-i18n="rules.label_resolution_patterns">Patterns de résolution</div>
                             <span id="resolution-patterns-count" class="res-tag-count" style="display: none;"></span>
                             <button type="button" id="resolution-patterns-clear-all" class="btn-icon-sm btn-danger-ghost" style="margin-left: auto; display: none;" title="Clear all">
                                 🗑️ <span data-i18n="rules.resolution_patterns_clear_all">Tout effacer</span>
                             </button>
                         </div>
-                        <!-- Tags display area -->
                         <div id="resolution-patterns-tags" class="res-tag-box">
                             <span id="resolution-patterns-empty" class="res-tag-empty" data-i18n="rules.resolution_patterns_empty">Aucun pattern défini. Ajoutez-en manuellement ou laissez l'IA les apprendre.</span>
                         </div>
-                        <!-- Add pattern row -->
-                        <div style="display: flex; gap: 0.4rem; align-items: center;">
+                        <div style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.35rem;">
                             <input type="text" id="resolution-pattern-input" data-i18n-placeholder="rules.placeholder_resolution_patterns" placeholder="Nouveau pattern..." style="flex: 1; padding: 0.35rem 0.6rem; font-size: 0.85rem;">
                             <button type="button" id="resolution-pattern-add-btn" class="btn btn-sm btn-outline-success" style="white-space: nowrap;">
                                 + <span data-i18n="rules.resolution_patterns_add">Ajouter</span>
                             </button>
                         </div>
-                        <!-- Hints -->
-                        <div class="form-hint" data-i18n="rules.resolution_patterns_hint">Mots-clés dans les logs qui déclencheront l'analyse de retour à la normale.</div>
+                        <div class="form-hint" data-i18n="rules.resolution_patterns_hint" style="margin-top: 0.35rem;">Mots-clés dans les logs qui déclencheront l'analyse de retour à la normale.</div>
                         <div class="form-hint res-tag-ai-hint" data-i18n="rules.resolution_patterns_ai_hint">🤖 Ces patterns sont enrichis automatiquement par l'IA lors de chaque résolution de problème validée.</div>
-                        <!-- Hidden storage for form data -->
                         <input type="hidden" id="rule-resolution-patterns" value="">
                     </div>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem; border-top: 1px dashed var(--border); padding-top: 0.75rem; margin-top: 0.25rem; width: 100%;">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="rule-resolution-ai-enabled">
-                            <span class="toggle-slider"></span>
-                            <span class="toggle-label" data-i18n="rules.label_resolution_ai_enabled">Validation IA</span>
-                        </label>
-                        <div id="resolution-ai-options" style="display: flex; flex-direction: column; gap: 0.5rem; padding-left: 1.5rem; margin-top: 0.25rem;" class="hidden">
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="rule-resolution-notify-search">
-                                <span class="toggle-slider"></span>
-                                <span class="toggle-label" data-i18n="rules.label_resolution_notify_search">Notifier lors de la recherche de résolution par l'IA</span>
-                            </label>
+
+                    <!-- ── Section 3 : Validation & Notifications ── -->
+                    <div class="res-subsection">
+                        <div class="res-subsection-label" data-i18n="rules.label_resolution_valnotif">Validation &amp; Notifications</div>
+                        <div class="res-option-list">
+                            <!-- Ligne : Validation IA -->
+                            <div class="res-option-row">
+                                <div class="res-option-icon">🤖</div>
+                                <div class="res-option-body">
+                                    <div class="res-option-title" data-i18n="rules.label_resolution_ai_enabled">Validation IA</div>
+                                    <div class="res-option-desc" data-i18n="rules.label_resolution_ai_desc">L'IA vérifie si le retour à la normale est réel avant de clore l'alerte.</div>
+                                </div>
+                                <label class="toggle-switch res-option-toggle">
+                                    <input type="checkbox" id="rule-resolution-ai-enabled">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <!-- Ligne enfant : Notifier lors de l'analyse IA (indentée) -->
+                            <div class="res-option-row res-option-row--child hidden" id="resolution-ai-options">
+                                <div class="res-option-icon">🔔</div>
+                                <div class="res-option-body">
+                                    <div class="res-option-title" data-i18n="rules.label_resolution_notify_search">Notifier lors de l'analyse IA</div>
+                                    <div class="res-option-desc" data-i18n="rules.label_resolution_notify_search_desc">Envoie une notification quand Sentinel commence la vérification IA.</div>
+                                </div>
+                                <label class="toggle-switch res-option-toggle">
+                                    <input type="checkbox" id="rule-resolution-notify-search">
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
+                            <!-- Ligne : Notifier à la résolution -->
+                            <div class="res-option-row">
+                                <div class="res-option-icon">✅</div>
+                                <div class="res-option-body">
+                                    <div class="res-option-title" data-i18n="rules.label_resolution_notify_resolved">Notifier à la résolution</div>
+                                    <div class="res-option-desc" data-i18n="rules.label_resolution_notify_resolved_desc">Envoie une notification de clôture quand le problème est résolu.</div>
+                                </div>
+                                <label class="toggle-switch res-option-toggle">
+                                    <input type="checkbox" id="rule-resolution-notify-resolved" checked>
+                                    <span class="toggle-slider"></span>
+                                </label>
+                            </div>
                         </div>
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="rule-resolution-notify-resolved" checked>
-                            <span class="toggle-slider"></span>
-                            <span class="toggle-label" data-i18n="rules.label_resolution_notify_resolved">Notifier lors de la résolution du problème</span>
-                        </label>
                     </div>
-                </div>
+
+                </div><!-- /resolution-settings-container -->
             </div>
             <div class="form-group checkbox-group" style="flex-wrap: wrap; gap: 1.5rem;">
                 <label class="toggle-switch">

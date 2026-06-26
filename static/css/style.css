@@ -2940,3 +2940,175 @@ select.kw-input option {
     margin-left: 0.05rem;
 }
 
+/* ── Resolution section redesign ─────────────────────────────────────────── */
+
+/* Subtitle under the main toggle */
+.res-section-subtitle {
+    margin: 0.1rem 0 0 2.4rem;
+    font-size: 0.8rem;
+    color: var(--text-muted, rgba(255,255,255,0.45));
+    font-style: normal;
+}
+
+/* Sub-section wrapper */
+.res-subsection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+/* Sub-section label (mini header) */
+.res-subsection-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted, rgba(255,255,255,0.45));
+    margin-bottom: 0.2rem;
+}
+
+/* ── Mode cards row ── */
+.res-mode-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.6rem;
+}
+
+@media (max-width: 560px) {
+    .res-mode-cards { grid-template-columns: 1fr; }
+}
+
+.res-mode-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.75rem 0.8rem;
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-sunken, rgba(255,255,255,0.02));
+    cursor: pointer;
+    transition: border-color 0.18s, background 0.18s, box-shadow 0.18s;
+    user-select: none;
+    outline: none;
+}
+.res-mode-card:focus-visible {
+    box-shadow: 0 0 0 2px var(--primary, #6366f1);
+}
+.res-mode-card:hover {
+    border-color: rgba(99, 102, 241, 0.45);
+    background: rgba(99, 102, 241, 0.04);
+}
+.res-mode-card--active {
+    border-color: var(--primary, #6366f1) !important;
+    background: rgba(99, 102, 241, 0.08) !important;
+    box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+.res-mode-card-icon {
+    font-size: 1.35rem;
+    line-height: 1;
+}
+.res-mode-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+.res-mode-card-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.res-mode-card--active .res-mode-card-title {
+    color: var(--accent, #818cf8);
+}
+.res-mode-card-desc {
+    font-size: 0.74rem;
+    color: var(--text-muted, rgba(255,255,255,0.5));
+    line-height: 1.4;
+}
+.res-mode-card-config {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.4rem;
+    padding-top: 0.4rem;
+    border-top: 1px dashed rgba(255,255,255,0.08);
+}
+.res-timeout-unit {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+/* ── Option rows (Validation & Notifications block) ── */
+.res-option-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.res-option-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 0.85rem;
+    transition: background 0.15s;
+}
+.res-option-row + .res-option-row {
+    border-top: 1px solid var(--border);
+}
+.res-option-row:hover {
+    background: rgba(255,255,255,0.025);
+}
+.res-option-row--child {
+    padding-left: 2.1rem;
+    background: rgba(255,255,255,0.015);
+}
+.res-option-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    width: 1.5rem;
+    text-align: center;
+}
+.res-option-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+.res-option-title {
+    font-size: 0.83rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
+}
+.res-option-desc {
+    font-size: 0.74rem;
+    color: var(--text-muted, rgba(255,255,255,0.5));
+    line-height: 1.35;
+}
+.res-option-toggle {
+    flex-shrink: 0;
+    margin: 0;
+}
+.res-option-toggle .toggle-label { display: none; }
+
+/* Greyed-out child row when AI is disabled */
+.res-option-row--child.hidden {
+    display: none;
+}
+
+/* Light theme overrides */
+[data-theme="light"] .res-mode-card {
+    background: #f8fafc;
+}
+[data-theme="light"] .res-mode-card--active {
+    background: rgba(99, 102, 241, 0.06) !important;
+}
+[data-theme="light"] .res-option-row--child {
+    background: rgba(0,0,0,0.02);
+}
+[data-theme="light"] .res-section-subtitle {
+    color: rgba(0,0,0,0.45);
+}

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 _orchestrator = None
 
 # Ring buffer per rule token — max 500 lines kept in memory
-_BUFFER_MAX = 500
+_BUFFER_MAX = 2000
 _webhook_buffers: dict[str, deque] = {}
 _WEBHOOK_LOG_DIR = Path(os.environ.get("SENTINEL_DATA_DIR", "/app/data")) / "webhooks"
 

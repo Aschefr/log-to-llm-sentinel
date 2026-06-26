@@ -1,4 +1,4 @@
-﻿{
+{
     "_meta": {
         "lang": "fr",
         "name": "Français",
@@ -135,6 +135,19 @@
         "resolution_patterns_clear_all": "Tout effacer",
         "resolution_patterns_confirm_clear": "Supprimer tous les patterns de résolution ?",
         "resolution_patterns_empty": "Aucun pattern défini. Ajoutez-en manuellement ou laissez l'IA les apprendre.",
+        "label_resolution_subtitle": "Détecter automatiquement quand un problème est résolu.",
+        "label_resolution_trigger_mode": "Mode de déclenchement",
+        "resolution_mode_timeout_short": "Timeout d'inactivité",
+        "resolution_mode_timeout_desc": "Si aucune nouvelle erreur n'est détectée pendant X minutes.",
+        "resolution_mode_timeout_unit": "min",
+        "resolution_mode_pattern_short": "Mot-clé dans les logs",
+        "resolution_mode_pattern_desc": "Quand un pattern spécifique apparaît dans les logs (ex : \"connection OK\").",
+        "resolution_mode_both_short": "Les deux",
+        "resolution_mode_both_desc": "Timeout OU pattern — résolution selon le premier critère atteint.",
+        "label_resolution_ai_desc": "L'IA vérifie si le retour à la normale est réel avant de clore l'alerte.",
+        "label_resolution_notify_search_desc": "Envoie une notification quand Sentinel commence la vérification IA.",
+        "label_resolution_notify_resolved_desc": "Envoie une notification de clôture quand le problème est résolu.",
+        "label_resolution_valnotif": "Validation & Notifications",
         "syslog_info_title": "Configuration de l'envoi depuis votre source (ex: Unraid) :",
         "label_inactivity_warning": "Avertissement d'inactivité (Aucun log reçu)",
         "label_inactivity_hours": "heures",

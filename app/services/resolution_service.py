@@ -260,7 +260,7 @@ class ResolutionService:
         db = SessionLocal()
         try:
             for rule_id, state in list(self._alert_states.items()):
-                if state["status"] not in ("alert", "resolving"):
+                if state["status"] != "alert":  # Ignorer 'resolving' : une validation IA est déjà en cours
                     continue
 
                 rule = db.query(Rule).filter(Rule.id == rule_id).first()
@@ -287,7 +287,18 @@ class ResolutionService:
 
     async def _try_resolve(self, rule_id: int, trigger: str, context_lines: List[str], resolution_line: str = None, resolution_patterns: List[str] = None):
         """Tente la resolution avec validation IA optionnelle.
-        Enregistre systematiquement un ResolutionVerdict pour chaque tentative."""
+        Enregistre systematiquement un ResolutionVerdict pour chaque tentative.
+
+        Pipeline decoupage en 3 phases pour minimiser la duree de detention du verrou :
+          Phase 1 (lock court) : lecture config + transition vers 'resolving'
+          Phase 2 (sans lock)  : appel IA potentiellement long (jusqu'a 180s)
+          Phase 3 (lock court) : application du resultat en memoire et BDD
+        """
+        # === Phase 1 : Transition vers 'resolving' ===
+        max_severity = "info"
+        use_ai = False
+        notify_search = False
+
         async with self._state_lock:
             db = SessionLocal()
             try:
@@ -296,78 +307,149 @@ class ResolutionService:
                     return
 
                 max_severity = self._alert_states.get(rule_id, {}).get("max_severity", "info")
+                use_ai = bool(rule.resolution_ai_enabled)
+                notify_search = bool(rule.resolution_notify_search)
 
                 self._alert_states[rule_id]["status"] = "resolving"
                 rule.alert_status = "resolving"
                 db.commit()
+            except Exception as e:
+                logger.error("ResolutionService", f"Erreur phase 1 de _try_resolve pour rule_id {rule_id} : {e}")
+                return
+            finally:
+                db.close()
 
-                if rule.resolution_ai_enabled:
-                    if rule.resolution_notify_search:
-                        await self._send_notification_for(db, rule, "search", trigger=trigger)
+        # === Phase 2 : Appel IA (sans lock — potentiellement long) ===
+        verdict = None
+        ai_accepted = False
+        low_confidence_rejected = False
+        effective_threshold = AI_CONFIDENCE_THRESHOLD
 
-                    verdict = await self._validate_with_ai(db, rule, trigger, context_lines, resolution_patterns)
+        if use_ai:
+            db = SessionLocal()
+            try:
+                rule = db.query(Rule).filter(Rule.id == rule_id).first()
+                if not rule:
+                    raise Exception("Regle introuvable avant appel IA")
 
-                    confidence = verdict.get("confidence", 0)
+                if notify_search:
+                    await self._send_notification_for(db, rule, "search", trigger=trigger)
 
-                    # Seuil de confiance dynamique : si le pattern a un poids >= 3, seuil reduit
-                    effective_threshold = AI_CONFIDENCE_THRESHOLD
-                    if resolution_patterns:
-                        weighted = rule.get_weighted_resolution_patterns()
-                        for item in weighted:
-                            if item.get("pattern", "") in (resolution_patterns or []):
-                                if item.get("weight", 1) >= AI_CONFIDENCE_WEIGHT_CUTOFF:
-                                    effective_threshold = AI_CONFIDENCE_THRESHOLD_LOW
-                                    logger.debug("ResolutionService", f"Seuil de confiance reduit a {effective_threshold}% (pattern poids={item.get('weight')})")
-                                break
+                verdict = await self._validate_with_ai(db, rule, trigger, context_lines, resolution_patterns)
+                confidence = verdict.get("confidence", 0)
 
-                    if verdict.get("resolved") and confidence < effective_threshold:
-                        logger.info("ResolutionService",
-                                    f"Resolution acceptee par l'IA mais confiance trop basse ({confidence}% < {effective_threshold}%) pour '{rule.name}'. Rejet.")
-                        self._record_verdict(db, rule_id, trigger, outcome="rejected_low_confidence",
-                                             ai_resolved=True, ai_confidence=confidence,
-                                             ai_explanation=verdict.get("explanation"),
-                                             max_severity=max_severity, context_lines=context_lines,
-                                             resolution_line=resolution_line, resolution_patterns=resolution_patterns)
-                        verdict["resolved"] = False
-                        verdict["explanation"] = f"{verdict.get('explanation', '')} [Rejete : confiance {confidence}% < seuil {effective_threshold}%]"
+                # Seuil de confiance dynamique : si le pattern a un poids >= cutoff, seuil reduit
+                if resolution_patterns:
+                    weighted = rule.get_weighted_resolution_patterns()
+                    for item in weighted:
+                        if item.get("pattern", "") in resolution_patterns:
+                            if item.get("weight", 1) >= AI_CONFIDENCE_WEIGHT_CUTOFF:
+                                effective_threshold = AI_CONFIDENCE_THRESHOLD_LOW
+                                logger.debug("ResolutionService", f"Seuil de confiance reduit a {effective_threshold}% (pattern poids={item.get('weight')})")
+                            break
 
-                    if verdict.get("resolved"):
-                        logger.info("ResolutionService", f"Resolution validee par l'IA pour '{rule.name}' avec {confidence}% de confiance.")
-                        self._record_verdict(db, rule_id, trigger, outcome="accepted",
-                                             ai_resolved=True, ai_confidence=confidence,
-                                             ai_explanation=verdict.get("explanation"),
-                                             max_severity=max_severity, context_lines=context_lines,
-                                             resolution_line=resolution_line, resolution_patterns=resolution_patterns)
-                        await self._mark_resolved(db, rule_id, trigger,
-                                                  ai_explanation=verdict.get("explanation"),
-                                                  confidence=confidence,
-                                                  context_lines=context_lines,
-                                                  resolution_line=resolution_line,
-                                                  resolution_patterns=resolution_patterns)
-                    else:
-                        if verdict.get("outcome") != "rejected_low_confidence":  # Evite doublon
-                            self._record_verdict(db, rule_id, trigger, outcome="rejected_ai",
-                                                 ai_resolved=False, ai_confidence=confidence,
-                                                 ai_explanation=verdict.get("explanation"),
-                                                 max_severity=max_severity, context_lines=context_lines,
-                                                 resolution_line=resolution_line, resolution_patterns=resolution_patterns)
-                        logger.info("ResolutionService", f"Resolution rejetee par l'IA pour '{rule.name}'. Explication: {verdict.get('explanation')}")
-                        self._alert_states[rule_id]["status"] = "alert"
-                        rule.alert_status = "alert"
-                        db.commit()
-                        if rule.resolution_notify_search:
-                            await self._send_notification_for(db, rule, "denied")
-                else:
-                    # Pas de validation IA : resolution directe
+                if verdict.get("resolved") and confidence < effective_threshold:
+                    logger.info("ResolutionService",
+                                f"Resolution acceptee par l'IA mais confiance trop basse ({confidence}% < {effective_threshold}%) pour '{rule.name}'. Rejet.")
+                    low_confidence_rejected = True
+                    verdict["resolved"] = False
+                    verdict["explanation"] = f"{verdict.get('explanation', '')} [Rejete : confiance {confidence}% < seuil {effective_threshold}%]"
+
+                ai_accepted = bool(verdict.get("resolved"))
+
+            except Exception as e:
+                logger.error("ResolutionService", f"Erreur phase 2 (appel IA) de _try_resolve pour rule_id {rule_id} : {e}")
+                # Restaurer l'etat 'alert' en memoire ET en BDD
+                async with self._state_lock:
+                    db_err = SessionLocal()
+                    try:
+                        rule_err = db_err.query(Rule).filter(Rule.id == rule_id).first()
+                        if rule_id in self._alert_states:
+                            self._alert_states[rule_id]["status"] = "alert"
+                        if rule_err:
+                            rule_err.alert_status = "alert"
+                            db_err.commit()
+                    except Exception:
+                        pass
+                    finally:
+                        db_err.close()
+                return
+            finally:
+                db.close()
+        else:
+            # Pas d'IA : resolution directe
+            ai_accepted = True
+
+        # === Phase 3 : Application du resultat (lock court) ===
+        async with self._state_lock:
+            db = SessionLocal()
+            try:
+                rule = db.query(Rule).filter(Rule.id == rule_id).first()
+                if not rule:
+                    return
+
+                confidence = verdict.get("confidence", 0) if verdict else 0
+
+                if not use_ai:
+                    # Resolution directe sans validation IA
                     self._record_verdict(db, rule_id, trigger, outcome="accepted_no_ai",
                                          max_severity=max_severity, context_lines=context_lines,
                                          resolution_line=resolution_line, resolution_patterns=resolution_patterns)
                     await self._mark_resolved(db, rule_id, trigger, context_lines=context_lines,
                                               resolution_line=resolution_line, resolution_patterns=resolution_patterns)
+
+                elif low_confidence_rejected:
+                    # Confiance IA insuffisante
+                    self._record_verdict(db, rule_id, trigger, outcome="rejected_low_confidence",
+                                         ai_resolved=True, ai_confidence=confidence,
+                                         ai_explanation=verdict.get("explanation"),
+                                         max_severity=max_severity, context_lines=context_lines,
+                                         resolution_line=resolution_line, resolution_patterns=resolution_patterns)
+                    self._alert_states[rule_id]["status"] = "alert"
+                    rule.alert_status = "alert"
+                    db.commit()
+                    if rule.resolution_notify_search:
+                        await self._send_notification_for(db, rule, "denied")
+
+                elif ai_accepted:
+                    # Resolution validee par l'IA
+                    logger.info("ResolutionService", f"Resolution validee par l'IA pour '{rule.name}' avec {confidence}% de confiance.")
+                    self._record_verdict(db, rule_id, trigger, outcome="accepted",
+                                         ai_resolved=True, ai_confidence=confidence,
+                                         ai_explanation=verdict.get("explanation"),
+                                         max_severity=max_severity, context_lines=context_lines,
+                                         resolution_line=resolution_line, resolution_patterns=resolution_patterns)
+                    await self._mark_resolved(db, rule_id, trigger,
+                                              ai_explanation=verdict.get("explanation"),
+                                              confidence=confidence,
+                                              context_lines=context_lines,
+                                              resolution_line=resolution_line,
+                                              resolution_patterns=resolution_patterns)
+
+                else:
+                    # Rejetee par l'IA
+                    self._record_verdict(db, rule_id, trigger, outcome="rejected_ai",
+                                         ai_resolved=False, ai_confidence=confidence,
+                                         ai_explanation=verdict.get("explanation") if verdict else None,
+                                         max_severity=max_severity, context_lines=context_lines,
+                                         resolution_line=resolution_line, resolution_patterns=resolution_patterns)
+                    logger.info("ResolutionService", f"Resolution rejetee par l'IA pour '{rule.name}'. Explication: {verdict.get('explanation') if verdict else 'N/A'}")
+                    self._alert_states[rule_id]["status"] = "alert"
+                    rule.alert_status = "alert"
+                    db.commit()
+                    if rule.resolution_notify_search:
+                        await self._send_notification_for(db, rule, "denied")
+
             except Exception as e:
-                logger.error("ResolutionService", f"Erreur dans _try_resolve pour rule_id {rule_id} : {e}")
+                logger.error("ResolutionService", f"Erreur phase 3 de _try_resolve pour rule_id {rule_id} : {e}")
+                # Restaurer l'etat 'alert' en memoire ET en BDD (BUG-RES-02)
                 if rule_id in self._alert_states:
                     self._alert_states[rule_id]["status"] = "alert"
+                try:
+                    rule.alert_status = "alert"
+                    db.commit()
+                except Exception:
+                    pass
             finally:
                 db.close()
 
@@ -807,10 +889,20 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
                 for item in weighted
             ])
 
-            # Lire quelques lignes recentes du fichier log pour le contexte
+            # Lire quelques lignes recentes du fichier log pour le contexte (BUG-RES-04)
+            # Les chemins virtuels [SYSLOG]:hostname et [WEBHOOK]:token sont resolus vers le fichier reel
             recent_logs = ""
-            if rule.log_file_path and not rule.log_file_path.startswith("[WEBHOOK]:"):
-                lines = _read_tail_lines(rule.log_file_path, n=30)
+            if rule.log_file_path:
+                log_path = rule.log_file_path
+                if rule.log_file_path.startswith("[SYSLOG]:"):
+                    hostname = rule.log_file_path.split(":", 1)[1].strip()
+                    safe = "".join(c for c in hostname if c.isalnum() or c in "-_")
+                    log_path = os.path.join(os.environ.get("SENTINEL_DATA_DIR", "/app/data"), "syslog", f"{safe}.log")
+                elif rule.log_file_path.startswith("[WEBHOOK]:"):
+                    token = rule.log_file_path.split(":", 1)[1].strip()
+                    safe = "".join(c for c in token if c.isalnum() or c in "-_")
+                    log_path = os.path.join(os.environ.get("SENTINEL_DATA_DIR", "/app/data"), "webhooks", f"{safe}.log")
+                lines = _read_tail_lines(log_path, n=30)
                 if lines:
                     recent_logs = f"\nLogs recents (dernieres 30 lignes):\n" + "\n".join(lines[-30:])
 
