@@ -1416,7 +1416,7 @@ function renderVerdictRow(v, ruleId) {
             ${v.trigger ? `<div style="opacity:0.65;font-size:0.73rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(v.trigger)}</div>` : ''}
         </div>
         <div style="display:flex;gap:0.25rem;align-items:center;flex-shrink:0;">
-            <button class="btn btn-secondary btn-sm" style="padding:0.1rem 0.35rem;font-size:0.7rem;" onclick="openVerdictModal(${JSON.stringify(v).replace(/"/g, '&quot;')}, ${ruleId})" title="Détail">🔍</button>
+            <button class="btn btn-secondary btn-sm" style="padding:0.1rem 0.35rem;font-size:0.7rem;" onclick="openVerdictModal(${JSON.stringify(v).replace(/"/g, '&quot;')}, ${ruleId})" title="${window.t ? window.t('monitor.verdict_detail_btn') : 'Détail'}">🔍</button>
             ${canMarkFp ? `<button class="btn btn-secondary btn-sm" style="padding:0.1rem 0.35rem;font-size:0.7rem;color:var(--danger);" onclick="markVerdictFalsePositive(${v.id}, ${ruleId}, this)" title="${window.t ? window.t('monitor.verdict_mark_fp') : 'Marquer faux-positif'}">🚫</button>` : ''}
         </div>
     </div>`;

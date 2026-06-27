@@ -790,3 +790,23 @@ bugs:
 
       Files: models.py, resolution_service.py, main.py, rules.py, monitor.py, rule_modal.js,
              monitor.js, style.css, fr.json, en.json.
+
+  - id: MON-22
+    name: "Resolution Monitoring UI Overhaul"
+    status: DONE
+    effort: M
+    priority: P1
+    notes: |
+      Problem: Toggles for resolution configuration were confusing and lacked context.
+      Fix: Replaced the dropdown + split checkboxes with three clickable card mode components (⏱ Inactivity Timeout, 🔍 Keyword in Logs, ⚡ Both) with contextual helpers, inline configuration inputs, and structured list items for notification setups.
+      Files: _rule_modal.html, rule_modal.js, style.css, fr.json, en.json.
+
+  - id: MON-23
+    name: "Light Theme Readability & Global i18n Cleanup"
+    status: DONE
+    effort: S
+    priority: P1
+    notes: |
+      Problem: Hardcoded dark backgrounds in markdown code elements made meta-analysis text unreadable in light mode. Several French texts and fallbacks were still hardcoded.
+      Fix: Added CSS overrides for light theme markdown blocks. Translated remaining French static strings and overhauled JS fallback messages in meta-analysis and keyword wizard to default to English.
+      Files: style.css, fr.json, en.json, meta.js, keyword_wizard.js, config.js, monitor.js, _rule_modal.html.

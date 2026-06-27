@@ -580,8 +580,8 @@ async function metaResultDeepen(resultId, configId) {
         const conv = await apiFetch('/chat/api/create', {
             method: 'POST',
             body: {
-                title: `Méta-Analyse #${resultId}`,
-                raw_context_prompt: `Méta-Analyse #${resultId}`,
+                title: (window.t ? window.t('meta.chat_title', 'M\u00e9ta-Analyse #{id}') : `M\u00e9ta-Analyse #${resultId}`).replace('{id}', resultId),
+                raw_context_prompt: (window.t ? window.t('meta.chat_title', 'M\u00e9ta-Analyse #{id}') : `M\u00e9ta-Analyse #${resultId}`).replace('{id}', resultId),
                 raw_context_response: r.ollama_response
             }
         });
@@ -647,7 +647,7 @@ function openConfigModal() {
     document.getElementById('config-id').value = '';
     
     // Mettre le prompt par défaut traduit
-    document.getElementById('config-prompt').value = window.t('meta.default_prompt') || 'Tu es un expert DevOps. Analyse ces événements et fais une synthèse globale de la situation du service.';
+    document.getElementById('config-prompt').value = window.t('meta.default_prompt') || 'You are a DevOps expert. Analyze these events and provide a global synthesis of the service situation.';
     
     // Mettre à jour les options de planification selon la langue
     const typeSelect = document.getElementById('config-schedule-type');
@@ -662,7 +662,7 @@ function openConfigModal() {
     
     updateScheduleUI();
     
-    document.getElementById('modal-title').textContent = window.t('meta.modal_title_new') || 'Nouvelle Configuration';
+    document.getElementById('modal-title').textContent = window.t('meta.modal_title_new') || 'New Configuration';
     document.getElementById('config-modal').classList.remove('hidden');
     document.getElementById('config-modal').style.display = 'flex';
 }
@@ -703,7 +703,7 @@ function editConfig(config) {
         chk.checked = ruleIds.includes(parseInt(chk.value));
     });
 
-    document.getElementById('modal-title').textContent = window.t('meta.modal_title_edit') || 'Modifier la configuration';
+    document.getElementById('modal-title').textContent = window.t('meta.modal_title_edit') || 'Edit Configuration';
     document.getElementById('config-modal').classList.remove('hidden');
     document.getElementById('config-modal').style.display = 'flex';
 }

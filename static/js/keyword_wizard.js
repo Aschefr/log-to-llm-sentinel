@@ -629,7 +629,7 @@ async function _launchSession() {
                 granularity_s: granularity,
             }),
         }).then(r => r.json());
-        if (!res.session_id) throw new Error('Réponse inattendue du serveur');
+        if (!res.session_id) throw new Error(window.t ? window.t('common.unexpected_response', 'Unexpected server response') : 'Unexpected server response');
         sessionId = res.session_id;
         _wizardSessionId = sessionId;
     } catch (e) {
@@ -680,11 +680,12 @@ function _updateRuleCard(ruleId, data) {
         ? Math.round((data.completed_packets / data.total_packets) * 100)
         : 0;
 
+    const _t = window.t || ((k, fb) => fb);
     const statusLabels = {
-        scanning:  `🔍 Scan en cours — ${data.completed_packets}/${data.total_packets} paquets (${pct}%)`,
-        refining:  '🧠 Raffinement par l\'IA…',
-        validated: '✅ Mots-clés appliqués',
-        error:     `⚠️ Erreur : ${data.error_message || 'Inconnue'}`,
+        scanning:  `🔍 ${_t('kw.status_scanning', 'Scan en cours')} — ${_t('kw.scan_progress', '{done}/{total} paquets ({pct}%)').replace('{done}', data.completed_packets).replace('{total}', data.total_packets).replace('{pct}', pct)}`,
+        refining:  `🧠 ${_t('kw.status_refining', 'Raffinement par l\'IA…')}`,
+        validated: `✅ ${_t('kw.status_validated', 'Mots-clés appliqués')}`,
+        error:     `⚠️ ${_t('kw.status_error', 'Erreur : {msg}').replace('{msg}', data.error_message || _t('common.unknown', 'Inconnue'))}`,
     };
 
     card.innerHTML = `
@@ -706,7 +707,7 @@ function _updateRuleCard(ruleId, data) {
         ` : ''}
         ${data.status === 'scanning' || data.status === 'refining' ? `
             <button type="button" class="btn btn-danger btn-sm" style="margin-top:.4rem"
-                onclick="kwStopSession(${_wizardSessionId})">⏹ Arrêter</button>
+                onclick="kwStopSession(${_wizardSessionId})">⏹ ${window.t ? window.t('kw.stop_btn', 'Arrêter') : 'Arrêter'}</button>
         ` : ''}
     `;
 }

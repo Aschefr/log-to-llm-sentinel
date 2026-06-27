@@ -817,7 +817,7 @@ function setupMaintenance() {
             cleanupBtn.disabled = true;
             try {
                 const res = await apiFetch('/api/config/maintenance/cleanup', { method: 'DELETE' });
-                alert(res.detail || 'Nettoyage terminé.');
+                alert(res.detail || (window.t ? window.t('config.cleanup_done') : 'Nettoyage terminé.'));
                 fetchMaintenanceStats();
             } catch (e) {
                 alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
@@ -855,7 +855,7 @@ async function fetchMaintenanceStats() {
             }
         }
     } catch (e) {
-        usageVal.textContent = 'Erreur';
+        usageVal.textContent = window.t ? window.t('config.disk_error') : 'Erreur';
     }
 }
 
@@ -905,10 +905,10 @@ function setupBackupAndRestore() {
                 
                 const result = await response.json();
                 if (!response.ok) {
-                    throw new Error(result.detail || 'Erreur lors de l\'importation');
+                    throw new Error(result.detail || (window.t ? window.t('config.import_error') : 'Erreur lors de l\'importation'));
                 }
                 
-                alert(result.message || 'Importation réussie.');
+                alert(result.message || (window.t ? window.t('config.import_success') : 'Importation réussie.'));
                 window.location.reload();
             } catch (e) {
                 alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);

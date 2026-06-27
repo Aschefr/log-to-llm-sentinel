@@ -58,7 +58,7 @@
                     <div id="file-browser-list" class="file-browser-list">
                         <div class="loading" data-i18n="common.loading">Chargement...</div>
                     </div>
-                    <div class="file-browser-hint" data-i18n="rules.file_browser_hint">
+                    <div class="file-browser-hint" data-i18n-html="rules.file_browser_hint">
                         Astuce : monte tes logs dans Docker (ex: volume vers <code>/logs</code>) puis sélectionne le fichier ici.
                     </div>
                 </div>
@@ -68,19 +68,19 @@
                 </div>
             </div>
             <div class="form-group hidden" id="webhook-group">
-                <label>URL du Webhook de Test/Prod</label>
+                <label data-i18n="rules.webhook_url_label">URL du Webhook de Test/Prod</label>
                 <div class="form-hint" style="margin-bottom: 0.5rem;" data-i18n="rules.webhook_hint">
                     Utilise cette URL avec l'outil <b>webhook-setup.html</b> pour générer facilement tes scripts de surveillance.
                 </div>
                 <div class="webhook-url-box" style="display:flex;gap:0.5rem;align-items:center;background:var(--surface-sunken);padding:0.75rem;border-radius:var(--radius-md);">
                     <code id="webhook-curl-cmd" style="flex:1;word-break:break-all;font-size:0.85rem;color:var(--primary-light);"></code>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="copyModalWebhookUrl(this)" title="Copier l'URL">📋 Copier</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="copyModalWebhookUrl(this)" data-i18n-title="rules.webhook_copy_url_title" title="Copier l'URL">📋 <span data-i18n="rules.webhook_copied_short">Copier</span></button>
                 </div>
             </div>
             <div class="form-group hidden" id="syslog-group">
-                <label for="syslog-hostname">Hostname du serveur Syslog</label>
-                <input type="text" id="syslog-hostname" placeholder="ex: Tower">
-                <div class="form-hint">
+                <label for="syslog-hostname" data-i18n="rules.syslog_hostname_label">Hostname du serveur Syslog</label>
+                <input type="text" id="syslog-hostname" data-i18n-placeholder="rules.syslog_hostname_placeholder" placeholder="ex: Tower">
+                <div class="form-hint" data-i18n-html="rules.syslog_hostname_hint">
                     Le hostname envoyé par le serveur dans son en-tête syslog (ex: <i>Tower</i> pour votre Unraid). Sentinel filtrera les messages de cette source. Utilisez <code>*</code> pour un récepteur général (fourre-tout).
                 </div>
                 

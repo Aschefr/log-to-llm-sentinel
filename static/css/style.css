@@ -573,6 +573,57 @@ body {
     100% { opacity: 0.6; }
 }
 .analysis-footer { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+
+.markdown-body code {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+    padding: 0.2rem 0.4rem;
+    border-radius: 3px;
+    font-family: 'Consolas', monospace;
+    font-size: 0.8em;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.markdown-body pre {
+    background: rgba(0, 0, 0, 0.25);
+    padding: 0.75rem;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin-bottom: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.markdown-body pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: inherit;
+}
+
+.markdown-body blockquote {
+    border-left: 3px solid var(--border);
+    margin-left: 0;
+    padding-left: 1rem;
+    color: var(--text-muted, rgba(255,255,255,0.5));
+}
+
+/* Light theme overrides for markdown content */
+[data-theme="light"] .markdown-body code {
+    background: rgba(0, 0, 0, 0.06);
+    color: #1e293b;
+    border-color: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .markdown-body pre {
+    background: #f1f5f9;
+    border-color: rgba(0, 0, 0, 0.1);
+    color: #1e293b;
+}
+
+[data-theme="light"] .markdown-body blockquote {
+    color: #64748b;
+    border-left-color: #94a3b8;
+}
 .collapse-toggle { font-size: 0.7rem; margin-right: 0.5rem; color: var(--text-secondary); }
 
 .analysis-header {
