@@ -219,7 +219,7 @@ class SyslogReceiver:
                         # silently on Python 3.10+. Use ensure_future to schedule on the running loop,
                         # exactly like log_watcher.py does with `await on_new_lines(...)`.
                         asyncio.ensure_future(
-                            _orchestrator.handle_new_lines(db_rule, [message])
+                            _orchestrator.handle_new_lines(rule, [stamped])
                         )
                 except Exception as ex:
                     logger.error(f"Error executing orchestrator check for syslog line: {ex}")
