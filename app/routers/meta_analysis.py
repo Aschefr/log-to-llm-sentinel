@@ -156,11 +156,15 @@ async def preview_meta_analysis(
 async def trigger_meta_analysis(config_id: int, background_tasks: BackgroundTasks, data: dict = None):
     """
     Déclenche une exécution manuelle d'une méta-analyse en arrière-plan.
-    Accepte optionnellement un custom_context dans le payload JSON.
+    Accepte optionnellement excluded_ids / annotations (sélection faite dans l'aperçu, agrégée côté serveur)
+    ou un custom_context libre (ancien format) dans le payload JSON.
     """
     from app.main import meta_service # Import lazy pour éviter ImportError ciculaire
-    
+
     custom_context = data.get("custom_context") if data else None
+    selection = None
+    if data and ("excluded_ids" in data or "annotations" in data):
+        selection = {"excluded_ids": data.get("excluded_ids") or [], "annotations": data.get("annotations") or {}}
     forced_period_start = None
     forced_period_end = None
     if data:
@@ -181,7 +185,8 @@ async def trigger_meta_analysis(config_id: int, background_tasks: BackgroundTask
                 config_id,
                 custom_context=custom_context,
                 forced_period_start=forced_period_start,
-                forced_period_end=forced_period_end
+                forced_period_end=forced_period_end,
+                selection=selection,
             )
         finally:
             _running_configs.discard(config_id)
@@ -227,6 +232,8 @@ async def list_results(config_id: Optional[int] = None, limit: int = 20, db: Ses
         "matched_keywords": json.loads(r.MetaAnalysisResult.matched_keywords_json) if getattr(r.MetaAnalysisResult, 'matched_keywords_json', None) else [],
         "context_sent": getattr(r.MetaAnalysisResult, 'context_sent', None),
         "ollama_response": r.MetaAnalysisResult.ollama_response,
+        "tldr": r.MetaAnalysisResult.tldr,
+        "status": r.MetaAnalysisResult.status,
         "created_at": r.MetaAnalysisResult.created_at.isoformat() + 'Z'
     } for r in results]
 

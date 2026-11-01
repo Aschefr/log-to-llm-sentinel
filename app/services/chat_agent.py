@@ -3,6 +3,7 @@ Boucle agent du chat : le LLM peut appeler des outils (lecture des logs, histori
 entre deux tours de génération, dans des limites strictes pour éviter l'emballement.
 """
 import asyncio
+import contextlib
 import json
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional
@@ -82,12 +83,14 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
                 messages.append({"role": "system", "content": label(lang, "tools_exhausted")})
 
             content, tool_calls, think = "", [], _ThinkFilter()
-            async with semaphore:
-                async for chunk in ollama.generate_stream(
-                    None, url=config.get("ollama_url"), model=config.get("ollama_model"),
-                    options=options, think=config.get("ollama_think", True),
-                    messages=messages, tools=tools_now,
-                ):
+            stream = ollama.generate_stream(
+                None, url=config.get("ollama_url"), model=config.get("ollama_model"),
+                options=options, think=config.get("ollama_think", True),
+                messages=messages, tools=tools_now,
+            )
+            # aclosing : referme le flux HTTP dès la sortie de boucle
+            async with semaphore, contextlib.aclosing(stream):
+                async for chunk in stream:
                     if "error" in chunk:
                         raise RuntimeError(chunk["error"])
                     msg = chunk.get("message", {})

@@ -38,3 +38,13 @@ Expanding the **Preview of pending data** accordion allows users to:
 * **Run Button (▶ Run)**: Executes the summary task immediately using the filtered/annotated context.
   * *Stop Button*: Aborts a running task.
 * **Deepen with AI**: Redirects to the Analysis Center, pre-loading the meta-analysis result as the initial conversation context.
+
+---
+
+## 4. How the Synthesis Is Built
+* **Aggregated context**: Instead of pasting every analysis, Sentinel groups identical events (same message once timestamps, IPs, ports and IDs are ignored) and sends one line per group: occurrence count, first/last occurrence, hours of occurrence, severity, unresolved count, a sample line and the latest analysis summary. Each rule gets its totals, resolution rate, MTTR and current alert state, and rules without alerts are listed.
+* **Max Included Analyses** still caps how many of the most recent analyses are detailed; the total number of alerts over the whole period is always reported so the model knows what was left out.
+* **Trend vs. previous run**: The TL;DR of the previous synthesis is included, so the model can flag what is new, persistent or gone.
+* **Structured result**: Each synthesis has an overall status (🟢 OK / 🟠 Degraded / 🔴 Critical), a short TL;DR, key points, the detailed synthesis and recommendations.
+* **Notifications**: Discord/Apprise notifications use the status, TL;DR and key points directly when the full synthesis is too long, without a second LLM call.
+* **Preview exclusions & annotations** are applied server-side to the aggregated context.

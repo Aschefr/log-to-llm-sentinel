@@ -517,7 +517,10 @@
     "time_ago": "ago",
     "download": "Download",
     "investigate": "Investigate",
-    "investigate_title": "Start a guided investigation: the AI reads the logs, recurrence and correlated events"
+    "investigate_title": "Start a guided investigation: the AI reads the logs, recurrence and correlated events",
+    "view_prompt": "Prompt",
+    "view_prompt_title": "Show the exact messages sent to the LLM",
+    "prompt_unavailable": "Prompt not stored for this analysis (created before v1.2.303)."
   },
   "meta": {
     "title": "Meta-Analysis",

@@ -12,6 +12,9 @@ from app.services.notification_service import NotificationService
 from app import logger
 from app.utils.notification_i18n import nt
 from app.services.alert_analysis import short_summary
+from app.services.alert_analysis import messages_to_text
+from app.services.meta_context import collect, previous_result, render_context, budget_for, parse_meta_response
+from app.services.prompts import META_SCHEMA, META_SYSTEM, meta_label
 
 
 class MetaAnalysisService:
@@ -144,6 +147,7 @@ class MetaAnalysisService:
                 by_rule[rule_id]['entries'].append({
                     'date': date_str,
                     'severity': analysis.severity.upper(),
+                    'id': analysis.id,
                     'detection_id': analysis.detection_id,
                     'triggered_line': analysis.triggered_line[:500],
                     'short_ia': short_ia,
@@ -164,7 +168,8 @@ class MetaAnalysisService:
     async def execute_meta_analysis(self, config_id: int, trigger_time: datetime = None,
                                      custom_context: str = None,
                                      forced_period_start: datetime = None,
-                                     forced_period_end: datetime = None):
+                                     forced_period_end: datetime = None,
+                                     selection: dict = None):
 
         """
         Exécute la méta-analyse : récupération, compression, appel LLM, sauvegarde et notification.
@@ -184,7 +189,7 @@ class MetaAnalysisService:
             ollama_model = (global_cfg.ollama_model or "gemma4:e4b") if global_cfg else "gemma4:e4b"
             lang = (global_cfg.ollama_prompt_lang or 'fr') if global_cfg else 'fr'
 
-            is_manual = custom_context is not None
+            is_manual = custom_context is not None or selection is not None
 
             # Période: priorité aux valeurs explicites (envoyées depuis le frontend lors d'un déclenchement manuel)
             if forced_period_start and forced_period_end:
@@ -222,101 +227,56 @@ class MetaAnalysisService:
                     else:
                         period_start = period_end - timedelta(days=1)
             
-            prompt = ""
             analyses_count = 0
             detection_ids = []
             all_matched_keywords = set()
+            system = META_SYSTEM.get(lang, META_SYSTEM["fr"])
+            if (config.system_prompt or "").strip():
+                system = f"{config.system_prompt.strip()}\n\n{system}"
 
             if custom_context:
-                prompt = custom_context
-                # Compter les blocs d'événements dans le contexte personnalisé
-                # Chaque événement est séparé par une ligne vide ("\n\n") dans le format attendu
+                # Ancien format : texte libre édité côté interface
+                user_content = custom_context
                 blocks = [b.strip() for b in custom_context.split('\n\n') if b.strip() and '[SEVERITY:' in b]
                 analyses_count = len(blocks)
-                # Extraire les IDs de détection présents dans le contexte
                 import re
                 detection_ids = re.findall(r'\[ID: ([a-f0-9]+)\]', custom_context)
                 logger.info("MetaAnalysisService", f"Exécution avec contexte édité manuellement pour {config.name} ({analyses_count} événements)")
             else:
-                rule_ids = []
-                if config.rule_ids_json:
-                    try: rule_ids = json.loads(config.rule_ids_json)
-                    except: pass
-
-                query = db.query(Analysis, Rule).outerjoin(Rule, Analysis.rule_id == Rule.id).filter(
-                    Analysis.analyzed_at >= period_start, Analysis.analyzed_at <= period_end
-                )
-                if rule_ids: query = query.filter(Analysis.rule_id.in_(rule_ids))
-                results = query.order_by(desc(Analysis.analyzed_at)).limit(config.max_analyses).all()
-
-                if not results:
+                # Agrégation par événement (exclusions et annotations éventuelles de l'aperçu)
+                selection = selection or {}
+                agg = collect(db, config, period_start, period_end,
+                              excluded_ids=selection.get("excluded_ids"), annotations=selection.get("annotations"))
+                if not agg["included"]:
                     logger.info("MetaAnalysisService", f"Aucune analyse à traiter pour '{config.name}'")
                     config.last_run_at = trigger_time
                     db.commit()
                     return {"status": "skipped", "message": "Aucune donnée"}
+                analyses_count = agg["included"]
+                detection_ids = agg["detection_ids"]
+                all_matched_keywords = set(agg["keywords"])
+                previous = previous_result(db, config.id, period_start)
+                user_content = render_context(agg, period_start, period_end, lang, previous,
+                                              budget_for(config, think=True) - len(system))
 
-                analyses_count = len(results)
-                results.reverse()
-                compressed_data = []
-                for analysis, rule in results:
-                    if analysis.detection_id: detection_ids.append(analysis.detection_id)
-                    if analysis.matched_keywords_json:
-                        try: all_matched_keywords.update(json.loads(analysis.matched_keywords_json))
-                        except: pass
-                    rule_name = rule.name if rule else "Inconnue"
-                    date_str = analysis.analyzed_at.strftime("%Y-%m-%d %H:%M:%S")
-                    short_ia = short_summary(analysis, 500) or "N/A"
-                    block = f"[{date_str}] [SEVERITY: {analysis.severity.upper()}] [R\u00e8gle: {rule_name}] [ID: {analysis.detection_id}]\nLigne: {analysis.triggered_line[:500]}\nIA unitaire: {short_ia}"
-                    compressed_data.append(block)
-
-                events_text = "\n\n".join(compressed_data)
-                if lang == 'en':
-                    meta_instruction = (
-                        "Perform an expert synthesis of this global situation. "
-                        "Cross-reference information if multiple services are affected "
-                        "and propose general recommendations."
-                    )
-                    events_header = (
-                        f"Here are the {analyses_count} events (limited to most recent) "
-                        f"between {period_start.strftime('%Y-%m-%d %H:%M')} "
-                        f"and {period_end.strftime('%Y-%m-%d %H:%M')}:"
-                    )
-                else:
-                    meta_instruction = (
-                        "R\u00e9alise une synth\u00e8se experte de cette situation globale, "
-                        "croise les informations si plusieurs services sont touch\u00e9s, "
-                        "et propose des recommandations g\u00e9n\u00e9rales."
-                    )
-                    events_header = (
-                        f"Voici les {analyses_count} \u00e9v\u00e9nements (limit\u00e9 aux plus r\u00e9cents) "
-                        f"survenus entre {period_start.strftime('%Y-%m-%d %H:%M')} "
-                        f"et {period_end.strftime('%Y-%m-%d %H:%M')} :"
-                    )
-                prompt = (
-                    f"{config.system_prompt}\n\n{events_header}\n"
-                    f"{'--' * 20}\n{events_text}\n{'--' * 20}\n"
-                    f"{meta_instruction}"
-                )
-
+            messages = [{"role": "system", "content": system}, {"role": "user", "content": user_content}]
+            prompt = messages_to_text(messages)
             logger.debug("MetaAnalysisService", f"Envoi prompt méta-analyse (Taille: {len(prompt)} car., Contexte: {config.context_size})")
 
-            if self.orchestrator:
-                async with self.orchestrator._ollama_semaphore:
-                    response_text = await ollama.analyze_async(
-                        prompt=prompt,
-                        url=ollama_url,
-                        model=ollama_model,
-                        options={"temperature": 0.2, "num_ctx": config.context_size},
-                        think=True
-                    )
-            else:
-                response_text = await ollama.analyze_async(
-                    prompt=prompt,
+            lock = self.orchestrator._ollama_semaphore if self.orchestrator else contextlib.nullcontext()
+            async with lock:
+                res = await ollama.chat(
+                    messages,
                     url=ollama_url,
                     model=ollama_model,
                     options={"temperature": 0.2, "num_ctx": config.context_size},
-                    think=True
+                    think=True,
+                    format=META_SCHEMA,
                 )
+            if res.get("error") or not res.get("content"):
+                parsed = {"markdown": f"[Erreur Ollama] {res.get('error') or 'Aucune réponse'}", "tldr": None, "status": None, "data": None}
+            else:
+                parsed = parse_meta_response(res["content"], lang)
 
             # Sauvegarder le résultat
             meta_result = MetaAnalysisResult(
@@ -327,7 +287,10 @@ class MetaAnalysisService:
                 detection_ids_json=json.dumps(detection_ids),
                 matched_keywords_json=json.dumps(list(all_matched_keywords)),
                 context_sent=prompt,
-                ollama_response=response_text
+                ollama_response=parsed["markdown"],
+                tldr=parsed["tldr"],
+                status=parsed["status"],
+                result_json=json.dumps(parsed["data"], ensure_ascii=False) if parsed["data"] else None,
             )
             db.add(meta_result)
 
@@ -379,7 +342,24 @@ class MetaAnalysisService:
 {result.ollama_response}
 """
             max_chars = global_cfg.apprise_max_chars or 1900
-            if len(notify_body) > max_chars:
+            if len(notify_body) > max_chars and result.tldr:
+                # TL;DR structuré déjà produit par la méta-analyse : pas de second appel LLM
+                status = f" — {meta_label(lang, 'status_label')[result.status]}" if result.status else ""
+                notify_body = f"""### 📊 {nt('meta_title', lang)}{status} : {config.name}
+**{nt('period', lang)}:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
+**{nt('events_analyzed', lang)}:** {result.analyses_count}
+
+**TL;DR :** {result.tldr}
+"""
+                highlights = (json.loads(result.result_json).get("highlights") or []) if result.result_json else []
+                footer = f"\n{nt('full_synthesis_available', lang)}"
+                for h in highlights:
+                    line = f"\n- {h}"
+                    if len(notify_body) + len(line) + len(footer) > max_chars:
+                        break
+                    notify_body += line
+                notify_body += "\n" + footer
+            elif len(notify_body) > max_chars:
                 logger.debug("MetaAnalysisService", f"Synthèse trop longue ({len(notify_body)} chars), demande de résumé simplifié à Ollama...")
                 summary_prompt = nt('meta_summary_prompt', lang).format(max_chars=max_chars - 500, response=result.ollama_response)
                 

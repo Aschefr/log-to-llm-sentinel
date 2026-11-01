@@ -813,6 +813,7 @@ async function onLineClick(el, ruleId) {
             <div style="display: flex; gap: 0.5rem;">
                 <button class="btn btn-secondary btn-sm" onclick="retryAnalysis(${relatedAnalysis.id}, this)">🔄 ${window.t('common.retry')}</button>
                 <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${relatedAnalysis.id}, this)">🔔 ${window.t('common.notify')}</button>
+                <button class="btn btn-secondary btn-sm" onclick="togglePromptView(${relatedAnalysis.id}, this)" title="${window.t('common.view_prompt_title')}">📜 ${window.t('common.view_prompt')}</button>
             </div>
             <button class="btn btn-primary btn-sm" onclick="openChat(${relatedAnalysis.id})">💬 ${window.t('common.deepen')}</button>
             <button class="btn btn-secondary btn-sm" onclick="investigateAnalysis(${relatedAnalysis.id})" title="${window.t('common.investigate_title')}">🔎 ${window.t('common.investigate')}</button>

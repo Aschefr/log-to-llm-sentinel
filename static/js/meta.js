@@ -781,11 +781,20 @@ async function triggerCustomMeta(id) {
         return;
     }
 
-    // Reconstruire le texte (entrées actives + annotations)
+    // Sélection (exclusions + annotations) : l'agrégation est faite côté serveur.
+    // Repli sur l'ancien texte libre si l'aperçu restauré date d'avant les identifiants d'analyse.
+    const excludedIds = [];
+    const annotations = {};
     const lines = [];
+    let legacy = false;
     data.rules_context.forEach(ruleCtx => {
         ruleCtx.entries.forEach(e => {
-            if (e._excluded) return;
+            if (e.id == null) legacy = true;
+            if (e._excluded) {
+                if (e.id != null) excludedIds.push(e.id);
+                return;
+            }
+            if (e.id != null && e.annotation && e.annotation.trim()) annotations[e.id] = e.annotation.trim();
             let block = `[${e.date}] [SEVERITY: ${e.severity}] [${window.t('notifications.rule')}: ${ruleCtx.rule_name}] [ID: ${e.detection_id}]\n${window.t('monitor.detail_line_label')}: ${e.triggered_line}\n${window.t('notifications.ollama_analysis')}: ${e.short_ia}`;
             if (e.annotation && e.annotation.trim()) {
                 block += `\n[${window.t('meta.user_annotation_label') || 'USER ANNOTATION'}]: ${e.annotation.trim()}`;
@@ -798,6 +807,9 @@ async function triggerCustomMeta(id) {
         _setTriggerStatus(id, `❌ ${window.t ? window.t('meta.all_excluded') : 'All entries have been excluded.'}`, false);
         return;
     }
+    const payload = legacy
+        ? { custom_context: lines.join('\n\n') }
+        : { excluded_ids: excludedIds, annotations: annotations };
 
     const abortController = new AbortController();
     _metaAbortControllers[id] = abortController;
@@ -807,7 +819,7 @@ async function triggerCustomMeta(id) {
         await apiFetch(`/api/meta-analysis/trigger/${id}`, {
             method: 'POST',
             body: {
-                custom_context: lines.join('\n\n'),
+                ...payload,
                 period_start: data.period_start,
                 period_end: data.period_end
             },

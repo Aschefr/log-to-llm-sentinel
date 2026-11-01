@@ -868,7 +868,7 @@ llm_overhaul:
 
   - id: LLM-05
     name: "Meta-analysis pre-aggregation"
-    status: TODO
+    status: DONE
     effort: L
     priority: P2
     notes: |
@@ -877,13 +877,13 @@ llm_overhaul:
 
   - id: LLM-06
     name: "Meta-analysis notification uses structured tl;dr"
-    status: TODO
+    status: DONE
     effort: S
     priority: P2
 
   - id: LLM-07
     name: "Prompt visibility and regression set"
-    status: TODO
+    status: DONE
     effort: M
     priority: P3
     notes: |

@@ -1,3 +1,4 @@
+import contextlib
 import json
 import time
 from typing import Optional, AsyncGenerator, List, Union
@@ -85,17 +86,19 @@ class OllamaService:
         Retourne {"content", "thinking", "tool_calls", "error"} ; content est nettoyé des balises <think>.
         """
         content, thinking, tool_calls = "", "", []
-        async for chunk in self.generate_stream(None, url, model, options, think,
-                                                messages=messages, format=format, tools=tools):
-            if "error" in chunk:
-                return {"content": strip_think(content), "thinking": thinking, "tool_calls": tool_calls,
-                        "error": str(chunk["error"])}
-            msg = chunk.get("message", {})
-            content += msg.get("content", "") or ""
-            thinking += msg.get("thinking", "") or ""
-            tool_calls.extend(msg.get("tool_calls") or [])
-            if chunk.get("done"):
-                break
+        # aclosing : referme le flux HTTP dès la sortie de boucle (sinon il reste ouvert jusqu'au ramasse-miettes)
+        async with contextlib.aclosing(self.generate_stream(None, url, model, options, think, messages=messages,
+                                                            format=format, tools=tools)) as stream:
+            async for chunk in stream:
+                if "error" in chunk:
+                    return {"content": strip_think(content), "thinking": thinking, "tool_calls": tool_calls,
+                            "error": str(chunk["error"])}
+                msg = chunk.get("message", {})
+                content += msg.get("content", "") or ""
+                thinking += msg.get("thinking", "") or ""
+                tool_calls.extend(msg.get("tool_calls") or [])
+                if chunk.get("done"):
+                    break
         return {"content": strip_think(content), "thinking": thinking, "tool_calls": tool_calls, "error": None}
 
     async def get_capabilities(self, url: str, model: str) -> set:

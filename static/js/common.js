@@ -175,6 +175,27 @@ async function openChat(analysisId, rawPrompt = null, rawResponse = null) {
     }
 }
 
+/** Affiche / masque les messages exacts envoyés au LLM pour une analyse. */
+async function togglePromptView(analysisId, btn) {
+    const holder = btn.closest('.analysis-footer, .detail-actions') || btn.parentElement;
+    const next = holder.nextElementSibling;
+    if (next && next.classList.contains('prompt-view')) {
+        next.remove();
+        return;
+    }
+    const _t = (k, fb) => (window.t && window.t(k) !== k) ? window.t(k) : fb;
+    try {
+        const res = await apiFetch(`/api/monitor/analyses/${analysisId}/prompt`);
+        const text = res.messages
+            ? res.messages.map(m => `[${m.role.toUpperCase()}]\n${m.content}`).join('\n\n')
+            : _t('common.prompt_unavailable', 'Prompt not stored for this analysis (created before v1.2.303).');
+        holder.insertAdjacentHTML('afterend',
+            `<pre class="prompt-view" onclick="event.stopPropagation()" style="font-family:monospace; font-size:0.75rem; white-space:pre-wrap; word-break:break-word; max-height:400px; overflow-y:auto; color:var(--text-secondary); background:var(--bg-secondary); border:1px solid var(--border); border-radius:4px; padding:0.75rem; margin-top:0.5rem;">${escapeHtml(text)}</pre>`);
+    } catch (e) {
+        alert(e.message);
+    }
+}
+
 /** Ouvre une conversation d'investigation guidée (l'IA consulte les logs via ses outils). */
 async function investigateAnalysis(analysisId) {
     try {
@@ -566,6 +587,7 @@ function renderAnalysisCard(a, opts = {}) {
                 <div style="display: flex; gap: 0.5rem;">
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); retryAnalysis(${a.id}, this)">🔄 ${_t('common.retry', 'Retry')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); notifyAnalysis(${a.id}, this)">🔔 ${_t('common.notify', 'Notify')}</button>
+                    <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); togglePromptView(${a.id}, this)" title="${_t('common.view_prompt_title', 'Show the exact messages sent to the LLM')}">📜 ${_t('common.view_prompt', 'Prompt')}</button>
                     ${a.detection_id ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); window.location.href='/monitor?search=${encodeURIComponent(a.detection_id)}'" title="${_t('common.view_in_monitor', 'View in Monitor')}">🔍 Monitor</button>` : ''}
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openChat(${a.id})">💬 ${_t('common.deepen', 'Deepen')}</button>

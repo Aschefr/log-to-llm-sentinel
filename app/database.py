@@ -111,6 +111,10 @@ def init_db():
         "ALTER TABLE analyses ADD COLUMN prompt_json TEXT DEFAULT NULL",
         # LLM-P3: trace des outils du chat (la table chat_actions est créée par create_all)
         "ALTER TABLE chat_messages ADD COLUMN metadata_json TEXT DEFAULT NULL",
+        # LLM-P5: méta-analyse structurée
+        "ALTER TABLE meta_analysis_results ADD COLUMN tldr TEXT DEFAULT NULL",
+        "ALTER TABLE meta_analysis_results ADD COLUMN status VARCHAR DEFAULT NULL",
+        "ALTER TABLE meta_analysis_results ADD COLUMN result_json TEXT DEFAULT NULL",
     ]
 
     with engine.connect() as conn:

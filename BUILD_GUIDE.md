@@ -63,3 +63,19 @@ Ouvrez une console PowerShell à la racine du projet et exécutez la commande su
 3. **Tag Git & Push** : Crée un tag Git local (ex: `v1.2.298`) et le pousse sur le dépôt GitHub principal.
 4. **Release GitHub** : Crée automatiquement une release GitHub officielle avec génération de notes de version via `gh release`.
 5. **Build & Push Docker** : Compile l'image Docker localement avec les étiquettes `:latest` et `:<version>`, puis pousse ces images sur Docker Hub (`aschefr/log-to-llm-sentinel`).
+
+---
+
+## 4. Jeu de régression du prompt (si les prompts ou le modèle changent)
+
+Le script `scripts/llm_regression.py` rejoue des cas de logs contre le modèle configuré et vérifie la sévérité obtenue :
+
+```powershell
+# Cas d'exemple anonymisés fournis avec le projet
+python scripts/llm_regression.py scripts/llm_regression.example.json --url http://<ollama>:11434 --model <modele> --ctx 32768 --no-think
+
+# Vos propres cas (lignes réelles) : à garder dans data/, qui n'est pas versionné
+docker exec <conteneur> python scripts/llm_regression.py data/llm_regression.json
+```
+
+Le script se termine avec un code d'erreur si un cas n'est pas conforme (utile avant une release qui modifie `app/services/prompts.py`).

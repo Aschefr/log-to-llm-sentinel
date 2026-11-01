@@ -381,6 +381,19 @@ async def retry_analysis(analysis_id: int):
         db.close()
 
 
+@router.get("/analyses/{analysis_id}/prompt")
+def get_analysis_prompt(analysis_id: int):
+    """Messages exacts envoyés au LLM pour cette analyse (None pour les analyses antérieures à leur stockage)."""
+    db = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="analysis_not_found")
+        return {"messages": json.loads(analysis.prompt_json) if analysis.prompt_json else None}
+    finally:
+        db.close()
+
+
 @router.get("/task/{task_id}")
 def get_task_status(task_id: str):
     """Retourne le statut d'une tâche d'analyse en arrière-plan."""

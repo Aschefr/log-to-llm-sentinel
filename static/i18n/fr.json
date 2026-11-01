@@ -517,7 +517,10 @@
     "time_ago": "Il y a",
     "download": "Télécharger",
     "investigate": "Investiguer",
-    "investigate_title": "Lancer une investigation guidée : l'IA consulte les logs, la récurrence et les événements corrélés"
+    "investigate_title": "Lancer une investigation guidée : l'IA consulte les logs, la récurrence et les événements corrélés",
+    "view_prompt": "Prompt",
+    "view_prompt_title": "Afficher les messages exacts envoyés au LLM",
+    "prompt_unavailable": "Prompt non enregistré pour cette analyse (créée avant la v1.2.303)."
   },
   "meta": {
     "title": "Méta-Analyse",

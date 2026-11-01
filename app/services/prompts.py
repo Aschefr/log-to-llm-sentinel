@@ -171,3 +171,98 @@ Then write a structured report: **Findings**, **Ranked hypotheses** (with the ev
 def label(lang: str, key: str, **kwargs) -> str:
     text = LABELS.get(lang, LABELS["fr"]).get(key) or LABELS["fr"][key]
     return text.format(**kwargs) if kwargs else text
+
+# ── Méta-analyse ──────────────────────────────────────────────────────────────
+
+META_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "status": {"type": "string", "enum": ["ok", "degraded", "critical"]},
+        "tldr": {"type": "string"},
+        "highlights": {"type": "array", "items": {"type": "string"}},
+        "synthesis": {"type": "string"},
+        "recommendations": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["status", "tldr", "highlights", "synthesis", "recommendations"],
+}
+
+META_SYSTEM = {
+    "fr": """Tu rédiges la synthèse périodique d'un outil de surveillance de logs. Les événements ont déjà été analysés un par un et sont fournis AGRÉGÉS (regroupés par événement identique, avec statistiques).
+
+Méthode :
+- Raisonne sur les tendances, pas événement par événement : volume, récurrence, horaires, sévérité, taux de résolution, MTTR.
+- Compare avec la synthèse précédente si elle est fournie : signale ce qui est nouveau, ce qui persiste et ce qui a disparu.
+- Distingue le bruit récurrent et bénin (régulier, résolu seul) des problèmes réels ; mets en avant ce qui demande une action.
+- Si plusieurs règles sont touchées au même moment, cherche une cause commune.
+- N'invente rien qui ne figure pas dans les données.
+
+Réponds en français, au format JSON demandé :
+- status : ok (rien d'anormal), degraded (problèmes à surveiller ou à corriger), critical (incident sérieux ou en cours).
+- tldr : 2 à 3 phrases (400 caractères max), compréhensibles seules, utilisées telles quelles dans la notification.
+- highlights : 3 à 5 points clés courts.
+- synthesis : la synthèse détaillée en Markdown (par thème ou par service).
+- recommendations : actions concrètes et priorisées ; liste vide si rien à faire.""",
+    "en": """You write the periodic synthesis of a log monitoring tool. Events were already analyzed one by one and are provided AGGREGATED (grouped by identical event, with statistics).
+
+Method:
+- Reason about trends, not event by event: volume, recurrence, timing, severity, resolution rate, MTTR.
+- Compare with the previous synthesis if provided: point out what is new, what persists and what disappeared.
+- Separate recurring benign noise (regular, self-resolving) from real problems; highlight what needs action.
+- If several rules are affected at the same time, look for a common cause.
+- Do not invent anything that is not in the data.
+
+Answer in English, using the requested JSON format:
+- status: ok (nothing abnormal), degraded (issues to watch or fix), critical (serious or ongoing incident).
+- tldr: 2 to 3 sentences (400 characters max), self-contained, used as-is in the notification.
+- highlights: 3 to 5 short key points.
+- synthesis: the detailed synthesis in Markdown (by topic or by service).
+- recommendations: concrete, prioritized actions; empty list if nothing to do.""",
+}
+
+META_LABELS = {
+    "fr": {
+        "period": "Période analysée (UTC) : du {start} au {end}",
+        "totals": "{total} alerte(s) sur la période ; {included} détaillée(s) ci-dessous (limite de la configuration : {limit}).",
+        "previous": "Synthèse précédente ({start} → {end}, état : {status})",
+        "rule": "Règle #{id} {name}",
+        "rule_stats": "{total} alerte(s) sur la période ({included} détaillée(s)) — {severities} — résolues : {resolved}/{included}{mttr} — état actuel : {state}",
+        "mttr": ", MTTR {mttr} min",
+        "group": "[×{count}] {severity} — {span} — heures (UTC) : {hours}{unresolved}",
+        "unresolved": " — non résolues : {n}",
+        "example": "Exemple : {line}",
+        "summary": "Analyse (dernière occurrence) : {summary}",
+        "annotation": "Annotation de l'utilisateur : {text}",
+        "omitted": "[… {groups} groupe(s) supplémentaire(s) omis faute de place ({alerts} alerte(s)).]",
+        "silent": "Règles sans alerte sur la période : {names}",
+        "status_label": {"ok": "🟢 OK", "degraded": "🟠 Dégradé", "critical": "🔴 Critique"},
+        "state": "État global",
+        "highlights": "Points clés",
+        "recommendations": "Recommandations",
+        "no_action": "Aucune action nécessaire.",
+    },
+    "en": {
+        "period": "Analyzed period (UTC): from {start} to {end}",
+        "totals": "{total} alert(s) over the period; {included} detailed below (configuration limit: {limit}).",
+        "previous": "Previous synthesis ({start} → {end}, status: {status})",
+        "rule": "Rule #{id} {name}",
+        "rule_stats": "{total} alert(s) over the period ({included} detailed) — {severities} — resolved: {resolved}/{included}{mttr} — current state: {state}",
+        "mttr": ", MTTR {mttr} min",
+        "group": "[×{count}] {severity} — {span} — hours (UTC): {hours}{unresolved}",
+        "unresolved": " — unresolved: {n}",
+        "example": "Example: {line}",
+        "summary": "Analysis (latest occurrence): {summary}",
+        "annotation": "User annotation: {text}",
+        "omitted": "[… {groups} more group(s) omitted for lack of space ({alerts} alert(s)).]",
+        "silent": "Rules without alerts over the period: {names}",
+        "status_label": {"ok": "🟢 OK", "degraded": "🟠 Degraded", "critical": "🔴 Critical"},
+        "state": "Overall status",
+        "highlights": "Key points",
+        "recommendations": "Recommendations",
+        "no_action": "No action needed.",
+    },
+}
+
+
+def meta_label(lang: str, key: str, **kwargs):
+    text = META_LABELS.get(lang, META_LABELS["fr"]).get(key) or META_LABELS["fr"][key]
+    return text.format(**kwargs) if kwargs and isinstance(text, str) else text

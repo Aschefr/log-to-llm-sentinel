@@ -4,7 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Aggregated Meta-Analysis**: The meta-analysis no longer pastes each analysis one by one. Identical events are grouped (count, first/last occurrence, hours, severity, unresolved count, sample line, latest summary), each rule gets its totals, resolution rate, MTTR and current state, rules without alerts are listed, and the total number of alerts over the whole period is always reported (the "Max Included Analyses" limit still caps the detailed ones). Groups are filled by severity within the configured context size.
+- **Trend Against the Previous Synthesis**: The previous run's TL;DR is included so the synthesis can flag what is new, persistent or gone.
+- **Structured Meta-Analysis Result**: Overall status (🟢 OK / 🟠 Degraded / 🔴 Critical), TL;DR, key points, detailed synthesis and recommendations, stored with each result (`tldr`, `status`, `result_json`).
+- **Prompt Visibility**: New "📜 Prompt" button on analyses (Dashboard, Monitor) showing the exact messages sent to the LLM.
+- **Prompt Regression Set**: `scripts/llm_regression.py` replays log cases against the configured model and checks the resulting severity; an anonymized example set is provided (`scripts/llm_regression.example.json`). See BUILD_GUIDE §4.
+
+### Changed
+- **Meta-Analysis Notifications**: When the synthesis is too long for Discord/Apprise, the notification uses the stored status, TL;DR and key points directly instead of a second LLM call.
+- **Preview Exclusions & Annotations**: Manual meta-analysis runs now send the excluded analysis IDs and annotations; the aggregation is done server-side (the previous free-text context is still accepted).
+
 ### Fixed
+- **Unclosed Ollama Streams**: Structured LLM calls and the chat tool loop now close the HTTP stream as soon as the answer is complete instead of leaving it to the garbage collector.
 - **Chat Action Cards Clicked Mid-Answer**: An action proposed by the AI appeared (with active buttons) while the model was still writing; after the click the answer kept growing, which looked like the conversation changing by itself. Cards received during generation are now locked ("The AI is finishing its answer…") until the turn ends, and the model is instructed to propose actions *before* writing its final answer (chat and investigation prompts).
 - **Unclear Effect of Applied Actions**: Applied actions now state their concrete effect and where to see it (e.g. "Analysis #947 is no longer counted in the dashboard MTTR. Rules and future alerts are unchanged."). The tool description also clarifies that `exclude_from_mttr` targets a single analysis and that recurring noise calls for an exclusion pattern or keyword removal instead.
 

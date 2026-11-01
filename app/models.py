@@ -327,6 +327,9 @@ class MetaAnalysisResult(Base):
     matched_keywords_json = Column(Text, default="[]")  # List of all keywords matched across all included analyses
     context_sent = Column(Text, nullable=True)  # Prompt exact envoyé au LLM
     ollama_response = Column(Text)
+    tldr = Column(Text, nullable=True)         # Résumé court (sortie structurée) — notification, synthèse suivante
+    status = Column(String, nullable=True)     # 'ok' | 'degraded' | 'critical'
+    result_json = Column(Text, nullable=True)  # Réponse structurée brute du LLM
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
