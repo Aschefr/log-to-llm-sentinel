@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.2.303] - 2026-11-01
 
 ### Added
 - **AI Chat Tools**: When the Ollama model supports tool calling (detected automatically), the chat assistant can look things up instead of guessing: list rules and their state, read the latest lines of a source, get the lines around an analysis or timestamp, search a source, list/open analyses, rule statistics (alerts per day, MTTR, most frequent events), resolution history, and events correlated across all rules around a given time. Each answer shows a live, collapsible "Tools used" list.

@@ -6,7 +6,7 @@
 # Priority: P0 (critical) | P1 (high) | P2 (medium) | P3 (low)
 
 project: log-to-llm-sentinel
-updated: 2026-06-14
+updated: 2026-11-01
 
 # ─────────────────────────────────────────────
 # GLOBAL RULES (apply to ALL tasks)
@@ -810,3 +810,81 @@ bugs:
       Problem: Hardcoded dark backgrounds in markdown code elements made meta-analysis text unreadable in light mode. Several French texts and fallbacks were still hardcoded.
       Fix: Added CSS overrides for light theme markdown blocks. Translated remaining French static strings and overhauled JS fallback messages in meta-analysis and keyword wizard to default to English.
       Files: style.css, fr.json, en.json, meta.js, keyword_wizard.js, config.js, monitor.js, _rule_modal.html.
+
+# ─────────────────────────────────────────────
+# LLM PIPELINE OVERHAUL (prompts, context, tools, chat)
+# ─────────────────────────────────────────────
+llm_overhaul:
+  - id: LLM-00
+    name: "Fix malformed prompts and notification summaries"
+    status: DONE
+    effort: S
+    priority: P0
+    notes: |
+      Chat prompt sent literal "\n"; prompt language ignored by orchestrator; grouped lines sent newest-first;
+      retry re-wrapped the group header; notification summaries used num_ctx 2048 (input truncation + model reload).
+      Files: chat.py, orchestrator.py, monitor.py, meta_service.py, models.py, database.py.
+
+  - id: LLM-01
+    name: "Shared LLM core"
+    status: DONE
+    effort: M
+    priority: P1
+    notes: |
+      OllamaService.chat() (system/user/assistant/tool roles, structured output, tools, /api/show capabilities),
+      app_config.config_to_dict() single config source (fixed retry ignoring ollama_ctx/temp/think), prompts.py.
+
+  - id: LLM-02
+    name: "Context-rich alert analysis"
+    status: DONE
+    effort: L
+    priority: P1
+    notes: |
+      One pipeline (Orchestrator.analyze_alert) for detections, retry, manual analysis and rule test.
+      Source context lines (rule.context_lines), signature-based duplicate grouping [xN], 7-day similar-alert history,
+      JSON-schema output -> summary/analysis_json/prompt_json, token budget by priority.
+      Files: alert_analysis.py, log_source.py, log_utils.py, prompts.py, orchestrator.py.
+
+  - id: LLM-03
+    name: "Bounded LLM tools and confirmed actions"
+    status: DONE
+    effort: L
+    priority: P1
+    notes: |
+      Read-only tools (IDs only, bounded output, substring search) + propose_action stored in chat_actions,
+      executed only after explicit user confirmation. Agent loop limits: 4 rounds / 8 calls (6/12 investigation),
+      final round without tools, 40% context budget, dedup, per-turn timeout.
+      Files: llm_tools.py, chat_agent.py, models.py.
+
+  - id: LLM-04
+    name: "Diagnostic chat and guided investigation"
+    status: DONE
+    effort: L
+    priority: P1
+    notes: |
+      Rich analysis context in chat, tool results replayed for the last 2 turns, SSE tool/action events,
+      "Tools used" chips and action cards, /chat/api/investigate + Investigate buttons.
+      Files: chat.py, chat.html, common.js, monitor.js, fr.json, en.json.
+
+  - id: LLM-05
+    name: "Meta-analysis pre-aggregation"
+    status: TODO
+    effort: L
+    priority: P2
+    notes: |
+      Aggregate the whole period by signature (counts, first/last seen, hours, resolution/MTTR), include the previous
+      meta-analysis tl;dr for trends, structured output (tldr, status, highlights, synthesis_markdown).
+
+  - id: LLM-06
+    name: "Meta-analysis notification uses structured tl;dr"
+    status: TODO
+    effort: S
+    priority: P2
+
+  - id: LLM-07
+    name: "Prompt visibility and regression set"
+    status: TODO
+    effort: M
+    priority: P3
+    notes: |
+      "View prompt sent" button (Analysis.prompt_json); small set of real production lines with expected severity.
