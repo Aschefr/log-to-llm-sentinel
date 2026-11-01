@@ -149,53 +149,62 @@ class Orchestrator:
                 "debug_mode": config.debug_mode if config else False,
                 "instance_name": config.instance_name if config else "",
                 "discord_webhook_url": config.discord_webhook_url if config else "",
+                "ollama_prompt_lang": (config.ollama_prompt_lang or "fr") if config else "fr",
+                "site_lang": (config.site_lang or "fr") if config else "fr",
             }
 
             max_chars = config_dict.get("max_log_chars", 5000)
             lang = config_dict.get("ollama_prompt_lang", "fr")
 
-            if len(lines) == 1:
-                line = clean_log_line(lines[0])
-                # Si la ligne est trop longue, on la tronque
-                if len(line) > max_chars:
-                    logger.warning("Orchestrator", f"Ligne trop longue ({len(line)} chars), troncature à {max_chars}")
-                    line = line[:max_chars] + "... [TRONQUÉ]"
-                
-                await self._process_match(rule, line, config_dict, db, detection_id, matched_keywords)
-            else:
-                # Regrouper les lignes
-                total_lines = len(lines)
-                # On limite à 30 lignes max dans le prompt pour ne pas exploser le contexte
-                recent_lines = [clean_log_line(l) for l in lines[-30:]]
-                
-                bundled_text = f"These {total_lines} matching events appeared in the last {buffer_delay} seconds. Here are the most recent:\n" if lang == 'en' else f"Ces {total_lines} événements correspondants sont apparus dans les {buffer_delay} dernières secondes. Voici un extrait des plus récents :\n"
-                
-                current_length = len(bundled_text)
-                lines_added = 0
-                for line in reversed(recent_lines):
-                    line_to_add = f"\n{line}"
-                    if current_length + len(line_to_add) > max_chars:
-                        if lines_added == 0:
-                            # Guarantee at least 1 line even if it must be truncated
-                            truncated_line = line[:max_chars - current_length - 20] + "…[tronqué]"
-                            bundled_text += f"\n{truncated_line}"
-                        bundled_text += f"\n... [Tronqué : limite de {max_chars} caractères atteinte ({total_lines} événements détectés)]"
-                        break
-                    bundled_text += line_to_add
-                    current_length += len(line_to_add)
-                    lines_added += 1
-
-                
-                logger.info("Orchestrator", f"Envoi groupé pour '{rule.name}' : {total_lines} lignes ({len(bundled_text)} chars)")
-                await self._process_match(rule, bundled_text, config_dict, db, detection_id, matched_keywords)
+            # On ne conserve que les 30 dernières lignes brutes (seules utilisées dans le prompt)
+            raw_lines = {"total": len(lines), "window_s": buffer_delay, "lines": lines[-30:]}
+            text = self.bundle_lines(raw_lines["lines"], raw_lines["total"], buffer_delay, max_chars, lang)
+            if len(lines) > 1:
+                logger.info("Orchestrator", f"Envoi groupé pour '{rule.name}' : {len(lines)} lignes ({len(text)} chars)")
+            await self._process_match(rule, text, config_dict, db, detection_id, matched_keywords, raw_lines)
         except Exception as e:
             logger.error("Orchestrator", f"Erreur lors du flush buffer : {e}")
         finally:
             db.close()
 
+    @staticmethod
+    def bundle_lines(lines: List[str], total_lines: int, buffer_delay: int, max_chars: int, lang: str = 'fr') -> str:
+        """Construit le texte envoyé au LLM à partir des lignes brutes, dans l'ordre chronologique.
+        Les lignes les plus récentes sont prioritaires si la limite de caractères est atteinte."""
+        if len(lines) == 1:
+            line = clean_log_line(lines[0])
+            if len(line) > max_chars:
+                logger.warning("Orchestrator", f"Ligne trop longue ({len(line)} chars), troncature à {max_chars}")
+                line = line[:max_chars] + "... [TRONQUÉ]"
+            return line
+
+        cleaned = [clean_log_line(l) for l in lines]
+        header = (f"These {total_lines} matching events appeared in the last {buffer_delay} seconds. Here are the most recent, in chronological order:\n"
+                  if lang == 'en' else
+                  f"Ces {total_lines} événements correspondants sont apparus dans les {buffer_delay} dernières secondes. Voici les plus récents, dans l'ordre chronologique :\n")
+
+        # Sélection du plus récent au plus ancien tant que le budget le permet
+        selected = []
+        current_length = len(header)
+        truncated = False
+        for line in reversed(cleaned):
+            if current_length + len(line) + 1 > max_chars:
+                if not selected:
+                    # Guarantee at least 1 line even if it must be truncated
+                    selected.append(line[:max_chars - current_length - 20] + "…[tronqué]")
+                truncated = True
+                break
+            selected.append(line)
+            current_length += len(line) + 1
+
+        text = header + "".join(f"\n{l}" for l in reversed(selected))
+        if truncated:
+            text += f"\n... [Tronqué : limite de {max_chars} caractères atteinte ({total_lines} événements détectés)]"
+        return text
 
     async def _process_match(self, rule: Rule, line: str, config: dict, db,
-                              detection_id: str = None, matched_keywords: list = None):
+                              detection_id: str = None, matched_keywords: list = None,
+                              raw_lines: dict = None):
         """Traite une ligne correspondante."""
         # 1. Préparer le contexte
         context_before = []
@@ -240,6 +249,7 @@ class Orchestrator:
             rule_id=rule.id,
             detection_id=detection_id,
             triggered_line=line,
+            triggered_lines_json=json.dumps(raw_lines) if raw_lines else None,
             matched_keywords_json=json.dumps(matched_keywords or []),
             context_before_json="[]",
             context_after_json="[]",
@@ -336,7 +346,9 @@ class Orchestrator:
                             think=False, # Pas de raisonnement pour un résumé court
                             options={
                                 "temperature": 0.1, # Résumé toujours à basse température
-                                "num_ctx": 2048,    # Résumé n'a pas besoin d'un gros contexte
+                                # Même num_ctx que l'analyse : un num_ctx différent force Ollama à recharger le modèle,
+                                # et 2048 tronquait l'analyse en entrée
+                                "num_ctx": config.get("ollama_ctx", 4096),
                             }
                         ),
                         timeout=60.0

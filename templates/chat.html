@@ -1597,7 +1597,7 @@ async function sendMessage(force = false) {
     if (window._chatContextData && !force) {
         const base = window._chatContextData.base_prompt;
         const max = window._chatContextData.ollama_ctx;
-        const fullText = base + "\\nUtilisateur : " + content + "\\nAssistant : ";
+        const fullText = base + "\nUtilisateur : " + content + "\nAssistant : ";
         const tokens = estimateTokens(fullText);
         if (tokens >= max) {
             // 09-C : prioriser le mode auto de la conv sur le localStorage global
@@ -1618,7 +1618,7 @@ async function sendMessage(force = false) {
     // Pré-calculer le contexte localement pour éviter le saut (glitch) du compteur
     // avant que le serveur n'ait répondu avec le nouveau contexte officiel.
     if (window._chatContextData) {
-        window._chatContextData.base_prompt += "\\nUtilisateur : " + content + "\\n";
+        window._chatContextData.base_prompt += "\nUtilisateur : " + content + "\n";
     }
 
     const container = document.getElementById('chat-messages');

@@ -103,6 +103,8 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN syslog_enabled BOOLEAN DEFAULT 0",
         "ALTER TABLE global_config ADD COLUMN syslog_forward_addr VARCHAR DEFAULT NULL",
         "ALTER TABLE global_config ADD COLUMN log_rotation_limit_mb INTEGER DEFAULT 10",
+        # LLM-P0: lignes brutes ayant déclenché l'analyse (rejouables par le retry)
+        "ALTER TABLE analyses ADD COLUMN triggered_lines_json TEXT DEFAULT NULL",
     ]
 
     with engine.connect() as conn:

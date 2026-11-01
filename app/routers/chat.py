@@ -153,7 +153,7 @@ def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
     for r in active_rules:
         ctx = f" (Context: {r.application_context})" if r.application_context else ""
         rules_lines.append(f"- {r.name}{ctx}")
-    rules_list_str = "\\n".join(rules_lines) if rules_lines else "- Aucune règle configurée"
+    rules_list_str = "\n".join(rules_lines) if rules_lines else "- Aucune règle configurée"
     
     if mode_text:
         mode_text = mode_text.replace("{datetime}", current_dt)
@@ -193,13 +193,13 @@ def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
     if mode_text:
         block_lines.append(mode_text)
 
-    prompt = "\\n".join(block_lines).strip() + "\\n\\n" if block_lines else ""
+    prompt = "\n".join(block_lines).strip() + "\n\n" if block_lines else ""
 
     # 3. Ajouter l'historique de la conversation
     # On limite à 20 messages récents au lieu de 10 car le contexte est géré
     for m in history[-20:]:
         role_label = "Utilisateur" if m.role == "user" else "Assistant"
-        prompt += f"{role_label} : {m.content}\\n"
+        prompt += f"{role_label} : {m.content}\n"
     
     ollama_ctx = cfg.ollama_ctx if cfg else 4096
     

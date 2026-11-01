@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Chat Prompt Formatting**: The chat context sent to the LLM contained literal `\n` sequences instead of real line breaks (system block, rules list and conversation history), so the model received the whole context as a single garbled line. Line breaks are now real, and the context usage estimate in the chat UI matches.
+- **Analysis Language Ignored**: The orchestrator's config never included `ollama_prompt_lang` / `site_lang`, so automatic analyses and their notifications always used French prompts regardless of settings. Manual line analysis and retry now also honour the prompt language.
+- **Grouped Lines Order**: When several matching lines were bundled in one analysis, they were sent to the LLM newest-first, breaking cause-and-effect reasoning. Lines are now sent in chronological order (the most recent lines are still kept first when the character limit is reached).
+- **Retry of Grouped Analyses**: The raw matching lines are now stored with each analysis (`triggered_lines_json`), so retrying a grouped analysis rebuilds the original prompt instead of wrapping the group header inside a new "Triggering line".
+- **Notification Summaries**: The AI summary used for Discord/Apprise notifications (alerts and meta-analyses) was requested with a 2048-token context, which truncated long analyses and forced Ollama to reload the model, often ending in a timeout and a raw `[TRUNCATED]` message. Summaries now reuse the analysis context size, and the meta-analysis summary now waits for the shared Ollama lock instead of running concurrently with other analyses.
+
 ## [1.2.297] - 2026-06-30
 
 ### Fixed

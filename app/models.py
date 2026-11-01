@@ -165,6 +165,7 @@ class Analysis(Base):
     rule_id = Column(Integer, index=True)
     detection_id = Column(String, index=True, nullable=True)  # UUID court de detection
     triggered_line = Column(Text, nullable=False)
+    triggered_lines_json = Column(Text, nullable=True)  # {"total", "window_s", "lines": [brutes]} pour les envois groupés
     matched_keywords_json = Column(Text, default="[]")  # mots-cles ayant declenche la regle
     context_before_json = Column(Text, default="[]")
     context_after_json = Column(Text, default="[]")

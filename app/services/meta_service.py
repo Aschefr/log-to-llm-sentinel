@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timedelta
 import asyncio
+import contextlib
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 
@@ -388,21 +389,26 @@ class MetaAnalysisService:
                 logger.debug("MetaAnalysisService", f"Synthèse trop longue ({len(notify_body)} chars), demande de résumé simplifié à Ollama...")
                 summary_prompt = nt('meta_summary_prompt', lang).format(max_chars=max_chars - 500, response=result.ollama_response)
                 
-                ollama = OllamaService()
+                ollama = self.orchestrator.ollama if self.orchestrator else OllamaService()
+                # Sérialiser avec les autres appels Ollama ; le délai ne court qu'une fois le verrou obtenu
+                lock = self.orchestrator._ollama_semaphore if self.orchestrator else contextlib.nullcontext()
                 try:
-                    summary = await asyncio.wait_for(
-                        ollama.analyze_async(
-                            prompt=summary_prompt,
-                            url=global_cfg.ollama_url,
-                            model=global_cfg.ollama_model,
-                            think=False,
-                            options={
-                                "temperature": 0.1,
-                                "num_ctx": 2048,
-                            }
-                        ),
-                        timeout=60.0
-                    )
+                    async with lock:
+                        summary = await asyncio.wait_for(
+                            ollama.analyze_async(
+                                prompt=summary_prompt,
+                                url=global_cfg.ollama_url,
+                                model=global_cfg.ollama_model,
+                                think=False,
+                                options={
+                                    "temperature": 0.1,
+                                    # Même num_ctx que la synthèse : évite le rechargement du modèle
+                                    # et la troncature de la synthèse en entrée (2048 était trop petit)
+                                    "num_ctx": config.context_size,
+                                }
+                            ),
+                            timeout=60.0
+                        )
                 except asyncio.TimeoutError:
                     summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (60s)"
                 except Exception as e:

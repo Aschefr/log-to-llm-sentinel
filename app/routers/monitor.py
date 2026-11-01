@@ -338,8 +338,16 @@ async def retry_analysis(analysis_id: int):
             raise HTTPException(status_code=500, detail="global_config_not_found")
             
         config = _get_config_dict(config_obj)
-        cleaned_line = clean_log_line(analysis.triggered_line)
-        prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""))
+        lang = config.get("ollama_prompt_lang", "fr")
+        if analysis.triggered_lines_json:
+            # Rejouer à partir des lignes brutes (évite de ré-emballer l'en-tête du groupe)
+            raw = json.loads(analysis.triggered_lines_json)
+            cleaned_line = _orchestrator.bundle_lines(
+                raw["lines"], raw["total"], raw["window_s"], config.get("max_log_chars", 5000), lang
+            )
+        else:
+            cleaned_line = clean_log_line(analysis.triggered_line)
+        prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""), lang=lang)
 
         # Capturer les IDs nécessaires pour la tâche en arrière-plan
         analysis_id_captured = analysis.id
@@ -436,11 +444,13 @@ async def analyze_line(data: dict):
             "ollama_temp":  cfg.ollama_temp  if cfg else 0.1,
             "ollama_ctx":   cfg.ollama_ctx   if cfg else 4096,
             "ollama_think": cfg.ollama_think if cfg else True,
-            "system_prompt": cfg.system_prompt if cfg else ""
+            "system_prompt": cfg.system_prompt if cfg else "",
+            "ollama_prompt_lang": (cfg.ollama_prompt_lang or "fr") if cfg else "fr",
         }
         rule_id_cap = rule.id
         cleaned_line = clean_log_line(line)
-        prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""))
+        prompt = _orchestrator._build_prompt(rule, cleaned_line, config.get("system_prompt", ""),
+                                             lang=config["ollama_prompt_lang"])
     finally:
         db.close()
 
