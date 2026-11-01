@@ -21,7 +21,6 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import os
-import subprocess
 import httpx
 import re
 
@@ -29,37 +28,35 @@ import re
 _update_cache: dict = {"is_available": False, "is_latest": False, "error": True, "checked": False}
 
 
+def _parse_semver(version: str):
+    """'1.3.0' / 'v1.3.0' -> (1, 3, 0) ; None si le format n'est pas MAJEUR.MINEUR.CORRECTIF."""
+    m = re.match(r"^v?(\d+)\.(\d+)\.(\d+)", (version or "").strip())
+    return tuple(int(x) for x in m.groups()) if m else None
+
+
 def check_for_updates(current_version):
-    """Checks GitHub for new commits on main branch and updates the in-memory cache."""
+    """Compare la version locale (SemVer) à la dernière release publiée sur GitHub et met à jour le cache."""
     global _update_cache
     try:
-        parts = current_version.split('.')
-        if len(parts) < 3:
+        local = _parse_semver(current_version)
+        if not local:
             result = {"is_available": False, "is_latest": False, "error": True, "checked": True}
             _update_cache = result
             return result
-        local_commits = int(parts[-1])
 
-        url = "https://api.github.com/repos/Aschefr/log-to-llm-sentinel/commits?per_page=1"
+        url = "https://api.github.com/repos/Aschefr/log-to-llm-sentinel/releases/latest"
         headers = {"User-Agent": "Log-to-LLM-Sentinel-App"}
         with httpx.Client(headers=headers, timeout=5.0) as client:
             response = client.get(url)
             if response.status_code == 200:
-                link_header = response.headers.get("Link", "")
-                if 'rel="last"' in link_header:
-                    match = re.search(r'page=(\d+)>; rel="last"', link_header)
-                    if match:
-                        remote_commits = int(match.group(1))
-                        result = {
-                            "is_available": remote_commits > local_commits,
-                            "is_latest": remote_commits <= local_commits,
-                            "error": False,
-                            "checked": True
-                        }
-                        _update_cache = result
-                        return result
-                else:
-                    result = {"is_available": False, "is_latest": True, "error": False, "checked": True}
+                remote = _parse_semver(response.json().get("tag_name", ""))
+                if remote:
+                    result = {
+                        "is_available": remote > local,
+                        "is_latest": remote <= local,
+                        "error": False,
+                        "checked": True
+                    }
                     _update_cache = result
                     return result
     except Exception as e:
@@ -70,24 +67,12 @@ def check_for_updates(current_version):
 
 
 def get_app_version():
+    """Version de l'application (SemVer), lue dans version.txt (mis à jour par scripts/publish_release.ps1)."""
     try:
-        if os.path.exists(".git"):
-            commits = subprocess.check_output(["git", "rev-list", "--count", "HEAD"]).decode("utf-8").strip()
-            merges = int(subprocess.check_output(["git", "rev-list", "--merges", "--count", "HEAD"]).decode("utf-8").strip())
-            merges += 2  # Offset pour branches mergées avant versionning (souvent fast-forward)
-            version = f"1.{merges}.{commits}"
-            with open("version.txt", "w", encoding="utf-8") as f:
-                f.write(version)
-            return version
-    except Exception:
-        pass
-    try:
-        if os.path.exists("version.txt"):
-            with open("version.txt", "r", encoding="utf-8") as f:
-                return f.read().strip()
-    except Exception:
-        pass
-    return "1.0.0"
+        with open("version.txt", "r", encoding="utf-8") as f:
+            return f.read().strip() or "0.0.0"
+    except OSError:
+        return "0.0.0"
 
 APP_VERSION = get_app_version()
 

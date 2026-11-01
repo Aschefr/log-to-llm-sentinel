@@ -1,71 +1,133 @@
 # Log-to-LLM Sentinel Release Script
-# Auto-calculates version based on git commits
+# Semantic Versioning (MAJOR.MINOR.PATCH): the version lives in version.txt and is bumped here.
+#
+#   .\scripts\publish_release.ps1 -Bump patch -DryRun   # preview only, nothing is modified
+#   .\scripts\publish_release.ps1 -Bump minor           # new backward-compatible features
+#   .\scripts\publish_release.ps1 -Bump major           # breaking changes
+#   .\scripts\publish_release.ps1 -Version 1.4.0        # explicit version
+#
+# The "## [Unreleased]" section of CHANGELOG.md becomes "## [X.Y.Z] - YYYY-MM-DD" and is used
+# as the GitHub release notes.
 
 param(
+    [Parameter(Mandatory=$false)]
+    [ValidateSet("patch", "minor", "major")]
+    [string]$Bump = "patch",
+
+    [Parameter(Mandatory=$false)]
+    [string]$Version,
+
     [Parameter(Mandatory=$false)]
     [switch]$DryRun
 )
 
-$ErrorActionPreference = "Continue"
-
+$ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $ProjectRoot
+$utf8NoBom = New-Object System.Text.UTF8Encoding $False
+$Image = "aschefr/log-to-llm-sentinel"
+
+function Invoke-Native {
+    # Runs a native command and stops the release if it fails (PS 5.1 does not do it by itself).
+    param([string]$Description, [scriptblock]$Command)
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: $Description failed (exit code $LASTEXITCODE)" -ForegroundColor Red
+        exit 1
+    }
+}
 
 Write-Host "`n=== Log-to-LLM Sentinel Release ===" -ForegroundColor Cyan
 
-$dirty = git status --porcelain 2>&1
-if ($dirty) {
-    Write-Host "INFO: Uncommitted changes will be included in the release commit:" -ForegroundColor Yellow
-    Write-Host $dirty
+# --- Preconditions ---------------------------------------------------------
+$branch = (git rev-parse --abbrev-ref HEAD).Trim()
+if ($branch -ne "main") {
+    Write-Host "ERROR: releases are published from 'main' (current branch: $branch)." -ForegroundColor Red
+    exit 1
 }
-
-Write-Host "`n[1/5] Git commit..." -ForegroundColor Yellow
-if (-not $DryRun) {
-    git add -A
-    git commit -m "release: automatic version bump" 2>&1 | Out-Null
-}
-
-Write-Host "`n[2/5] Calculating version..." -ForegroundColor Yellow
-$merges = (git rev-list --merges --count HEAD).Trim()
-$commits = (git rev-list --count HEAD).Trim()
-$mergesInt = [int]$merges + 2
-$Version = "1.${mergesInt}.${commits}"
-
-$utf8NoBom = New-Object System.Text.UTF8Encoding $False
-[System.IO.File]::WriteAllText((Join-Path $PWD "version.txt"), $Version, $utf8NoBom)
-
-Write-Host "  Calculated version: $Version" -ForegroundColor Green
-
-if (-not $DryRun) {
-    git add version.txt
-    git commit --amend --no-edit 2>&1 | Out-Null
-}
-
-if ($DryRun) {
-    Write-Host "`n[DRY RUN] Stopping before push & docker operations." -ForegroundColor Yellow
-    exit 0
-}
-
-Write-Host "`n[3/5] Git tag & push..." -ForegroundColor Yellow
-git tag -a "v$Version" -m "Sentinel v$Version"
-git push origin main --tags 2>&1 | ForEach-Object { Write-Host "  $_" }
-Write-Host "  Pushed to GitHub" -ForegroundColor Green
-
-Write-Host "`n[4/5] Creating GitHub release..." -ForegroundColor Yellow
-gh release delete "v$Version" -y 2>&1 | Out-Null
-gh release create "v$Version" --title "Sentinel v$Version" --generate-notes
-
-Write-Host "`n[5/5] Building and pushing Docker image..." -ForegroundColor Yellow
-docker build -t aschefr/log-to-llm-sentinel:$Version -t aschefr/log-to-llm-sentinel:latest .
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "ERROR: Docker build failed" -ForegroundColor Red
+Invoke-Native "git fetch" { git fetch --quiet origin }
+$behind = (git rev-list --count "HEAD..origin/main").Trim()
+if ([int]$behind -gt 0) {
+    Write-Host "ERROR: local main is $behind commit(s) behind origin/main. Pull first." -ForegroundColor Red
     exit 1
 }
 
-docker push aschefr/log-to-llm-sentinel:$Version
-docker push aschefr/log-to-llm-sentinel:latest
+# --- Version -----------------------------------------------------------------
+$current = ([System.IO.File]::ReadAllText((Join-Path $PWD "version.txt"))).Trim()
+if ($current -notmatch '^(\d+)\.(\d+)\.(\d+)$') {
+    Write-Host "ERROR: version.txt does not contain a MAJOR.MINOR.PATCH version ('$current')." -ForegroundColor Red
+    exit 1
+}
+$major = [int]$Matches[1]; $minor = [int]$Matches[2]; $patch = [int]$Matches[3]
 
-Write-Host "`n=== Release v$Version complete! ===" -ForegroundColor Green
-$releaseUrl = "https://github.com/Aschefr/log-to-llm-sentinel/releases/tag/v$Version"
-Write-Host "  GitHub: $releaseUrl"
-Write-Host "  Docker: https://hub.docker.com/r/aschefr/log-to-llm-sentinel"
+if ($Version) {
+    if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+        Write-Host "ERROR: -Version must be MAJOR.MINOR.PATCH (got '$Version')." -ForegroundColor Red
+        exit 1
+    }
+    $NewVersion = $Version
+} elseif ($Bump -eq "major") {
+    $NewVersion = "$($major + 1).0.0"
+} elseif ($Bump -eq "minor") {
+    $NewVersion = "$major.$($minor + 1).0"
+} else {
+    $NewVersion = "$major.$minor.$($patch + 1)"
+}
+$Tag = "v$NewVersion"
+
+if (git tag --list $Tag) {
+    Write-Host "ERROR: tag $Tag already exists." -ForegroundColor Red
+    exit 1
+}
+Write-Host "  Version: $current -> $NewVersion" -ForegroundColor Green
+
+# --- CHANGELOG -----------------------------------------------------------------
+$changelogPath = Join-Path $PWD "CHANGELOG.md"
+$changelog = [System.IO.File]::ReadAllText($changelogPath, [System.Text.Encoding]::UTF8)
+$section = [regex]::Match($changelog, '(?s)## \[Unreleased\][^\n]*\n(.*?)(?=\r?\n## \[|\z)')
+if (-not $section.Success -or -not $section.Groups[1].Value.Trim()) {
+    Write-Host "ERROR: CHANGELOG.md has no '## [Unreleased]' section with content." -ForegroundColor Red
+    exit 1
+}
+$notes = $section.Groups[1].Value.Trim()
+$date = Get-Date -Format "yyyy-MM-dd"
+
+$dirty = git status --porcelain
+if ($dirty) {
+    Write-Host "  Uncommitted changes that will be part of the release commit:" -ForegroundColor Yellow
+    $dirty | ForEach-Object { Write-Host "    $_" }
+}
+
+if ($DryRun) {
+    Write-Host "`n[DRY RUN] Release notes for $Tag :" -ForegroundColor Yellow
+    Write-Host $notes
+    Write-Host "`n[DRY RUN] Nothing was modified." -ForegroundColor Yellow
+    exit 0
+}
+
+# --- Commit, tag, push ---------------------------------------------------------
+Write-Host "`n[1/4] Commit & tag..." -ForegroundColor Yellow
+$changelog = $changelog.Remove($section.Index, "## [Unreleased]".Length).Insert($section.Index, "## [$NewVersion] - $date")
+[System.IO.File]::WriteAllText($changelogPath, $changelog, $utf8NoBom)
+[System.IO.File]::WriteAllText((Join-Path $PWD "version.txt"), "$NewVersion`n", $utf8NoBom)
+Invoke-Native "git add" { git add -A }
+Invoke-Native "git commit" { git commit --quiet -m "release: $Tag" }
+Invoke-Native "git tag" { git tag -a $Tag -m "Sentinel $Tag" }
+
+Write-Host "`n[2/4] Push to GitHub..." -ForegroundColor Yellow
+Invoke-Native "git push" { git push origin main $Tag }
+
+Write-Host "`n[3/4] GitHub release..." -ForegroundColor Yellow
+$notesFile = Join-Path $env:TEMP "sentinel-release-notes.md"
+[System.IO.File]::WriteAllText($notesFile, $notes, $utf8NoBom)
+Invoke-Native "gh release create" { gh release create $Tag --title "Sentinel $Tag" --notes-file $notesFile }
+Remove-Item $notesFile -ErrorAction SilentlyContinue
+
+Write-Host "`n[4/4] Docker build & push..." -ForegroundColor Yellow
+Invoke-Native "docker build" { docker build -t "${Image}:$NewVersion" -t "${Image}:latest" . }
+Invoke-Native "docker push $NewVersion" { docker push "${Image}:$NewVersion" }
+Invoke-Native "docker push latest" { docker push "${Image}:latest" }
+
+Write-Host "`n=== Release $Tag complete! ===" -ForegroundColor Green
+Write-Host "  GitHub: https://github.com/Aschefr/log-to-llm-sentinel/releases/tag/$Tag"
+Write-Host "  Docker: https://hub.docker.com/r/$Image"

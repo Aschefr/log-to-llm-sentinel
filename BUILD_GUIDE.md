@@ -26,7 +26,8 @@ Mettez à jour les fichiers de documentation principaux pour refléter les chang
 - **`CHANGELOG.md`** : Ajoutez une section détaillant les nouveautés, améliorations et corrections de la version en cours de publication (suivez le format existant *Keep a Changelog*).
 - **`DevTracker.yaml`** : Mettez à jour le statut des tâches accomplies (`status: DONE`), modifiez la date de dernière mise à jour globale (`updated: AAAA-MM-JJ`) et notez les éventuelles nouvelles règles de dev.
 - **`README.md`** : Si la nouvelle version introduit des variables d'environnement, des volumes Docker ou des configurations inédites, documentez-les dans le README.
-- **`version.txt`** : Ce fichier contient le numéro de version. Il est mis à jour **automatiquement** par le script de release, vous n'avez pas besoin de le modifier manuellement.
+- **`version.txt`** : Contient la version courante au format [Semantic Versioning](https://semver.org/lang/fr/) (`MAJEUR.MINEUR.CORRECTIF`). Il est versionné et mis à jour **par le script de release** : ne le modifiez pas à la main.
+- **`CHANGELOG.md`** : Rédigez les changements sous `## [Unreleased]` au fil de l'eau. Le script transforme cette section en `## [X.Y.Z] - AAAA-MM-JJ` et l'utilise comme notes de la release GitHub.
 
 ---
 
@@ -45,24 +46,37 @@ Avant de lancer le script, assurez-vous d'être connecté à vos comptes sur vot
    docker login
    ```
 
+### Choisir le type de version (SemVer)
+
+| Option | Quand l'utiliser | Exemple |
+|---|---|---|
+| `-Bump patch` (défaut) | Corrections de bugs uniquement | 1.3.0 → 1.3.1 |
+| `-Bump minor` | Nouvelles fonctionnalités compatibles (migrations de BDD automatiques comprises) | 1.3.1 → 1.4.0 |
+| `-Bump major` | Changement incompatible : configuration à refaire, volume ou variable d'environnement modifiés, API cassée | 1.4.0 → 2.0.0 |
+| `-Version X.Y.Z` | Version explicite (cas particuliers) | |
+
 ### Lancement du script de release
 
-Ouvrez une console PowerShell à la racine du projet et exécutez la commande suivante :
+Le script se lance **depuis `main`** (intégrez d'abord votre branche), avec une branche à jour par rapport à `origin/main` :
 
 ```powershell
-# Pour tester le processus sans pousser ni builder sur Docker Hub (Dry Run)
-.\scripts\publish_release.ps1 -DryRun
+# Aperçu : version calculée et notes de release, sans rien modifier
+.\scripts\publish_release.ps1 -Bump minor -DryRun
 
-# Pour publier la release finale
-.\scripts\publish_release.ps1
+# Publication
+.\scripts\publish_release.ps1 -Bump minor
 ```
 
 ### Ce que fait le script automatiquement :
-1. **Commit des modifications en cours** : Ajoute tous les fichiers modifiés et crée un commit de bump de version.
-2. **Calcul de la version** : Génère automatiquement la version au format `1.[merges+2].[commits]` basé sur l'historique Git et met à jour [version.txt](file:///d:/Code%20Projects/log-to-llm-sentinel/version.txt).
-3. **Tag Git & Push** : Crée un tag Git local (ex: `v1.2.298`) et le pousse sur le dépôt GitHub principal.
-4. **Release GitHub** : Crée automatiquement une release GitHub officielle avec génération de notes de version via `gh release`.
-5. **Build & Push Docker** : Compile l'image Docker localement avec les étiquettes `:latest` et `:<version>`, puis pousse ces images sur Docker Hub (`aschefr/log-to-llm-sentinel`).
+1. **Vérifications** : branche `main`, à jour avec `origin/main`, `version.txt` valide, tag inexistant, section `## [Unreleased]` non vide dans le CHANGELOG.
+2. **Version** : calcule la nouvelle version à partir de `version.txt` et de l'option choisie, met à jour `version.txt` et date la section du CHANGELOG.
+3. **Commit, tag & push** : commit `release: vX.Y.Z` (incluant les modifications en cours), tag annoté `vX.Y.Z`, push de `main` et du tag.
+4. **Release GitHub** : `gh release create` avec la section du CHANGELOG comme notes.
+5. **Build & Push Docker** : image `aschefr/log-to-llm-sentinel` étiquetée `:X.Y.Z` et `:latest`.
+
+Le script s'arrête à la première commande en échec. L'application compare sa version à la **dernière release GitHub** pour signaler une mise à jour disponible.
+
+> Historique : jusqu'à la v1.2.303, la version était calculée à partir du nombre de commits (`1.[merges+2].[commits]`). La numérotation SemVer commence à la v1.3.0.
 
 ---
 

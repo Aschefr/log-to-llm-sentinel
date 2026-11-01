@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **Prompt Regression Set**: `scripts/llm_regression.py` replays log cases against the configured model and checks the resulting severity; an anonymized example set is provided (`scripts/llm_regression.example.json`). See BUILD_GUIDE §4.
 
 ### Changed
+- **Semantic Versioning**: Versions now follow `MAJOR.MINOR.PATCH` (starting with 1.3.0) instead of being derived from the commit count. `version.txt` is tracked and bumped by `scripts/publish_release.ps1 -Bump patch|minor|major`, which also dates the `[Unreleased]` CHANGELOG section and uses it as the GitHub release notes. The in-app update indicator now compares the running version with the latest GitHub release.
 - **Meta-Analysis Notifications**: When the synthesis is too long for Discord/Apprise, the notification uses the stored status, TL;DR and key points directly instead of a second LLM call.
 - **Preview Exclusions & Annotations**: Manual meta-analysis runs now send the excluded analysis IDs and annotations; the aggregation is done server-side (the previous free-text context is still accepted).
 
