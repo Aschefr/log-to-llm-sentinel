@@ -105,6 +105,10 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN log_rotation_limit_mb INTEGER DEFAULT 10",
         # LLM-P0: lignes brutes ayant déclenché l'analyse (rejouables par le retry)
         "ALTER TABLE analyses ADD COLUMN triggered_lines_json TEXT DEFAULT NULL",
+        # LLM-P2: sortie structurée + prompt envoyé
+        "ALTER TABLE analyses ADD COLUMN summary TEXT DEFAULT NULL",
+        "ALTER TABLE analyses ADD COLUMN analysis_json TEXT DEFAULT NULL",
+        "ALTER TABLE analyses ADD COLUMN prompt_json TEXT DEFAULT NULL",
     ]
 
     with engine.connect() as conn:

@@ -8,9 +8,17 @@ from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
 from app.services.ollama_service import OllamaService
 from app.services.notification_service import NotificationService
-from app.utils.log_utils import clean_log_line
+from app.services.app_config import config_to_dict, llm_options
+from app.services.alert_analysis import (build_history, build_alert_messages, messages_to_text,
+                                         parse_alert_response, detect_severity)
+from app.services.log_source import find_context
+from app.services.prompts import ALERT_SCHEMA, label
+from app.utils.log_utils import clean_log_line, aggregate_lines, line_signature
 from app import logger
 from app.utils.notification_i18n import nt
+
+# Nombre max de lignes brutes conservées par analyse (prompt, retry, récurrence)
+MAX_STORED_LINES = 100
 
 
 class Orchestrator:
@@ -126,42 +134,13 @@ class Orchestrator:
             if not rule or not rule.enabled:
                 return
 
-            config = db.query(GlobalConfig).first()
-            config_dict = {
-                "smtp_host": config.smtp_host if config else "",
-                "smtp_port": config.smtp_port if config else 587,
-                "smtp_user": config.smtp_user if config else "",
-                "smtp_password": config.smtp_password if config else "",
-                "smtp_recipient": config.smtp_recipient if config else "",
-                "smtp_tls": config.smtp_tls if config else True,
-                "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
-                "ollama_url": config.ollama_url if config and config.ollama_url else "http://ollama:11434",
-                "ollama_model": config.ollama_model if config and config.ollama_model else "gemma4:e4b",
-                "ollama_temp": config.ollama_temp if config else 0.1,
-                "ollama_ctx": config.ollama_ctx if config else 4096,
-                "ollama_think": config.ollama_think if config else True,
-                "system_prompt": config.system_prompt if config else "",
-                "notification_method": config.notification_method if config else "smtp",
-                "apprise_url": config.apprise_url if config else "",
-                "apprise_tags": config.apprise_tags if config else "",
-                "apprise_max_chars": config.apprise_max_chars if config else 1900,
-                "max_log_chars": config.max_log_chars if config else 5000,
-                "debug_mode": config.debug_mode if config else False,
-                "instance_name": config.instance_name if config else "",
-                "discord_webhook_url": config.discord_webhook_url if config else "",
-                "ollama_prompt_lang": (config.ollama_prompt_lang or "fr") if config else "fr",
-                "site_lang": (config.site_lang or "fr") if config else "fr",
-            }
+            config_dict = config_to_dict(db.query(GlobalConfig).first())
 
-            max_chars = config_dict.get("max_log_chars", 5000)
-            lang = config_dict.get("ollama_prompt_lang", "fr")
-
-            # On ne conserve que les 30 dernières lignes brutes (seules utilisées dans le prompt)
-            raw_lines = {"total": len(lines), "window_s": buffer_delay, "lines": lines[-30:]}
-            text = self.bundle_lines(raw_lines["lines"], raw_lines["total"], buffer_delay, max_chars, lang)
+            # Lignes brutes conservées (bornées) : servent au prompt, au retry et à la récurrence
+            raw_lines = {"total": len(lines), "window_s": buffer_delay, "lines": lines[-MAX_STORED_LINES:]}
             if len(lines) > 1:
-                logger.info("Orchestrator", f"Envoi groupé pour '{rule.name}' : {len(lines)} lignes ({len(text)} chars)")
-            await self._process_match(rule, text, config_dict, db, detection_id, matched_keywords, raw_lines)
+                logger.info("Orchestrator", f"Envoi groupé pour '{rule.name}' : {len(lines)} lignes")
+            await self._process_match(rule, raw_lines, config_dict, db, detection_id, matched_keywords)
         except Exception as e:
             logger.error("Orchestrator", f"Erreur lors du flush buffer : {e}")
         finally:
@@ -169,8 +148,9 @@ class Orchestrator:
 
     @staticmethod
     def bundle_lines(lines: List[str], total_lines: int, buffer_delay: int, max_chars: int, lang: str = 'fr') -> str:
-        """Construit le texte envoyé au LLM à partir des lignes brutes, dans l'ordre chronologique.
-        Les lignes les plus récentes sont prioritaires si la limite de caractères est atteinte."""
+        """Construit le bloc d'événements à partir des lignes brutes, dans l'ordre chronologique.
+        Les lignes identiques à des valeurs variables près sont regroupées ([×N], dernière occurrence affichée).
+        Les groupes les plus récents sont prioritaires si la limite de caractères est atteinte."""
         if len(lines) == 1:
             line = clean_log_line(lines[0])
             if len(line) > max_chars:
@@ -178,16 +158,15 @@ class Orchestrator:
                 line = line[:max_chars] + "... [TRONQUÉ]"
             return line
 
-        cleaned = [clean_log_line(l) for l in lines]
-        header = (f"These {total_lines} matching events appeared in the last {buffer_delay} seconds. Here are the most recent, in chronological order:\n"
-                  if lang == 'en' else
-                  f"Ces {total_lines} événements correspondants sont apparus dans les {buffer_delay} dernières secondes. Voici les plus récents, dans l'ordre chronologique :\n")
+        groups = aggregate_lines(lines)
+        header = label(lang, "group_header", total=total_lines, delay=buffer_delay, distinct=len(groups)) + "\n"
+        rendered = [(f"[×{g['count']}] " if g["count"] > 1 else "") + clean_log_line(g["example"]) for g in groups]
 
         # Sélection du plus récent au plus ancien tant que le budget le permet
         selected = []
         current_length = len(header)
         truncated = False
-        for line in reversed(cleaned):
+        for line in reversed(rendered):
             if current_length + len(line) + 1 > max_chars:
                 if not selected:
                     # Guarantee at least 1 line even if it must be truncated
@@ -199,65 +178,84 @@ class Orchestrator:
 
         text = header + "".join(f"\n{l}" for l in reversed(selected))
         if truncated:
-            text += f"\n... [Tronqué : limite de {max_chars} caractères atteinte ({total_lines} événements détectés)]"
+            text += "\n" + label(lang, "group_truncated", max_chars=max_chars, total=total_lines)
         return text
 
-    async def _process_match(self, rule: Rule, line: str, config: dict, db,
-                              detection_id: str = None, matched_keywords: list = None,
-                              raw_lines: dict = None):
-        """Traite une ligne correspondante."""
-        # 1. Préparer le contexte
-        context_before = []
-        context_after = []
-        # Note: Dans une implémentation complète, on récupérerait le contexte depuis le fichier.
-        # Ici, on simule ou on utilise les lignes disponibles si possible.
-        # Pour simplifier, on passe le contexte vide ou on le récupère si disponible.
-
-        # 2. Construire le prompt
+    async def analyze_alert(self, rule: Rule, raw_lines: dict, config: dict, db,
+                            matched_keywords: Optional[list] = None, detection_id: Optional[str] = None,
+                            ref_time: Optional[datetime] = None, exclude_id: Optional[int] = None,
+                            context: Optional[dict] = None) -> dict:
+        """
+        Pipeline d'analyse d'une alerte, commun aux détections automatiques, au retry, à l'analyse manuelle
+        et au test de règle : bloc d'événements + contexte de la source + historique → LLM (sortie structurée).
+        Retourne {"events_text", "context", "markdown", "severity", "summary", "data", "messages"}.
+        """
         lang = config.get("ollama_prompt_lang", "fr")
-        prompt = self._build_prompt(rule, line, config.get("system_prompt", ""), lang=lang)
+        ref_time = ref_time or datetime.utcnow()
+        events_text = self.bundle_lines(raw_lines["lines"], raw_lines["total"], raw_lines.get("window_s", 0),
+                                        config.get("max_log_chars", 5000), lang)
+        if context is None and rule.context_lines:
+            context = await asyncio.to_thread(find_context, rule.log_file_path, raw_lines["lines"],
+                                              rule.context_lines, rule.context_lines)
+        signatures = {line_signature(l) for l in raw_lines["lines"]}
+        history = build_history(db, rule.id, signatures, ref_time, exclude_id=exclude_id)
+        messages = build_alert_messages(rule, events_text, matched_keywords, context, history, config, ref_time)
 
-        # 3. Appeler Ollama (sous verrou pour éviter de surcharger le CPU)
-        logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | ligne={line[:80]}")
-        # 3. Appeler Ollama (en streaming asynchrone pour éviter les timeouts)
-        logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | ligne={line[:80]}")
+        logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | {len(messages[1]['content'])} car.")
         async with self._ollama_semaphore:
             try:
-                response = await asyncio.wait_for(
-                    self.ollama.analyze_async(
-                        prompt=prompt,
+                res = await asyncio.wait_for(
+                    self.ollama.chat(
+                        messages,
                         url=config.get("ollama_url"),
                         model=config.get("ollama_model"),
                         think=config.get("ollama_think", True),
-                        options={
-                            "temperature": config.get("ollama_temp", 0.1),
-                            "num_ctx": config.get("ollama_ctx", 4096)
-                        }
+                        options=llm_options(config),
+                        format=ALERT_SCHEMA,
                     ),
                     timeout=300.0
                 )
             except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
-        logger.debug("Orchestrator", f"Réponse Ollama reçue : {response[:200]}")
-        logger.add_ollama_log(prompt, response, detection_id)
+                res = {"content": "", "error": "Délai d'attente dépassé (300s)"}
 
-        # 4. Déterminer la sévérité (simple heuristic ou parsing de la réponse)
-        severity = self._detect_severity(response)
+        if res.get("error") or not res.get("content"):
+            markdown = f"[Erreur Ollama] {res.get('error') or 'Aucune réponse'}"
+            parsed = {"markdown": markdown, "severity": "info", "summary": None, "data": None}
+        else:
+            parsed = parse_alert_response(res["content"], lang)
+        logger.debug("Orchestrator", f"Réponse Ollama reçue : {parsed['markdown'][:200]}")
+        logger.add_ollama_log(messages_to_text(messages), parsed["markdown"], detection_id)
+        return {"events_text": events_text, "context": context, "messages": messages, **parsed}
 
-        # 5. Sauvegarder en BDD
+    @staticmethod
+    def apply_result(analysis: Analysis, result: dict):
+        """Reporte le résultat d'analyze_alert sur une Analysis (création ou retry)."""
+        analysis.triggered_line = result["events_text"]
+        analysis.ollama_response = result["markdown"]
+        analysis.severity = result["severity"]
+        analysis.summary = result["summary"]
+        analysis.analysis_json = json.dumps(result["data"], ensure_ascii=False) if result["data"] else None
+        analysis.prompt_json = json.dumps(result["messages"], ensure_ascii=False)
+        ctx = result.get("context") or {}
+        analysis.context_before_json = json.dumps(ctx.get("before") or [], ensure_ascii=False)
+        analysis.context_after_json = json.dumps(ctx.get("after") or [], ensure_ascii=False)
+
+    async def _process_match(self, rule: Rule, raw_lines: dict, config: dict, db,
+                              detection_id: str = None, matched_keywords: list = None):
+        """Analyse un groupe de lignes correspondantes, sauvegarde et notifie."""
+        result = await self.analyze_alert(rule, raw_lines, config, db,
+                                          matched_keywords=matched_keywords, detection_id=detection_id)
+        severity = result["severity"]
+
         analysis = Analysis(
             rule_id=rule.id,
             detection_id=detection_id,
-            triggered_line=line,
-            triggered_lines_json=json.dumps(raw_lines) if raw_lines else None,
+            triggered_lines_json=json.dumps(raw_lines, ensure_ascii=False),
             matched_keywords_json=json.dumps(matched_keywords or []),
-            context_before_json="[]",
-            context_after_json="[]",
-            ollama_response=response,
-            severity=severity,
             notified=False,
             analyzed_at=datetime.utcnow(),
         )
+        self.apply_result(analysis, result)
         db.add(analysis)
         db.commit()
         db.refresh(analysis)
@@ -290,7 +288,6 @@ class Orchestrator:
         response = analysis.ollama_response
         matched_keywords = []
         if analysis.matched_keywords_json:
-            import json
             matched_keywords = json.loads(analysis.matched_keywords_json)
             
         lang = config.get("site_lang", config.get("ollama_prompt_lang", "fr"))
@@ -333,7 +330,23 @@ class Orchestrator:
         notify_body = body
         lang = config.get("ollama_prompt_lang", "fr")
 
-        if config.get("notification_method") in ("apprise", "discord") and len(body) > max_chars:
+        is_short_channel = config.get("notification_method") in ("apprise", "discord")
+        if is_short_channel and len(body) > max_chars and analysis.summary:
+            # Résumé structuré déjà produit par l'analyse : pas de second appel LLM
+            notify_body = f"""### {severity_emoji} {nt('alert', lang)} Sentinel ({nt('analysis_summary', lang)}) : {rule.name}
+**ID:** `{detection_id or 'N/A'}` | **{nt('severity', lang)}:** {severity.upper()}
+
+**{nt('analysis_summary', lang)} :**
+{analysis.summary}
+"""
+            actions = (json.loads(analysis.analysis_json).get("actions") or []) if analysis.analysis_json else []
+            footer = f"\n{nt('full_analysis_available', lang)}"
+            if actions:
+                actions_block = f"\n**{label(lang, 'actions')} :**\n" + "\n".join(f"{i}. {a}" for i, a in enumerate(actions, 1)) + "\n"
+                if len(notify_body) + len(actions_block) + len(footer) <= max_chars:
+                    notify_body += actions_block
+            notify_body += footer
+        elif is_short_channel and len(body) > max_chars:
             logger.debug("Notification", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
             summary_prompt = nt('summary_prompt', lang).format(max_chars=max_chars - 500, response=response)
             async with self._ollama_semaphore:
@@ -411,30 +424,5 @@ class Orchestrator:
         return base_prompt
 
     def _detect_severity(self, response: str) -> str:
-        """Détermine la sévérité à partir de la réponse Ollama."""
-        # Priorité : chercher le tag explicite demandé dans le prompt
-        lines = response.splitlines()
-        for line in lines[:10]: # On regarde les premières lignes
-            l = line.upper()
-            if "SEVERITY:" in l:
-                if "CRITICAL" in l: return "critical"
-                if "WARNING" in l: return "warning"
-                if "INFO" in l: return "info"
-
-        # Fallback : recherche heuristique plus stricte
-        lower_resp = response.lower()
-        # On cherche des mentions isolées ou en début de phrase pour éviter les faux positifs
-        # comme "ce n'est pas une erreur CRITICAL"
-        if "severity: critical" in lower_resp or "sévérité: critical" in lower_resp:
-            return "critical"
-        if "severity: warning" in lower_resp or "sévérité: warning" in lower_resp:
-            return "warning"
-        if "severity: info" in lower_resp or "sévérité: info" in lower_resp:
-            return "info"
-            
-        # Ultime fallback (moins fiable)
-        if "critical" in lower_resp or "urgent" in lower_resp:
-            return "critical"
-        elif "warning" in lower_resp or "warn" in lower_resp:
-            return "warning"
-        return "info"
+        """Détermine la sévérité à partir d'une réponse texte libre (voir alert_analysis.detect_severity)."""
+        return detect_severity(response)

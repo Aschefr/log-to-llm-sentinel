@@ -2,11 +2,14 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+import asyncio
+import json
 import os
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
 from app.services.orchestrator import Orchestrator
+from app.services.app_config import config_to_dict
 from app.utils.log_utils import clean_log_line
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
@@ -349,69 +352,28 @@ async def test_rule(rule_id: int, request: Request):
         last_line = last_lines[-1]
         logger.debug("TestRule", f"Dernière ligne : {last_line[:120]}")
 
-        config = db.query(GlobalConfig).first()
-        config_dict = {
-            "smtp_host": config.smtp_host if config else "",
-            "smtp_port": config.smtp_port if config else 587,
-            "smtp_user": config.smtp_user if config else "",
-            "smtp_password": config.smtp_password if config else "",
-            "smtp_recipient": config.smtp_recipient if config else "",
-            "smtp_tls": config.smtp_tls if config else True,
-            "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
-            "ollama_url": config.ollama_url if config and config.ollama_url else "http://ollama:11434",
-            "ollama_model": config.ollama_model if config and config.ollama_model else "gemma4:e4b",
-            "ollama_temp": config.ollama_temp if config else 0.1,
-            "ollama_ctx": config.ollama_ctx if config else 4096,
-            "ollama_think": config.ollama_think if config else True,
-            "system_prompt": config.system_prompt if config else "",
-            "notification_method": config.notification_method if config else "smtp",
-            "apprise_url": config.apprise_url if config else "",
-            "apprise_tags": config.apprise_tags if config else "",
-            "apprise_max_chars": config.apprise_max_chars if config else 1900,
-            "debug_mode": config.debug_mode if config else False,
-            "discord_webhook_url": config.discord_webhook_url if config else "",
-            "ollama_prompt_lang": config.ollama_prompt_lang if config else "fr",
-            "site_lang": config.site_lang if config else "fr",
-            "instance_name": config.instance_name if config else "",
-        }
+        config_dict = config_to_dict(db.query(GlobalConfig).first())
 
-        cleaned_context = [clean_log_line(l) for l in last_lines[:-1]]
-        cleaned_last_line = clean_log_line(last_line)
-        prompt = orchestrator._build_prompt(rule, cleaned_last_line, config_dict.get("system_prompt", ""), context_lines=cleaned_context)
+        # Même pipeline qu'en production ; les lignes précédentes servent de contexte
+        raw = {"total": 1, "window_s": 0, "lines": [last_line]}
+        context = {"before": [clean_log_line(l) for l in last_lines[:-1]], "between": None, "after": []}
         logger.debug("TestRule", f"Envoi à Ollama (via stream) — modèle={config_dict.get('ollama_model')}")
 
         from app.routers.utils import cancel_on_disconnect
-        async with orchestrator._ollama_semaphore:
-            try:
-                coro = orchestrator.ollama.analyze_async(
-                    prompt=prompt,
-                    url=config_dict.get("ollama_url"),
-                    model=config_dict.get("ollama_model"),
-                    think=config_dict.get("ollama_think", True),
-                    options={
-                        "temperature": config_dict.get("ollama_temp", 0.1),
-                        "num_ctx": config_dict.get("ollama_ctx", 4096)
-                    }
-                )
-                response = await cancel_on_disconnect(
-                    request,
-                    asyncio.wait_for(coro, timeout=300.0)
-                )
-            except asyncio.TimeoutError:
-                response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
-        logger.debug("TestRule", f"Réponse Ollama reçue ({len(response)} chars)")
-        severity = orchestrator._detect_severity(response)
-        logger.debug("TestRule", f"Sévérité détectée : {severity}")
+        result = await cancel_on_disconnect(
+            request,
+            orchestrator.analyze_alert(rule, raw, config_dict, db, context=context)
+        )
+        response = result["markdown"]
+        severity = result["severity"]
+        logger.debug("TestRule", f"Réponse Ollama reçue ({len(response)} chars), sévérité : {severity}")
 
         analysis = Analysis(
             rule_id=rule.id,
-            triggered_line=last_line,
-            context_before_json="[]",
-            context_after_json="[]",
-            ollama_response=response,
-            severity=severity,
+            triggered_lines_json=json.dumps(raw, ensure_ascii=False),
             notified=False,
         )
+        orchestrator.apply_result(analysis, result)
         db.add(analysis)
         db.commit()
         db.refresh(analysis)
@@ -468,7 +430,9 @@ _Ceci est un test manuel depuis l'interface Log to LLM Sentinel._
             max_chars = config_dict.get("apprise_max_chars", 1900)
             notify_body = body
 
-            if config_dict.get("notification_method") in ("apprise", "discord") and len(body) > max_chars:
+            if config_dict.get("notification_method") in ("apprise", "discord") and len(body) > max_chars and analysis.summary:
+                summary = analysis.summary  # résumé structuré déjà produit par l'analyse
+            elif config_dict.get("notification_method") in ("apprise", "discord") and len(body) > max_chars:
                 logger.debug("TestRule", f"Analyse trop longue ({len(body)} chars), demande de résumé simplifié à Ollama...")
                 summary_prompt = f"Résume cette analyse de log :\n{response}"
                 async with orchestrator._ollama_semaphore:
@@ -484,6 +448,7 @@ _Ceci est un test manuel depuis l'interface Log to LLM Sentinel._
                         )
                     except asyncio.TimeoutError:
                         summary = "[Erreur Ollama] Délai d'attente dépassé pour le résumé (60s)"
+            if config_dict.get("notification_method") in ("apprise", "discord") and len(body) > max_chars:
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     notify_body = f"""### 🧪 Test Log to LLM Sentinel (Résumé) : {rule.name}
 **{nt('severity', lang)}:** {severity.upper()}

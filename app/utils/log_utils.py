@@ -1,4 +1,45 @@
 import json
+import re
+
+# Normalisation des parties variables d'une ligne de log (horodatages, IP, PID, identifiants…).
+# Les petits nombres (< 4 chiffres) sont conservés : codes d'erreur / HTTP significatifs (error 13, 500).
+_SIG_REPEATED = re.compile(r"message repeated \d+ times: \[\s*(.*?)\s*\]\s*$")
+_SIG_RULES = [
+    (re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?"), "<TS>"),
+    (re.compile(r"\b[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b"), "<TS>"),
+    (re.compile(r"\b\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\b"), "<TS>"),
+    (re.compile(r"^<\d+>"), ""),
+    (re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"), "<ID>"),
+    (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b"), "<IP>"),
+    (re.compile(r"\b(?=[0-9a-fA-F]*\d)(?=[0-9a-fA-F]*[a-fA-F])[0-9a-fA-F]{8,}\b"), "<HEX>"),
+    (re.compile(r"\[\d+\]"), "[<N>]"),
+    (re.compile(r"\b\d{4,}\b"), "<N>"),
+    (re.compile(r"\s+"), " "),
+]
+
+
+def line_signature(line: str) -> str:
+    """Gabarit d'une ligne : deux occurrences d'un même événement ont la même signature."""
+    # "message repeated N times: [ X ]" → X, en gardant le préfixe (horodatage, hôte, processus)
+    sig = _SIG_REPEATED.sub(r"\1", clean_log_line(line).strip())
+    for pattern, repl in _SIG_RULES:
+        sig = pattern.sub(repl, sig)
+    return sig.strip()[:300]
+
+
+def aggregate_lines(lines: list) -> list:
+    """Regroupe des lignes par signature, dans l'ordre de première apparition.
+    Retourne [{"signature", "count", "example"}] où example est l'occurrence la plus récente."""
+    groups = {}
+    for line in lines:
+        sig = line_signature(line)
+        if sig in groups:
+            groups[sig]["count"] += 1
+            groups[sig]["example"] = line
+        else:
+            groups[sig] = {"signature": sig, "count": 1, "example": line}
+    return list(groups.values())
+
 
 def clean_log_line(line: str) -> str:
     """Tente de nettoyer une ligne de log si elle est au format JSON (ex: Nextcloud)."""

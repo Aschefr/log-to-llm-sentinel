@@ -170,6 +170,9 @@ class Analysis(Base):
     context_before_json = Column(Text, default="[]")
     context_after_json = Column(Text, default="[]")
     ollama_response = Column(Text)
+    summary = Column(Text, nullable=True)        # Résumé court (sortie structurée) — notifications, méta-analyse
+    analysis_json = Column(Text, nullable=True)  # Réponse structurée brute du LLM
+    prompt_json = Column(Text, nullable=True)    # Messages exacts envoyés au LLM (audit)
     severity = Column(String, default="info")
     notified = Column(Boolean, default=False)
     viewed = Column(Boolean, default=False)

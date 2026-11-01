@@ -26,16 +26,8 @@ def set_orchestrator(o):
     global _orchestrator
     _orchestrator = o
 
-def _get_config_dict(config):
-    if not config: return {}
-    return {
-        "ollama_url": config.ollama_url,
-        "ollama_model": config.ollama_model,
-        "ollama_temp": config.ollama_temp,
-        "ollama_ctx": config.ollama_ctx,
-        "ollama_think": config.ollama_think,
-        "system_prompt": config.system_prompt,
-    }
+# Alias conservé pour les appelants existants (une seule définition, complète : voir app_config)
+from app.services.app_config import config_to_dict as _get_config_dict
 
 @router.post("/pull-model")
 async def pull_model(data: dict):
@@ -240,35 +232,6 @@ def update_site_lang(data: dict):
         return {"ok": True, "site_lang": lang}
     finally:
         db.close()
-
-def _get_config_dict(config: Optional[GlobalConfig]) -> dict:
-    return {
-        "smtp_host": config.smtp_host if config else "",
-        "smtp_port": config.smtp_port if config else 587,
-        "smtp_user": config.smtp_user if config else "",
-        "smtp_password": config.smtp_password if config else "",
-        "smtp_recipient": config.smtp_recipient if config else "",
-        "smtp_tls": config.smtp_tls if config else True,
-        "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
-        "ollama_url": config.ollama_url if config and config.ollama_url else "http://ollama:11434",
-        "ollama_model": config.ollama_model if config and config.ollama_model else "gemma4:e4b",
-        "system_prompt": config.system_prompt if config else "",
-        "notification_method": config.notification_method if config else "smtp",
-        "apprise_url": config.apprise_url if config else "",
-        "apprise_tags": config.apprise_tags if config else "",
-        "apprise_max_chars": config.apprise_max_chars if config else 1900,
-        "max_log_chars": config.max_log_chars if config else 5000,
-        "monitor_log_lines": config.monitor_log_lines if config else 60,
-        "debug_mode": config.debug_mode if config else False,
-        "ollama_prompt_lang": (config.ollama_prompt_lang or 'fr') if config else 'fr',
-        "site_lang": (config.site_lang or 'fr') if config else 'fr',
-        "instance_name": (config.instance_name or '') if config else '',
-        "discord_webhook_url": (config.discord_webhook_url or '') if config else '',
-        "auto_delete_analyses": config.auto_delete_analyses if config else False,
-        "auto_delete_retention_days": config.auto_delete_retention_days if config else 30,
-        "syslog_enabled": config.syslog_enabled if config else False,
-        "syslog_forward_addr": (config.syslog_forward_addr or '') if config else '',
-    }
 
 
 @router.post("/test/ollama")

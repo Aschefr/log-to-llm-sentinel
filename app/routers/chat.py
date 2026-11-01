@@ -123,10 +123,10 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
     }
 
 
-def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
+def build_chat_messages(conv_id: int, db: Session) -> tuple[list, int]:
     conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
     if not conv:
-        return "", 4096
+        return [], 4096
         
     history_query = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id)
     if conv.compressed_at:
@@ -193,16 +193,29 @@ def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
     if mode_text:
         block_lines.append(mode_text)
 
-    prompt = "\n".join(block_lines).strip() + "\n\n" if block_lines else ""
+    system = "\n".join(block_lines).strip()
+    messages = [{"role": "system", "content": system}] if system else []
 
-    # 3. Ajouter l'historique de la conversation
+    # 3. Ajouter l'historique de la conversation (vrais rôles user / assistant)
     # On limite à 20 messages récents au lieu de 10 car le contexte est géré
     for m in history[-20:]:
-        role_label = "Utilisateur" if m.role == "user" else "Assistant"
-        prompt += f"{role_label} : {m.content}\n"
-    
+        messages.append({"role": "assistant" if m.role == "assistant" else "user", "content": m.content})
+
     ollama_ctx = cfg.ollama_ctx if cfg else 4096
-    
+
+    return messages, ollama_ctx
+
+
+def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
+    """Représentation texte des messages du chat (affichage et estimation du contexte côté interface)."""
+    messages, ollama_ctx = build_chat_messages(conv_id, db)
+    prompt = ""
+    for m in messages:
+        if m["role"] == "system":
+            prompt += m["content"] + "\n\n"
+        else:
+            role_label = "Utilisateur" if m["role"] == "user" else "Assistant"
+            prompt += f"{role_label} : {m['content']}\n"
     return prompt, ollama_ctx
 
 
@@ -436,9 +449,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     db.commit()
 
     # 2. Construire le contexte
-    prompt, ollama_ctx = build_chat_prompt(conv_id, db)
-    prompt += "Assistant : "
-
+    messages, ollama_ctx = build_chat_messages(conv_id, db)
 
     cfg = db.query(GlobalConfig).first()
     ollama_url    = (cfg.ollama_url    or "http://ollama:11434") if cfg else "http://ollama:11434"
@@ -456,7 +467,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
         _run_chat_generation(
             entry=entry,
             conv_id=conv_id,
-            prompt=prompt,
+            messages=messages,
             ollama_url=ollama_url,
             ollama_model=ollama_model,
             ollama_temp=ollama_temp,
@@ -471,7 +482,7 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
 async def _run_chat_generation(
     entry: ChatTaskEntry,
     conv_id: int,
-    prompt: str,
+    messages: list,
     ollama_url: str,
     ollama_model: str,
     ollama_temp: float,
@@ -494,7 +505,8 @@ async def _run_chat_generation(
 
         async with _orchestrator._ollama_semaphore:
             async for chunk in _orchestrator.ollama.generate_stream(
-                prompt=prompt,
+                prompt=None,
+                messages=messages,
                 url=ollama_url,
                 model=ollama_model,
                 think=ollama_think,
