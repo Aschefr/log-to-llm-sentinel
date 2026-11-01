@@ -346,7 +346,16 @@
     "disable_title": "Disable",
     "mode_truncate": "Truncate",
     "mode_compact": "Compact",
-    "mode_summary": "AI Summary"
+    "mode_summary": "AI Summary",
+    "tools_used": "Tools used",
+    "tool_lines": "lines",
+    "action_proposed": "Proposed action",
+    "action_apply": "Apply",
+    "action_reject": "Decline",
+    "action_status_pending": "Awaiting your confirmation",
+    "action_status_applied": "Applied",
+    "action_status_rejected": "Declined",
+    "action_status_failed": "Failed"
   },
   "config": {
     "title": "Global Configuration",
@@ -505,7 +514,9 @@
     "save": "Save",
     "edit": "Edit",
     "time_ago": "ago",
-    "download": "Download"
+    "download": "Download",
+    "investigate": "Investigate",
+    "investigate_title": "Start a guided investigation: the AI reads the logs, recurrence and correlated events"
   },
   "meta": {
     "title": "Meta-Analysis",

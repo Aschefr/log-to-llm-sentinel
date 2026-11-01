@@ -8,7 +8,11 @@ import asyncio
 import json
 
 from app.database import SessionLocal
-from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessage, ChatCompression
+from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessage, ChatCompression, ChatAction
+from app.services.app_config import config_to_dict
+from app.services.chat_agent import run_agent_turn, replay_tool_messages, AgentLimits
+from app.services.llm_tools import apply_action, action_to_dict
+from app.services.prompts import CHAT_ANALYSIS_CONTEXT, CHAT_TOOLS_INSTRUCTIONS, INVESTIGATION_PROMPT
 from app.services.orchestrator import Orchestrator
 from app.services.task_manager import task_manager, ChatTaskEntry
 from app import logger
@@ -89,10 +93,23 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
         a = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
         if a:
             analysis = {
+                "id": a.id,
                 "triggered_line": a.triggered_line,
                 "ollama_response": a.ollama_response,
                 "detection_id": a.detection_id
             }
+
+    # Trace des outils (libellés seulement) et actions proposées, pour l'affichage
+    lang = _chat_lang(db.query(GlobalConfig).first())
+    def _meta(m):
+        if not m.metadata_json:
+            return None
+        meta = json.loads(m.metadata_json)
+        return {"tools": [{"label": t.get("label") or t["name"], "error": str(t.get("result", "")).startswith("Erreur")}
+                          for t in meta.get("tools") or []],
+                "actions": meta.get("actions") or []}
+    actions = {a.id: action_to_dict(a, lang)
+               for a in db.query(ChatAction).filter(ChatAction.conversation_id == conv_id).all()}
             
     # 09-B : récupérer l'historique des compressions
     compressions = db.query(ChatCompression).filter(
@@ -117,31 +134,55 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
             for c in compressions
         ],
         "messages": [
-            {"id": m.id, "role": m.role, "content": m.content, "created_at": m.created_at.isoformat()}
+            {"id": m.id, "role": m.role, "content": m.content, "created_at": m.created_at.isoformat(), "meta": _meta(m)}
             for m in messages
-        ]
+        ],
+        "actions": actions,
     }
 
 
-def build_chat_messages(conv_id: int, db: Session) -> tuple[list, int]:
+def _chat_lang(cfg) -> str:
+    return cfg.chat_lang if cfg and cfg.chat_lang else "fr"
+
+
+def _analysis_block(analysis: Analysis, rule: Optional[Rule], lang: str) -> list:
+    """Contexte complet de l'analyse liée à la conversation (événements, contexte de la source, analyse)."""
+    en = lang == "en"
+    lines = [CHAT_ANALYSIS_CONTEXT.get(lang, CHAT_ANALYSIS_CONTEXT["fr"]), ""]
+    if rule:
+        lines.append(f"=== {'Rule' if en else 'Règle'} #{rule.id} : {rule.name} ===")
+        if rule.application_context:
+            lines.append(f"{'Application' if en else 'Application'} : {rule.application_context}")
+    lines.append(f"{'Analysis' if en else 'Analyse'} #{analysis.id} [{analysis.detection_id or '-'}] — "
+                 f"{analysis.analyzed_at.strftime('%Y-%m-%d %H:%M') if analysis.analyzed_at else '?'} UTC — {analysis.severity}")
+    lines += ["", f"=== {'Triggering events' if en else 'Événements déclencheurs'} ===", analysis.triggered_line or ""]
+    before = json.loads(analysis.context_before_json or "[]")
+    after = json.loads(analysis.context_after_json or "[]")
+    if before or after:
+        lines += ["", f"=== {'Context in the source' if en else 'Contexte dans la source'} ===", *before,
+                  f"[… {'triggering events above' if en else 'événements déclencheurs ci-dessus'} …]", *after]
+    lines += ["", f"=== {'Initial analysis' if en else 'Analyse initiale'} ===", analysis.ollama_response or "", ""]
+    return lines
+
+
+def build_chat_messages(conv_id: int, db: Session, with_tools: bool = False) -> tuple[list, int]:
     conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
     if not conv:
         return [], 4096
-        
+
     history_query = db.query(ChatMessage).filter(ChatMessage.conversation_id == conv_id)
     if conv.compressed_at:
         history_query = history_query.filter(ChatMessage.created_at > conv.compressed_at)
     history = history_query.order_by(ChatMessage.created_at.asc()).all()
-    
+
     # 1. Charger la configuration de base (System Prompt & Mode Text)
     cfg = db.query(GlobalConfig).first()
     system_prompt = cfg.chat_system_prompt.strip() if cfg and cfg.chat_system_prompt else ""
-    lang = cfg.chat_lang if cfg and cfg.chat_lang else "fr"
+    lang = _chat_lang(cfg)
     lang_file = f"static/i18n/{lang}.json"
     mode_text = ""
-    
-    import os, json
-    from datetime import datetime
+
+    import os
     if os.path.exists(lang_file):
         with open(lang_file, 'r', encoding='utf-8-sig') as f:
             lang_data = json.load(f)
@@ -152,9 +193,10 @@ def build_chat_messages(conv_id: int, db: Session) -> tuple[list, int]:
     rules_lines = []
     for r in active_rules:
         ctx = f" (Context: {r.application_context})" if r.application_context else ""
-        rules_lines.append(f"- {r.name}{ctx}")
+        status = f" — {r.alert_status}" if r.alert_status and r.alert_status != "normal" else ""
+        rules_lines.append(f"- #{r.id} {r.name}{ctx}{status}")
     rules_list_str = "\n".join(rules_lines) if rules_lines else "- Aucune règle configurée"
-    
+
     if mode_text:
         mode_text = mode_text.replace("{datetime}", current_dt)
         mode_text = mode_text.replace("{lang}", lang.upper())
@@ -164,7 +206,7 @@ def build_chat_messages(conv_id: int, db: Session) -> tuple[list, int]:
     block_lines = []
     if system_prompt:
         block_lines.extend([system_prompt, ""])
-        
+
     if conv.compressed_context:
         block_lines.extend([
             "=== Contexte Compressé ===",
@@ -175,30 +217,24 @@ def build_chat_messages(conv_id: int, db: Session) -> tuple[list, int]:
         analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
         if analysis:
             rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
-            block_lines.extend([
-                "Tu es un assistant expert en systèmes Linux, Docker et infrastructure.",
-                "Une analyse de log a été effectuée. L'utilisateur te pose des questions de suivi.",
-                "",
-                f"=== Règle : {rule.name if rule else 'Inconnue'} ===",
-                f"Application : {rule.application_context if rule else ''}",
-                "",
-                "=== Ligne de log concernée ===",
-                analysis.triggered_line,
-                "",
-                "=== Analyse initiale ===",
-                analysis.ollama_response,
-                ""
-            ])
+            block_lines.extend(_analysis_block(analysis, rule, lang))
 
     if mode_text:
         block_lines.append(mode_text)
+    if with_tools:
+        block_lines.extend(["", CHAT_TOOLS_INSTRUCTIONS.get(lang, CHAT_TOOLS_INSTRUCTIONS["fr"])])
 
     system = "\n".join(block_lines).strip()
     messages = [{"role": "system", "content": system}] if system else []
 
     # 3. Ajouter l'historique de la conversation (vrais rôles user / assistant)
-    # On limite à 20 messages récents au lieu de 10 car le contexte est géré
-    for m in history[-20:]:
+    # On limite à 20 messages récents au lieu de 10 car le contexte est géré.
+    # Les résultats d'outils ne sont rejoués que pour les 2 derniers tours qui en ont utilisé (budget de contexte).
+    recent = history[-20:]
+    with_trace = [m.id for m in recent if m.role == "assistant" and m.metadata_json][-2:]
+    for m in recent:
+        if m.id in with_trace:
+            messages += replay_tool_messages(json.loads(m.metadata_json).get("tools") or [])
         messages.append({"role": "assistant" if m.role == "assistant" else "user", "content": m.content})
 
     ollama_ctx = cfg.ollama_ctx if cfg else 4096
@@ -208,12 +244,14 @@ def build_chat_messages(conv_id: int, db: Session) -> tuple[list, int]:
 
 def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
     """Représentation texte des messages du chat (affichage et estimation du contexte côté interface)."""
-    messages, ollama_ctx = build_chat_messages(conv_id, db)
+    messages, ollama_ctx = build_chat_messages(conv_id, db, with_tools=True)
     prompt = ""
     for m in messages:
         if m["role"] == "system":
             prompt += m["content"] + "\n\n"
-        else:
+        elif m["role"] == "tool":
+            prompt += f"[{m.get('tool_name', 'tool')}] {m['content']}\n"
+        elif m.get("content"):
             role_label = "Utilisateur" if m["role"] == "user" else "Assistant"
             prompt += f"{role_label} : {m['content']}\n"
     return prompt, ollama_ctx
@@ -433,12 +471,12 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     """
     conv_id = data.get("conversation_id")
     content = data.get("content")
-    
+
     logger.info("ChatRouter", f"Requête reçue pour conv {conv_id}")
-    
+
     if not conv_id or not content:
         raise HTTPException(status_code=400, detail="missing_data")
-        
+
     conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation non trouvée")
@@ -448,105 +486,61 @@ async def send_message(data: dict, db: Session = Depends(get_db)):
     db.add(user_msg)
     db.commit()
 
-    # 2. Construire le contexte
-    messages, ollama_ctx = build_chat_messages(conv_id, db)
-
-    cfg = db.query(GlobalConfig).first()
-    ollama_url    = (cfg.ollama_url    or "http://ollama:11434") if cfg else "http://ollama:11434"
-    ollama_model  = (cfg.ollama_model  or "gemma4:e4b")         if cfg else "gemma4:e4b"
-    ollama_temp   = cfg.ollama_temp   if cfg else 0.1
-    ollama_ctx    = cfg.ollama_ctx    if cfg else 4096
-    ollama_think  = cfg.ollama_think  if cfg else True
-
-    # 3. Créer une tâche en arrière-plan
-    entry = task_manager.create_chat_task(conv_id)
-    task_id = entry.task_id
-
-    # 4. Lancer la génération sans attendre (fire & forget)
-    asyncio.create_task(
-        _run_chat_generation(
-            entry=entry,
-            conv_id=conv_id,
-            messages=messages,
-            ollama_url=ollama_url,
-            ollama_model=ollama_model,
-            ollama_temp=ollama_temp,
-            ollama_ctx=ollama_ctx,
-            ollama_think=ollama_think,
-        )
-    )
-
+    task_id = await _start_generation(conv_id, db)
     return {"status": "ok", "task_id": task_id}
+
+
+async def _start_generation(conv_id: int, db: Session, limits: AgentLimits = AgentLimits()) -> str:
+    """Construit le contexte et lance la génération (avec outils si le modèle les supporte) en arrière-plan."""
+    config = config_to_dict(db.query(GlobalConfig).first())
+    use_tools = False
+    if _orchestrator:
+        caps = await _orchestrator.ollama.get_capabilities(config["ollama_url"], config["ollama_model"])
+        use_tools = "tools" in caps
+    messages, _ = build_chat_messages(conv_id, db, with_tools=use_tools)
+
+    entry = task_manager.create_chat_task(conv_id)
+    # Lancer la génération sans attendre (fire & forget)
+    asyncio.create_task(_run_chat_generation(entry, conv_id, messages, config, use_tools, limits))
+    return entry.task_id
 
 
 async def _run_chat_generation(
     entry: ChatTaskEntry,
     conv_id: int,
     messages: list,
-    ollama_url: str,
-    ollama_model: str,
-    ollama_temp: float,
-    ollama_ctx: int,
-    ollama_think: bool,
+    config: dict,
+    use_tools: bool,
+    limits: AgentLimits,
 ):
     """
-    Coroutine arrière-plan : génère les tokens Ollama, les accémule dans le buffer
-    de l'entrée et sauvegarde la réponse complète en BDD à la fin.
+    Coroutine arrière-plan : génère la réponse (boucle agent avec outils), accumule tokens et événements
+    dans le buffer de l'entrée et sauvegarde la réponse complète en BDD à la fin.
     S'exécute indépendamment de la connexion HTTP du client.
     """
-    full_response = ""
-    is_thinking = False
-
     try:
         if not _orchestrator:
             entry.error = "Orchestrateur non initialisé"
             entry.status = "error"
             return
 
-        async with _orchestrator._ollama_semaphore:
-            async for chunk in _orchestrator.ollama.generate_stream(
-                prompt=None,
-                messages=messages,
-                url=ollama_url,
-                model=ollama_model,
-                think=ollama_think,
-                options={"temperature": ollama_temp, "num_ctx": ollama_ctx}
-            ):
-                if "error" in chunk:
-                    entry.error = chunk["error"]
-                    entry.status = "error"
-                    return
+        result = await run_agent_turn(
+            _orchestrator.ollama, _orchestrator._ollama_semaphore, messages, config,
+            emit_text=lambda t: task_manager.append_chat_token(entry, t),
+            emit_event=lambda e: task_manager.append_chat_token(entry, e),
+            use_tools=use_tools, conversation_id=conv_id, limits=limits,
+            lang=_chat_lang_from_config(),
+        )
 
-                text = chunk.get("message", {}).get("content", "") or chunk.get("response", "")
-                if text:
-                    if not is_thinking:
-                        if "<think>" in text:
-                            is_thinking = True
-                            to_send = text.split("<think>", 1)[0]
-                            if to_send:
-                                full_response += to_send
-                                task_manager.append_chat_token(entry, to_send)
-                        else:
-                            full_response += text
-                            task_manager.append_chat_token(entry, text)
-                    else:
-                        if "</think>" in text:
-                            is_thinking = False
-                            to_send = text.split("</think>", 1)[-1]
-                            if to_send:
-                                full_response += to_send
-                                task_manager.append_chat_token(entry, to_send)
-
-                if chunk.get("done"):
-                    break
-
-        # Sauvegarde BDD
+        # Sauvegarde BDD (la trace des outils permet de rejouer leurs résultats aux tours suivants)
         save_db = SessionLocal()
         try:
-            ai_msg = ChatMessage(conversation_id=conv_id, role="assistant", content=full_response)
+            metadata = {"tools": result.tools, "actions": result.action_ids} if result.tools else None
+            ai_msg = ChatMessage(conversation_id=conv_id, role="assistant", content=result.text,
+                                 metadata_json=json.dumps(metadata, ensure_ascii=False) if metadata else None)
             save_db.add(ai_msg)
             save_db.commit()
-            logger.info("ChatRouter", f"Réponse sauvegardée ({len(full_response)} car.)")
+            logger.info("ChatRouter", f"Réponse sauvegardée ({len(result.text)} car., {len(result.tools)} appel(s) d'outils)")
         finally:
             save_db.close()
 
@@ -558,12 +552,65 @@ async def _run_chat_generation(
         entry.status = "error"
 
 
+def _chat_lang_from_config() -> str:
+    with SessionLocal() as s:
+        return _chat_lang(s.query(GlobalConfig).first())
+
+
+@router.post("/api/investigate")
+async def investigate(data: dict, db: Session = Depends(get_db)):
+    """Crée une conversation liée à une analyse et lance une investigation guidée (limites d'outils élargies)."""
+    analysis = db.query(Analysis).filter(Analysis.id == data.get("analysis_id")).first()
+    if not analysis:
+        raise HTTPException(status_code=404, detail="analysis_not_found")
+    lang = _chat_lang(db.query(GlobalConfig).first())
+    conv = ChatConversation(title=f"🔎 Investigation #{analysis.detection_id or analysis.id}", analysis_id=analysis.id)
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    prompt = INVESTIGATION_PROMPT.get(lang, INVESTIGATION_PROMPT["fr"]).format(analysis_id=analysis.id, rule_id=analysis.rule_id)
+    db.add(ChatMessage(conversation_id=conv.id, role="user", content=prompt))
+    db.commit()
+    task_id = await _start_generation(conv.id, db, AgentLimits(max_rounds=6, max_calls=12))
+    return {"status": "ok", "id": conv.id, "task_id": task_id}
+
+
+@router.get("/api/actions/{action_id}")
+async def get_action(action_id: int, db: Session = Depends(get_db)):
+    act = db.query(ChatAction).filter(ChatAction.id == action_id).first()
+    if not act:
+        raise HTTPException(status_code=404, detail="action_not_found")
+    return action_to_dict(act, _chat_lang(db.query(GlobalConfig).first()))
+
+
+@router.post("/api/actions/{action_id}")
+async def decide_action(action_id: int, data: dict, db: Session = Depends(get_db)):
+    """Confirmation explicite de l'utilisateur : 'apply' exécute l'action proposée, 'reject' la refuse."""
+    act = db.query(ChatAction).filter(ChatAction.id == action_id).first()
+    if not act:
+        raise HTTPException(status_code=404, detail="action_not_found")
+    decision = data.get("decision")
+    if decision == "reject":
+        if act.status == "pending":
+            act.status = "rejected"
+            act.decided_at = datetime.utcnow()
+            db.commit()
+        return action_to_dict(act, _chat_lang(db.query(GlobalConfig).first()))
+    if decision != "apply":
+        raise HTTPException(status_code=400, detail="invalid_decision")
+    await apply_action(action_id)
+    db.expire_all()
+    act = db.query(ChatAction).filter(ChatAction.id == action_id).first()
+    return action_to_dict(act, _chat_lang(db.query(GlobalConfig).first()))
+
+
 @router.get("/api/stream/{task_id}")
 async def stream_chat(task_id: str, from_pos: int = 0):
     """
     Endpoint SSE reconnectable : diffuse les tokens d'une tâche chat.
     Le paramètre `from_pos` permet de reprendre là où le client s'est arrêté.
     La connexion reste ouverte jusqu'à ce que la génération soit terminée.
+    Les éléments non textuels du buffer (appels d'outils, actions proposées) sont envoyés comme `event`.
     """
     entry = task_manager.get_chat_task(task_id)
     if not entry:
@@ -577,7 +624,10 @@ async def stream_chat(task_id: str, from_pos: int = 0):
                 # Envoyer les tokens en attente (rattrapage ou nouveaux)
                 for token in buf[pos:]:
                     pos += 1
-                    yield f"data: {json.dumps({'text': token, 'pos': pos})}\n\n"
+                    if isinstance(token, dict):
+                        yield f"data: {json.dumps({'event': token, 'pos': pos})}\n\n"
+                    else:
+                        yield f"data: {json.dumps({'text': token, 'pos': pos})}\n\n"
             elif entry.status == "done":
                 yield f"data: {json.dumps({'done': True})}\n\n"
                 break
@@ -611,7 +661,8 @@ async def delete_conversation(conv_id: int, db: Session = Depends(get_db)):
     conv = db.query(ChatConversation).filter(ChatConversation.id == conv_id).first()
     if not conv:
         raise HTTPException(status_code=404, detail="Conversation non trouvée")
-    
+
+    db.query(ChatAction).filter(ChatAction.conversation_id == conv_id).delete()
     db.delete(conv)
     db.commit()
     return {"status": "ok"}

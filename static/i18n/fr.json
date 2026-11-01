@@ -346,7 +346,16 @@
     "disable_title": "Désactiver",
     "mode_truncate": "Tronquer",
     "mode_compact": "Compacter",
-    "mode_summary": "Résumé IA"
+    "mode_summary": "Résumé IA",
+    "tools_used": "Outils utilisés",
+    "tool_lines": "lignes",
+    "action_proposed": "Action proposée",
+    "action_apply": "Appliquer",
+    "action_reject": "Refuser",
+    "action_status_pending": "En attente de votre confirmation",
+    "action_status_applied": "Appliquée",
+    "action_status_rejected": "Refusée",
+    "action_status_failed": "Échec"
   },
   "config": {
     "title": "Configuration Globale",
@@ -505,7 +514,9 @@
     "save": "Enregistrer",
     "edit": "Modifier",
     "time_ago": "Il y a",
-    "download": "Télécharger"
+    "download": "Télécharger",
+    "investigate": "Investiguer",
+    "investigate_title": "Lancer une investigation guidée : l'IA consulte les logs, la récurrence et les événements corrélés"
   },
   "meta": {
     "title": "Méta-Analyse",

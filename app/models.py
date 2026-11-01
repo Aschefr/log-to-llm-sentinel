@@ -267,9 +267,24 @@ class ChatMessage(Base):
     conversation_id = Column(Integer, ForeignKey("chat_conversations.id"))
     role = Column(String) # user, assistant
     content = Column(Text)
+    metadata_json = Column(Text, nullable=True)  # {"tools": [trace des appels d'outils], "actions": [ids ChatAction]}
     created_at = Column(DateTime, default=datetime.utcnow)
 
     conversation = relationship("ChatConversation", back_populates="messages")
+
+
+class ChatAction(Base):
+    """Action proposée par le LLM dans le chat ; n'est exécutée qu'après confirmation explicite de l'utilisateur."""
+    __tablename__ = "chat_actions"
+    id              = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("chat_conversations.id", ondelete="CASCADE"), index=True)
+    action          = Column(String)            # ex: 'add_excluded_pattern'
+    params_json     = Column(Text, default="{}")
+    reason          = Column(Text, nullable=True)
+    status          = Column(String, default="pending")  # 'pending' | 'applied' | 'rejected' | 'failed'
+    result          = Column(Text, nullable=True)
+    created_at      = Column(DateTime, default=datetime.utcnow)
+    decided_at      = Column(DateTime, nullable=True)
 
 
 class ChatCompression(Base):

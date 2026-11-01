@@ -385,44 +385,6 @@ class Orchestrator:
 
     # La méthode _clean_log_line a été déplacée dans app.utils.log_utils.clean_log_line
 
-    def _build_prompt(self, rule: Rule, line: str, system_prompt: str,
-                      context_lines: list = None, lang: str = 'fr') -> str:
-        """Construit le prompt pour Ollama — EN or FR selon lang."""
-        import textwrap
-        context_block = ""
-        if context_lines:
-            ctx_label = "Previous context" if lang == 'en' else "Contexte précédent"
-            context_block = f"\n{ctx_label} :\n" + "\n".join(f"{l}" for l in context_lines) + "\n"
-
-        if lang == 'en':
-            base_prompt = textwrap.dedent(f"""
-            Analyze the following log line and determine its severity.
-            Your response MUST start with a line indicating severity in this EXACT format:
-            SEVERITY: [info|warning|critical]
-
-            Then provide a short, explanatory summary of the incident.
-
-            Application context: {rule.application_context}
-            {context_block}
-            Triggering line: {line}
-            """).strip()
-        else:
-            base_prompt = textwrap.dedent(f"""
-            Analyse la ligne de log suivante et détermine sa sévérité.
-            Ta réponse DOIT impérativement commencer par une ligne indiquant la sévérité sous ce format EXACT :
-            SEVERITY: [info|warning|critical]
-
-            Ensuite, fournis un résumé court et explicatif de l'incident.
-
-            Contexte de l'application: {rule.application_context}
-            {context_block}
-            Ligne déclenchante: {line}
-            """).strip()
-
-        if system_prompt:
-            return f"{system_prompt.strip()}\n\n{base_prompt}"
-        return base_prompt
-
     def _detect_severity(self, response: str) -> str:
         """Détermine la sévérité à partir d'une réponse texte libre (voir alert_analysis.detect_severity)."""
         return detect_severity(response)

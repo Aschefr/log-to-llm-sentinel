@@ -464,43 +464,38 @@ async def chat_analysis(data: dict, request: Request):
         
     db = SessionLocal()
     try:
-        prompt = ""
+        from app.routers.chat import _analysis_block
+        from app.services.prompts import CHAT_ANALYSIS_CONTEXT
+        config = load_config_dict()
+        lang = config["ollama_prompt_lang"]
         if analysis_id and str(analysis_id).isdigit():
             analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
             if not analysis:
                 raise HTTPException(status_code=404, detail="analysis_not_found")
             rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
-            cfg = db.query(GlobalConfig).first()
-            
-            # Reconstruire le prompt original (ou le stocker en BDD ?)
-            # Ici on va construire un prompt de chat
-            base_prompt = _orchestrator._build_prompt(rule, analysis.triggered_line, cfg.system_prompt if cfg else "")
-            prompt = f"{base_prompt}\n\nTa réponse précédente :\n{analysis.ollama_response}\n\nQuestion de l'utilisateur : {question}"
+            # Même contexte que le chat : événements, contexte de la source, analyse initiale
+            system = "\n".join(_analysis_block(analysis, rule, lang)).strip()
         else:
             # Mode manuel ou contextuel
-            prompt = f"Contexte de l'analyse :\n{context_prompt}\n\nRéponse précédente :\n{context_response}\n\nQuestion de l'utilisateur : {question}"
-
-        cfg = db.query(GlobalConfig).first()
-        if not cfg:
-            raise HTTPException(status_code=500, detail="config_not_found")
+            system = (f"{CHAT_ANALYSIS_CONTEXT.get(lang, CHAT_ANALYSIS_CONTEXT['fr'])}\n\n"
+                      f"=== Contexte de l'analyse ===\n{context_prompt}\n\n=== Analyse initiale ===\n{context_response}")
+        messages = [{"role": "system", "content": system}, {"role": "user", "content": question}]
 
         from app.routers.utils import cancel_on_disconnect
         async with _orchestrator._ollama_semaphore:
             try:
-                coro = _orchestrator.ollama.analyze_async(
-                    prompt=prompt,
-                    url=cfg.ollama_url,
-                    model=cfg.ollama_model,
-                    think=cfg.ollama_think if hasattr(cfg, 'ollama_think') else True,
-                    options={
-                        "temperature": cfg.ollama_temp if hasattr(cfg, 'ollama_temp') else 0.1,
-                        "num_ctx": cfg.ollama_ctx if hasattr(cfg, 'ollama_ctx') else 4096
-                    }
+                coro = _orchestrator.ollama.chat(
+                    messages,
+                    url=config["ollama_url"],
+                    model=config["ollama_model"],
+                    think=config["ollama_think"],
+                    options={"temperature": config["ollama_temp"], "num_ctx": config["ollama_ctx"]},
                 )
-                response = await cancel_on_disconnect(
+                res = await cancel_on_disconnect(
                     request,
                     asyncio.wait_for(coro, timeout=300.0)
                 )
+                response = f"[Erreur Ollama] {res['error']}" if res["error"] else (res["content"] or "Aucune réponse d'Ollama")
             except asyncio.TimeoutError:
                 response = "[Erreur Ollama] Délai d'attente dépassé (300s)"
             

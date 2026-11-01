@@ -815,6 +815,7 @@ async function onLineClick(el, ruleId) {
                 <button class="btn btn-secondary btn-sm" onclick="notifyAnalysis(${relatedAnalysis.id}, this)">🔔 ${window.t('common.notify')}</button>
             </div>
             <button class="btn btn-primary btn-sm" onclick="openChat(${relatedAnalysis.id})">💬 ${window.t('common.deepen')}</button>
+            <button class="btn btn-secondary btn-sm" onclick="investigateAnalysis(${relatedAnalysis.id})" title="${window.t('common.investigate_title')}">🔎 ${window.t('common.investigate')}</button>
         </div>
         ` : `
         <div class="detail-row"><em>${window.t ? window.t('monitor.no_auto_analysis') : 'No automatic analysis found for this line.'}</em></div>
@@ -1157,6 +1158,7 @@ async function manualAnalyze(ruleId, btn) {
                                 <div class="analysis-response markdown-body">${marked.parse(a.ollama_response)}</div>
                                 <div class="detail-actions" style="margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; display: flex; justify-content: flex-end;">
                                     <button class="btn btn-primary btn-sm" onclick="openChat(${a.id})">💬 ${window.t('common.deepen')}</button>
+                                    <button class="btn btn-secondary btn-sm" onclick="investigateAnalysis(${a.id})" title="${window.t('common.investigate_title')}">🔎 ${window.t('common.investigate')}</button>
                                 </div>
                             </div>
                         `;

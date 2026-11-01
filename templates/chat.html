@@ -864,6 +864,58 @@
 [data-theme="light"] .chat-sidebar-toggle {
     background: #f1f5f9;
 }
+
+/* ── Outils utilisés par l'IA & actions proposées ── */
+.tool-trace {
+    margin-bottom: 0.5rem;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+.tool-trace summary {
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+.tool-trace summary::-webkit-details-marker { display: none; }
+.tool-trace summary::before { content: '▸ '; }
+.tool-trace[open] summary::before { content: '▾ '; }
+.tool-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.35rem;
+}
+.tool-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.tool-chip.running { border-color: var(--accent); }
+.tool-chip.error { border-color: var(--danger); color: var(--danger); }
+.action-card {
+    margin-top: 0.6rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--warning);
+    border-radius: 0.5rem;
+    background: var(--bg-secondary);
+    font-size: 0.85rem;
+}
+.action-card.applied { border-color: var(--success); }
+.action-card.rejected, .action-card.failed { border-color: var(--border); opacity: 0.75; }
+.action-card .action-title { font-weight: 600; color: var(--text-primary); }
+.action-card .action-reason { margin: 0.25rem 0 0.5rem; color: var(--text-secondary); }
+.action-card .action-buttons { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
+.action-card .action-status { font-size: 0.8rem; color: var(--text-secondary); }
+.action-card.applied .action-status { color: var(--success); }
+.action-card.failed .action-status { color: var(--danger); }
 </style>
 
 <script>
@@ -1073,6 +1125,7 @@ async function loadHistory(id) {
     try {
         const data = await apiFetch(`/chat/api/history/${id}`);
         document.getElementById('current-chat-title').textContent = data.title;
+        window._chatActions = data.actions || {};
         
         // ── 09-C : mettre à jour le badge auto-mode ──
         updateAutoCompressionBadge(data.auto_compression_mode);
@@ -1150,7 +1203,10 @@ async function loadHistory(id) {
                     <hr style="opacity:0.1; margin:0.75rem 0;">
                     <div class="markdown-body" style="font-size:0.9rem;">${parseMd(data.analysis.ollama_response)}</div>
                     ${detectionId ? `
-                    <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid rgba(255,255,255,0.08); display:flex; justify-content:flex-end;">
+                    <div style="margin-top:0.75rem; padding-top:0.75rem; border-top:1px solid rgba(255,255,255,0.08); display:flex; justify-content:flex-end; gap:0.5rem; flex-wrap:wrap;">
+                        <button class="btn btn-secondary btn-sm" onclick="investigateAnalysis(${data.analysis.id})" title="${_tc('common.investigate_title', 'Lancer une investigation guidée par l\'IA')}">
+                            🔎 ${_tc('common.investigate', 'Investiguer')}
+                        </button>
                         <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?search=${encodeURIComponent(detectionId)}'" title="${window.t ? window.t('common.view_in_monitor') : 'Afficher dans Monitor'}">
                             🔍 ${window.t ? window.t('common.view_in_monitor') : 'Afficher dans Monitor'}
                         </button>
@@ -1179,9 +1235,9 @@ async function loadHistory(id) {
             
             // Truncated messages: dimmed styling
             if (isTruncatedMsg) {
-                html += `<div style="opacity: 0.35;">${buildMessageWrapper(m.role, m.content, i, m.id, m.created_at)}</div>`;
+                html += `<div style="opacity: 0.35;">${buildMessageWrapper(m.role, m.content, i, m.id, m.created_at, m.meta)}</div>`;
             } else {
-                html += buildMessageWrapper(m.role, m.content, i, m.id, m.created_at);
+                html += buildMessageWrapper(m.role, m.content, i, m.id, m.created_at, m.meta);
             }
         });
         
@@ -1386,7 +1442,7 @@ function formatMsgTime(isoStr) {
  * @param {number|null} msgId - ID DB du message (null pour les bulles générées en live)
  * @param {string|null} timestamp - ISO date string du message
  */
-function buildMessageWrapper(role, content, index, msgId = null, timestamp = null) {
+function buildMessageWrapper(role, content, index, msgId = null, timestamp = null, meta = null) {
     const isUser = role === 'user';
     const timeStr = formatMsgTime(timestamp);
     const timeHtml = timeStr
@@ -1397,10 +1453,94 @@ function buildMessageWrapper(role, content, index, msgId = null, timestamp = nul
         : `<div class="msg-label">${window.t ? window.t('chat.label_ollama') : 'Ollama'}${timeHtml}</div>`;
     const bubbleHtml = isUser
         ? `<div class="message-bubble user"><div class="markdown-body">${escapeHtml(content)}</div></div>`
-        : `<div class="message-bubble assistant"><div class="markdown-body">${parseMd(content)}</div></div>`;
+        : `<div class="message-bubble assistant">${toolTraceHtml(meta && meta.tools)}<div class="markdown-body">${parseMd(content)}</div></div>`;
+    const cardsHtml = (!isUser && meta && meta.actions)
+        ? meta.actions.map(id => actionCardHtml(window._chatActions[id])).join('')
+        : '';
     const actionsHtml = isUser ? userActionsHtml(content, msgId) : aiActionsHtml(content, msgId);
     const dataId = msgId ? ` data-msg-id="${msgId}"` : '';
-    return `<div class="message-wrapper ${role}"${dataId}>${label}${bubbleHtml}${actionsHtml}</div>`;
+    return `<div class="message-wrapper ${role}"${dataId}>${label}${bubbleHtml}${cardsHtml}${actionsHtml}</div>`;
+}
+
+// ── Outils utilisés par l'IA & actions proposées ─────────────────────────────
+window._chatActions = {};
+let _streamTools = [];
+
+function _tc(key, fallback) {
+    const v = window.t ? window.t(key) : key;
+    return v === key ? fallback : v;
+}
+
+/** Puces repliables listant les outils appelés par l'IA pendant un tour. */
+function toolTraceHtml(tools, open = false) {
+    if (!tools || !tools.length) return '';
+    const chips = tools.map(tl => {
+        const cls = tl.running ? ' running' : (tl.error ? ' error' : '');
+        const suffix = tl.running ? ' …' : (tl.lines != null ? ` · ${tl.lines} ${_tc('chat.tool_lines', 'lignes')}` : '');
+        return `<span class="tool-chip${cls}" title="${escapeAttr(tl.label)}"><span aria-hidden="true">🔧</span> ${escapeHtml(tl.label)}${suffix}</span>`;
+    }).join('');
+    return `<details class="tool-trace"${open ? ' open' : ''}><summary>${_tc('chat.tools_used', 'Outils utilisés')} (${tools.length})</summary><div class="tool-chips">${chips}</div></details>`;
+}
+
+/** Carte d'une action proposée par l'IA : rien n'est appliqué sans clic sur « Appliquer ». */
+function actionCardHtml(a) {
+    if (!a) return '';
+    const statusLabels = {
+        pending: _tc('chat.action_status_pending', 'En attente de votre confirmation'),
+        applied: _tc('chat.action_status_applied', 'Appliquée'),
+        rejected: _tc('chat.action_status_rejected', 'Refusée'),
+        failed: _tc('chat.action_status_failed', 'Échec'),
+    };
+    let status = statusLabels[a.status] || a.status;
+    if (a.status === 'failed' && a.result) status += ` : ${escapeHtml(a.result)}`;
+    const buttons = a.status === 'pending'
+        ? `<button class="btn btn-sm btn-secondary" onclick="decideAction(${a.id}, 'reject', this)">${_tc('chat.action_reject', 'Refuser')}</button>
+           <button class="btn btn-sm btn-primary" onclick="decideAction(${a.id}, 'apply', this)">${_tc('chat.action_apply', 'Appliquer')}</button>`
+        : '';
+    return `<div class="action-card ${a.status}" data-action-id="${a.id}">
+        <div class="action-title"><span aria-hidden="true">⚡</span> ${_tc('chat.action_proposed', 'Action proposée')} : ${escapeHtml(a.description)}</div>
+        ${a.reason ? `<div class="action-reason">${escapeHtml(a.reason)}</div>` : ''}
+        <div class="action-buttons"><span class="action-status">${status}</span>${buttons}</div>
+    </div>`;
+}
+
+async function decideAction(id, decision, btn) {
+    const card = btn.closest('.action-card');
+    card.querySelectorAll('button').forEach(b => b.disabled = true);
+    try {
+        const a = await apiFetch(`/chat/api/actions/${id}`, { method: 'POST', body: { decision } });
+        window._chatActions[id] = a;
+        card.outerHTML = actionCardHtml(a);
+    } catch (e) {
+        card.querySelectorAll('button').forEach(b => b.disabled = false);
+        alert(e.message);
+    }
+}
+
+/** Événements non textuels du flux : appels d'outils et actions proposées. */
+function handleStreamEvent(ev, aiBubble) {
+    if (ev.type === 'tool_call' || ev.type === 'tool_result') {
+        let tl = _streamTools.find(x => x.id === ev.id);
+        if (ev.type === 'tool_call' && !tl) {
+            _streamTools.push({ id: ev.id, label: ev.label, running: true });
+        } else if (ev.type === 'tool_result' && tl) {
+            tl.running = false;
+            tl.error = ev.error;
+            tl.lines = ev.lines;
+        }
+        const html = toolTraceHtml(_streamTools, true);
+        const old = aiBubble.querySelector('.tool-trace');
+        if (old) old.outerHTML = html; else aiBubble.insertAdjacentHTML('afterbegin', html);
+    } else if (ev.type === 'action') {
+        if (document.querySelector(`.action-card[data-action-id="${ev.id}"]`)) return;
+        apiFetch(`/chat/api/actions/${ev.id}`).then(a => {
+            window._chatActions[a.id] = a;
+            if (document.querySelector(`.action-card[data-action-id="${a.id}"]`)) return;
+            const cards = aiBubble.parentElement ? aiBubble.parentElement.querySelectorAll('.action-card') : [];
+            const anchor = cards.length ? cards[cards.length - 1] : aiBubble;
+            anchor.insertAdjacentHTML('afterend', actionCardHtml(a));
+        }).catch(() => {});
+    }
 }
 
 /** Copie le texte d'un message dans le presse-papier */
@@ -1718,6 +1858,7 @@ async function readStream(taskId, fromPos, signal) {
 
     const aiContent = aiBubble.querySelector('.markdown-body');
     const thinkingState = aiBubble.querySelector('.thinking-state');
+    if (fromPos === 0) _streamTools = [];  // le flux est rejoué depuis le début
 
     try {
         const response = await fetch(`/chat/api/stream/${taskId}?from_pos=${fromPos}`, { signal });
@@ -1746,6 +1887,11 @@ async function readStream(taskId, fromPos, signal) {
                         setSendBtn(false);
                         return;
                     }
+                    if (evt.event) {
+                        _streamPos = evt.pos ?? (_streamPos + 1);
+                        handleStreamEvent(evt.event, aiBubble);
+                        if (container) container.scrollTop = container.scrollHeight;
+                    }
                     if (evt.text) {
                         if (thinkingState) thinkingState.style.display = 'none';
                         _streamFullText += evt.text;
@@ -1771,6 +1917,7 @@ async function readStream(taskId, fromPos, signal) {
                         aiBubble.removeAttribute('id');
                         _activeTaskId = null;
                         _streamFullText = '';
+                        _streamTools = [];
                         setSendBtn(false);  // ← Revenir en mode "Envoyer"
 
                         // Mettre à jour le contexte après génération

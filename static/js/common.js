@@ -175,6 +175,22 @@ async function openChat(analysisId, rawPrompt = null, rawResponse = null) {
     }
 }
 
+/** Ouvre une conversation d'investigation guidée (l'IA consulte les logs via ses outils). */
+async function investigateAnalysis(analysisId) {
+    try {
+        const res = await apiFetch('/chat/api/investigate', {
+            method: 'POST',
+            body: { analysis_id: analysisId }
+        });
+        if (res.id) {
+            window.location.href = `/chat?id=${res.id}`;
+        }
+    } catch (e) {
+        const errorPrefix = window.t ? window.t('chat.error_create_conv') : 'Erreur lors de la création de la conversation :';
+        alert(`${errorPrefix} ${e.message}`);
+    }
+}
+
 async function askQuestion(analysisId, inputEl, contextPrompt = null, contextResponse = null) {
     const question = inputEl.value.trim();
     if (!question) return;
@@ -553,6 +569,7 @@ function renderAnalysisCard(a, opts = {}) {
                     ${a.detection_id ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); window.location.href='/monitor?search=${encodeURIComponent(a.detection_id)}'" title="${_t('common.view_in_monitor', 'View in Monitor')}">🔍 Monitor</button>` : ''}
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openChat(${a.id})">💬 ${_t('common.deepen', 'Deepen')}</button>
+                <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); investigateAnalysis(${a.id})" title="${_t('common.investigate_title', 'Start an AI-guided investigation')}">🔎 ${_t('common.investigate', 'Investigate')}</button>
             </div>
         </div>
     </div>`;

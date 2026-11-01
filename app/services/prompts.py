@@ -84,6 +84,11 @@ LABELS = {
         "confidence": "Confiance",
         "group_header": "Ces {total} événements correspondants sont apparus dans les {delay} dernières secondes ({distinct} distincts). Dans l'ordre chronologique :",
         "group_truncated": "... [Tronqué : limite de {max_chars} caractères atteinte ({total} événements détectés)]",
+        "tools_exhausted": "Limite d'outils atteinte : réponds maintenant à l'utilisateur avec les informations déjà obtenues, sans appeler d'autre outil.",
+        "tool_duplicate": "Appel identique déjà effectué dans ce tour : réutilise le résultat précédent.",
+        "tool_limit": "Limite d'appels d'outils atteinte pour ce tour : outil non exécuté.",
+        "tool_budget": "[Budget de contexte des outils épuisé : résultat tronqué.]",
+        "turn_timeout": "*(Réponse interrompue : durée maximale du tour atteinte.)*",
     },
     "en": {
         "admin_instructions": "Administrator instructions",
@@ -113,7 +118,49 @@ LABELS = {
         "confidence": "Confidence",
         "group_header": "These {total} matching events appeared in the last {delay} seconds ({distinct} distinct). In chronological order:",
         "group_truncated": "... [Truncated: {max_chars} character limit reached ({total} events detected)]",
+        "tools_exhausted": "Tool limit reached: answer the user now with the information already gathered, without calling another tool.",
+        "tool_duplicate": "Identical call already made in this turn: reuse the previous result.",
+        "tool_limit": "Tool call limit reached for this turn: tool not executed.",
+        "tool_budget": "[Tool context budget exhausted: result truncated.]",
+        "turn_timeout": "*(Answer interrupted: maximum turn duration reached.)*",
     },
+}
+
+CHAT_ANALYSIS_CONTEXT = {
+    "fr": "Tu es un assistant expert en systèmes Linux, Docker, réseau et infrastructure. Une alerte a été analysée par Sentinel ; l'utilisateur te pose des questions de suivi pour approfondir le diagnostic.",
+    "en": "You are an expert assistant for Linux, Docker, networking and infrastructure. An alert was analyzed by Sentinel; the user asks follow-up questions to deepen the diagnosis.",
+}
+
+CHAT_TOOLS_INSTRUCTIONS = {
+    "fr": """=== Outils ===
+Tu disposes d'outils pour consulter les sources de logs et l'historique de Sentinel (règles, analyses, statistiques, événements corrélés entre règles).
+- Quand une information te manque (lignes autour d'un événement, récurrence, ce qui s'est passé ailleurs au même moment), utilise un outil plutôt que de supposer.
+- Fais des appels ciblés : le nombre d'appels par réponse est limité.
+- Appuie tes conclusions sur les lignes obtenues et cite-les brièvement.
+- Tu ne peux rien modifier toi-même : pour toute modification (mot-clé, motif d'exclusion, résolution, notification, méta-analyse), utilise propose_action. L'utilisateur confirmera ou refusera ; ne présente jamais une proposition comme appliquée.""",
+    "en": """=== Tools ===
+You have tools to read the log sources and Sentinel's history (rules, analyses, statistics, events correlated across rules).
+- When information is missing (lines around an event, recurrence, what happened elsewhere at the same time), use a tool instead of guessing.
+- Make targeted calls: the number of calls per answer is limited.
+- Ground your conclusions in the lines you retrieved and quote them briefly.
+- You cannot change anything yourself: for any change (keyword, exclusion pattern, resolution, notification, meta-analysis), use propose_action. The user will confirm or decline; never present a proposal as applied.""",
+}
+
+INVESTIGATION_PROMPT = {
+    "fr": """Lance une investigation complète de l'alerte #{analysis_id} (règle #{rule_id}) :
+1. Récupère le contexte élargi autour des lignes déclenchantes.
+2. Vérifie la récurrence et les statistiques de la règle.
+3. Cherche des événements corrélés sur les autres règles au même moment.
+4. Consulte l'historique de résolution si utile.
+
+Puis rends un rapport structuré : **Constat**, **Hypothèses classées** (avec les éléments qui les appuient ou les contredisent), **Vérifications à faire** (commandes concrètes), **Recommandation**. Propose une action via propose_action seulement si elle est clairement justifiée.""",
+    "en": """Run a full investigation of alert #{analysis_id} (rule #{rule_id}):
+1. Retrieve the wider context around the triggering lines.
+2. Check the rule's recurrence and statistics.
+3. Look for correlated events on the other rules at the same time.
+4. Check the resolution history if useful.
+
+Then write a structured report: **Findings**, **Ranked hypotheses** (with the evidence for and against), **Checks to run** (concrete commands), **Recommendation**. Propose an action with propose_action only if it is clearly justified.""",
 }
 
 
