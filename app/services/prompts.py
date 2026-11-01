@@ -137,13 +137,15 @@ Tu disposes d'outils pour consulter les sources de logs et l'historique de Senti
 - Quand une information te manque (lignes autour d'un événement, récurrence, ce qui s'est passé ailleurs au même moment), utilise un outil plutôt que de supposer.
 - Fais des appels ciblés : le nombre d'appels par réponse est limité.
 - Appuie tes conclusions sur les lignes obtenues et cite-les brièvement.
-- Tu ne peux rien modifier toi-même : pour toute modification (mot-clé, motif d'exclusion, résolution, notification, méta-analyse), utilise propose_action. L'utilisateur confirmera ou refusera ; ne présente jamais une proposition comme appliquée.""",
+- Tu ne peux rien modifier toi-même : pour toute modification (mot-clé, motif d'exclusion, résolution, notification, méta-analyse), utilise propose_action. L'utilisateur confirmera ou refusera ; ne présente jamais une proposition comme appliquée.
+- Appelle propose_action AVANT de rédiger ta réponse finale, puis mentionne la proposition dans cette réponse : l'utilisateur ne doit pas voir ta réponse se prolonger après la proposition.""",
     "en": """=== Tools ===
 You have tools to read the log sources and Sentinel's history (rules, analyses, statistics, events correlated across rules).
 - When information is missing (lines around an event, recurrence, what happened elsewhere at the same time), use a tool instead of guessing.
 - Make targeted calls: the number of calls per answer is limited.
 - Ground your conclusions in the lines you retrieved and quote them briefly.
-- You cannot change anything yourself: for any change (keyword, exclusion pattern, resolution, notification, meta-analysis), use propose_action. The user will confirm or decline; never present a proposal as applied.""",
+- You cannot change anything yourself: for any change (keyword, exclusion pattern, resolution, notification, meta-analysis), use propose_action. The user will confirm or decline; never present a proposal as applied.
+- Call propose_action BEFORE writing your final answer, then mention the proposal in that answer: the user should not see your answer continue after the proposal.""",
 }
 
 INVESTIGATION_PROMPT = {
@@ -152,15 +154,17 @@ INVESTIGATION_PROMPT = {
 2. Vérifie la récurrence et les statistiques de la règle.
 3. Cherche des événements corrélés sur les autres règles au même moment.
 4. Consulte l'historique de résolution si utile.
+5. Si une action est clairement justifiée, propose-la via propose_action à ce stade, avant le rapport.
 
-Puis rends un rapport structuré : **Constat**, **Hypothèses classées** (avec les éléments qui les appuient ou les contredisent), **Vérifications à faire** (commandes concrètes), **Recommandation**. Propose une action via propose_action seulement si elle est clairement justifiée.""",
+Puis rends un rapport structuré : **Constat**, **Hypothèses classées** (avec les éléments qui les appuient ou les contredisent), **Vérifications à faire** (commandes concrètes), **Recommandation** (en mentionnant l'éventuelle action proposée).""",
     "en": """Run a full investigation of alert #{analysis_id} (rule #{rule_id}):
 1. Retrieve the wider context around the triggering lines.
 2. Check the rule's recurrence and statistics.
 3. Look for correlated events on the other rules at the same time.
 4. Check the resolution history if useful.
+5. If an action is clearly justified, propose it with propose_action at this point, before the report.
 
-Then write a structured report: **Findings**, **Ranked hypotheses** (with the evidence for and against), **Checks to run** (concrete commands), **Recommendation**. Propose an action with propose_action only if it is clearly justified.""",
+Then write a structured report: **Findings**, **Ranked hypotheses** (with the evidence for and against), **Checks to run** (concrete commands), **Recommendation** (mentioning any proposed action).""",
 }
 
 

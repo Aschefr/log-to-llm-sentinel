@@ -291,6 +291,30 @@ def describe_action(action: str, params: dict, lang: str = "fr") -> str:
     return (en if lang == "en" else fr).get(action, action)
 
 
+def describe_effect(action: str, params: dict, lang: str = "fr") -> str:
+    """Effet concret d'une action appliquée, et où le constater dans l'interface."""
+    v, r, a, c = params.get("value"), params.get("rule_id"), params.get("analysis_id"), params.get("config_id")
+    fr = {
+        "add_excluded_pattern": f"Les lignes contenant « {v} » sont désormais ignorées par la règle #{r} (Règles → motifs d'exclusion).",
+        "add_keyword": f"La règle #{r} surveille désormais le mot-clé « {v} » (Règles → mots-clés).",
+        "remove_keyword": f"La règle #{r} ne surveille plus le mot-clé « {v} » (Règles → mots-clés).",
+        "mark_resolved": f"La règle #{r} est revenue à l'état normal (Monitor).",
+        "exclude_from_mttr": f"L'analyse #{a} n'est plus comptée dans le MTTR du tableau de bord. Les règles et les futures alertes ne changent pas.",
+        "resend_notification": f"La notification de l'analyse #{a} a été renvoyée.",
+        "trigger_meta_analysis": f"La méta-analyse #{c} est lancée ; le résultat apparaîtra dans Méta-analyse.",
+    }
+    en = {
+        "add_excluded_pattern": f"Lines containing \"{v}\" are now ignored by rule #{r} (Rules → exclusion patterns).",
+        "add_keyword": f"Rule #{r} now watches the keyword \"{v}\" (Rules → keywords).",
+        "remove_keyword": f"Rule #{r} no longer watches the keyword \"{v}\" (Rules → keywords).",
+        "mark_resolved": f"Rule #{r} is back to normal (Monitor).",
+        "exclude_from_mttr": f"Analysis #{a} is no longer counted in the dashboard MTTR. Rules and future alerts are unchanged.",
+        "resend_notification": f"The notification of analysis #{a} was resent.",
+        "trigger_meta_analysis": f"Meta-analysis #{c} started; the result will appear in Meta-analysis.",
+    }
+    return (en if lang == "en" else fr).get(action, "ok")
+
+
 def propose_action(db, action=None, reason=None, rule_id=None, analysis_id=None, config_id=None, value=None,
                    _conversation_id=None, **_):
     if action not in ACTIONS:
@@ -315,7 +339,8 @@ def propose_action(db, action=None, reason=None, rule_id=None, analysis_id=None,
     db.commit()
     db.refresh(act)
     return (f"Action #{act.id} proposée : {describe_action(action, params)}. Elle est EN ATTENTE de confirmation par "
-            f"l'utilisateur et n'est PAS appliquée ; ne la présente pas comme effectuée.")
+            f"l'utilisateur et n'est PAS appliquée ; ne la présente pas comme effectuée. "
+            f"Termine ta réponse en la mentionnant en une phrase, sans réécrire ton analyse.")
 
 
 def action_to_dict(act: ChatAction, lang: str = "fr") -> dict:
@@ -348,16 +373,13 @@ async def apply_action(action_id: int) -> dict:
                 else:
                     rule.set_keywords([k for k in rule.get_keywords() if k != params["value"]])
                 db.commit()
-                act.result = "ok"
             elif act.action == "mark_resolved":
                 from app.main import resolution_service
                 await resolution_service.mark_resolved_manually(params["rule_id"])
-                act.result = "ok"
             elif act.action == "exclude_from_mttr":
                 a = db.query(Analysis).filter(Analysis.id == params["analysis_id"]).first()
                 a.exclude_from_mttr = True
                 db.commit()
-                act.result = "ok"
             elif act.action == "resend_notification":
                 from app.main import orchestrator
                 from app.services.app_config import config_to_dict
@@ -365,7 +387,6 @@ async def apply_action(action_id: int) -> dict:
                 a = db.query(Analysis).filter(Analysis.id == params["analysis_id"]).first()
                 rule = _rule(db, a.rule_id)
                 await orchestrator.trigger_notification(a, rule, config_to_dict(db.query(GlobalConfig).first()), db)
-                act.result = "ok"
             elif act.action == "trigger_meta_analysis":
                 from app.main import meta_service
                 from app.routers.meta_analysis import _running_configs
@@ -380,8 +401,10 @@ async def apply_action(action_id: int) -> dict:
                     finally:
                         _running_configs.discard(cid)
                 asyncio.create_task(runner())
-                act.result = "started"
             act.status = "applied"
+            from app.models import GlobalConfig
+            cfg = db.query(GlobalConfig).first()
+            act.result = describe_effect(act.action, params, cfg.chat_lang if cfg and cfg.chat_lang else "fr")
         except Exception as e:
             act.status = "failed"
             act.result = str(e)[:500]
@@ -421,7 +444,9 @@ TOOLS = [
         {"rule_id": _INT, "limit": _INT}, ["rule_id"]),
     _fn("propose_action", "Propose une modification à l'utilisateur, qui devra la confirmer (rien n'est appliqué sans son accord). "
         "Actions : add_excluded_pattern / add_keyword / remove_keyword (rule_id + value), mark_resolved (rule_id), "
-        "exclude_from_mttr / resend_notification (analysis_id), trigger_meta_analysis (config_id). Explique la raison dans reason.",
+        "exclude_from_mttr (analysis_id : exclut UNE analyse précise du calcul du MTTR, ne change ni la règle ni les futures alertes), "
+        "resend_notification (analysis_id), trigger_meta_analysis (config_id). Pour ne plus être alerté sur un bruit récurrent, "
+        "c'est add_excluded_pattern (ou remove_keyword) qu'il faut proposer. Explique la raison dans reason.",
         {"action": {"type": "string", "enum": list(ACTIONS)}, "reason": {"type": "string"}, "rule_id": _INT,
          "analysis_id": _INT, "config_id": _INT, "value": {"type": "string"}}, ["action", "reason"]),
 ]

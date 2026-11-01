@@ -916,6 +916,7 @@
 .action-card .action-status { font-size: 0.8rem; color: var(--text-secondary); }
 .action-card.applied .action-status { color: var(--success); }
 .action-card.failed .action-status { color: var(--danger); }
+.action-card .action-effect { margin-top: 0.4rem; font-size: 0.8rem; color: var(--text-secondary); }
 </style>
 
 <script>
@@ -1482,26 +1483,41 @@ function toolTraceHtml(tools, open = false) {
     return `<details class="tool-trace"${open ? ' open' : ''}><summary>${_tc('chat.tools_used', 'Outils utilisés')} (${tools.length})</summary><div class="tool-chips">${chips}</div></details>`;
 }
 
-/** Carte d'une action proposée par l'IA : rien n'est appliqué sans clic sur « Appliquer ». */
-function actionCardHtml(a) {
+/** Carte d'une action proposée par l'IA : rien n'est appliqué sans clic sur « Appliquer ».
+ *  `locked` : l'IA n'a pas fini sa réponse, les boutons restent désactivés jusqu'à la fin du tour. */
+function actionCardHtml(a, locked = false) {
     if (!a) return '';
     const statusLabels = {
-        pending: _tc('chat.action_status_pending', 'En attente de votre confirmation'),
+        pending: locked
+            ? _tc('chat.action_wait_end', "L'IA termine sa réponse…")
+            : _tc('chat.action_status_pending', 'En attente de votre confirmation'),
         applied: _tc('chat.action_status_applied', 'Appliquée'),
         rejected: _tc('chat.action_status_rejected', 'Refusée'),
         failed: _tc('chat.action_status_failed', 'Échec'),
     };
     let status = statusLabels[a.status] || a.status;
     if (a.status === 'failed' && a.result) status += ` : ${escapeHtml(a.result)}`;
+    const effect = (a.status === 'applied' && a.result && a.result !== 'ok')
+        ? `<div class="action-effect">${escapeHtml(a.result)}</div>` : '';
+    const dis = locked ? ' disabled' : '';
     const buttons = a.status === 'pending'
-        ? `<button class="btn btn-sm btn-secondary" onclick="decideAction(${a.id}, 'reject', this)">${_tc('chat.action_reject', 'Refuser')}</button>
-           <button class="btn btn-sm btn-primary" onclick="decideAction(${a.id}, 'apply', this)">${_tc('chat.action_apply', 'Appliquer')}</button>`
+        ? `<button class="btn btn-sm btn-secondary" onclick="decideAction(${a.id}, 'reject', this)"${dis}>${_tc('chat.action_reject', 'Refuser')}</button>
+           <button class="btn btn-sm btn-primary" onclick="decideAction(${a.id}, 'apply', this)"${dis}>${_tc('chat.action_apply', 'Appliquer')}</button>`
         : '';
-    return `<div class="action-card ${a.status}" data-action-id="${a.id}">
+    return `<div class="action-card ${a.status}" data-action-id="${a.id}"${locked ? ' data-locked="1"' : ''}>
         <div class="action-title"><span aria-hidden="true">⚡</span> ${_tc('chat.action_proposed', 'Action proposée')} : ${escapeHtml(a.description)}</div>
         ${a.reason ? `<div class="action-reason">${escapeHtml(a.reason)}</div>` : ''}
         <div class="action-buttons"><span class="action-status">${status}</span>${buttons}</div>
+        ${effect}
     </div>`;
+}
+
+/** Fin du tour de l'IA : les cartes d'action reçues pendant la génération deviennent actionnables. */
+function unlockActionCards() {
+    document.querySelectorAll('.action-card[data-locked]').forEach(card => {
+        const a = window._chatActions[card.dataset.actionId];
+        if (a) card.outerHTML = actionCardHtml(a);
+    });
 }
 
 async function decideAction(id, decision, btn) {
@@ -1538,7 +1554,8 @@ function handleStreamEvent(ev, aiBubble) {
             if (document.querySelector(`.action-card[data-action-id="${a.id}"]`)) return;
             const cards = aiBubble.parentElement ? aiBubble.parentElement.querySelectorAll('.action-card') : [];
             const anchor = cards.length ? cards[cards.length - 1] : aiBubble;
-            anchor.insertAdjacentHTML('afterend', actionCardHtml(a));
+            // Verrouillée tant que le tour est en cours (sinon la réponse continue après le clic)
+            anchor.insertAdjacentHTML('afterend', actionCardHtml(a, !!_activeTaskId));
         }).catch(() => {});
     }
 }
@@ -1884,6 +1901,7 @@ async function readStream(taskId, fromPos, signal) {
                         aiContent.innerHTML = `<span style="color:var(--danger)">Erreur: ${escapeHtml(evt.error)}</span>`;
                         aiBubble.removeAttribute('id');
                         _activeTaskId = null;
+                        unlockActionCards();
                         setSendBtn(false);
                         return;
                     }
@@ -1918,6 +1936,7 @@ async function readStream(taskId, fromPos, signal) {
                         _activeTaskId = null;
                         _streamFullText = '';
                         _streamTools = [];
+                        unlockActionCards();
                         setSendBtn(false);  // ← Revenir en mode "Envoyer"
 
                         // Mettre à jour le contexte après génération

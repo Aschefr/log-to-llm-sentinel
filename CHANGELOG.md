@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Chat Action Cards Clicked Mid-Answer**: An action proposed by the AI appeared (with active buttons) while the model was still writing; after the click the answer kept growing, which looked like the conversation changing by itself. Cards received during generation are now locked ("The AI is finishing its answer…") until the turn ends, and the model is instructed to propose actions *before* writing its final answer (chat and investigation prompts).
+- **Unclear Effect of Applied Actions**: Applied actions now state their concrete effect and where to see it (e.g. "Analysis #947 is no longer counted in the dashboard MTTR. Rules and future alerts are unchanged."). The tool description also clarifies that `exclude_from_mttr` targets a single analysis and that recurring noise calls for an exclusion pattern or keyword removal instead.
+
 ## [1.2.303] - 2026-11-01
 
 ### Added

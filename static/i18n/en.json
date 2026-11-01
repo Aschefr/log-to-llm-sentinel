@@ -355,7 +355,8 @@
     "action_status_pending": "Awaiting your confirmation",
     "action_status_applied": "Applied",
     "action_status_rejected": "Declined",
-    "action_status_failed": "Failed"
+    "action_status_failed": "Failed",
+    "action_wait_end": "The AI is finishing its answer…"
   },
   "config": {
     "title": "Global Configuration",
