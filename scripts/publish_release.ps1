@@ -29,8 +29,16 @@ $Image = "aschefr/log-to-llm-sentinel"
 
 function Invoke-Native {
     # Runs a native command and stops the release if it fails (PS 5.1 does not do it by itself).
+    # Success is judged on the exit code only: git/docker write progress and warnings to stderr,
+    # which PS 5.1 would turn into terminating errors under "Stop" when the output is redirected.
     param([string]$Description, [scriptblock]$Command)
-    & $Command
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        & $Command
+    } finally {
+        $ErrorActionPreference = $previous
+    }
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: $Description failed (exit code $LASTEXITCODE)" -ForegroundColor Red
         exit 1
