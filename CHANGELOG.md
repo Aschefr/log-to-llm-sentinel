@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.3.0] - 2026-11-01
 
 ### Added
 - **Aggregated Meta-Analysis**: The meta-analysis no longer pastes each analysis one by one. Identical events are grouped (count, first/last occurrence, hours, severity, unresolved count, sample line, latest summary), each rule gets its totals, resolution rate, MTTR and current state, rules without alerts are listed, and the total number of alerts over the whole period is always reported (the "Max Included Analyses" limit still caps the detailed ones). Groups are filled by severity within the configured context size.
