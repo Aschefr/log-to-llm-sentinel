@@ -53,6 +53,7 @@ GENERIC_PATTERNS = {
 FAILURE_WORDS = re.compile(
     r"\b(fail(ed|ure|s|ing)?|errors?|denied|refused|time[ds]?[ -]?out|unable|cannot|can't|could not|exception|fatal|"
     r"critical|warn(ing)?|unreachable|invalid|unauthori[sz]ed|forbidden|lost|panic|crash(ed)?|abort(ed)?|killed|"
+    r"exceed(ed|s)?|exit(ing|ed)|terminat(ed|ing)|unhealthy|degraded|segfault|oom|out of memory|no such|not found|"
     r"échec|erreur|refusé|impossible)\b", re.IGNORECASE)
 
 

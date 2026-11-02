@@ -14,6 +14,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - The Docker image now includes `openssh-client` (used only by server diagnostics).
 
+### Fixed
+- **Learned patterns describing a failure**: Phrases such as "stop_after time has been exceeded", "container exited", "unhealthy" or "No such container" are no longer suggested as return-to-normal patterns.
+
 ## [1.4.1] - 2026-11-02
 
 ### Fixed
