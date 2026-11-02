@@ -371,7 +371,8 @@ async function renderOverview() {
         <a class="rp-latest" href="?analysis=${l.id}#analyses" onclick="RP.focusAnalysisId=${l.id}; selectTab('analyses'); return false;">
             <span class="rp-muted">${esc(fmtWhen(l.analyzed_at))}</span>${sevBadge(l.severity)}
             <span class="rp-latest-text">${esc(l.summary)}</span>
-            <span class="${l.status === 'open' ? 'rp-ko' : 'rp-ok'}">${l.status === 'open' ? esc(T('rule.open', 'ouvert')) : esc(T('rule.resolved_after', 'résolu en {d}', { d: fmtMinutes(l.resolution_minutes) }))}</span>
+            <span class="${l.status === 'open' ? 'rp-ko' : 'rp-ok'}">${l.status === 'open' ? esc(T('rule.open', 'ouvert'))
+                : l.resolution_minutes == null ? esc(T('rules.resolved', 'résolu')) : esc(T('rule.resolved_after', 'résolu en {d}', { d: fmtMinutes(l.resolution_minutes) }))}</span>
         </a>`).join('') : `<p class="rp-muted">${esc(T('rule.no_alert_30d', 'Aucune alerte enregistrée.'))}</p>`}
     </section>`;
 

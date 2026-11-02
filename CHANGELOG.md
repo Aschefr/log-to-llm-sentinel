@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Learned patterns describing a failure**: Phrases such as "login failed" or "connection timed out" are no longer suggested as return-to-normal patterns (failure words are filtered out, in English and French).
+- **Empty summary on some legacy analyses**: When the "Summary:" label stands alone in its paragraph, the summary is now taken from the next paragraph.
+- **"resolved in —"**: Analyses whose resolution time is unknown or excluded from the MTTR now simply show "resolved".
+- **Incident timeline order**: "Incident opened" now comes before the first analysis logged at the same time.
+
 ## [1.4.0] - 2026-11-02
 
 ### Added

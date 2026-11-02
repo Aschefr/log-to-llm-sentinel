@@ -114,7 +114,8 @@ function rowHtml(r, s) {
     }).join('');
     const last = r.last;
     const lastWhen = last ? `${roWhen(last.analyzed_at)} · ${last.severity} · ${last.status === 'open'
-        ? roT('rules.open', 'ouvert') : roT('rule.resolved_after', 'résolu en {d}', { d: roMinutes(last.resolution_minutes) })}` : '—';
+        ? roT('rules.open', 'ouvert') : last.resolution_minutes == null ? roT('rules.resolved', 'résolu')
+        : roT('rule.resolved_after', 'résolu en {d}', { d: roMinutes(last.resolution_minutes) })}` : '—';
     const ago = r.last_line_received_at
         ? roT('rules.last_line_ago', 'dernière ligne {t}', { t: roT('rule.ago', 'il y a {d}', { d: roMinutes((Date.now() - new Date(r.last_line_received_at).getTime()) / 60000) }) })
         : roT('rules.never_received', 'aucune ligne reçue');

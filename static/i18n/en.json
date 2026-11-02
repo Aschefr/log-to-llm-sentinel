@@ -195,7 +195,8 @@
     "no_match": "No rule matches.",
     "create_first": "Create a rule",
     "disable": "Disable",
-    "enable": "Enable"
+    "enable": "Enable",
+    "resolved": "resolved"
   },
   "monitor": {
     "title": "Monitor",

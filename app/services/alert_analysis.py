@@ -44,9 +44,11 @@ def short_summary(a: Analysis, max_len: int = 300) -> str:
     if not text:
         paras = [p.strip() for p in (a.ollama_response or "").split("\n\n") if p.strip().strip("-")]
         # Paragraphe « Résumé : … » s'il existe (format structuré et anciens prompts), sinon le dernier hors confiance
-        tagged = [p for p in paras if _SUMMARY_TAG.match(p)]
+        tagged = [i for i, p in enumerate(paras) if _SUMMARY_TAG.match(p)]
         rest = [p for p in paras if not _CONFIDENCE_LINE.match(p)]
-        text = _SUMMARY_TAG.sub("", tagged[0]) if tagged else (rest[-1] if rest else "")
+        text = _SUMMARY_TAG.sub("", paras[tagged[0]]) if tagged else (rest[-1] if rest else "")
+        if tagged and not text.strip("*_ ") and tagged[0] + 1 < len(paras):
+            text = paras[tagged[0] + 1]  # libellé seul, le résumé est dans le paragraphe suivant
         text = text.replace("**", "").replace("__", "").strip("*_ ")
     text = " ".join(text.split())
     return text if len(text) <= max_len else text[:max_len] + "…"

@@ -517,7 +517,8 @@ def rule_resolution(rule_id: int):
             if incident.get("probe"):
                 timeline.append({"kind": "probe", "at": incident["probe"]["at"], "ok": incident["probe"]["ok"],
                                  "detail": incident["probe"]["detail"]})
-            timeline.sort(key=lambda e: e["at"] or "")
+            order = {"opened": 0, "analysis": 1, "probe": 2, "verdict": 3}
+            timeline.sort(key=lambda e: ((e["at"] or "")[:19], order.get(e["kind"], 9)))
             if incident.get("next_check_at"):
                 timeline.append({"kind": "next", "at": incident["next_check_at"]})
         counts = {}

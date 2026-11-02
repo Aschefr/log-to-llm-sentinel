@@ -195,7 +195,8 @@
     "no_match": "Aucune règle ne correspond.",
     "create_first": "Créer une règle",
     "disable": "Désactiver",
-    "enable": "Réactiver"
+    "enable": "Réactiver",
+    "resolved": "résolu"
   },
   "monitor": {
     "title": "Monitor",

@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import collections
 import statistics
 from datetime import datetime, timedelta
@@ -48,6 +49,11 @@ GENERIC_PATTERNS = {
     "running", "stopped", "exiting", "queued", "restart", "restarted", "normal", "level=info",
     "message repeated", "repeated",
 }
+# Un motif de retour à la normale ne décrit pas un échec
+FAILURE_WORDS = re.compile(
+    r"\b(fail(ed|ure|s|ing)?|errors?|denied|refused|time[ds]?[ -]?out|unable|cannot|can't|could not|exception|fatal|"
+    r"critical|warn(ing)?|unreachable|invalid|unauthori[sz]ed|forbidden|lost|panic|crash(ed)?|abort(ed)?|killed|"
+    r"échec|erreur|refusé|impossible)\b", re.IGNORECASE)
 
 
 def clean_ollama_json(response: str) -> str:
@@ -116,7 +122,7 @@ def _is_error_line(line: str, keywords: List[str], excluded: List[str]) -> bool:
 def _is_learnable_pattern(pattern: str, keywords: List[str], error_lines: List[str], context_lines: List[str]) -> bool:
     """Un motif appris doit être spécifique, absent des lignes d'erreur et réellement présent dans les logs."""
     low = pattern.lower()
-    if len(low) < LEARNED_PATTERN_MIN_LEN or low in GENERIC_PATTERNS:
+    if len(low) < LEARNED_PATTERN_MIN_LEN or low in GENERIC_PATTERNS or FAILURE_WORDS.search(low):
         return False
     if any(k.lower() in low or low in k.lower() for k in keywords):
         return False
