@@ -250,45 +250,68 @@ def host_fingerprint() -> Optional[str]:
 DIAG_SCRIPT_VERSION = "2"  # à incrémenter à chaque modification du script : Sentinel signale un script à mettre à jour
 
 DIAG_SCRIPT = r'''#!/bin/bash
-# Log-to-LLM Sentinel — diagnostic en lecture seule.
-# Appelé uniquement par la clé SSH de Sentinel (option command= dans authorized_keys) :
-# seuls les contrôles ci-dessous sont possibles, aucune autre commande n'est exécutée.
+# ══════════════════════════════════════════════════════════════════════════════
+# Log-to-LLM Sentinel — script de diagnostic en LECTURE SEULE
+# La clé SSH de Sentinel ne peut lancer que ce script (option command= de la clé).
+# Sentinel choisit un contrôle dans la liste ci-dessous, et rien d'autre :
+# aucune commande ici n'écrit, ne redémarre ni ne modifie quoi que ce soit.
+# ══════════════════════════════════════════════════════════════════════════════
 set -u
 SCRIPT_VERSION=@VERSION@
+
+# Contrôle demandé par Sentinel, par exemple « disk » ou « service nginx »
 read -r -a ARGS <<< "${SSH_ORIGINAL_COMMAND:-help}"
 CHECK="${ARGS[0]:-help}"
 ARG="${ARGS[1]:-}"
-CLIENT_IP="${SSH_CONNECTION%% *}"
+CLIENT_IP="${SSH_CONNECTION:-}"; CLIENT_IP="${CLIENT_IP%% *}"
+
+# ── Outils internes ───────────────────────────────────────────────────────────
+# Nom de service accepté : lettres, chiffres et @ . _ : - uniquement
 valid_unit() { [[ "$1" =~ ^[A-Za-z0-9@._:-]{1,80}$ ]]; }
 has_systemd() { command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; }
 no_systemd() {
   if [ -f /etc/unraid-version ]; then echo "Unraid n'utilise pas systemd : utiliser les contrôles syslog, array, processes ou les outils Docker."
   else echo "systemd indisponible sur ce système"; fi
 }
-# Retire les lignes dues aux connexions de Sentinel lui-même (sessions SSH venant de son adresse)
+# Retire du journal les connexions SSH de Sentinel lui-même
 drop_own_ssh() {
   [ -n "$CLIENT_IP" ] || { cat "$1"; return; }
   local pids
   pids=$(grep -F "$CLIENT_IP" "$1" 2>/dev/null | grep -oE 'sshd(-session)?\[[0-9]+\]' | grep -oE '[0-9]+' | sort -u | paste -sd'|')
   if [ -n "$pids" ]; then grep -vE "sshd(-session)?\[($pids)\]" "$1"; else cat "$1"; fi
 }
+# Bruit sans intérêt pour un diagnostic : interfaces réseau de Docker, ouvertures de session
+DOCKER_NET='br-[0-9a-f]{12}|docker0'
+KERNEL_NOISE="veth[0-9a-f]+|$DOCKER_NET|entered (blocking|forwarding|disabled) state|(allmulticast|promiscuous) mode|renamed from veth|elogind.*(New|Removed) session"
+# Systèmes de fichiers virtuels ignorés par df
 DF_EXCL="-x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs"
+
+# ── Contrôles disponibles ─────────────────────────────────────────────────────
 case "$CHECK" in
+  # Vue d'ensemble : charge, mémoire, espace disque
   overview)  uptime; echo; free -m; echo; df -hT $DF_EXCL 2>/dev/null ;;
+  # Espace disque et inodes
   disk)      df -hT $DF_EXCL 2>/dev/null; echo; df -i $DF_EXCL 2>/dev/null | head -n 20 ;;
+  # Mémoire et swap
   memory)    free -m; echo; grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree|Dirty|Committed_AS)' /proc/meminfo ;;
+  # Charge processeur
   load)      uptime; echo "CPU : $(nproc)"; cat /proc/loadavg ;;
+  # Processus les plus gourmands (CPU puis mémoire), sans ce script lui-même
   processes) ps -eo pid,ppid,user,%cpu,%mem,etime,comm --sort=-%cpu | awk -v me=$$ 'NR==1 || ($1!=me && $2!=me && $7!~/^sshd/)' | cut -c1-120 | head -n 16
              echo; ps -eo pid,user,%mem,rss,comm --sort=-%mem | head -n 11 ;;
+  # Partages réseau montés (NFS, SMB, shfs…)
   mounts)    (findmnt -rn -t nfs,nfs4,cifs,smb3,fuse.sshfs,fuse.shfs -o TARGET,SOURCE,FSTYPE 2>/dev/null) || mount | grep -E ' (nfs|nfs4|cifs|smb3|fuse\.[a-z]+) ' ;;
-  network)   ip -br addr 2>/dev/null | grep -vE '^(veth|br-[0-9a-f]{12}|docker0|vhost)' ; echo; ip route 2>/dev/null | grep -vE 'br-[0-9a-f]{12}|docker0' | head -n 20 ;;
-  kernel)    { dmesg -T 2>/dev/null || journalctl -k -n 400 --no-pager 2>/dev/null; } \
-               | grep -vE 'veth[0-9a-f]+|br-[0-9a-f]{12}|docker0|entered (blocking|forwarding|disabled) state|(allmulticast|promiscuous) mode|renamed from veth|elogind.*(New|Removed) session' | tail -n 50 ;;
+  # Adresses et routes réseau, sans les interfaces de Docker
+  network)   ip -br addr 2>/dev/null | grep -vE "^(veth|$DOCKER_NET|vhost)"; echo; ip route 2>/dev/null | grep -vE "$DOCKER_NET" | head -n 20 ;;
+  # 50 derniers messages du noyau, sans le bruit réseau de Docker
+  kernel)    { dmesg -T 2>/dev/null || journalctl -k -n 400 --no-pager 2>/dev/null; } | grep -vE "$KERNEL_NOISE" | tail -n 50 ;;
+  # 100 dernières lignes du journal système, sans les connexions de Sentinel
   syslog)    TMP=$(mktemp); trap 'rm -f "$TMP"' EXIT
              if [ -r /var/log/syslog ]; then tail -n 400 /var/log/syslog > "$TMP"
              elif has_systemd; then journalctl -n 400 --no-pager -o short-iso > "$TMP"
              else echo "journal système illisible"; exit 0; fi
              drop_own_ssh "$TMP" | tail -n 100 ;;
+  # État de l'array Unraid et de ses disques, sinon RAID logiciel ou ZFS
   array)     if [ -f /var/local/emhttp/var.ini ]; then
                echo "== Array Unraid"; grep -E '^(mdState|fsState|mdResync|mdResyncAction|mdResyncPos|mdNumDisabled|mdNumInvalid|mdNumMissing|sbSynced|sbSyncErrs)=' /var/local/emhttp/var.ini
                echo; echo "== Disques (nom statut erreurs température système de fichiers)"
@@ -299,11 +322,15 @@ case "$CHECK" in
                command -v zpool >/dev/null 2>&1 && { echo; echo "== ZFS"; zpool status -x 2>&1 | head -n 40; }
                [ -r /proc/mdstat ] || command -v zpool >/dev/null 2>&1 || echo "Aucun array, RAID logiciel ou pool ZFS détecté"
              fi ;;
+  # Services systemd en échec
   failed-services) if has_systemd; then systemctl --failed --no-pager --plain; else no_systemd; fi ;;
+  # État d'un service précis
   service)   valid_unit "$ARG" || { echo "nom de service invalide"; exit 2; }
              if has_systemd; then systemctl status --no-pager -n 20 -- "$ARG"; else no_systemd; fi ;;
+  # 100 dernières lignes du journal d'un service précis
   journal)   valid_unit "$ARG" || { echo "nom de service invalide"; exit 2; }
              if has_systemd; then journalctl -u "$ARG" -n 100 --no-pager -o short-iso; else no_systemd; fi ;;
+  # Version de ce script (Sentinel signale quand il faut le recoller)
   version)   echo "sentinel-diag $SCRIPT_VERSION" ;;
   *)         echo "Contrôles disponibles : overview disk memory load processes mounts network kernel syslog array failed-services service <nom> journal <nom>" ;;
 esac
@@ -322,42 +349,66 @@ def installed_script_version(cfg: Optional[dict] = None) -> Optional[str]:
 
 
 def install_snippet(platform: str) -> str:
-    """Bloc à coller dans un terminal root du serveur (Linux classique ou Unraid)."""
+    """Bloc à coller dans un terminal root du serveur (Linux classique ou Unraid).
+
+    Les lignes qui modifient le serveur viennent en tête, sous des titres numérotés ;
+    le script de contrôles, plus long, vient en dernier pour que le bloc se relise facilement.
+    """
     pub = public_key()
     if not pub:
         raise DiagnosticError("générer d'abord la clé")
+    rule = "# " + "═" * 78 + "\n"
     if platform == "unraid":
         line = f'restrict,command="bash /boot/config/sentinel/sentinel-diag.sh" {pub}'
         return (
-            "# Unraid (6.9 ou plus récent) — à coller dans le terminal d'Unraid (root)\n"
+            rule
+            + "# Log-to-LLM Sentinel — diagnostic serveur pour Unraid (6.9 ou plus récent)\n"
+            "# À coller dans le terminal d'Unraid (root). Ce bloc :\n"
+            "#  1. autorise la clé de Sentinel à lancer UNIQUEMENT le script de contrôles,\n"
+            "#  2. installe ce script, en lecture seule, sur la clé USB d'Unraid.\n"
+            "# Seules les étapes 1 et 2 modifient le serveur ; la suite est le contenu du script.\n"
+            + rule
+            + "\n# 1. Clé de Sentinel, limitée au script (option restrict,command=)\n"
+            "#    sur la clé USB (restaurée par Unraid à chaque démarrage)…\n"
             "mkdir -p /boot/config/sentinel /boot/config/ssh/root\n"
-            "cat > /boot/config/sentinel/sentinel-diag.sh <<'SENTINEL_SCRIPT'\n"
-            f"{_script()}SENTINEL_SCRIPT\n"
             "touch /boot/config/ssh/root/authorized_keys\n"
             "sed -i '/sentinel-diag/d' /boot/config/ssh/root/authorized_keys\n"
             f"echo '{line}' >> /boot/config/ssh/root/authorized_keys\n"
-            "# Session en cours (la copie sur la clé USB est restaurée par Unraid au démarrage)\n"
+            "#    … et pour la session en cours\n"
             "mkdir -p /root/.ssh && chmod 700 /root/.ssh && touch /root/.ssh/authorized_keys\n"
             "if [ ! /root/.ssh/authorized_keys -ef /boot/config/ssh/root/authorized_keys ]; then\n"
             "  sed -i '/sentinel-diag/d' /root/.ssh/authorized_keys\n"
             f"  echo '{line}' >> /root/.ssh/authorized_keys\n"
             "fi\n"
             "chmod 600 /root/.ssh/authorized_keys\n"
-            "echo 'Sentinel : diagnostic installé. Utilisateur à renseigner : root'\n"
+            "\n# 2. Script de contrôles : tout ce qui suit, jusqu'à SENTINEL_SCRIPT\n"
+            "cat > /boot/config/sentinel/sentinel-diag.sh <<'SENTINEL_SCRIPT'\n"
+            f"{_script()}SENTINEL_SCRIPT\n"
+            "\necho 'Sentinel : diagnostic installé. Utilisateur à renseigner : root'\n"
         )
     line = f'restrict,command="/usr/local/bin/sentinel-diag" {pub}'
     return (
-        "# Linux (Debian, Ubuntu…) — à coller dans un terminal du serveur\n"
+        rule
+        + "# Log-to-LLM Sentinel — diagnostic serveur pour Linux (Debian, Ubuntu…)\n"
+        "# À coller dans un terminal du serveur. Ce bloc :\n"
+        "#  1. crée l'utilisateur système sentinel-diag (sans mot de passe ni sudo),\n"
+        "#  2. autorise la clé de Sentinel à lancer UNIQUEMENT le script de contrôles,\n"
+        "#  3. installe ce script, en lecture seule : /usr/local/bin/sentinel-diag.\n"
+        "# Seules les étapes 1 à 3 modifient le serveur ; la suite est le contenu du script.\n"
+        + rule
+        + "\n# 1. Utilisateur dédié, autorisé à lire les journaux système\n"
         "sudo useradd --system --create-home --shell /bin/bash sentinel-diag 2>/dev/null || true\n"
         "sudo usermod -aG systemd-journal,adm sentinel-diag 2>/dev/null || true\n"
-        "sudo tee /usr/local/bin/sentinel-diag >/dev/null <<'SENTINEL_SCRIPT'\n"
-        f"{_script()}SENTINEL_SCRIPT\n"
-        "sudo chmod 755 /usr/local/bin/sentinel-diag\n"
+        "\n# 2. Clé de Sentinel, limitée au script (option restrict,command=)\n"
         "sudo install -d -m 700 -o sentinel-diag -g sentinel-diag /home/sentinel-diag/.ssh\n"
         f"echo '{line}' | sudo tee /home/sentinel-diag/.ssh/authorized_keys >/dev/null\n"
         "sudo chown sentinel-diag: /home/sentinel-diag/.ssh/authorized_keys\n"
         "sudo chmod 600 /home/sentinel-diag/.ssh/authorized_keys\n"
-        "echo 'Sentinel : diagnostic installé. Utilisateur à renseigner : sentinel-diag'\n"
+        "\n# 3. Script de contrôles : tout ce qui suit, jusqu'à SENTINEL_SCRIPT\n"
+        "sudo tee /usr/local/bin/sentinel-diag >/dev/null <<'SENTINEL_SCRIPT'\n"
+        f"{_script()}SENTINEL_SCRIPT\n"
+        "sudo chmod 755 /usr/local/bin/sentinel-diag\n"
+        "\necho 'Sentinel : diagnostic installé. Utilisateur à renseigner : sentinel-diag'\n"
     )
 
 

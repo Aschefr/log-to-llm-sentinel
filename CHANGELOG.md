@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - **Diagnostics setup**: A single **Test and save** button per card tests the values typed in the form and saves them when the test succeeds (**Save anyway** is offered when it fails; an empty field disables). The proxy address and SSH user are now real pre-filled values matching the selected platform (docker compose / Unraid, Linux / Unraid) instead of placeholders, and the server address is pre-filled with the server IP from the general settings. The SSH test no longer requires saving first.
+- **Server diagnostics install block easier to review**: A header sums up what the block does, the few lines that change the server come first under numbered steps, and the read-only checks script comes last with a comment above each check (Docker noise filters are now named). The checks themselves are unchanged, so an already installed script does not need to be pasted again.
+
+### Fixed
+- **Configuration page auto-save and diagnostics**: Typing in the diagnostics fields no longer shows "Auto-saved" (those fields were never part of the general auto-save and were not saved).
+- The server diagnostics script no longer fails when run by hand outside an SSH session.
 
 ## [1.5.0] - 2026-11-02
 

@@ -59,6 +59,8 @@ Sentinel generates an SSH key. On the server, this key is only allowed to run on
 ### Step 2 — install on the server (CLI)
 Choose your platform, click **Copy** and paste the block in a terminal on the server.
 
+To review it before pasting: the header sums up what the block does, only the numbered steps change the server, and everything after them is the read-only checks script, with a comment above each check.
+
 **Linux (Debian, Ubuntu…)** — the block, run with `sudo`:
 - creates a system user `sentinel-diag` (member of `systemd-journal` and `adm` to read journals),
 - installs the script at `/usr/local/bin/sentinel-diag`,

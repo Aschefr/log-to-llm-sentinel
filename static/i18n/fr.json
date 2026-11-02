@@ -989,6 +989,7 @@
     "saved_ok": "enregistré",
     "disabled": "Champ vide enregistré : diagnostic désactivé.",
     "need_host": "Renseigne l'adresse du serveur et l'utilisateur.",
-    "saved_untested": "Enregistré sans test réussi."
+    "saved_untested": "Enregistré sans test réussi.",
+    "install_review": "Pour le relire : l'en-tête résume ce qu'il fait, seules les étapes numérotées modifient le serveur, et tout ce qui suit est le script de contrôles en lecture seule, commenté contrôle par contrôle."
   }
 }

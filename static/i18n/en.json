@@ -989,6 +989,7 @@
     "saved_ok": "saved",
     "disabled": "Empty field saved: diagnostics disabled.",
     "need_host": "Enter the server address and the user.",
-    "saved_untested": "Saved without a successful test."
+    "saved_untested": "Saved without a successful test.",
+    "install_review": "To review it: the header sums up what it does, only the numbered steps change the server, and everything after them is the read-only checks script, commented check by check."
   }
 }
