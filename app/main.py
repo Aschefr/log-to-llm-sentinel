@@ -95,6 +95,9 @@ meta_service = MetaAnalysisService(orchestrator=orchestrator)
 from app.services.resolution_service import ResolutionService
 resolution_service = ResolutionService(orchestrator=orchestrator)
 orchestrator.resolution_service = resolution_service
+from app.services.keyword_tuning import KeywordTuningService
+keyword_tuning = KeywordTuningService(orchestrator=orchestrator)
+orchestrator.keyword_tuning = keyword_tuning
 
 log_watcher = LogWatcher(on_new_lines=orchestrator.handle_new_lines)
 watcher_task = None
@@ -118,6 +121,8 @@ async def lifespan(app: FastAPI):
     config.set_orchestrator(orchestrator)
     rules.set_orchestrator(orchestrator)
     rules.set_resolution_service(resolution_service)
+    rules.set_keyword_tuning(keyword_tuning)
+    monitor_router.set_keyword_tuning(keyword_tuning)
     webhook_router.set_orchestrator(orchestrator)
 
     # Initialiser et démarrer le récepteur Syslog (UDP 514)
@@ -134,8 +139,11 @@ async def lifespan(app: FastAPI):
     print("[Main] LogWatcher démarré en background")
 
     # Reprendre les sessions d'auto-apprentissage interrompues par un redémarrage
-    from app.services.keyword_learning_service import resume_stuck_sessions
+    from app.services.keyword_learning_service import resume_stuck_sessions, set_tuning_service
+    set_tuning_service(keyword_tuning)
     asyncio.create_task(resume_stuck_sessions())
+    # Ajustement automatique des mots-clés : statistiques, angles morts, arbitrage périodique
+    asyncio.create_task(keyword_tuning.run_forever())
 
     # Nettoyage périodique des tâches d'arrière-plan (toutes les 30 min)
     async def _cleanup_tasks():
@@ -246,6 +254,10 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     log_watcher.stop()
+    try:
+        await keyword_tuning.flush()
+    except Exception:
+        pass
     from app.services.syslog_receiver import syslog_receiver
     asyncio.create_task(syslog_receiver.stop())
     if watcher_task:

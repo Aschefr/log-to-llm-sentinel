@@ -47,6 +47,11 @@ class Rule(Base):
     probe_target = Column(String, default="")                 # URL (http) ou hôte:port (tcp)
     probe_expect = Column(String, default="")                 # Codes HTTP attendus (ex. "200" ou "200,204") ; vide = 2xx/3xx
 
+    # ── Ajustement automatique des mots-clés (KW-2) ──
+    keyword_tuning_mode = Column(String, default="auto")      # 'auto' (l'IA arbitre et applique) | 'suggest' | 'off'
+    keyword_stats_json = Column(Text, default="{}")           # {"days": {date: {"lines": n, "hits": {motif: n}}}, "reviews": {motif: iso}}
+    keyword_tuned_at = Column(DateTime, nullable=True)        # Dernière revue par l'arbitre
+
     def get_keywords(self):
         import json
         try:
@@ -227,6 +232,7 @@ class Analysis(Base):
     resolution_ai_explanation = Column(Text, nullable=True)
     resolution_ai_confidence = Column(Integer, nullable=True)
     exclude_from_mttr = Column(Boolean, default=False)
+    feedback = Column(String, nullable=True)  # 'irrelevant' : signalée « pas pertinente » par l'utilisateur
 
 
 class ResolutionVerdict(Base):
@@ -398,8 +404,45 @@ class KeywordLearningSession(Base):
     raw_exclusions_json    = Column(Text, default="[]")              # exclusions brutes
     final_exclusions_json  = Column(Text, default="[]")              # exclusions retenues
     previous_keywords_json = Column(Text, default="[]")             # keywords avant learning (revert)
+    previous_exclusions_json = Column(Text, default="[]")           # exclusions avant learning
+    mode                   = Column(String, default="history")      # 'history' (période passée) | 'live' (observation)
+    summary_json           = Column(Text, default="{}")             # {lines, templates, blind_spots, changes: [ids]}
     refine_rationale_json  = Column(Text, default="{}")             # {keyword: raison}
     ollama_log_json        = Column(Text, default="[]")              # [{packet_idx, window, chars, keywords}]
     error_message          = Column(Text, nullable=True)
     created_at             = Column(DateTime, default=datetime.utcnow)
     validated_at           = Column(DateTime, nullable=True)
+
+
+class KeywordChange(Base):
+    """Journal des ajustements de mots-clés et d'exclusions : appliqués par l'arbitre IA, proposés
+    (mode suggestion ou garde-fou), refusés ou annulés. Un changement refusé ou annulé n'est plus reproposé."""
+    __tablename__ = "keyword_changes"
+    id = Column(Integer, primary_key=True, index=True)
+    rule_id = Column(Integer, index=True)
+    kind = Column(String)              # 'keyword' | 'exclusion'
+    action = Column(String)            # 'add' | 'remove'
+    value = Column(String)
+    origin = Column(String)            # 'blind_spot' | 'noise' | 'feedback' | 'learning' | 'chat'
+    status = Column(String, index=True)  # 'applied' | 'pending' | 'rejected' | 'reverted'
+    reason = Column(Text, default="")
+    confidence = Column(Integer, nullable=True)
+    hold_reason = Column(String, nullable=True)  # Pourquoi l'arbitre n'a pas appliqué lui-même (mode suggestion, garde-fou…)
+    evidence_json = Column(Text, default="{}")   # {examples: [...], count, per_day, severities}
+    session_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    decided_at = Column(DateTime, nullable=True)
+
+
+class KeywordTemplate(Base):
+    """Modèle de ligne d'erreur qu'aucun mot-clé n'attrape (angle mort), compté au fil de l'eau."""
+    __tablename__ = "keyword_templates"
+    id = Column(Integer, primary_key=True, index=True)
+    rule_id = Column(Integer, index=True)
+    signature = Column(String)
+    count = Column(Integer, default=0)
+    first_seen = Column(DateTime)
+    last_seen = Column(DateTime)
+    examples_json = Column(Text, default="[]")
+    status = Column(String, default="new")  # 'new' | 'ignored' | 'covered'
+    reviewed_count = Column(Integer, default=0)  # Nombre d'occurrences lors de la dernière revue

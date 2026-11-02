@@ -135,6 +135,7 @@ def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = 
                 "matched_keywords": _json.loads(a.matched_keywords_json) if a.matched_keywords_json else [],
                 "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
                 "resolution_status": a.resolution_status,
+                "feedback": a.feedback,
                 "resolution_line": a.resolution_line,
                 "resolution_patterns": _json.loads(a.resolution_patterns_json) if a.resolution_patterns_json else [],
                 "resolution_ai_explanation": a.resolution_ai_explanation,

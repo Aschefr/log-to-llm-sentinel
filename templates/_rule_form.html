@@ -87,25 +87,29 @@
         <section id="rf-detection" class="rf-card">
             <h2 data-i18n="rf.section_detection">Détection</h2>
             <div class="form-group">
-                <span class="rf-field-label" data-i18n="rf.keywords">Mots-clés déclencheurs</span>
-                <div class="kw-tabs" role="tablist">
-                    <button type="button" id="kw-tab-manual" class="kw-tab kw-tab--active" role="tab" aria-selected="true" onclick="kwTabSwitch('manual')"><span data-i18n="kw.tab_manual">Mots-clés manuels</span></button>
-                    <button type="button" id="kw-tab-auto" class="kw-tab" role="tab" aria-selected="false" onclick="kwTabSwitch('auto')"><span data-i18n="kw.tab_auto">Auto-apprentissage</span></button>
-                </div>
-                <div id="kw-panel-manual" class="kw-tab-panel">
-                    <input type="text" id="rule-keywords" list="keywords-suggestions" data-i18n-placeholder="rules.placeholder_keywords" placeholder="error, exception, fatal" aria-label="Mots-clés">
-                    <datalist id="keywords-suggestions"></datalist>
-                    <div class="keyword-chips" id="keyword-chips"></div>
-                    <div class="form-hint" data-i18n="rules.keywords_hint">Clique sur une suggestion pour l'ajouter, ou écris librement.</div>
-                </div>
-                <div id="kw-panel-auto" class="kw-tab-panel kw-tab-panel--hidden">
-                    <div id="kw-wizard" class="kw-wizard"><div id="kw-wizard-body" class="kw-wizard-body"></div></div>
-                </div>
+                <label class="rf-field-label" for="rule-keywords" data-i18n="rf.keywords">Mots-clés déclencheurs</label>
+                <input type="text" id="rule-keywords" list="keywords-suggestions" data-i18n-placeholder="rules.placeholder_keywords" placeholder="error, exception, fatal">
+                <datalist id="keywords-suggestions"></datalist>
+                <div class="keyword-chips" id="keyword-chips"></div>
+                <div class="form-hint" data-i18n="rf.keywords_hint_auto">Séparés par des virgules. Tu peux laisser vide : l'IA les propose d'après le journal.</div>
             </div>
             <div class="form-group">
                 <label for="rule-excluded-patterns" data-i18n="rf.exclusions">Lignes ignorées</label>
                 <input type="text" id="rule-excluded-patterns" placeholder="com.docker.backend, GET /app/settings, healthcheck…" data-i18n-placeholder="rules.placeholder_exclusions">
                 <div class="form-hint" data-i18n="rf.exclusions_hint">Une ligne contenant l'un de ces termes (séparés par des virgules) est ignorée, même si un mot-clé correspond.</div>
+            </div>
+            <div class="rf-sub">
+                <span class="rf-label" data-i18n="rf.tuning">Ajustement automatique par l'IA</span>
+                <div class="rf-seg" role="radiogroup" data-i18n-aria-label="rf.tuning" aria-label="Ajustement automatique par l'IA">
+                    <input type="radio" name="rule-keyword-tuning" id="kt-auto" value="auto" checked><label for="kt-auto" data-i18n="rf.tuning_auto">Automatique</label>
+                    <input type="radio" name="rule-keyword-tuning" id="kt-suggest" value="suggest"><label for="kt-suggest" data-i18n="rf.tuning_suggest">Suggestions</label>
+                    <input type="radio" name="rule-keyword-tuning" id="kt-off" value="off"><label for="kt-off" data-i18n="rf.tuning_off">Désactivé</label>
+                </div>
+                <span class="form-hint" id="rf-tuning-hint"></span>
+                <label class="rf-check hidden" id="rf-learn-history-row">
+                    <input type="checkbox" id="rule-learn-history" checked>
+                    <span data-i18n="rf.learn_history">Analyser les 7 derniers jours du journal à la création</span>
+                </label>
             </div>
             <div class="form-group">
                 <label for="rule-anti-spam" data-i18n="rf.grouping_window">Fenêtre de regroupement</label>
@@ -251,9 +255,6 @@
 
         <div class="form-actions rf-actions">
             <button type="button" id="cancel-rule" class="btn btn-secondary" data-i18n="common.cancel">Annuler</button>
-            <button type="button" id="kw-launch-main-btn" class="btn btn-primary hidden" onclick="_launchSession()">
-                <span data-i18n="kw.launch_full">Auto-apprentissage : Lancer l'analyse</span>
-            </button>
             <button type="submit" class="btn btn-primary" data-i18n="common.save">Enregistrer</button>
         </div>
     </div>

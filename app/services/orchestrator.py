@@ -14,6 +14,7 @@ from app.services.alert_analysis import (build_history, build_alert_messages, me
 from app.services.log_source import find_context
 from app.services.prompts import ALERT_SCHEMA, label
 from app.utils.log_utils import clean_log_line, aggregate_lines, line_signature
+from app.utils import keyword_match
 from app import logger
 from app.utils.notification_i18n import nt
 
@@ -35,6 +36,7 @@ class Orchestrator:
         self.ollama = OllamaService()
         self.notifier = NotificationService()
         self.resolution_service = None
+        self.keyword_tuning = None
         self._buffers = {}  # rule_id -> {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
         self._ollama_semaphore = asyncio.Semaphore(1)
 
@@ -53,27 +55,30 @@ class Orchestrator:
                 await self.resolution_service.on_new_lines(db_rule, lines)
 
             keywords = db_rule.get_keywords()
-            if not keywords:
-                logger.debug("Orchestrator", f"Règle '{db_rule.name}' : aucun mot-clé configuré, ignorée")
-                return
-
             excluded = db_rule.get_excluded_patterns()
 
-            # Filtrer les lignes contenant au moins un mot-clé
+            # Filtrer les lignes contenant au moins un mot-clé (les exclusions sont prioritaires)
             matching_lines = []
+            matched_keywords = set()
             for line in lines:
                 # 0. Skip oversized lines (defense-in-depth, BUG-01c)
                 if len(line) > 10_000:
                     logger.warning("Orchestrator", f"Ligne surdimensionnée ignorée ({len(line)} chars) pour '{db_rule.name}'")
                     continue
-                # 1. Exclusion patterns (negative keywords) — priorité max
-                if excluded and any(pat.lower() in line.lower() for pat in excluded):
+                status, hits = keyword_match.classify(line, keywords, excluded)
+                # Statistiques par motif et angles morts (lignes d'erreur qu'aucun mot-clé n'attrape)
+                if self.keyword_tuning:
+                    self.keyword_tuning.observe(db_rule.id, line, status, hits)
+                if status == "excluded":
                     logger.debug("Orchestrator", f"Ligne exclue (pattern d'exclusion) pour '{db_rule.name}' : {line[:80]}")
-                    continue
-                # 2. Positive keyword match
-                if any(kw.lower() in line.lower() for kw in keywords):
+                elif status == "matched":
                     matching_lines.append(line)
+                    matched_keywords.update(hits)
                     logger.debug("Orchestrator", f"Match '{db_rule.name}' | kw dans : {line[:120]}")
+
+            if not keywords:
+                logger.debug("Orchestrator", f"Règle '{db_rule.name}' : aucun mot-clé configuré, ignorée")
+                return
 
             if not matching_lines:
                 logger.debug("Orchestrator", f"Règle '{db_rule.name}' : aucune correspondance")
@@ -91,11 +96,7 @@ class Orchestrator:
 
             self._buffers[rule_id]["lines"].extend(matching_lines)
 
-            # Collecter les mots-clés matchés
-            for line in matching_lines:
-                for kw in keywords:
-                    if kw.lower() in line.lower():
-                        self._buffers[rule_id]["matched_keywords"].add(kw)
+            self._buffers[rule_id]["matched_keywords"].update(matched_keywords)
 
             # Démarrer le timer anti-spam si pas déjà en cours
             if self._buffers[rule_id]["task"] is None:

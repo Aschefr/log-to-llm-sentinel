@@ -28,7 +28,7 @@ Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. 
 - 🩺 **Read-only Infrastructure Diagnostics**: Instead of telling you to run `docker ps` or `df -h`, the chat AI can check container state, health, restarts and logs, and server disks, memory, network shares and services itself — through a read-only Docker socket proxy and an SSH key restricted to a fixed list of checks. See [Diagnostics](docs/en/features/diagnostics.md).
 - 📊 **AI Meta-Analysis**: Get the big picture. Schedule daily, weekly, or monthly reports that aggregate multiple detections into a high-level summary of your system's health and trends.
 
-- 🤖 **Keyword Auto-Learning**: Not sure what to look for? Let the AI scan your historical logs. It will automatically suggest and validate the most important keywords to monitor.
+- 🤖 **Self-tuning keywords**: Not sure what to look for? Leave the keywords empty: the local AI reads the log history, adds keywords for the errors nothing catches, and removes the noise — every change checked against your data and undoable.
 - 📨 **Syslog Server & Relay**: Turn Sentinel into a remote syslog UDP server (listening on port 10514 UDP on host). Ingest remote logs (e.g., from Unraid) and optionally forward them to a secondary syslog server as a relay.
 - 🔗 **Home Assistant Ready**: Use Webhooks to stream logs from your smart home directly to Sentinel.
 - 🔔 **Smart Notifications**: Integrated with SMTP and Apprise (Discord, Telegram, Slack). Sentinel intelligently adapts to character limits by asking the local AI to generate concise summaries when needed, ensuring critical alerts always fit your favorite messaging platform.
@@ -96,12 +96,12 @@ Once the containers are started, open your browser and go to the port you chose 
 3. **AI Kick-in**: When a match is found, Sentinel grabs the surrounding lines and sends them to your local AI.
 4. **Get Notified**: You receive a notification with a summary of the situation and the AI's diagnosis.
 
-### 💡 The "Auto-Learning" Magic
-Setting up keywords can be tedious. Use the **Auto-Learning Wizard**:
-- Select a time period (e.g., "The next 24 hours").
-- Sentinel will "read" your logs in chunks.
-- It identifies recurring errors and asks the AI to refine a list of "Actionable Keywords."
-- **Result**: A perfectly tuned monitoring rule.
+### 💡 Self-tuning keywords
+Setting up keywords can be tedious, so Sentinel keeps them up to date by itself:
+- A new rule analyzes the last 7 days of its log: the AI proposes the keywords that matter.
+- Every hour, error lines that no keyword catches ("blind spots") and keywords that only produce noise are reviewed by the local AI.
+- Flag an alert **Not relevant** and the AI adds the right exclusion.
+- Every change is checked against your data first (it must appear in the real lines, must not hide important alerts…), logged in the rule's **Keywords** tab and can be undone in one click. Prefer to approve each change? Switch the rule to *Suggestions*.
 
 ### 📊 Meta-Analysis: The Big Picture
 For long-term monitoring, use **Meta-Analysis**:

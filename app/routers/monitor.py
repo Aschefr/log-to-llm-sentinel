@@ -25,6 +25,12 @@ def set_resolution_service(res_service):
     global _resolution_service
     _resolution_service = res_service
 
+_keyword_tuning: Optional[Any] = None
+
+def set_keyword_tuning(service):
+    global _keyword_tuning
+    _keyword_tuning = service
+
 
 @router.post("/notify/{analysis_id}")
 async def notify_analysis(analysis_id: int):
@@ -151,6 +157,27 @@ def mark_analysis_viewed(analysis_id: int):
         db.close()
 
 
+@router.post("/analyses/{analysis_id}/feedback")
+async def set_analysis_feedback(analysis_id: int, value: str = "irrelevant"):
+    """Signale une alerte « pas pertinente » (value=irrelevant) ou retire le signalement (value=none).
+    L'arbitre des mots-clés réexamine aussitôt la règle : exclusion ou retrait du mot-clé fautif."""
+    if value not in ("irrelevant", "none"):
+        raise HTTPException(status_code=422, detail="invalid_feedback")
+    db = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="analysis_not_found")
+        analysis.feedback = None if value == "none" else value
+        rule_id = analysis.rule_id
+        db.commit()
+    finally:
+        db.close()
+    if value == "irrelevant" and _keyword_tuning:
+        asyncio.create_task(_keyword_tuning.review_rule(rule_id, focus_analysis_id=analysis_id))
+    return {"status": "ok", "feedback": None if value == "none" else value}
+
+
 @router.post("/rules/{rule_id}/view-all")
 def mark_all_analyses_viewed(rule_id: int):
     """Marque toutes les analyses d'une règle comme consultées/lues."""
@@ -266,6 +293,7 @@ def get_rule_analyses(rule_id: int, limit: int = Query(20)):
                 "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
                 "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
                 "resolution_status": a.resolution_status,
+                "feedback": a.feedback,
                 "resolution_line": a.resolution_line,
                 "resolution_patterns": json.loads(a.resolution_patterns_json or "[]"),
                 "resolution_ai_explanation": a.resolution_ai_explanation,
@@ -303,6 +331,7 @@ def search_by_detection_id(id: str = Query(..., description="ID de détection à
                 "analyzed_at": analysis.analyzed_at.isoformat() if analysis.analyzed_at else None,
                 "resolved_at": analysis.resolved_at.isoformat() if analysis.resolved_at else None,
                 "resolution_status": analysis.resolution_status,
+                "feedback": analysis.feedback,
                 "resolution_line": analysis.resolution_line,
                 "resolution_patterns": json.loads(analysis.resolution_patterns_json or "[]"),
                 "resolution_ai_explanation": analysis.resolution_ai_explanation,

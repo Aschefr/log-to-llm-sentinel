@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Self-tuning keywords**: The local AI acts as an arbiter that keeps each rule's keywords and exclusions up to date. Sentinel counts, per day, the lines matched by every keyword and exclusion, and groups the error lines that no keyword catches ("blind spots") into templates. Every hour the arbiter decides (structured output) to add a keyword for recurring blind spots, and to keep, exclude or remove noisy keywords (mostly `info` alerts, or alerts flagged *Not relevant*). Each decision is checked against the data before being applied: the keyword or exclusion must literally appear in the real lines, must not be generic or contain a variable part, an exclusion must not hide a `warning`/`critical` alert of the last 30 days nor neutralize a keyword, the last keyword is never removed. Checked decisions are applied (mode *Automatic*, default); the others are offered for review. Rejected or undone changes are never proposed again, and manual edits win. One notification sums up each review.
+- **Keywords tab** on the rule page: tuning mode (*Automatic*, *Suggestions*, *Off*), *Review now*, history analysis and observation, changes to review with their reason and the lines involved, keywords with alerts over 30 days (severities), lines per day, last alert and origin, exclusions with lines ignored per day, a warning when an exclusion neutralizes a keyword, blind spots being watched, change history with undo.
+- **Not relevant** button on alert cards: the arbiter reviews the rule right away and targets those lines with a precise exclusion.
+- A new rule analyzes the last 7 days of its log on creation (option in the form), so its keywords can be left empty.
+- Keyword changes made from the chat (with confirmation) are logged in the rule's history and can be undone there.
+
+### Changed
+- **Keyword learning rewritten**: instead of sending the first characters of each time packet to the AI, a session reads the whole period in a single pass (current and rotated `.1` file), groups every line into templates and gives the arbiter the blind spots and, per keyword, the templates it catches. Lines without a timestamp (stack traces) belong to the previous line; time zones are honored. Sessions are *Analyze history* (last 1-30 days) or *Observe* (next 1-24 hours) and their changes can be undone at once. The former wizard (period, granularity, packets, YES/NO cross-validation, up to ten notifications per session) is removed.
+- **Keyword matching**: a keyword or exclusion that is a number or 3 characters or fewer must now match a whole word (`502` no longer matches a port `:50231` or an interface `vethb68c502`, `oom` no longer matches `zoom`). Longer keywords still match as substrings.
+- *Ignore these lines…* (recurring events) now opens the Keywords tab with the exclusion pre-filled.
+
+### Fixed
+- Keyword learning no longer replaces the whole keyword and exclusion lists (manual entries were lost), restores the exclusions on revert, saves candidate exclusions during the scan, and no longer copies the examples of its own prompt as keywords or exclusions.
+- The old per-session debug logs (`data/learning_logs/`), which contained raw log lines, are deleted after 30 days.
+
 ## [1.5.1] - 2026-11-02
 
 ### Changed

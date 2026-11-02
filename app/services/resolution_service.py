@@ -13,6 +13,7 @@ from app.utils.notification_i18n import nt
 from app.services.alert_analysis import analysis_lines, short_summary, messages_to_text, _format_duration
 from app.services.app_config import config_to_dict, llm_options
 from app.services.log_source import resolve_path, read_tail_lines
+from app.utils import keyword_match
 from app.services.prompts import RESOLUTION_SCHEMA, RESOLUTION_SYSTEM, resolution_label
 from app.services.probe_service import run_probe, PROBE_TYPES
 from app import logger
@@ -114,10 +115,7 @@ def _tail(log_file_path: str, n: int = 30) -> List[str]:
 
 def _is_error_line(line: str, keywords: List[str], excluded: List[str]) -> bool:
     """Même critère que l'orchestrateur : la ligne déclencherait la règle."""
-    low = line.lower()
-    if any(p.lower() in low for p in excluded):
-        return False
-    return any(k.lower() in low for k in keywords)
+    return keyword_match.classify(line, keywords, excluded)[0] == "matched"
 
 
 def _is_learnable_pattern(pattern: str, keywords: List[str], error_lines: List[str], context_lines: List[str]) -> bool:

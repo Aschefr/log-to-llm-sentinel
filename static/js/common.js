@@ -611,6 +611,8 @@ function renderAnalysisCard(a, opts = {}) {
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); retryAnalysis(${a.id}, this)">🔄 ${_t('common.retry', 'Retry')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); notifyAnalysis(${a.id}, this)">🔔 ${_t('common.notify', 'Notify')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); togglePromptView(${a.id}, this)" title="${_t('common.view_prompt_title', 'Show the exact messages sent to the LLM')}">📜 ${_t('common.view_prompt', 'Prompt')}</button>
+                    ${a.rule_id ? `<button class="btn btn-secondary btn-sm${a.feedback === 'irrelevant' ? ' is-flagged' : ''}" onclick="event.stopPropagation(); toggleIrrelevant(${a.id}, this)" aria-pressed="${a.feedback === 'irrelevant'}"
+                        title="${_t('common.irrelevant_title', 'L’IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne')}">👎 ${a.feedback === 'irrelevant' ? _t('common.irrelevant_done', 'Signalée pas pertinente') : _t('common.irrelevant', 'Pas pertinente')}</button>` : ''}
                     ${a.rule_id && !opts.hideRuleLink ? `<a class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" href="/rules/${a.rule_id}?analysis=${a.id}#analyses">🔍 ${_t('common.view_rule', 'Voir dans la règle')}</a>` : ''}
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openChat(${a.id})">💬 ${_t('common.deepen', 'Deepen')}</button>
@@ -618,6 +620,26 @@ function renderAnalysisCard(a, opts = {}) {
             </div>
         </div>
     </div>`;
+}
+
+/** Flags (or unflags) an alert as not relevant: the keyword arbiter reviews the rule right away. */
+async function toggleIrrelevant(analysisId, btn) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    const flagged = btn.getAttribute('aria-pressed') === 'true';
+    btn.disabled = true;
+    try {
+        await apiFetch(`/api/monitor/analyses/${analysisId}/feedback?value=${flagged ? 'none' : 'irrelevant'}`, { method: 'POST' });
+        btn.setAttribute('aria-pressed', String(!flagged));
+        btn.classList.toggle('is-flagged', !flagged);
+        btn.textContent = '👎 ' + (flagged ? _t('common.irrelevant', 'Pas pertinente') : _t('common.irrelevant_done', 'Signalée pas pertinente'));
+        if (!flagged && typeof showToast === 'function') {
+            showToast(_t('common.irrelevant_toast', 'Merci : l’IA réexamine les mots-clés de la règle.'), 'success');
+        }
+    } catch (e) {
+        alert(e.message);
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 // Cache of viewed analysis IDs to avoid duplicate network requests

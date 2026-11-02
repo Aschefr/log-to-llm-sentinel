@@ -7,7 +7,11 @@ import json
 import os
 
 from app.database import SessionLocal
-from app.models import Rule, Analysis, GlobalConfig, ResolutionVerdict
+from app.models import (Rule, Analysis, GlobalConfig, ResolutionVerdict, KeywordChange, KeywordTemplate,
+                        KeywordLearningSession)
+from app.services import keyword_tuning as kt
+from app.services import keyword_learning_service as kls
+from app.utils import keyword_match
 from app.services.orchestrator import Orchestrator
 from app.services.app_config import config_to_dict
 from app.services import rule_stats
@@ -17,6 +21,7 @@ from app.utils.log_utils import clean_log_line
 router = APIRouter(prefix="/api/rules", tags=["rules"])
 orchestrator = None
 resolution_service = None
+keyword_tuning = None
 
 CALM_MODES = ("adaptive", "fixed")
 AI_MODES = ("ambiguous", "always", "never")
@@ -31,6 +36,11 @@ def set_orchestrator(o):
 def set_resolution_service(s):
     global resolution_service
     resolution_service = s
+
+
+def set_keyword_tuning(s):
+    global keyword_tuning
+    keyword_tuning = s
 
 
 def _choice(value, allowed, field):
@@ -67,6 +77,8 @@ class RuleCreate(BaseModel):
     probe_type: str = "none"
     probe_target: str = ""
     probe_expect: str = ""
+    keyword_tuning_mode: str = "auto"
+    learn_history: bool = True  # Lancer l'apprentissage sur les 7 derniers jours à la création
 
 
 class RuleUpdate(BaseModel):
@@ -98,6 +110,7 @@ class RuleUpdate(BaseModel):
     probe_type: Optional[str] = None
     probe_target: Optional[str] = None
     probe_expect: Optional[str] = None
+    keyword_tuning_mode: Optional[str] = None
 
 
 class PatternBody(BaseModel):
@@ -267,13 +280,16 @@ def get_rule(rule_id: int):
             "probe_type": rule.probe_type or "none",
             "probe_target": rule.probe_target or "",
             "probe_expect": rule.probe_expect or "",
+            "keyword_tuning_mode": rule.keyword_tuning_mode or "auto",
+            "keyword_pending": db.query(KeywordChange).filter(KeywordChange.rule_id == rule.id,
+                                                              KeywordChange.status == "pending").count(),
         }
     finally:
         db.close()
 
 
 @router.post("")
-def create_rule(rule_data: RuleCreate):
+async def create_rule(rule_data: RuleCreate):
     db = SessionLocal()
     try:
         rule = Rule(
@@ -300,6 +316,7 @@ def create_rule(rule_data: RuleCreate):
             probe_type=_choice(rule_data.probe_type, PROBE_CHOICES, "probe_type"),
             probe_target=rule_data.probe_target.strip(),
             probe_expect=rule_data.probe_expect.strip(),
+            keyword_tuning_mode=_choice(rule_data.keyword_tuning_mode, kt.MODES, "keyword_tuning_mode"),
         )
         rule.set_keywords(rule_data.keywords)
         rule.set_excluded_patterns(rule_data.excluded_patterns)
@@ -315,7 +332,14 @@ def create_rule(rule_data: RuleCreate):
         except Exception:
             pass
 
-        return {"id": rule.id, "message": "Règle créée"}
+        # Apprentissage initial : l'arbitre propose ou complète les mots-clés d'après l'historique
+        session_id = None
+        if rule_data.learn_history and rule.keyword_tuning_mode != "off":
+            try:
+                session_id = kls.start_session(rule.id, "history", 168)
+            except Exception:
+                session_id = None
+        return {"id": rule.id, "message": "Règle créée", "learning_session_id": session_id}
     finally:
         db.close()
 
@@ -332,6 +356,7 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.name = rule_data.name
         if rule_data.log_file_path is not None:
             rule.log_file_path = rule_data.log_file_path
+        old_keywords, old_excluded = rule.get_keywords(), rule.get_excluded_patterns()
         if rule_data.keywords is not None:
             rule.set_keywords(rule_data.keywords)
         if rule_data.application_context is not None:
@@ -385,6 +410,10 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.probe_target = rule_data.probe_target.strip()
         if rule_data.probe_expect is not None:
             rule.probe_expect = rule_data.probe_expect.strip()
+        if rule_data.keyword_tuning_mode is not None:
+            rule.keyword_tuning_mode = _choice(rule_data.keyword_tuning_mode, kt.MODES, "keyword_tuning_mode")
+        # Une modification à la main prime sur l'arbitre : il ne revient pas dessus
+        kt.sync_manual_edit(db, rule, old_keywords, old_excluded)
 
         db.commit()
 
@@ -408,6 +437,8 @@ def delete_rule(rule_id: int):
         if not rule:
             raise HTTPException(status_code=404, detail="rule_not_found")
         db.delete(rule)
+        db.query(KeywordChange).filter(KeywordChange.rule_id == rule_id).delete()
+        db.query(KeywordTemplate).filter(KeywordTemplate.rule_id == rule_id).delete()
         db.commit()
 
         # Recharger les règles Syslog
@@ -816,3 +847,89 @@ def download_rule_log(rule_id: int):
         )
     finally:
         db.close()
+
+
+# ── Mots-clés : statistiques, ajustements de l'arbitre, décisions (KW-2) ────────────
+
+def _round1(v):
+    return None if v is None else round(v, 1)
+
+
+@router.get("/{rule_id}/keywords")
+def get_rule_keywords(rule_id: int):
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="rule_not_found")
+        stats = kt.load_stats(rule)
+        alerts = kt.alert_stats(db, rule)
+        changes = db.query(KeywordChange).filter(KeywordChange.rule_id == rule_id) \
+            .order_by(KeywordChange.created_at.desc()).limit(300).all()
+
+        def origin_of(kind, value):
+            for c in changes:
+                if c.kind == kind and c.action == "add" and c.status == "applied" and c.value.lower() == value.lower():
+                    return c.origin, rule_stats.iso(c.decided_at or c.created_at)
+            return "manual", None
+
+        keywords, excluded = rule.get_keywords(), rule.get_excluded_patterns()
+        neutralized = keyword_match.neutralized(keywords, excluded)
+        kw_rows = []
+        for kw in keywords:
+            a = alerts.get(kw) or {"alerts": 0, "severities": {}, "irrelevant": [], "last_at": None}
+            origin, added_at = origin_of("keyword", kw)
+            kw_rows.append({"value": kw, "alerts_30d": a["alerts"], "severities": dict(a["severities"]),
+                            "irrelevant": len(a["irrelevant"]), "last_alert_at": rule_stats.iso(a["last_at"]),
+                            "lines_per_day": _round1(kt.pattern_daily_hits(stats, "k", kw)),
+                            "origin": origin, "added_at": added_at, "neutralized_by": neutralized.get(kw)})
+        ex_rows = []
+        for ex in excluded:
+            origin, added_at = origin_of("exclusion", ex)
+            ex_rows.append({"value": ex, "lines_per_day": _round1(kt.pattern_daily_hits(stats, "x", ex)),
+                            "origin": origin, "added_at": added_at})
+        days = sorted(stats.get("days", {}).items())[-7:]
+        watching = db.query(KeywordTemplate).filter(KeywordTemplate.rule_id == rule_id, KeywordTemplate.status == "new") \
+            .order_by(KeywordTemplate.count.desc()).limit(10).all()
+        session = kls.get_session_status(rule.last_learning_session_id) if rule.last_learning_session_id else None
+        return {
+            "mode": rule.keyword_tuning_mode or "auto",
+            "tuned_at": rule_stats.iso(rule.keyword_tuned_at),
+            "lines_per_day": round(sum(d.get("lines", 0) for _, d in days) / len(days), 1) if days else None,
+            "keywords": kw_rows,
+            "exclusions": ex_rows,
+            "pending": [kt.change_dict(c) for c in changes if c.status == "pending"],
+            "history": [kt.change_dict(c) for c in changes if c.status != "pending"][:50],
+            "watching": [{"signature": t.signature, "count": t.count, "last_seen": rule_stats.iso(t.last_seen),
+                          "example": (json.loads(t.examples_json or "[]") or [""])[0][:300]} for t in watching],
+            "session": session,
+        }
+    finally:
+        db.close()
+
+
+@router.post("/{rule_id}/keyword-changes/{change_id}/{action}")
+def decide_keyword_change(rule_id: int, change_id: int, action: str):
+    if action not in ("accept", "reject", "revert"):
+        raise HTTPException(status_code=422, detail="invalid_action")
+    db = SessionLocal()
+    try:
+        change = db.query(KeywordChange).filter(KeywordChange.id == change_id, KeywordChange.rule_id == rule_id).first()
+        if not change:
+            raise HTTPException(status_code=404, detail="change_not_found")
+        error = kt.decide(db, change, action)
+        if error:
+            raise HTTPException(status_code=409, detail=error)
+        db.commit()
+        return kt.change_dict(change)
+    finally:
+        db.close()
+
+
+@router.post("/{rule_id}/keywords/review")
+async def review_rule_keywords(rule_id: int):
+    """Demande une revue immédiate à l'arbitre (en tâche de fond)."""
+    if not keyword_tuning:
+        raise HTTPException(status_code=503, detail="keyword_tuning_unavailable")
+    asyncio.create_task(keyword_tuning.review_rule(rule_id))
+    return {"status": "started"}

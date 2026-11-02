@@ -350,3 +350,128 @@ RESOLUTION_LABELS = {
 def resolution_label(lang: str, key: str, **kwargs) -> str:
     text = RESOLUTION_LABELS.get(lang, RESOLUTION_LABELS["fr"]).get(key) or RESOLUTION_LABELS["fr"][key]
     return text.format(**kwargs) if kwargs else text
+
+
+# ── Arbitre des mots-clés (ajustement automatique, KW-2) ─────────────────────────
+
+KEYWORD_ARBITER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "blind_spots": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "template": {"type": "integer", "description": "Numéro du modèle de ligne (T1 → 1)"},
+                    "reason": {"type": "string"},
+                    "decision": {"type": "string", "enum": ["add_keyword", "ignore"]},
+                    "keyword": {"type": "string", "description": "Partie exacte et constante des exemples (vide si ignore)"},
+                    "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+                },
+                "required": ["template", "reason", "decision", "keyword", "confidence"],
+            },
+        },
+        "noise": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "keyword": {"type": "string"},
+                    "reason": {"type": "string"},
+                    "decision": {"type": "string", "enum": ["keep", "add_exclusion", "remove_keyword"]},
+                    "exclusion": {"type": "string", "description": "Partie exacte et constante des lignes inutiles (vide sinon)"},
+                    "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+                },
+                "required": ["keyword", "reason", "decision", "exclusion", "confidence"],
+            },
+        },
+    },
+    "required": ["blind_spots", "noise"],
+}
+
+KEYWORD_ARBITER_SYSTEM = {
+    "fr": """Tu es l'arbitre qui ajuste les mots-clés d'une règle de surveillance de logs.
+Une ligne déclenche une alerte si elle contient un mot-clé et aucun motif d'exclusion (sous-chaîne, insensible à la casse).
+Objectif : alerter sur les problèmes qui demandent une action (panne, échec, sécurité, perte de données, ressource épuisée), sans bruit.
+
+Angles morts — lignes d'erreur qu'aucun mot-clé n'attrape. Pour chaque modèle T :
+- add_keyword seulement si l'événement demande une action de l'utilisateur (service en panne ou qui redémarre en boucle, stockage
+  ou réseau perdu, sécurité, données en danger). Le mot-clé est une partie exacte et constante des exemples, copiée telle quelle :
+  2 à 5 mots, sans valeur variable (nombre, identifiant, adresse, date, nom de fichier), assez spécifique pour ne pas attraper de lignes normales.
+- ignore si c'est attendu ou sans action possible : erreur passagère qui se résout seule, arrêt forcé ou redémarrage normal d'un conteneur,
+  outil de maintenance ou de mise à jour, tentative isolée gérée par l'application, détail d'un composant tiers.
+- Un même événement produit souvent plusieurs lignes (cause, code de sortie, conséquence) : un seul mot-clé suffit, sur la ligne la plus explicite ;
+  ignore les autres modèles de cet événement, et ceux déjà couverts par un mot-clé que tu ajoutes.
+
+Bruit — mots-clés qui déclenchent surtout des alertes de faible importance. Pour chaque mot-clé :
+- keep si des alertes restent utiles et qu'aucune exclusion ne sépare proprement les lignes inutiles.
+- add_exclusion si un groupe de lignes inutiles se distingue : l'exclusion est une partie exacte et constante de ces lignes, absente des lignes utiles.
+- remove_keyword si le mot-clé n'attrape que des lignes inutiles.
+Les lignes marquées [irrelevant] ont été signalées « pas pertinente » par l'utilisateur : vise-les avec une exclusion précise
+(la partie constante qui les distingue) plutôt que de retirer un mot-clé qui attrape aussi des alertes utiles.
+
+confidence (0 à 100) : ta certitude que la décision améliore la règle. En dessous de 70, la décision est proposée à l'utilisateur au lieu d'être appliquée.
+N'invente rien : appuie-toi uniquement sur les lignes fournies. Réponds pour chaque modèle T et chaque mot-clé listés.""",
+    "en": """You are the arbiter that tunes the keywords of a log monitoring rule.
+A line triggers an alert when it contains a keyword and no exclusion pattern (substring, case-insensitive).
+Goal: alert on problems that need action (outage, failure, security, data loss, exhausted resource), without noise.
+
+Blind spots — error lines that no keyword catches. For each template T:
+- add_keyword only if the event needs the user to act (service down or restarting in a loop, storage or network lost,
+  security, data at risk). The keyword is an exact, constant part of the examples, copied as is:
+  2 to 5 words, no variable value (number, identifier, address, date, file name), specific enough not to catch normal lines.
+- ignore if it is expected or not actionable: transient error that resolves itself, forced stop or normal restart of a container,
+  maintenance or update tool, isolated attempt handled by the application, third-party detail.
+- One event often produces several lines (cause, exit code, consequence): one keyword is enough, on the most explicit line;
+  ignore the other templates of that event, and those already covered by a keyword you add.
+
+Noise — keywords that mostly trigger low-importance alerts. For each keyword:
+- keep if some alerts are still useful and no exclusion cleanly separates the useless lines.
+- add_exclusion if a group of useless lines stands out: the exclusion is an exact, constant part of those lines, absent from the useful ones.
+- remove_keyword if the keyword only catches useless lines.
+Lines marked [irrelevant] were flagged "not relevant" by the user: target them with a precise exclusion
+(the constant part that sets them apart) rather than removing a keyword that also catches useful alerts.
+
+confidence (0 to 100): how sure you are that the decision improves the rule. Below 70, the decision is offered to the user instead of being applied.
+Do not invent anything: rely only on the lines provided. Answer for every listed template T and keyword.""",
+}
+
+KEYWORD_LABELS = {
+    "fr": {
+        "rule": "Règle : {name}",
+        "app_context": "Contexte de l'application : {context}",
+        "keywords": "Mots-clés actuels : {keywords}",
+        "exclusions": "Exclusions actuelles : {exclusions}",
+        "none": "(aucun)",
+        "period": "Période observée : {period}",
+        "blind_title": "=== Angles morts : lignes d'erreur qu'aucun mot-clé n'attrape ===",
+        "blind_item": "T{n} ×{count} (≈ {per_day} par jour, du {first} au {last})",
+        "noise_title": "=== Bruit : mots-clés à examiner ===",
+        "noise_item": "Mot-clé « {keyword} » : {alerts} alerte(s) sur 30 jours ({severities}), {irrelevant} signalée(s) « pas pertinente » par l'utilisateur ; ≈ {per_day} ligne(s) par jour.",
+        "noise_lines": "  Lignes déclenchées :",
+        "noise_line": "  - ×{count} [{severity}] {example}",
+        "example": "  ex. : {example}",
+        "nothing": "(rien à examiner)",
+    },
+    "en": {
+        "rule": "Rule: {name}",
+        "app_context": "Application context: {context}",
+        "keywords": "Current keywords: {keywords}",
+        "exclusions": "Current exclusions: {exclusions}",
+        "none": "(none)",
+        "period": "Observed period: {period}",
+        "blind_title": "=== Blind spots: error lines that no keyword catches ===",
+        "blind_item": "T{n} ×{count} (≈ {per_day} per day, from {first} to {last})",
+        "noise_title": "=== Noise: keywords to review ===",
+        "noise_item": "Keyword \"{keyword}\": {alerts} alert(s) over 30 days ({severities}), {irrelevant} flagged \"not relevant\" by the user; ≈ {per_day} line(s) per day.",
+        "noise_lines": "  Triggered lines:",
+        "noise_line": "  - ×{count} [{severity}] {example}",
+        "example": "  e.g.: {example}",
+        "nothing": "(nothing to review)",
+    },
+}
+
+
+def keyword_label(lang: str, key: str, **kwargs) -> str:
+    text = KEYWORD_LABELS.get(lang, KEYWORD_LABELS["fr"]).get(key) or KEYWORD_LABELS["fr"][key]
+    return text.format(**kwargs) if kwargs else text

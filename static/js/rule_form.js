@@ -189,6 +189,9 @@ function setupRuleForm(opts = {}) {
         .forEach(el => el.addEventListener('change', updateResolutionUI));
     const notifyEl = document.getElementById('rule-notify');
     if (notifyEl) notifyEl.addEventListener('change', updateResolutionUI);
+    document.querySelectorAll('input[name="rule-keyword-tuning"]')
+        .forEach(el => el.addEventListener('change', updateTuningUI));
+    window.i18n?.onLanguageChange(updateTuningUI);
 
     const probeBtn = document.getElementById('rf-probe-test');
     if (probeBtn) probeBtn.addEventListener('click', testProbe);
@@ -364,8 +367,10 @@ function resetForm() {
     // Quick templates are offered for a new rule only
     const tpl = document.getElementById('modal-quick-templates');
     if (tpl) tpl.classList.remove('hidden');
-    // Reset the keyword learning wizard and return to manual tab
-    if (typeof kwWizardReset === 'function') kwWizardReset();
+    _setRadio('rule-keyword-tuning', 'auto');
+    document.getElementById('rule-learn-history').checked = true;
+    document.getElementById('rf-learn-history-row').classList.remove('hidden');
+    updateTuningUI();
 }
 
 /* ── Save rule ─────────────────────────────────────────────────────────────── */
@@ -408,20 +413,28 @@ function _ruleFormData() {
         probe_type: document.getElementById('rule-probe-type').value,
         probe_target: document.getElementById('rule-probe-target').value,
         probe_expect: document.getElementById('rule-probe-expect').value,
+        keyword_tuning_mode: _radioValue('rule-keyword-tuning', 'auto'),
     };
+}
+
+/** Hint of the keyword tuning mode; the history option is offered for a new rule only. */
+function updateTuningUI() {
+    const hint = document.getElementById('rf-tuning-hint');
+    if (!hint) return;
+    const mode = _radioValue('rule-keyword-tuning', 'auto');
+    const t = (k, fb) => { const v = window.t ? window.t(k) : null; return v && v !== k ? v : fb; };
+    hint.textContent = {
+        auto: t('rf.tuning_auto_hint', "L'IA ajoute les mots-clés qui manquent et écarte le bruit, après des vérifications sur tes données. Chaque changement est annulable dans l'onglet Mots-clés."),
+        suggest: t('rf.tuning_suggest_hint', "L'IA propose ; tu valides chaque changement dans l'onglet Mots-clés."),
+        off: t('rf.tuning_off_hint', 'Les mots-clés ne changent que lorsque tu les modifies.'),
+    }[mode];
+    document.getElementById('rf-learn-history-row')?.classList.toggle('dimmed', mode === 'off');
 }
 
 async function saveRule() {
     const id = document.getElementById('rule-id').value;
     const data = _ruleFormData();
-
-    // If on manual tab, clear the learning session link so the auto tab
-    // is not selected next time
-    const autoTabActive = document.getElementById('kw-tab-auto')
-        ?.classList.contains('kw-tab--active');
-    if (!autoTabActive && id) {
-        data.last_learning_session_id = -1; // sentinel: clear session link
-    }
+    if (!id) data.learn_history = document.getElementById('rule-learn-history').checked;
 
     try {
         let savedId = id;
@@ -432,10 +445,6 @@ async function saveRule() {
             savedId = res.id;
         }
 
-        // Clean up wizard state if we were on the manual tab
-        if (!autoTabActive && typeof kwWizardReset === 'function') {
-            kwWizardReset();
-        }
         if (_ruleFormOnSave) _ruleFormOnSave(parseInt(savedId), !id);
     } catch (error) {
         console.error('Erreur sauvegarde règle:', error);
@@ -493,12 +502,9 @@ async function editRule(id) {
             document.getElementById('file-preview-container')?.classList.add('hidden');
         }
 
-        // Only open auto-learning tab if the rule still has a linked session.
-        if (rule.last_learning_session_id && typeof kwWizardLoadSession === 'function') {
-            await kwWizardLoadSession(rule.last_learning_session_id);
-        } else if (typeof kwWizardReset === 'function') {
-            kwWizardReset();
-        }
+        _setRadio('rule-keyword-tuning', rule.keyword_tuning_mode || 'auto');
+        document.getElementById('rf-learn-history-row').classList.add('hidden');
+        updateTuningUI();
         return rule;
     } catch (error) {
         console.error('Erreur chargement règle:', error);

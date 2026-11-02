@@ -13,7 +13,7 @@ const RP = {
     focusAnalysisId: null,
     verdictLimit: 10,
 };
-const TABS = ['overview', 'log', 'analyses', 'resolution', 'settings'];
+const TABS = ['overview', 'log', 'analyses', 'resolution', 'keywords', 'settings'];
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 function T(key, fallback, vars) {
@@ -81,7 +81,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     setupRuleForm({
         onSave: (id, isNew) => {
-            if (isNew) { window.location.href = `/rules/${id}#overview`; return; }
+            if (isNew) {
+                // A new rule starts by learning its keywords from the log history (unless disabled)
+                const learning = document.getElementById('rule-learn-history')?.checked
+                    && document.querySelector('input[name="rule-keyword-tuning"]:checked')?.value !== 'off';
+                window.location.href = `/rules/${id}#${learning ? 'keywords' : 'overview'}`;
+                return;
+            }
             loadHeader();
             flash(document.getElementById('tab-settings'), T('rule.saved', 'Réglages enregistrés.'));
         },
@@ -91,11 +97,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             selectTab('overview');
         },
     });
-    window.onKeywordSessionStarted = (ruleId, sessionId, isNew) => {
-        if (isNew) { window.location.href = `/rules/${ruleId}#settings`; return; }
-        kwWizardLoadSession(sessionId);
-    };
-    window.onKeywordSessionChanged = () => { if (RP.id) loadHeader(); };
 
     if (!RP.id) {
         document.getElementById('rp-name').textContent = T('rule.new_title', 'Nouvelle règle');
@@ -161,6 +162,9 @@ function selectTab(tab) {
     else if (tab === 'log') renderLogTab();
     else if (tab === 'analyses') { loadAnalyses(true); RP.timers.push(setInterval(pollAnalyses, 20000)); }
     else if (tab === 'resolution') { renderResolution(); RP.timers.push(setInterval(renderResolution, 20000)); }
+    else if (tab === 'keywords') renderKeywords();
+    // The AI arbiter may have changed the keywords since the form was filled
+    else if (tab === 'settings' && RP.id) editRule(RP.id);
 }
 
 /* ── Header ────────────────────────────────────────────────────────────────── */
@@ -191,6 +195,7 @@ async function loadHeader() {
             pill.textContent = T('rule.status_normal', 'Normal');
         }
 
+        setKwBadge(rule.keyword_pending || 0);
         const counts = (await apiFetch(`/api/dashboard/recent?limit=1&rule_id=${RP.id}`)).counts || {};
         const badge = document.getElementById('rp-unread-badge');
         badge.textContent = counts.unread || '';
@@ -384,19 +389,11 @@ function nextCheckText(iso) {
     return m <= 0 ? T('rule.check_imminent', 'imminente') : T('rule.in_minutes', 'dans {d}', { d: fmtMinutes(m) });
 }
 
-/** Pre-fills the exclusion field with the most specific literal part of a recurring event. */
+/** Opens the Keywords tab with the most specific literal part of a recurring event in the exclusion field. */
 function proposeExclusion(signature) {
     const parts = signature.split(/<[A-Z]+>|\[×\d+\]/).map(p => p.trim()).filter(p => p.length > 3);
-    const best = parts.sort((a, b) => b.length - a.length)[0] || '';
-    goToSettings('rf-detection');
-    const input = document.getElementById('rule-excluded-patterns');
-    if (input && best) {
-        const current = input.value.split(',').map(x => x.trim()).filter(Boolean);
-        if (!current.includes(best)) current.push(best);
-        input.value = current.join(', ');
-        input.focus();
-        input.setSelectionRange(input.value.length - best.length, input.value.length);
-    }
+    RP.kwPrefill = parts.sort((a, b) => b.length - a.length)[0] || '';
+    selectTab('keywords');
 }
 
 function goToSettings(sectionId) {

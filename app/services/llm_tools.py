@@ -362,17 +362,16 @@ async def apply_action(action_id: int) -> dict:
         params = json.loads(act.params_json or "{}")
         try:
             if act.action in ("add_excluded_pattern", "add_keyword", "remove_keyword"):
+                from app.models import KeywordChange
+                from app.services.keyword_tuning import apply_change_to_rule
                 rule = _rule(db, params["rule_id"])
-                if act.action == "add_excluded_pattern":
-                    pats = rule.get_excluded_patterns()
-                    if params["value"] not in pats:
-                        rule.set_excluded_patterns(pats + [params["value"]])
-                elif act.action == "add_keyword":
-                    kws = rule.get_keywords()
-                    if params["value"] not in kws:
-                        rule.set_keywords(kws + [params["value"]])
-                else:
-                    rule.set_keywords([k for k in rule.get_keywords() if k != params["value"]])
+                kind, change = {"add_excluded_pattern": ("exclusion", "add"), "add_keyword": ("keyword", "add"),
+                                "remove_keyword": ("keyword", "remove")}[act.action]
+                if apply_change_to_rule(rule, kind, change, params["value"]):
+                    # Journal des mots-clés de la règle (annulable depuis l'onglet Mots-clés)
+                    db.add(KeywordChange(rule_id=rule.id, kind=kind, action=change, value=params["value"],
+                                         origin="chat", status="applied", reason=(act.reason or "")[:1000],
+                                         decided_at=datetime.utcnow()))
                 db.commit()
             elif act.action == "mark_resolved":
                 from app.main import resolution_service

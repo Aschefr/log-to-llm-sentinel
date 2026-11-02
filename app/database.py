@@ -129,6 +129,14 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN ssh_host VARCHAR DEFAULT ''",
         "ALTER TABLE global_config ADD COLUMN ssh_port INTEGER DEFAULT 22",
         "ALTER TABLE global_config ADD COLUMN ssh_user VARCHAR DEFAULT ''",
+        # KW-2: ajustement automatique des mots-clés (tables keyword_changes / keyword_templates créées par create_all)
+        "ALTER TABLE rules ADD COLUMN keyword_tuning_mode VARCHAR DEFAULT 'auto'",
+        "ALTER TABLE rules ADD COLUMN keyword_stats_json TEXT DEFAULT '{}'",
+        "ALTER TABLE rules ADD COLUMN keyword_tuned_at DATETIME DEFAULT NULL",
+        "ALTER TABLE analyses ADD COLUMN feedback VARCHAR DEFAULT NULL",
+        "ALTER TABLE keyword_learning_sessions ADD COLUMN previous_exclusions_json TEXT DEFAULT '[]'",
+        "ALTER TABLE keyword_learning_sessions ADD COLUMN mode VARCHAR DEFAULT 'history'",
+        "ALTER TABLE keyword_learning_sessions ADD COLUMN summary_json TEXT DEFAULT '{}'",
     ]
 
     with engine.connect() as conn:

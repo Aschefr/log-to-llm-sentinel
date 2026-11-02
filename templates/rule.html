@@ -31,6 +31,7 @@
         <a href="#log" data-tab="log" role="tab" data-i18n="rule.tab_log">Journal en direct</a>
         <a href="#analyses" data-tab="analyses" role="tab"><span data-i18n="rule.tab_analyses">Analyses</span> <span id="rp-unread-badge" class="rp-count hidden"></span></a>
         <a href="#resolution" data-tab="resolution" role="tab" data-i18n="rule.tab_resolution">Résolution</a>
+        <a href="#keywords" data-tab="keywords" role="tab"><span data-i18n="rule.tab_keywords">Mots-clés</span> <span id="rp-kw-badge" class="rp-count hidden"></span></a>
         <a href="#settings" data-tab="settings" role="tab" data-i18n="rule.tab_settings">Réglages</a>
     </nav>
 
@@ -54,6 +55,7 @@
         <div id="an-list" class="rp-analyses"></div>
     </section>
     <section id="tab-resolution" class="rp-panel hidden" role="tabpanel"></section>
+    <section id="tab-keywords" class="rp-panel hidden" role="tabpanel"></section>
     <section id="tab-settings" class="rp-panel hidden" role="tabpanel">
         {% include '_rule_form.html' %}
     </section>
@@ -61,7 +63,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/rule_form.js?v=1"></script>
-<script src="/static/js/keyword_wizard.js?v=10"></script>
-<script src="/static/js/rule_page.js?v=2"></script>
+<script src="/static/js/rule_form.js?v=3"></script>
+<script src="/static/js/rule_page.js?v=3"></script>
+<script src="/static/js/rule_keywords.js?v=2"></script>
 {% endblock %}
