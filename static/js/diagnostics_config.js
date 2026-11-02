@@ -88,6 +88,7 @@ function renderKey(pub) {
     document.getElementById('diag-pubkey').classList.toggle('hidden', !has);
     document.getElementById('diag-key-generate').classList.toggle('hidden', has);
     document.getElementById('diag-key-regenerate').classList.toggle('hidden', !has);
+    document.getElementById('diag-ssh-remove').classList.toggle('hidden', !has);
     renderSnippet();
 }
 
@@ -100,6 +101,8 @@ async function renderSnippet() {
     try {
         const res = await apiFetch(`/api/diagnostics/ssh/install?platform=${DIAG.platform.ssh}`);
         pre.textContent = res.snippet;
+        const un = await apiFetch(`/api/diagnostics/ssh/uninstall?platform=${DIAG.platform.ssh}`);
+        document.getElementById('diag-ssh-uninstall').textContent = un.snippet;
     } catch (e) {
         pre.textContent = e.message;
     }
@@ -210,6 +213,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('diag-ssh-test').addEventListener('click', testAndSaveSsh);
+    document.getElementById('diag-ssh-forget').addEventListener('click', (e) => {
+        showInlineConfirm(e.currentTarget, dT('diag.forget_confirm', 'Effacer l’adresse et l’utilisateur ? L’IA n’aura plus accès au serveur.'), async () => {
+            if (await saveDiag({ ssh_host: '', ssh_user: '' }, 'diag-ssh-forget-result')) {
+                document.getElementById('diag-ssh-host').value = '';
+                document.getElementById('diag-ssh-user').value = DIAG_DEFAULTS.ssh[DIAG.platform.ssh];
+                document.getElementById('diag-ssh-output').classList.add('hidden');
+                diagResult('diag-ssh-result', null, '');
+                diagResult('diag-ssh-forget-result', true, dT('diag.forgotten', '✓ Serveur oublié : diagnostic serveur désactivé.'));
+            }
+        });
+    });
     document.getElementById('diag-ssh-save').addEventListener('click', async (e) => {
         const btn = e.currentTarget;
         if (await saveDiag(sshFields(), 'diag-ssh-result')) {

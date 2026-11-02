@@ -412,5 +412,39 @@ def install_snippet(platform: str) -> str:
     )
 
 
+def uninstall_snippet(platform: str) -> str:
+    """Bloc qui défait exactement ce qu'a installé install_snippet (ne dépend pas de la clé)."""
+    rule = "# " + "═" * 78 + "\n"
+    if platform == "unraid":
+        return (
+            rule
+            + "# Log-to-LLM Sentinel — retrait du diagnostic serveur pour Unraid\n"
+            "# À coller dans le terminal d'Unraid (root). Retire la clé de Sentinel et son script.\n"
+            + rule
+            + "# 1. Clé de Sentinel : retirée de la clé USB et de la session en cours\n"
+            "[ -f /boot/config/ssh/root/authorized_keys ] && sed -i '/sentinel-diag/d' /boot/config/ssh/root/authorized_keys\n"
+            "if [ -f /root/.ssh/authorized_keys ] && [ ! /root/.ssh/authorized_keys -ef /boot/config/ssh/root/authorized_keys ]; then\n"
+            "  sed -i '/sentinel-diag/d' /root/.ssh/authorized_keys\n"
+            "fi\n"
+            "# 2. Script de contrôles\n"
+            "rm -f /boot/config/sentinel/sentinel-diag.sh\n"
+            "rmdir /boot/config/sentinel 2>/dev/null\n"
+            "echo 'Sentinel : accès retiré.'\n"
+        )
+    return (
+        rule
+        + "# Log-to-LLM Sentinel — retrait du diagnostic serveur pour Linux\n"
+        "# À coller dans un terminal du serveur. Retire la clé de Sentinel, son script et son utilisateur.\n"
+        + rule
+        + "# 1. Clé de Sentinel (retirée en premier : plus aucune connexion possible)\n"
+        "sudo rm -f /home/sentinel-diag/.ssh/authorized_keys\n"
+        "# 2. Script de contrôles\n"
+        "sudo rm -f /usr/local/bin/sentinel-diag\n"
+        "# 3. Utilisateur dédié et son dossier personnel\n"
+        "sudo userdel -r sentinel-diag 2>/dev/null || true\n"
+        "echo 'Sentinel : accès retiré.'\n"
+    )
+
+
 def as_text(value) -> str:
     return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=1, default=str)

@@ -91,9 +91,13 @@ Click **Test and save**: the values typed in the form are tested and saved only 
 The script carries a version number. When a new Sentinel version improves it, **Test and save** warns that the installed script is outdated: paste the step 2 block again (the key does not change).
 
 ### Revoking access
-- Linux: `sudo userdel -r sentinel-diag && sudo rm /usr/local/bin/sentinel-diag`
-- Unraid: remove the line containing `sentinel-diag` from `/boot/config/ssh/root/authorized_keys` (and `/root/.ssh/authorized_keys`), then `rm -r /boot/config/sentinel`.
-- Or **Regenerate** the key in Sentinel: the previous key stops working everywhere.
+Once the key exists, **Configuration › Diagnostics › Server › Remove access** shows the block that undoes the installation for the platform chosen in step 2:
+- Linux: removes the key from `/home/sentinel-diag/.ssh/authorized_keys`, deletes `/usr/local/bin/sentinel-diag`, then the `sentinel-diag` user and its home folder.
+- Unraid: removes the line containing `sentinel-diag` from `/boot/config/ssh/root/authorized_keys` (and from `/root/.ssh/authorized_keys` when it is a separate file), then deletes `/boot/config/sentinel/sentinel-diag.sh` and its folder.
+
+Then click **Forget the server in Sentinel** to clear the address and user (server diagnostics are disabled and the tools are no longer offered to the AI).
+
+You can also **Regenerate** the key in Sentinel: the previous key stops working everywhere, since Sentinel no longer holds it.
 
 ---
 

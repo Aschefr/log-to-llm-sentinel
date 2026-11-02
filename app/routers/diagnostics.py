@@ -88,6 +88,13 @@ def ssh_install(platform: str = "linux"):
         _error(e)
 
 
+@router.get("/ssh/uninstall")
+def ssh_uninstall(platform: str = "linux"):
+    if platform not in ("linux", "unraid"):
+        raise HTTPException(status_code=422, detail="platform: linux ou unraid")
+    return {"platform": platform, "snippet": diag.uninstall_snippet(platform)}
+
+
 @router.post("/ssh/test")
 async def test_ssh(body: Optional[DiagSettings] = None):
     """Teste les valeurs saisies (body) sans les enregistrer ; à défaut, la configuration enregistrée."""

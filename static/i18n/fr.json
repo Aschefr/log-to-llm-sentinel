@@ -990,6 +990,11 @@
     "disabled": "Champ vide enregistré : diagnostic désactivé.",
     "need_host": "Renseigne l'adresse du serveur et l'utilisateur.",
     "saved_untested": "Enregistré sans test réussi.",
-    "install_review": "Pour le relire : l'en-tête résume ce qu'il fait, seules les étapes numérotées modifient le serveur, et tout ce qui suit est le script de contrôles en lecture seule, commenté contrôle par contrôle."
+    "install_review": "Pour le relire : l'en-tête résume ce qu'il fait, seules les étapes numérotées modifient le serveur, et tout ce qui suit est le script de contrôles en lecture seule, commenté contrôle par contrôle.",
+    "remove_title": "Retirer l'accès",
+    "remove_hint": "Colle ce bloc dans un terminal du serveur (plateforme choisie à l'étape 2) : il retire la clé de Sentinel et le script, et Sentinel ne peut plus se connecter. Oublie ensuite le serveur dans Sentinel.",
+    "forget_server": "Oublier le serveur dans Sentinel",
+    "forget_confirm": "Effacer l'adresse et l'utilisateur ? L'IA n'aura plus accès au serveur.",
+    "forgotten": "✓ Serveur oublié : diagnostic serveur désactivé."
   }
 }

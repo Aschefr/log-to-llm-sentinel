@@ -990,6 +990,11 @@
     "disabled": "Empty field saved: diagnostics disabled.",
     "need_host": "Enter the server address and the user.",
     "saved_untested": "Saved without a successful test.",
-    "install_review": "To review it: the header sums up what it does, only the numbered steps change the server, and everything after them is the read-only checks script, commented check by check."
+    "install_review": "To review it: the header sums up what it does, only the numbered steps change the server, and everything after them is the read-only checks script, commented check by check.",
+    "remove_title": "Remove access",
+    "remove_hint": "Paste this block in a terminal on the server (platform chosen in step 2): it removes Sentinel's key and the script, so Sentinel can no longer connect. Then forget the server in Sentinel.",
+    "forget_server": "Forget the server in Sentinel",
+    "forget_confirm": "Clear the address and user? The AI will no longer have access to the server.",
+    "forgotten": "✓ Server forgotten: server diagnostics disabled."
   }
 }

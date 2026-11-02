@@ -503,6 +503,16 @@
                             <pre class="diag-code hidden" id="diag-ssh-output"></pre>
                         </li>
                     </ol>
+                    <details class="diag-howto hidden" id="diag-ssh-remove">
+                        <summary data-i18n="diag.remove_title">Retirer l'accès</summary>
+                        <p class="form-hint" data-i18n="diag.remove_hint">Colle ce bloc dans un terminal du serveur (plateforme choisie à l'étape 2) : il retire la clé de Sentinel et le script, et Sentinel ne peut plus se connecter. Oublie ensuite le serveur dans Sentinel.</p>
+                        <pre class="diag-code" id="diag-ssh-uninstall"></pre>
+                        <div class="diag-actions">
+                            <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-ssh-uninstall" data-i18n="common.copy">Copier</button>
+                            <button type="button" class="btn btn-secondary btn-sm" id="diag-ssh-forget" data-i18n="diag.forget_server">Oublier le serveur dans Sentinel</button>
+                            <span class="form-hint" id="diag-ssh-forget-result"></span>
+                        </div>
+                    </details>
                 </div>
             </div>
         </section>
@@ -558,5 +568,5 @@
 
 {% block scripts %}
 <script src="/static/js/config.js?v=5"></script>
-<script src="/static/js/diagnostics_config.js?v=3"></script>
+<script src="/static/js/diagnostics_config.js?v=4"></script>
 {% endblock %}
