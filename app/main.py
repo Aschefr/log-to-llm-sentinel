@@ -251,6 +251,8 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_inactivity_checker())
     asyncio.create_task(_resolution_checker())
     asyncio.create_task(_pattern_decay_checker())
+    from app.utils import loop_watchdog
+    loop_watchdog.start()  # signale dans les logs ce qui bloque la boucle principale
 
     yield
 
