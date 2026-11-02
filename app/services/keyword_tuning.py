@@ -347,17 +347,24 @@ class KeywordTuningService:
                                          f"{basis.get('alerts')} alerts of the last 30 days were info or not relevant"))
             dismiss_pending(db, rule)
             recent = await asyncio.to_thread(lambda: read_tail_lines(resolve_path(rule.log_file_path))[-5000:])
+            # Origine absente (versions précédentes) : un motif appris porte une date de validation, un motif manuel non
+            origin_of = lambda p: p.get("origin") or ("learned" if p.get("last_validated_at") else "manual")
+            learned_active = sum(1 for p in rule.get_weighted_resolution_patterns()
+                                 if p.get("status", "active") == "active" and origin_of(p) in ("learned", "autopilot"))
             for item in rule.get_weighted_resolution_patterns():
-                status, origin = item.get("status", "active"), item.get("origin")
+                status, origin = item.get("status", "active"), origin_of(item)
                 # Suggestions en attente et motifs appris déjà actifs passent les garde-fous ; ceux écrits à la main restent
                 if status == "suggested" or (status == "active" and origin in ("learned", "autopilot")):
                     safe = ap.pattern_is_safe(db, rule, item["pattern"], recent)
                     if status == "suggested":
+                        safe = safe and learned_active < ap.AUTOPILOT_PATTERNS_MAX
                         rule.set_pattern_status(item["pattern"], "active" if safe else "rejected", origin="autopilot" if safe else None)
                         if safe:
+                            learned_active += 1
                             lines.append(f"- {'Motif de retour à la normale' if fr else 'Return-to-normal pattern'} `{item['pattern']}`")
                     elif not safe:
                         rule.set_pattern_status(item["pattern"], "rejected")
+                        learned_active -= 1
                         lines.append(f"- {'Motif de retour à la normale retiré (il apparaît aussi dans les erreurs ou presque partout)' if fr else 'Return-to-normal pattern removed (also in errors or almost everywhere)'} `{item['pattern']}`")
             db.commit()
             name, notify = rule.name, rule.notify_on_match

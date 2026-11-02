@@ -33,7 +33,8 @@ STATE_VERSION = 2               # 2 : seuil de notification géré
 NOTIFY_MIN_ALERTS = 10          # alertes sur 30 jours avant de juger le seuil de notification
 NOTIFY_LOW_SHARE = 0.7          # part d'alertes « info » (ou signalées pas pertinentes) qui fait passer à « warning »
 SEVERITIES = ("info", "warning", "critical")
-PATTERN_MAX_SHARE = 0.2         # un motif de retour à la normale présent dans plus de 20 % des lignes ne signale rien
+PATTERN_MAX_SHARE = 0.05        # un motif de retour à la normale présent dans plus de 5 % des lignes ne signale rien
+PATTERN_ERROR_DISTANCE = 3      # … ni un motif qui apparaît à 3 lignes ou moins d'une ligne d'alerte
 AUTOPILOT_PATTERNS_MAX = 8      # motifs appris actifs au plus, par règle
 OBSERVE_HOURS = 24
 OBSERVE_MAX_ROUNDS = 7          # une source toujours muette n'est pas observée indéfiniment
@@ -270,18 +271,30 @@ def apply_notification_threshold(db, rule: Rule) -> bool:
 
 
 def pattern_is_safe(db, rule: Rule, pattern: str, recent_lines: List[str]) -> bool:
-    """Garde-fous d'un motif de retour à la normale appliqué sans validation : absent de toutes les lignes ayant
-    déclenché une alerte depuis 30 jours, et pas présent dans une grande partie des lignes du journal (il ne
-    signalerait plus rien)."""
+    """Garde-fous d'un motif de retour à la normale appliqué sans validation :
+    - spécifique : assez long, ni générique, ni mot d'échec, sans valeur variable (horodatage, identifiant…),
+      sans recouvrir un mot-clé ;
+    - absent de toutes les lignes ayant déclenché une alerte depuis 30 jours ;
+    - rare dans le journal (au plus 5 % des lignes : sinon il ne signale rien) ;
+    - jamais à 3 lignes ou moins d'une ligne d'alerte (il accompagnerait l'erreur au lieu de signaler sa fin)."""
     from app.services.alert_analysis import analysis_lines
-    low = pattern.lower()
+    from app.services.keyword_tuning import _has_variable_part
+    from app.services.resolution_service import FAILURE_WORDS, GENERIC_PATTERNS, LEARNED_PATTERN_MIN_LEN
+    low = pattern.lower().strip()
+    keywords, excluded = rule.get_keywords(), rule.get_excluded_patterns()
+    if len(low) < LEARNED_PATTERN_MIN_LEN or low in GENERIC_PATTERNS or FAILURE_WORDS.search(low) \
+            or _has_variable_part(pattern) or any(k.lower() in low or low in k.lower() for k in keywords):
+        return False
     since = datetime.utcnow() - timedelta(days=30)
     for a in db.query(Analysis).filter(Analysis.rule_id == rule.id, Analysis.analyzed_at >= since).all():
         if any(low in l.lower() for l in analysis_lines(a)):
             return False
     if recent_lines:
-        share = sum(1 for l in recent_lines if low in l.lower()) / len(recent_lines)
-        if share > PATTERN_MAX_SHARE:
+        hits = [i for i, l in enumerate(recent_lines) if low in l.lower()]
+        if len(hits) / len(recent_lines) > PATTERN_MAX_SHARE:
+            return False
+        errors = [i for i, l in enumerate(recent_lines) if keyword_match.classify(l, keywords, excluded)[0] == "matched"]
+        if any(abs(h - e) <= PATTERN_ERROR_DISTANCE for h in hits for e in errors):
             return False
     return True
 
