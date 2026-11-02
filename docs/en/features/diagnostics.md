@@ -79,7 +79,14 @@ The block can be pasted again safely (it replaces its previous key line).
 Click **Save**, then **Test the connection**: the output of the `overview` check is shown with the server's key fingerprint, which Sentinel remembers (connections fail if it changes).
 
 ### Available checks
-`overview`, `disk`, `memory`, `load`, `processes`, `mounts`, `network`, `kernel`, `syslog`, `failed-services`, `service <name>`, `journal <name>` (systemd checks answer "systemd unavailable" on Unraid).
+`overview`, `disk`, `memory`, `load`, `processes`, `mounts`, `network`, `kernel`, `syslog`, `array`, `failed-services`, `service <name>`, `journal <name>`.
+
+- `array`: on Unraid, the array state (started, sync errors, resync, disabled/invalid disks) and each disk's status, error count, temperature and file system; elsewhere, software RAID (`/proc/mdstat`) and ZFS pools (`zpool status -x`).
+- `kernel` and `network` leave out Docker's network noise (veth, bridges); `syslog` leaves out Sentinel's own SSH sessions.
+- Unraid has no systemd: `service`, `journal` and `failed-services` point to `syslog`, `array` and `processes` instead.
+
+### Updating the script
+The script carries a version number. When a new Sentinel version improves it, **Test the connection** warns that the installed script is outdated: paste the step 2 block again (the key does not change).
 
 ### Revoking access
 - Linux: `sudo userdel -r sentinel-diag && sudo rm /usr/local/bin/sentinel-diag`

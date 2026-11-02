@@ -9,7 +9,9 @@ All notable changes to this project will be documented in this file.
 - **Server diagnostics (restricted SSH)**: Sentinel generates an SSH key and the block to paste on the server (Linux or Unraid variant). On the server the key is restricted (`restrict,command=`) to a script that only runs a fixed list of read-only checks: overview, disk, memory, load, processes, network shares, network, kernel messages, system log, failed services, service status and journal. Service names are validated on both sides; the server's key fingerprint is pinned on first connection.
 - **Configuration › Diagnostics**: Proxy address with a connection test, key generation, copy-ready install blocks for Linux and Unraid, connection test showing the server overview. Diagnostic tools are only offered to the AI once configured, and only in the chat and investigations (never in the automatic alert analysis).
 - **Docker configurator**: Platform choice (docker compose or Unraid step-by-step), optional Docker diagnostics service, syslog port mapping. The repository `docker-compose.yml` includes the optional proxy.
-- **Diagnostics guide**: `docs/en/features/diagnostics.md` (what to type on the server, what to fill in Sentinel, how to revoke).
+- **Unraid-aware checks** (validated on Unraid 7.3): `array` reports the array state and each disk's status, errors and temperature (software RAID / ZFS elsewhere); systemd checks point to `syslog`, `array` and `processes` on Unraid; Docker network noise and Sentinel's own SSH sessions are filtered out of `kernel`, `network` and `syslog`; "containers with problems" ignores containers stopped on purpose (never started, exit code 0 or 143).
+- **Script versioning**: the connection test warns when the script installed on the server is older than the one Sentinel ships, so the block can be pasted again.
+- **Diagnostics guide**: `docs/en/features/diagnostics.md` (what to type on the server, what to fill in Sentinel, how to revoke, how to update the script).
 
 ### Changed
 - The Docker image now includes `openssh-client` (used only by server diagnostics).

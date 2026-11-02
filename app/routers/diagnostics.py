@@ -92,6 +92,8 @@ def ssh_install(platform: str = "linux"):
 async def test_ssh():
     try:
         out = await asyncio.to_thread(diag.run_host_check, "overview")
-        return {"ok": True, "output": out[:3000], "host_fingerprint": diag.host_fingerprint()}
+        version = await asyncio.to_thread(diag.installed_script_version)
+        return {"ok": True, "output": out[:3000], "host_fingerprint": diag.host_fingerprint(),
+                "script_version": version, "script_outdated": version != diag.DIAG_SCRIPT_VERSION}
     except diag.DiagnosticError as e:
         return {"ok": False, "error": str(e)}

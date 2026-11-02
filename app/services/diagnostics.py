@@ -31,7 +31,7 @@ UNIT_RE = re.compile(r"^[A-Za-z0-9@._:-]{1,80}$")
 # Contrôles serveur : nom → prend un argument (nom de service). Doit correspondre au script installé sur le serveur.
 HOST_CHECKS = {
     "overview": False, "disk": False, "memory": False, "load": False, "processes": False,
-    "mounts": False, "network": False, "kernel": False, "syslog": False,
+    "mounts": False, "network": False, "kernel": False, "syslog": False, "array": False,
     "failed-services": False, "service": True, "journal": True,
 }
 
@@ -211,14 +211,14 @@ def generate_key(force: bool = False) -> str:
     return public_key()
 
 
-def run_host_check(check: str, arg: Optional[str] = None, cfg: Optional[dict] = None) -> str:
+def run_host_check(check: str, arg: Optional[str] = None, cfg: Optional[dict] = None, _raw: Optional[str] = None) -> str:
     cfg = cfg or settings()
     if not availability(cfg)["host"]:
         raise DiagnosticError("diagnostic serveur non configuré")
     if check not in HOST_CHECKS:
         raise DiagnosticError(f"contrôle inconnu « {check} » (disponibles : {', '.join(HOST_CHECKS)})")
-    words = [check]
-    if HOST_CHECKS[check]:
+    words = [_raw] if _raw else [check]
+    if HOST_CHECKS[check] and not _raw:
         if not arg or not UNIT_RE.match(arg):
             raise DiagnosticError("nom de service invalide")
         words.append(arg)
@@ -247,35 +247,78 @@ def host_fingerprint() -> Optional[str]:
 
 # ── Script installé sur le serveur ──────────────────────────────────────────────
 
+DIAG_SCRIPT_VERSION = "2"  # à incrémenter à chaque modification du script : Sentinel signale un script à mettre à jour
+
 DIAG_SCRIPT = r'''#!/bin/bash
 # Log-to-LLM Sentinel — diagnostic en lecture seule.
 # Appelé uniquement par la clé SSH de Sentinel (option command= dans authorized_keys) :
 # seuls les contrôles ci-dessous sont possibles, aucune autre commande n'est exécutée.
 set -u
+SCRIPT_VERSION=@VERSION@
 read -r -a ARGS <<< "${SSH_ORIGINAL_COMMAND:-help}"
 CHECK="${ARGS[0]:-help}"
 ARG="${ARGS[1]:-}"
+CLIENT_IP="${SSH_CONNECTION%% *}"
 valid_unit() { [[ "$1" =~ ^[A-Za-z0-9@._:-]{1,80}$ ]]; }
 has_systemd() { command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; }
+no_systemd() {
+  if [ -f /etc/unraid-version ]; then echo "Unraid n'utilise pas systemd : utiliser les contrôles syslog, array, processes ou les outils Docker."
+  else echo "systemd indisponible sur ce système"; fi
+}
+# Retire les lignes dues aux connexions de Sentinel lui-même (sessions SSH venant de son adresse)
+drop_own_ssh() {
+  [ -n "$CLIENT_IP" ] || { cat "$1"; return; }
+  local pids
+  pids=$(grep -F "$CLIENT_IP" "$1" 2>/dev/null | grep -oE 'sshd(-session)?\[[0-9]+\]' | grep -oE '[0-9]+' | sort -u | paste -sd'|')
+  if [ -n "$pids" ]; then grep -vE "sshd(-session)?\[($pids)\]" "$1"; else cat "$1"; fi
+}
 DF_EXCL="-x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs"
 case "$CHECK" in
   overview)  uptime; echo; free -m; echo; df -hT $DF_EXCL 2>/dev/null ;;
   disk)      df -hT $DF_EXCL 2>/dev/null; echo; df -i $DF_EXCL 2>/dev/null | head -n 20 ;;
   memory)    free -m; echo; grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree|Dirty|Committed_AS)' /proc/meminfo ;;
   load)      uptime; echo "CPU : $(nproc)"; cat /proc/loadavg ;;
-  processes) ps -eo pid,user,%cpu,%mem,etime,comm --sort=-%cpu | head -n 16; echo; ps -eo pid,user,%mem,rss,comm --sort=-%mem | head -n 11 ;;
+  processes) ps -eo pid,ppid,user,%cpu,%mem,etime,comm --sort=-%cpu | awk -v me=$$ 'NR==1 || ($1!=me && $2!=me && $7!~/^sshd/)' | cut -c1-120 | head -n 16
+             echo; ps -eo pid,user,%mem,rss,comm --sort=-%mem | head -n 11 ;;
   mounts)    (findmnt -rn -t nfs,nfs4,cifs,smb3,fuse.sshfs,fuse.shfs -o TARGET,SOURCE,FSTYPE 2>/dev/null) || mount | grep -E ' (nfs|nfs4|cifs|smb3|fuse\.[a-z]+) ' ;;
-  network)   ip -br addr 2>/dev/null; echo; ip route 2>/dev/null | head -n 20 ;;
-  kernel)    dmesg -T 2>/dev/null | tail -n 50 || journalctl -k -n 50 --no-pager 2>/dev/null ;;
-  syslog)    if [ -r /var/log/syslog ]; then tail -n 100 /var/log/syslog; elif has_systemd; then journalctl -n 100 --no-pager -o short-iso; else echo "journal système illisible"; fi ;;
-  failed-services) if has_systemd; then systemctl --failed --no-pager --plain; else echo "systemd indisponible sur ce système"; fi ;;
+  network)   ip -br addr 2>/dev/null | grep -vE '^(veth|br-[0-9a-f]{12}|docker0|vhost)' ; echo; ip route 2>/dev/null | grep -vE 'br-[0-9a-f]{12}|docker0' | head -n 20 ;;
+  kernel)    { dmesg -T 2>/dev/null || journalctl -k -n 400 --no-pager 2>/dev/null; } \
+               | grep -vE 'veth[0-9a-f]+|br-[0-9a-f]{12}|docker0|entered (blocking|forwarding|disabled) state|(allmulticast|promiscuous) mode|renamed from veth|elogind.*(New|Removed) session' | tail -n 50 ;;
+  syslog)    TMP=$(mktemp); trap 'rm -f "$TMP"' EXIT
+             if [ -r /var/log/syslog ]; then tail -n 400 /var/log/syslog > "$TMP"
+             elif has_systemd; then journalctl -n 400 --no-pager -o short-iso > "$TMP"
+             else echo "journal système illisible"; exit 0; fi
+             drop_own_ssh "$TMP" | tail -n 100 ;;
+  array)     if [ -f /var/local/emhttp/var.ini ]; then
+               echo "== Array Unraid"; grep -E '^(mdState|fsState|mdResync|mdResyncAction|mdResyncPos|mdNumDisabled|mdNumInvalid|mdNumMissing|sbSynced|sbSyncErrs)=' /var/local/emhttp/var.ini
+               echo; echo "== Disques (nom statut erreurs température système de fichiers)"
+               awk -F= '/^\[/{if(n!="")print n, s, e, t, f; n=$0; s=e=t=f="-"} /^status=/{s=$2} /^numErrors=/{e=$2} /^temp=/{t=$2} /^fsStatus=/{f=$2} END{print n, s, e, t, f}' /var/local/emhttp/disks.ini \
+                 | tr -d '"[]' | awk '$2 != "DISK_NP"'
+             else
+               [ -r /proc/mdstat ] && { echo "== RAID logiciel (/proc/mdstat)"; cat /proc/mdstat; }
+               command -v zpool >/dev/null 2>&1 && { echo; echo "== ZFS"; zpool status -x 2>&1 | head -n 40; }
+               [ -r /proc/mdstat ] || command -v zpool >/dev/null 2>&1 || echo "Aucun array, RAID logiciel ou pool ZFS détecté"
+             fi ;;
+  failed-services) if has_systemd; then systemctl --failed --no-pager --plain; else no_systemd; fi ;;
   service)   valid_unit "$ARG" || { echo "nom de service invalide"; exit 2; }
-             if has_systemd; then systemctl status --no-pager -n 20 -- "$ARG"; else echo "systemd indisponible sur ce système"; fi ;;
+             if has_systemd; then systemctl status --no-pager -n 20 -- "$ARG"; else no_systemd; fi ;;
   journal)   valid_unit "$ARG" || { echo "nom de service invalide"; exit 2; }
-             if has_systemd; then journalctl -u "$ARG" -n 100 --no-pager -o short-iso; else echo "systemd indisponible sur ce système"; fi ;;
-  *)         echo "Contrôles disponibles : overview disk memory load processes mounts network kernel syslog failed-services service <nom> journal <nom>" ;;
+             if has_systemd; then journalctl -u "$ARG" -n 100 --no-pager -o short-iso; else no_systemd; fi ;;
+  version)   echo "sentinel-diag $SCRIPT_VERSION" ;;
+  *)         echo "Contrôles disponibles : overview disk memory load processes mounts network kernel syslog array failed-services service <nom> journal <nom>" ;;
 esac
 '''
+
+
+def _script() -> str:
+    return DIAG_SCRIPT.replace("@VERSION@", DIAG_SCRIPT_VERSION)
+
+
+def installed_script_version() -> Optional[str]:
+    """Version du script installé sur le serveur (None si ancien script sans numéro de version)."""
+    out = run_host_check("overview", _raw="version")
+    m = re.match(r"^sentinel-diag (\S+)$", out.strip())
+    return m.group(1) if m else None
 
 
 def install_snippet(platform: str) -> str:
@@ -289,7 +332,7 @@ def install_snippet(platform: str) -> str:
             "# Unraid (6.9 ou plus récent) — à coller dans le terminal d'Unraid (root)\n"
             "mkdir -p /boot/config/sentinel /boot/config/ssh/root\n"
             "cat > /boot/config/sentinel/sentinel-diag.sh <<'SENTINEL_SCRIPT'\n"
-            f"{DIAG_SCRIPT}SENTINEL_SCRIPT\n"
+            f"{_script()}SENTINEL_SCRIPT\n"
             "touch /boot/config/ssh/root/authorized_keys\n"
             "sed -i '/sentinel-diag/d' /boot/config/ssh/root/authorized_keys\n"
             f"echo '{line}' >> /boot/config/ssh/root/authorized_keys\n"
@@ -308,7 +351,7 @@ def install_snippet(platform: str) -> str:
         "sudo useradd --system --create-home --shell /bin/bash sentinel-diag 2>/dev/null || true\n"
         "sudo usermod -aG systemd-journal,adm sentinel-diag 2>/dev/null || true\n"
         "sudo tee /usr/local/bin/sentinel-diag >/dev/null <<'SENTINEL_SCRIPT'\n"
-        f"{DIAG_SCRIPT}SENTINEL_SCRIPT\n"
+        f"{_script()}SENTINEL_SCRIPT\n"
         "sudo chmod 755 /usr/local/bin/sentinel-diag\n"
         "sudo install -d -m 700 -o sentinel-diag -g sentinel-diag /home/sentinel-diag/.ssh\n"
         f"echo '{line}' | sudo tee /home/sentinel-diag/.ssh/authorized_keys >/dev/null\n"

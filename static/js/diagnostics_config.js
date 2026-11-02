@@ -128,6 +128,9 @@ document.addEventListener('DOMContentLoaded', () => {
         diagResult('diag-ssh-result', null, dT('diag.testing', 'Test en cours…'));
         const res = await apiFetch('/api/diagnostics/ssh/test', { method: 'POST' });
         diagResult('diag-ssh-result', res.ok, res.ok ? `✓ ${dT('diag.connected', 'Connecté')}${res.host_fingerprint ? ' · ' + res.host_fingerprint.split(' ')[1] : ''}` : `✗ ${res.error}`);
+        if (res.ok && res.script_outdated) {
+            diagResult('diag-ssh-result', false, dT('diag.script_outdated', '⚠ Connecté, mais le script installé sur le serveur est ancien : recolle le bloc de l’étape 2 pour profiter des derniers contrôles.'));
+        }
         out.textContent = res.ok ? res.output : '';
         out.classList.toggle('hidden', !res.ok);
     });

@@ -985,6 +985,7 @@
     "saved": "Enregistré.",
     "testing": "Test en cours…",
     "containers_running": "conteneurs actifs",
-    "connected": "Connecté"
+    "connected": "Connecté",
+    "script_outdated": "⚠ Connecté, mais le script installé sur le serveur est ancien : recolle le bloc de l'étape 2 pour profiter des derniers contrôles."
   }
 }

@@ -985,6 +985,7 @@
     "saved": "Saved.",
     "testing": "Testing…",
     "containers_running": "containers running",
-    "connected": "Connected"
+    "connected": "Connected",
+    "script_outdated": "⚠ Connected, but the script installed on the server is outdated: paste the step 2 block again to get the latest checks."
   }
 }

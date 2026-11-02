@@ -426,11 +426,26 @@ def _diag(fn, *args):
         raise ToolError(str(e))
 
 
+_EXIT_CODE = re.compile(r"Exited \((\d+)\)")
+
+
+def _is_problem(c: dict) -> bool:
+    """Conteneur en anomalie : redémarrage en boucle, unhealthy, mort, ou arrêté sur une erreur.
+    Un conteneur jamais démarré ou arrêté normalement (code 0, 143 = SIGTERM) n'en est pas un."""
+    status = c.get("status") or ""
+    if c.get("state") in ("restarting", "dead") or "unhealthy" in status:
+        return True
+    if c.get("state") == "exited":
+        m = _EXIT_CODE.search(status)
+        return bool(m and m.group(1) not in ("0", "143"))
+    return False
+
+
 def docker_list_containers(db, only_problems=False, **_):
     rows = _diag(diag.docker_containers)
     data = json.loads(rows)
     if only_problems:
-        data = [c for c in data if c["state"] != "running" or "unhealthy" in (c["status"] or "") or "Restarting" in (c["status"] or "")]
+        data = [c for c in data if _is_problem(c)]
     if not data:
         return "Aucun conteneur en anomalie." if only_problems else "Aucun conteneur."
     return "\n".join(f"- {c['name']} — {c['state']} — {c['status']} — {c['image']}" for c in data)
@@ -489,7 +504,7 @@ TOOLS = [
 ]
 
 DOCKER_TOOLS = [
-    _fn("docker_list_containers", "Liste les conteneurs Docker du serveur (nom, état, statut avec santé et durée, image). only_problems=true : seulement ceux arrêtés, en redémarrage ou unhealthy.",
+    _fn("docker_list_containers", "Liste les conteneurs Docker du serveur (nom, état, statut avec santé et durée, image). only_problems=true : seulement ceux en redémarrage, unhealthy, morts ou arrêtés sur une erreur (pas ceux arrêtés volontairement).",
         {"only_problems": {"type": "boolean"}}),
     _fn("docker_container_status", "État détaillé d'un conteneur Docker : statut, santé et derniers healthchecks, nombre de redémarrages, code de sortie, OOM, dates de démarrage et d'arrêt, montages, réseaux.",
         {"name": {"type": "string"}}, ["name"]),
@@ -499,7 +514,7 @@ DOCKER_TOOLS = [
         {"name": {"type": "string"}}, ["name"]),
 ]
 HOST_TOOLS = [
-    _fn("host_check", "Contrôle en lecture seule du serveur hôte. check : overview (charge, mémoire, disques), disk, memory, load, processes, mounts (partages réseau NFS/SMB), network, kernel (derniers messages du noyau), syslog, failed-services, service (état d'un service systemd, target = nom), journal (journal d'un service systemd, target = nom).",
+    _fn("host_check", "Contrôle en lecture seule du serveur hôte. check : overview (charge, mémoire, disques), disk, memory, load, processes, mounts (partages réseau NFS/SMB), network, kernel (derniers messages du noyau, sans le bruit réseau de Docker), syslog, array (état de l'array Unraid et de ses disques, ou RAID logiciel / ZFS), failed-services, service (état d'un service systemd, target = nom), journal (journal d'un service systemd, target = nom). Sur Unraid, pas de systemd : utiliser syslog, array et processes.",
         {"check": {"type": "string", "enum": list(diag.HOST_CHECKS)}, "target": {"type": "string"}}, ["check"]),
 ]
 
