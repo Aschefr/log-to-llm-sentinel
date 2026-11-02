@@ -119,9 +119,30 @@ def _to_utc(dt: datetime, off: Optional[timedelta], local_offset: timedelta) -> 
 
 # ── Lecture de la période ──────────────────────────────────────────────────────────
 
-def source_files(path: Path) -> list:
-    rotated = path.with_suffix(f"{path.suffix}.1")
-    return [p for p in (rotated, path) if p.is_file()]
+_ARCHIVE_SUFFIXES = (".gz", ".zip", ".bz2", ".xz", ".zst", ".7z")
+
+
+def source_files(path: Path, since: Optional[datetime] = None) -> list:
+    """Fichier courant et fichiers tournés (« app.log.1 », « app.log.20261102-170332.916 »…, archives exclues),
+    du plus ancien au plus récent. since (UTC) : fichiers tournés modifiés après cette date seulement."""
+    rotated = []
+    try:
+        siblings = list(path.parent.iterdir()) if path.parent.is_dir() else []
+    except OSError:
+        siblings = []
+    for p in siblings:
+        if not p.name.startswith(path.name + ".") or p.name.lower().endswith(_ARCHIVE_SUFFIXES):
+            continue
+        try:
+            if not p.is_file():
+                continue
+            mtime = datetime.utcfromtimestamp(p.stat().st_mtime)
+        except OSError:
+            continue
+        if since is None or mtime >= since:
+            rotated.append((mtime, p))
+    files = [p for _, p in sorted(rotated)]
+    return files + ([path] if path.is_file() else [])
 
 
 def scan(files: list, start: datetime, end: datetime, keywords: list, excluded: list,
@@ -360,7 +381,7 @@ async def _run_session(session_id: int):
             path = resolve_path(rule.log_file_path)
         finally:
             db.close()
-        files = source_files(path)
+        files = source_files(path, since=start)
         if not files:
             if autopilot and not summary.get("refresh") and _to_observation(
                     session_id, rule_id, summary, "aucune ligne reçue pour l'instant"):
@@ -380,7 +401,8 @@ async def _run_session(session_id: int):
         summary.update({"lines": result["lines"], "templates": len(result["templates"]), "overflow": result["overflow"],
                         "local_offset_h": result["local_offset_h"]})
         if autopilot and not summary.get("refresh"):
-            short = mode == "history" and (result["lines"] < ap.MIN_HISTORY_LINES or span_h < ap.MIN_HISTORY_SPAN_H)
+            short = mode == "history" and ap.history_too_short(result["lines"], span_h)
+            summary["history_span_h"] = round(span_h, 1)
             if (short or not result["lines"]) and _to_observation(
                     session_id, rule_id, summary, "historique insuffisant" if result["lines"] else "aucune ligne reçue"):
                 return await _run_session(session_id)

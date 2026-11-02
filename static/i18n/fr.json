@@ -1025,7 +1025,7 @@
     "ap_step_source_done": "{n} ligne(s) reçue(s) · dernière {when}",
     "ap_step_source_wait": "En attente de la première ligne de la source…",
     "ap_step_history": "Lecture de l'historique",
-    "ap_step_history_short": "{n} ligne(s) trouvée(s) : pas assez pour définir la règle.",
+    "ap_step_history_short": "{n} ligne(s) trouvée(s) : trop peu pour définir la règle.",
     "ap_step_history_active": "Lecture des 7 derniers jours du journal…",
     "ap_step_history_done": "{n} ligne(s) lues, regroupées en {t} modèle(s).",
     "ap_step_observe": "Observation de la source",
@@ -1046,7 +1046,8 @@
     "ap_step_ready_todo": "Une notification résumera ce qui a été défini.",
     "ap_journey_done": "terminée",
     "ap_journey_progress": "étape {n} sur {t}",
-    "ap_journey_details": "Détails dans l'onglet Mots-clés"
+    "ap_journey_details": "Détails dans l'onglet Mots-clés",
+    "ap_step_history_brief": "{n} ligne(s) sur {h} h seulement : trop peu de recul pour définir la règle."
   },
   "diag": {
     "title": "Diagnostic (lecture seule)",

@@ -193,8 +193,10 @@ function autopilotJourneyHtml(j) {
             : T('rule.ap_step_source_wait', 'En attente de la première ligne de la source…'));
 
     if (observed) {
-        step('history', 'warn', T('rule.ap_step_history', 'Lecture de l’historique'),
-            T('rule.ap_step_history_short', '{n} ligne(s) trouvée(s) : pas assez pour définir la règle.', { n: sum.history_lines ?? sum.lines ?? 0 }));
+        const histLines = sum.history_lines ?? sum.lines ?? 0;
+        step('history', 'warn', T('rule.ap_step_history', 'Lecture de l’historique'), histLines >= 50 && sum.history_span_h != null
+            ? T('rule.ap_step_history_brief', '{n} ligne(s) sur {h} h seulement : trop peu de recul pour définir la règle.', { n: histLines.toLocaleString(), h: sum.history_span_h })
+            : T('rule.ap_step_history_short', '{n} ligne(s) trouvée(s) : trop peu pour définir la règle.', { n: histLines.toLocaleString() }));
         let extra = '';
         if (observing) {
             const total = new Date(s.period_end) - new Date(s.period_start);

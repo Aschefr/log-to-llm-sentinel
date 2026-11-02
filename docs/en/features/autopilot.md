@@ -6,7 +6,7 @@ With the autopilot, you only give a rule its **source** (a log file, a syslog ho
 
 ## 1. Setting up a rule
 
-When the rule is created, Sentinel reads the last 7 days of the log (current file and rotated `.1` file):
+When the rule is created, Sentinel reads the last 7 days of the log (current file and rotated files, archives excepted):
 
 * The AI writes the rule's **name** and its **application context**: what this log contains (system, application, services) and what is normal in it. The context then helps the AI judge every alert.
 * The [keyword arbiter](keyword-learning.md) chooses the **keywords** and **exclusions**, with the usual checks.
@@ -18,7 +18,7 @@ The rule page shows *Autopilot · reading history* in its header, and the setup 
 
 ## 2. Without history
 
-A syslog host or a webhook that has not sent anything yet, or a log with less than 50 lines or 6 hours of history, is **watched for 24 hours** first (the lines already there count too). The AI then sets up the rule as above. If nothing arrives, the observation starts over, up to 7 days.
+A syslog host or a webhook that has not sent anything yet, or a log with less than 50 lines of history (or less than 500 lines over less than 6 hours), is **watched for 24 hours** first (the lines already there count too). The AI then sets up the rule as above. If nothing arrives, the observation starts over, up to 7 days.
 
 While the rule is not set up yet, it alerts on lines that carry an **explicit error level** (syslog priority error or worse, JSON `level`, `ERROR`/`FATAL`/`CRIT`…). These alerts show the keyword `[error level]`.
 

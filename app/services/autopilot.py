@@ -28,7 +28,8 @@ MANAGED_FIELDS = ("name", "application_context", "anti_spam_delay", "inactivity_
 OBSERVE_HOURS = 24
 OBSERVE_MAX_ROUNDS = 7          # une source toujours muette n'est pas observée indéfiniment
 MIN_HISTORY_LINES = 50          # en dessous, l'historique ne suffit pas : observation
-MIN_HISTORY_SPAN_H = 6
+MIN_HISTORY_SPAN_H = 6          # … ni un historique court et peu fourni (moins de RICH_HISTORY_LINES lignes)
+RICH_HISTORY_LINES = 500
 REFRESH_DAYS = 7
 PROFILE_CHANGE_OVERLAP = 0.5    # contexte revu si moins de la moitié des modèles fréquents sont encore là
 TOP_SIGNATURES = 40
@@ -215,6 +216,12 @@ def apply_profile(rule: Rule, profile: Optional[dict]) -> List[str]:
     if len(context) >= 20 and set_value(rule, "application_context", context):
         changed.append("application_context")
     return changed
+
+
+def history_too_short(lines: int, span_h: float) -> bool:
+    """L'historique ne suffit pas pour définir la règle : trop peu de lignes, ou peu de lignes sur peu de temps.
+    Un journal très actif (Docker Desktop tourne son fichier toutes les 2 h) suffit même sur quelques heures."""
+    return lines < MIN_HISTORY_LINES or (span_h < MIN_HISTORY_SPAN_H and lines < RICH_HISTORY_LINES)
 
 
 def observe_until(hours: int = OBSERVE_HOURS) -> str:

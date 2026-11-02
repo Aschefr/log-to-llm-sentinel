@@ -1025,7 +1025,7 @@
     "ap_step_source_done": "{n} line(s) received · last {when}",
     "ap_step_source_wait": "Waiting for the first line from the source…",
     "ap_step_history": "Reading the history",
-    "ap_step_history_short": "{n} line(s) found: not enough to set up the rule.",
+    "ap_step_history_short": "{n} line(s) found: too few to set up the rule.",
     "ap_step_history_active": "Reading the last 7 days of the log…",
     "ap_step_history_done": "{n} line(s) read, grouped into {t} template(s).",
     "ap_step_observe": "Watching the source",
@@ -1046,7 +1046,8 @@
     "ap_step_ready_todo": "A notification will sum up what was set.",
     "ap_journey_done": "done",
     "ap_journey_progress": "step {n} of {t}",
-    "ap_journey_details": "Details in the Keywords tab"
+    "ap_journey_details": "Details in the Keywords tab",
+    "ap_step_history_brief": "{n} line(s) over only {h} h: not enough hindsight to set up the rule."
   },
   "diag": {
     "title": "Diagnostics (read-only)",
