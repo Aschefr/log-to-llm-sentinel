@@ -765,7 +765,7 @@
     "ap_title": "Autopilot",
     "ap_badge": "AI",
     "ap_badge_title": "Set by the autopilot. Change it to take it over.",
-    "ap_hint_new_on": "Just give the source. The AI reads the log history (or watches it for 24 h if there is none) and sets the name, context, keywords, grouping window and silence delay. Everything stays editable.",
+    "ap_hint_new_on": "Just pick the log to watch. The AI reads its history (or watches it for 24 h if there is none) and sets the name, context, keywords, grouping window and silence delay. Everything stays editable afterwards in Settings.",
     "ap_hint_new_off": "You set the keywords and the rule settings yourself.",
     "ap_hint_on": "The AI keeps the rule up to date: keywords, context re-read every week, grouping window and silence delay. A setting you change is no longer touched.",
     "ap_hint_off": "When on, the autopilot re-reads the history and manages the grouping window, the silence delay, and the context if it is empty. The name and what you wrote are kept.",
@@ -781,7 +781,11 @@
     "syslog_detected": "Detected sources",
     "syslog_taken": "already followed by \"{name}\"",
     "syslog_host_meta": "{n} line(s) · last {when}",
-    "syslog_none": "No line received yet. Set up sending from your source: it will show up here with its first message."
+    "syslog_none": "No line received yet. Set up sending from your source: it will show up here with its first message.",
+    "mode": "Rule mode",
+    "ap_tagline": "The AI takes care of everything",
+    "manual_title": "Manual",
+    "manual_tagline": "I set everything myself"
   },
   "rule": {
     "back": "← All rules",

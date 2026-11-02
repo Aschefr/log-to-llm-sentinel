@@ -765,7 +765,7 @@
     "ap_title": "Pilote automatique",
     "ap_badge": "IA",
     "ap_badge_title": "Défini par le pilote automatique. Modifie-le pour le reprendre en main.",
-    "ap_hint_new_on": "Indique seulement la source. L'IA lit l'historique du journal (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable.",
+    "ap_hint_new_on": "Choisis seulement le journal à surveiller. L'IA lit son historique (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable ensuite dans les Réglages.",
     "ap_hint_new_off": "Tu définis toi-même les mots-clés et les réglages de la règle.",
     "ap_hint_on": "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Un réglage que tu modifies n'est plus touché.",
     "ap_hint_off": "Activé, le pilote relit l'historique et gère la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent.",
@@ -781,7 +781,11 @@
     "syslog_detected": "Sources détectées",
     "syslog_taken": "déjà suivie par « {name} »",
     "syslog_host_meta": "{n} ligne(s) · dernière {when}",
-    "syslog_none": "Aucune ligne reçue pour l'instant. Configure l'envoi depuis ta source : elle apparaîtra ici dès son premier message."
+    "syslog_none": "Aucune ligne reçue pour l'instant. Configure l'envoi depuis ta source : elle apparaîtra ici dès son premier message.",
+    "mode": "Mode de la règle",
+    "ap_tagline": "L'IA s'occupe de tout",
+    "manual_title": "Manuel",
+    "manual_tagline": "Je règle tout moi-même"
   },
   "rule": {
     "back": "← Toutes les règles",

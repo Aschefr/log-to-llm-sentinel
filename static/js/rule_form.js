@@ -194,7 +194,7 @@ function setupRuleForm(opts = {}) {
     if (notifyEl) notifyEl.addEventListener('change', updateResolutionUI);
     document.querySelectorAll('input[name="rule-keyword-tuning"]')
         .forEach(el => el.addEventListener('change', updateTuningUI));
-    document.getElementById('rule-autopilot')?.addEventListener('change', updateAutopilotUI);
+    document.querySelectorAll('input[name="rule-mode"]').forEach(el => el.addEventListener('change', updateAutopilotUI));
     window.i18n?.onLanguageChange(() => { updateTuningUI(); updateAutopilotUI(); });
 
     const probeBtn = document.getElementById('rf-probe-test');
@@ -204,14 +204,21 @@ function setupRuleForm(opts = {}) {
     setupKeywordSuggestions();
 }
 
-/** Autopilot card, AI badges, and the fields it makes optional (new rule) or moves to the Keywords tab (existing rule). */
+function _setAutopilot(on) {
+    document.getElementById(on ? 'rule-autopilot' : 'rule-manual').checked = true;
+    updateAutopilotUI();
+}
+
+/** Mode cards, AI badges, and the fields the autopilot makes unnecessary (new rule: only the source is shown)
+ *  or moves to the Keywords tab (existing rule). */
 function updateAutopilotUI() {
     const on = !!document.getElementById('rule-autopilot')?.checked;
     const isNew = !document.getElementById('rule-id').value;
+    document.getElementById('rule-form')?.classList.toggle('rf--minimal', isNew && on);
     const hint = document.getElementById('rf-ap-hint');
     if (hint) {
         hint.textContent = isNew
-            ? (on ? _rfT('rf.ap_hint_new_on', "Indique seulement la source. L'IA lit l'historique du journal (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable.")
+            ? (on ? _rfT('rf.ap_hint_new_on', "Choisis seulement le journal à surveiller. L'IA lit son historique (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable ensuite dans les Réglages.")
                   : _rfT('rf.ap_hint_new_off', 'Tu définis toi-même les mots-clés et les réglages de la règle.'))
             : (on ? _rfT('rf.ap_hint_on', "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Un réglage que tu modifies n'est plus touché.")
                   : _rfT('rf.ap_hint_off', "Activé, le pilote relit l'historique et gère la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent."));
@@ -454,8 +461,7 @@ function resetForm() {
     document.getElementById('rf-learn-history-row').classList.remove('hidden');
     updateTuningUI();
     _rfAutopilot = null;
-    document.getElementById('rule-autopilot').checked = true;
-    updateAutopilotUI();
+    _setAutopilot(true);
 }
 
 /* ── Save rule ─────────────────────────────────────────────────────────────── */
@@ -598,8 +604,7 @@ async function editRule(id) {
         document.getElementById('rf-learn-history-row').classList.add('hidden');
         updateTuningUI();
         _rfAutopilot = rule.autopilot || null;
-        document.getElementById('rule-autopilot').checked = !!(_rfAutopilot && _rfAutopilot.enabled);
-        updateAutopilotUI();
+        _setAutopilot(!!(_rfAutopilot && _rfAutopilot.enabled));
         return rule;
     } catch (error) {
         console.error('Erreur chargement règle:', error);
@@ -775,8 +780,7 @@ async function fetchFilePreview(path) {
 function applyTemplate(type) {
     resetForm();
     // A template brings its own keywords: manual rule
-    document.getElementById('rule-autopilot').checked = false;
-    updateAutopilotUI();
+    _setAutopilot(false);
     const templates = {
         'auth': {
             name: window.t ? window.t('rules.template_auth') : 'Security SSH / Connections',

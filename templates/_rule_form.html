@@ -12,13 +12,23 @@
     <div class="rf-sections">
         <!-- ── Pilote automatique ── -->
         <section id="rf-autopilot" class="rf-card">
-            <div class="rf-option rf-option--head">
-                <div class="rf-option-text">
-                    <h2 data-i18n="rf.ap_title">Pilote automatique</h2>
-                    <span class="form-hint" id="rf-ap-hint"></span>
-                </div>
-                <label class="toggle-switch"><input type="checkbox" id="rule-autopilot"><span class="toggle-slider"></span><span class="sr-only" data-i18n="rf.ap_title">Pilote automatique</span></label>
+            <div class="rf-mode-cards" role="radiogroup" data-i18n-aria-label="rf.mode" aria-label="Mode de la règle">
+                <label class="rf-mode-card">
+                    <input type="radio" name="rule-mode" id="rule-autopilot" value="auto" class="sr-only">
+                    <span class="rf-mode-icon rf-mode-icon--ap" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><g class="rf-needle"><path d="M15.5 8.5 13.4 13.4 8.5 15.5 10.6 10.6Z" fill="currentColor" fill-opacity="0.25"/><circle cx="12" cy="12" r="1" fill="currentColor"/></g></svg>
+                    </span>
+                    <span class="rf-mode-text"><strong data-i18n="rf.ap_title">Pilote automatique</strong><span data-i18n="rf.ap_tagline">L'IA s'occupe de tout</span></span>
+                </label>
+                <label class="rf-mode-card">
+                    <input type="radio" name="rule-mode" id="rule-manual" value="manual" class="sr-only">
+                    <span class="rf-mode-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg>
+                    </span>
+                    <span class="rf-mode-text"><strong data-i18n="rf.manual_title">Manuel</strong><span data-i18n="rf.manual_tagline">Je règle tout moi-même</span></span>
+                </label>
             </div>
+            <p class="form-hint" id="rf-ap-hint"></p>
             <div class="form-hint hidden" id="rf-ap-status"></div>
         </section>
 
@@ -35,7 +45,7 @@
         <!-- ── Source ── -->
         <section id="rf-source" class="rf-card">
             <h2 data-i18n="rf.section_source">Source</h2>
-            <div class="form-group">
+            <div class="form-group rf-name-group">
                 <label for="rule-name"><span data-i18n="rules.label_name">Nom</span> <span class="rf-ai-badge hidden" data-ap="name" data-i18n="rf.ap_badge" data-i18n-title="rf.ap_badge_title" title="Défini par le pilote automatique. Modifie-le pour le reprendre en main.">IA</span></label>
                 <input type="text" id="rule-name" required placeholder="Nom de la règle">
             </div>
