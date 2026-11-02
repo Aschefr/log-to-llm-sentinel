@@ -1,5 +1,6 @@
 // ─── Rule form (Réglages tab of the rule page) ──────────────────────────────
-// Form logic shared by the rule page: source tabs, file browser, keywords,
+// Form logic shared by the rule page: autopilot, source tabs, file browser,
+// keywords (new manual rule only: afterwards they live in the Keywords tab),
 // resolution settings, save.
 //
 // Usage:
@@ -11,6 +12,7 @@
 /* ── Callbacks set by host page ────────────────────────────────────────────── */
 let _ruleFormOnSave = null;
 let _ruleFormOnCancel = null;
+let _rfAutopilot = null;  // autopilot state of the edited rule (null for a new rule)
 
 /**
  * crypto.randomUUID() is only available in secure contexts (HTTPS / localhost).
@@ -191,13 +193,63 @@ function setupRuleForm(opts = {}) {
     if (notifyEl) notifyEl.addEventListener('change', updateResolutionUI);
     document.querySelectorAll('input[name="rule-keyword-tuning"]')
         .forEach(el => el.addEventListener('change', updateTuningUI));
-    window.i18n?.onLanguageChange(updateTuningUI);
+    document.getElementById('rule-autopilot')?.addEventListener('change', updateAutopilotUI);
+    window.i18n?.onLanguageChange(() => { updateTuningUI(); updateAutopilotUI(); });
 
     const probeBtn = document.getElementById('rf-probe-test');
     if (probeBtn) probeBtn.addEventListener('click', testProbe);
 
     updateResolutionUI();
     setupKeywordSuggestions();
+}
+
+/** Autopilot card, AI badges, and the fields it makes optional (new rule) or moves to the Keywords tab (existing rule). */
+function updateAutopilotUI() {
+    const on = !!document.getElementById('rule-autopilot')?.checked;
+    const isNew = !document.getElementById('rule-id').value;
+    const hint = document.getElementById('rf-ap-hint');
+    if (hint) {
+        hint.textContent = isNew
+            ? (on ? _rfT('rf.ap_hint_new_on', "Indique seulement la source. L'IA lit l'historique du journal (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable.")
+                  : _rfT('rf.ap_hint_new_off', 'Tu définis toi-même les mots-clés et les réglages de la règle.'))
+            : (on ? _rfT('rf.ap_hint_on', "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Un réglage que tu modifies n'est plus touché.")
+                  : _rfT('rf.ap_hint_off', "Activé, le pilote relit l'historique et gère la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent."));
+    }
+    // Keywords: typed in the form only for a new manual rule
+    document.querySelectorAll('.rf-kw-field').forEach(el => el.classList.toggle('hidden', !isNew || on));
+    document.getElementById('rf-kw-link')?.classList.toggle('hidden', isNew);
+    document.getElementById('rf-learn-history-row')?.classList.toggle('hidden', !isNew || on);
+    document.getElementById('modal-quick-templates')?.classList.toggle('hidden', !isNew || on);
+    const name = document.getElementById('rule-name');
+    if (name) {
+        name.required = !(isNew && on);
+        name.placeholder = isNew && on ? _rfT('rf.ap_name_placeholder', "Laisse vide : l'IA le choisira") : _rfT('rules.placeholder_name', 'Nom de la règle');
+    }
+    const context = document.getElementById('rule-context');
+    if (context) {
+        context.placeholder = isNew && on ? _rfT('rf.ap_context_placeholder', "Laisse vide : l'IA le rédigera d'après le journal") : _rfT('rules.placeholder_context', 'Description du contexte...');
+    }
+    // AI badges: fields still managed by the autopilot of an existing rule
+    const managed = (_rfAutopilot && _rfAutopilot.enabled && on) ? (_rfAutopilot.managed || []) : [];
+    document.querySelectorAll('.rf-ai-badge').forEach(b => b.classList.toggle('hidden', !managed.includes(b.dataset.ap)));
+    const status = document.getElementById('rf-ap-status');
+    if (status) {
+        const text = (_rfAutopilot && _rfAutopilot.enabled && on) ? autopilotStatusText(_rfAutopilot) : '';
+        status.textContent = text;
+        status.classList.toggle('hidden', !text);
+    }
+}
+
+/** One-line state of the autopilot (rule page header and settings card). */
+function autopilotStatusText(a) {
+    if (!a || !a.enabled) return '';
+    const when = a.observe_until ? new Date(a.observe_until + 'Z').toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+    if (a.status === 'learning') return _rfT('rf.ap_status_learning', "Lecture de l'historique du journal…");
+    if (a.status === 'observing') return _rfT('rf.ap_status_observing', "Observation jusqu'à {when} : pas assez d'historique. En attendant, la règle alerte sur les lignes de niveau erreur.").replace('{when}', when);
+    if (a.status === 'error') return a.error === 'cancelled'
+        ? _rfT('rf.ap_status_cancelled', "Mise en place annulée. La règle alerte sur les lignes de niveau erreur ; lance une analyse de l'historique dans l'onglet Mots-clés pour reprendre.")
+        : _rfT('rf.ap_status_error', "La mise en place a échoué ({error}). Nouvel essai automatique dans quelques heures ; en attendant, la règle alerte sur les lignes de niveau erreur.").replace('{error}', a.error || '?');
+    return _rfT('rf.ap_status_active', 'Règle en place. Le journal est relu chaque semaine.');
 }
 
 /** Show/hide the dependent fields of the notification and resolution sections. */
@@ -371,6 +423,9 @@ function resetForm() {
     document.getElementById('rule-learn-history').checked = true;
     document.getElementById('rf-learn-history-row').classList.remove('hidden');
     updateTuningUI();
+    _rfAutopilot = null;
+    document.getElementById('rule-autopilot').checked = true;
+    updateAutopilotUI();
 }
 
 /* ── Save rule ─────────────────────────────────────────────────────────────── */
@@ -388,8 +443,8 @@ function _ruleFormData() {
 
     const resolutionOn = document.getElementById('rule-resolution-enable').checked;
     const silentAlert = document.getElementById('rule-inactivity-notify').checked;
-    return {
-        name: document.getElementById('rule-name').value,
+    const data = {
+        name: document.getElementById('rule-name').value.trim(),
         log_file_path: logFilePath,
         keywords: document.getElementById('rule-keywords').value.split(',').map(k => k.trim()).filter(k => k),
         application_context: document.getElementById('rule-context').value,
@@ -414,7 +469,14 @@ function _ruleFormData() {
         probe_target: document.getElementById('rule-probe-target').value,
         probe_expect: document.getElementById('rule-probe-expect').value,
         keyword_tuning_mode: _radioValue('rule-keyword-tuning', 'auto'),
+        autopilot: document.getElementById('rule-autopilot').checked,
     };
+    // Existing rule: keywords and exclusions are edited in the Keywords tab, never overwritten from here
+    if (document.getElementById('rule-id').value) {
+        delete data.keywords;
+        delete data.excluded_patterns;
+    }
+    return data;
 }
 
 /** Hint of the keyword tuning mode; the history option is offered for a new rule only. */
@@ -505,6 +567,9 @@ async function editRule(id) {
         _setRadio('rule-keyword-tuning', rule.keyword_tuning_mode || 'auto');
         document.getElementById('rf-learn-history-row').classList.add('hidden');
         updateTuningUI();
+        _rfAutopilot = rule.autopilot || null;
+        document.getElementById('rule-autopilot').checked = !!(_rfAutopilot && _rfAutopilot.enabled);
+        updateAutopilotUI();
         return rule;
     } catch (error) {
         console.error('Erreur chargement règle:', error);
@@ -679,6 +744,9 @@ async function fetchFilePreview(path) {
 /* ── Quick templates ──────────────────────────────────────────────────────── */
 function applyTemplate(type) {
     resetForm();
+    // A template brings its own keywords: manual rule
+    document.getElementById('rule-autopilot').checked = false;
+    updateAutopilotUI();
     const templates = {
         'auth': {
             name: window.t ? window.t('rules.template_auth') : 'Security SSH / Connections',

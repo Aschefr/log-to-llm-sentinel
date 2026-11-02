@@ -82,13 +82,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupRuleForm({
         onSave: (id, isNew) => {
             if (isNew) {
-                // A new rule starts by learning its keywords from the log history (unless disabled)
-                const learning = document.getElementById('rule-learn-history')?.checked
-                    && document.querySelector('input[name="rule-keyword-tuning"]:checked')?.value !== 'off';
+                // A new rule starts by learning from the log history (autopilot, or unless disabled)
+                const learning = document.getElementById('rule-autopilot')?.checked
+                    || (document.getElementById('rule-learn-history')?.checked
+                        && document.querySelector('input[name="rule-keyword-tuning"]:checked')?.value !== 'off');
                 window.location.href = `/rules/${id}#${learning ? 'keywords' : 'overview'}`;
                 return;
             }
-            loadHeader();
+            loadHeader().then(rule => {
+                // The autopilot may have just been switched on: refresh its state in the form
+                if (rule) { _rfAutopilot = rule.autopilot || null; updateAutopilotUI(); }
+            });
             flash(document.getElementById('tab-settings'), T('rule.saved', 'Réglages enregistrés.'));
         },
         onCancel: () => {
@@ -196,6 +200,7 @@ async function loadHeader() {
         }
 
         setKwBadge(rule.keyword_pending || 0);
+        setAutopilotPill(rule.autopilot);
         const counts = (await apiFetch(`/api/dashboard/recent?limit=1&rule_id=${RP.id}`)).counts || {};
         setUnreadBadge(counts.unread);
         return rule;
@@ -398,6 +403,21 @@ function goToSettings(sectionId) {
     selectTab('settings');
     const el = document.getElementById(sectionId);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function setAutopilotPill(a) {
+    const pill = document.getElementById('rp-autopilot');
+    if (!pill) return;
+    pill.classList.toggle('hidden', !(a && a.enabled));
+    if (!a || !a.enabled) return;
+    const label = {
+        learning: T('rule.ap_pill_learning', 'Pilote auto · lecture de l’historique'),
+        observing: T('rule.ap_pill_observing', 'Pilote auto · observation'),
+        error: T('rule.ap_pill_error', 'Pilote auto · en attente'),
+    }[a.status] || T('rule.ap_pill', 'Pilote auto');
+    pill.textContent = label;
+    pill.className = 'rp-pill rp-pill--ap' + (a.status === 'active' ? '' : ' rp-pill--ap-busy');
+    pill.title = autopilotStatusText(a);
 }
 
 function setUnreadBadge(n) {

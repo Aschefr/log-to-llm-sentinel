@@ -3044,6 +3044,9 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .rp-pill--ok { background: rgba(16, 185, 129, 0.14); color: var(--success); }
 .rp-pill--warn { background: rgba(245, 158, 11, 0.16); color: var(--warning); }
 .rp-pill--off { background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); }
+.rp-pill--ap { background: rgba(59, 130, 246, 0.12); color: var(--accent); cursor: help; }
+.rp-pill--ap::before { content: '🧭'; width: auto; height: auto; background: none; font-size: 0.8rem; }
+.rp-pill--ap-busy { background: rgba(59, 130, 246, 0.06); border: 1px dashed var(--accent); }
 .rp-tabs { display: flex; gap: 1.6rem; border-bottom: 1px solid var(--border); margin-bottom: 1.25rem; overflow-x: auto; }
 .rp-tabs a { color: var(--text-secondary); text-decoration: none; font-size: 0.9rem; font-weight: 500; padding: 0.7rem 0.15rem; border-bottom: 2px solid transparent; white-space: nowrap; }
 .rp-tabs a:hover { color: var(--text-primary); }
@@ -3257,5 +3260,11 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 #rf-detection .rf-sub > .rf-seg { align-self: flex-start; }
 .rf-check { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.6rem; font-size: 0.85rem; cursor: pointer; }
 .rf-check.dimmed { opacity: 0.5; }
+/* Pilote automatique : réglages définis par l'IA */
+.rf-ai-badge { display: inline-block; margin-left: 0.35rem; padding: 0 0.4rem; border-radius: 999px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.03em; color: var(--accent); background: rgba(59, 130, 246, 0.12); vertical-align: middle; cursor: help; }
+#rf-autopilot .rf-option { flex-wrap: nowrap; align-items: flex-start; margin-bottom: 0; }
+#rf-autopilot .rf-option-text { flex: 1; min-width: 0; }
+#rf-ap-status { margin-top: 0.25rem; }
+.rf-kw-link { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0 0 1rem; }
 .btn.is-flagged { border-color: var(--warning); color: var(--warning); }
 @media (max-width: 768px) { .kw-change { flex-direction: column; } .kw-learn-group { flex-wrap: wrap; } }

@@ -10,7 +10,19 @@
     </nav>
 
     <div class="rf-sections">
-        <!-- Quick templates (new rule only) -->
+        <!-- ── Pilote automatique ── -->
+        <section id="rf-autopilot" class="rf-card">
+            <div class="rf-option rf-option--head">
+                <div class="rf-option-text">
+                    <h2 data-i18n="rf.ap_title">Pilote automatique</h2>
+                    <span class="form-hint" id="rf-ap-hint"></span>
+                </div>
+                <label class="toggle-switch"><input type="checkbox" id="rule-autopilot"><span class="toggle-slider"></span><span class="sr-only" data-i18n="rf.ap_title">Pilote automatique</span></label>
+            </div>
+            <div class="form-hint hidden" id="rf-ap-status"></div>
+        </section>
+
+        <!-- Quick templates (new rule, manual mode only) -->
         <div id="modal-quick-templates" class="rf-card rf-templates">
             <span class="rf-label" data-i18n="rules.quick_templates">Modèles rapides</span>
             <div class="rf-row-wrap">
@@ -24,8 +36,8 @@
         <section id="rf-source" class="rf-card">
             <h2 data-i18n="rf.section_source">Source</h2>
             <div class="form-group">
-                <label for="rule-name" data-i18n="rules.label_name">Nom</label>
-                <input type="text" id="rule-name" required data-i18n-placeholder="rules.placeholder_name" placeholder="Nom de la règle">
+                <label for="rule-name"><span data-i18n="rules.label_name">Nom</span> <span class="rf-ai-badge hidden" data-ap="name" data-i18n="rf.ap_badge" data-i18n-title="rf.ap_badge_title" title="Défini par le pilote automatique. Modifie-le pour le reprendre en main.">IA</span></label>
+                <input type="text" id="rule-name" required placeholder="Nom de la règle">
             </div>
             <div class="form-group">
                 <span class="rf-field-label" data-i18n="rules.label_source">Source des logs</span>
@@ -86,14 +98,16 @@
         <!-- ── Détection ── -->
         <section id="rf-detection" class="rf-card">
             <h2 data-i18n="rf.section_detection">Détection</h2>
-            <div class="form-group">
+            <p class="form-hint rf-kw-link hidden" id="rf-kw-link"><span data-i18n="rf.kw_in_tab">Les mots-clés et les lignes ignorées se gèrent dans l'onglet Mots-clés, avec leurs statistiques et l'historique des changements.</span>
+                <a href="#keywords" class="btn btn-secondary btn-sm" data-i18n="rf.kw_open_tab">Ouvrir l'onglet Mots-clés</a></p>
+            <div class="form-group rf-kw-field">
                 <label class="rf-field-label" for="rule-keywords" data-i18n="rf.keywords">Mots-clés déclencheurs</label>
                 <input type="text" id="rule-keywords" list="keywords-suggestions" data-i18n-placeholder="rules.placeholder_keywords" placeholder="error, exception, fatal">
                 <datalist id="keywords-suggestions"></datalist>
                 <div class="keyword-chips" id="keyword-chips"></div>
                 <div class="form-hint" data-i18n="rf.keywords_hint_auto">Séparés par des virgules. Tu peux laisser vide : l'IA les propose d'après le journal.</div>
             </div>
-            <div class="form-group">
+            <div class="form-group rf-kw-field">
                 <label for="rule-excluded-patterns" data-i18n="rf.exclusions">Lignes ignorées</label>
                 <input type="text" id="rule-excluded-patterns" placeholder="com.docker.backend, GET /app/settings, healthcheck…" data-i18n-placeholder="rules.placeholder_exclusions">
                 <div class="form-hint" data-i18n="rf.exclusions_hint">Une ligne contenant l'un de ces termes (séparés par des virgules) est ignorée, même si un mot-clé correspond.</div>
@@ -112,7 +126,7 @@
                 </label>
             </div>
             <div class="form-group">
-                <label for="rule-anti-spam" data-i18n="rf.grouping_window">Fenêtre de regroupement</label>
+                <label for="rule-anti-spam"><span data-i18n="rf.grouping_window">Fenêtre de regroupement</span> <span class="rf-ai-badge hidden" data-ap="anti_spam_delay" data-i18n="rf.ap_badge" data-i18n-title="rf.ap_badge_title" title="Défini par le pilote automatique. Modifie-le pour le reprendre en main.">IA</span></label>
                 <div class="rf-inline"><input type="number" id="rule-anti-spam" min="1" max="3600" value="60" class="rf-num"> <span data-i18n="rf.seconds">secondes</span></div>
                 <div class="form-hint" data-i18n="rf.grouping_window_hint">Les lignes détectées pendant cette fenêtre sont analysées ensemble, en un seul appel à l'IA.</div>
             </div>
@@ -122,8 +136,8 @@
         <section id="rf-analysis" class="rf-card">
             <h2 data-i18n="rf.section_analysis">Analyse IA</h2>
             <div class="form-group">
-                <label for="rule-context" data-i18n="rf.app_context">Contexte applicatif</label>
-                <textarea id="rule-context" rows="3" data-i18n-placeholder="rules.placeholder_context" placeholder="Description du contexte..."></textarea>
+                <label for="rule-context"><span data-i18n="rf.app_context">Contexte applicatif</span> <span class="rf-ai-badge hidden" data-ap="application_context" data-i18n="rf.ap_badge" data-i18n-title="rf.ap_badge_title" title="Défini par le pilote automatique. Modifie-le pour le reprendre en main.">IA</span></label>
+                <textarea id="rule-context" rows="3" placeholder="Description du contexte..."></textarea>
                 <div class="form-hint" data-i18n="rf.app_context_hint">Décrit à l'IA ce que surveille cette règle et ce qui est normal ici.</div>
             </div>
             <div class="form-group">
@@ -159,7 +173,7 @@
             </div>
             <div class="rf-option">
                 <div class="rf-option-text">
-                    <span class="rf-option-title" data-i18n="rf.notify_silent">Alerter si la source est muette</span>
+                    <span class="rf-option-title"><span data-i18n="rf.notify_silent">Alerter si la source est muette</span> <span class="rf-ai-badge hidden" data-ap="inactivity_period_hours" data-i18n="rf.ap_badge" data-i18n-title="rf.ap_badge_title" title="Défini par le pilote automatique. Modifie-le pour le reprendre en main.">IA</span></span>
                     <span class="form-hint" data-i18n="rf.notify_silent_hint">aucune ligne reçue pendant la durée choisie</span>
                 </div>
                 <div class="rf-option-controls">

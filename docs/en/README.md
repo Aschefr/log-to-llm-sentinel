@@ -16,6 +16,7 @@ Sentinel detects critical log events, automatically collects surrounding applica
 * [**Global Configuration**](pages/configuration.md) — SMTP, Apprise, Discord notification settings, Ollama model setups, and backups.
 
 ### ⚙️ Deep-Dive Features
+* [**Autopilot**](features/autopilot.md) — Give only the source: the local AI sets up the rule (name, context, keywords, rhythm) from the log history, or after watching it for 24 h.
 * [**Keyword tuning**](features/keyword-learning.md) — How the local AI keeps keywords and exclusions up to date (blind spots, noise, history analysis), with checks and undo.
 * [**Inactivity Monitoring**](features/inactivity-monitoring.md) — Tracking log ingestion gaps to alert on dead processes.
 * [**Incident Resolution**](features/resolution-tracking.md) — Adaptive calm, health probes, AI validation modes and suggested patterns.

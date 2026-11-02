@@ -246,10 +246,18 @@ class KeywordTuningService:
     async def review_all(self):
         db = SessionLocal()
         try:
-            ids = [r.id for r in db.query(Rule).filter(Rule.enabled == True).all()
-                   if (r.keyword_tuning_mode or "auto") != "off"]
+            rules = db.query(Rule).filter(Rule.enabled == True).all()
+            ids = [r.id for r in rules if (r.keyword_tuning_mode or "auto") != "off"]
+            autopilot_due = [(r.id, refresh) for r in rules for refresh in [autopilot_due_refresh(r)] if refresh is not None]
         finally:
             db.close()
+        # Pilote automatique : relecture hebdomadaire, ou nouvel essai après un échec
+        from app.services import keyword_learning_service as kls
+        for rule_id, refresh in autopilot_due:
+            try:
+                kls.start_session(rule_id, "history", 168, refresh=refresh)
+            except Exception as e:
+                logger.error("Autopilot", f"Relance du pilote pour la règle {rule_id} : {e}")
         for rule_id in ids:
             try:
                 await self.review_rule(rule_id)
@@ -309,7 +317,8 @@ class KeywordTuningService:
         finally:
             self._reviewing.discard(rule_id)
 
-    async def ask_arbiter(self, messages: list, config: dict, label: str = "") -> Optional[dict]:
+    async def ask_arbiter(self, messages: list, config: dict, label: str = "", schema: dict = KEYWORD_ARBITER_SCHEMA,
+                          kind: str = "KEYWORDS") -> Optional[dict]:
         if not self.orchestrator:
             return None
         from app.services.resolution_service import clean_ollama_json
@@ -318,11 +327,11 @@ class KeywordTuningService:
                 res = await asyncio.wait_for(self.orchestrator.ollama.chat(
                     messages, url=config.get("ollama_url"), model=config.get("ollama_model"),
                     think=config.get("ollama_think", False), options=llm_options(config, temperature=0.1),
-                    format=KEYWORD_ARBITER_SCHEMA), timeout=300.0)
+                    format=schema), timeout=300.0)
             except asyncio.TimeoutError:
                 res = {"content": "", "error": "Timeout Ollama (300 s)"}
         content = res.get("content") or ""
-        logger.add_ollama_log(messages_to_text(messages), content or res.get("error") or "", "KEYWORDS")
+        logger.add_ollama_log(messages_to_text(messages), content or res.get("error") or "", kind)
         if res.get("error") or not content:
             logger.warning("KeywordTuning", f"Arbitre indisponible ({label}) : {res.get('error') or 'réponse vide'}")
             return None
@@ -336,6 +345,24 @@ class KeywordTuningService:
 
 def _detached(c: KeywordChange) -> dict:
     return change_dict(c)
+
+
+AUTOPILOT_RETRY_H = 6
+
+
+def autopilot_due_refresh(rule: Rule) -> Optional[bool]:
+    """Session du pilote à lancer : True (relecture hebdomadaire), False (nouvel essai après un échec), None (rien)."""
+    from app.services import autopilot as ap
+    data = ap.load(rule)
+    if not data.get("enabled"):
+        return None
+    now = datetime.utcnow()
+    since = lambda key: (now - datetime.fromisoformat(data[key])).total_seconds() / 3600 if data.get(key) else 1e9
+    if data.get("status") == "active" and since("refreshed_at") >= ap.REFRESH_DAYS * 24:
+        return True
+    if data.get("status") == "error" and data.get("error") != "cancelled" and since("attempt_at") >= AUTOPILOT_RETRY_H:
+        return False
+    return None
 
 
 def change_dict(c: KeywordChange) -> dict:
@@ -593,7 +620,8 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
             cand = blind[int(item.get("template", 0)) - 1]
         except (ValueError, TypeError, IndexError):
             continue
-        tpl = db.query(KeywordTemplate).filter(KeywordTemplate.id == cand["template_id"]).first()             if cand.get("template_id") else None
+        tpl = db.query(KeywordTemplate).filter(KeywordTemplate.id == cand["template_id"]).first() \
+            if cand.get("template_id") else None
         reason, conf = str(item.get("reason", "")), _confidence(item)
         if item.get("decision") != "add_keyword":
             if tpl is not None:
@@ -607,7 +635,8 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
                 tpl.status, tpl.reviewed_count = "ignored", tpl.count
             logger.info("KeywordTuning", f"Mot-clé proposé écarté pour '{rule.name}' : « {value} »")
             continue
-        if keyword_match.neutralized([value], excluded) or any(k.lower() == value.lower() for k in keywords)                 or not once("keyword", "add", value):
+        if keyword_match.neutralized([value], excluded) or any(k.lower() == value.lower() for k in keywords) \
+                or not once("keyword", "add", value):
             continue
         # Déjà couvert par un mot-clé ajouté juste avant (deux lignes du même événement)
         if all(keyword_match.classify(ex, keywords, excluded)[0] for ex in examples):
@@ -718,7 +747,8 @@ def sync_manual_edit(db, rule: Rule, old_keywords: List[str], old_excluded: List
         for c in rows:
             v = c.value.lower()
             if c.status == "applied":
-                undone = (c.action == "add" and v in old_l and v not in new_l) or                          (c.action == "remove" and v not in old_l and v in new_l)
+                undone = (c.action == "add" and v in old_l and v not in new_l) or \
+                         (c.action == "remove" and v not in old_l and v in new_l)
                 if undone:
                     c.status, c.decided_at, c.hold_reason = "reverted", now, "manual_edit"
             else:
@@ -740,16 +770,19 @@ def record_manual_change(rule_id: int, kind: str, action: str, value: str, origi
 
 # ── Notification ───────────────────────────────────────────────────────────────────
 
-async def notify_changes(rule_name: str, notify: bool, changes: List[dict], config: dict, title: str = None):
+async def notify_changes(rule_name: str, notify: bool, changes: List[dict], config: dict, title: str = None,
+                         extra: Optional[List[str]] = None):
+    """Une notification par revue. extra : lignes déjà formatées (réglages définis par le pilote automatique)."""
     applied = [c for c in changes if c["status"] == "applied"]
     pending = [c for c in changes if c["status"] == "pending"]
-    if not notify or not (applied or pending):
+    if not notify or not (applied or pending or extra):
         return
     lang = config.get("ollama_prompt_lang", "fr")
     fr = lang == "fr"
     sign = {("keyword", "add"): "+ mot-clé" if fr else "+ keyword", ("keyword", "remove"): "− mot-clé" if fr else "− keyword",
             ("exclusion", "add"): "+ exclusion", ("exclusion", "remove"): "− exclusion"}
-    lines = [f"- {sign[(c['kind'], c['action'])]} `{c['value']}` — {c['reason'][:200]}" for c in applied]
+    lines = list(extra or [])
+    lines += [f"- {sign[(c['kind'], c['action'])]} `{c['value']}` — {c['reason'][:200]}" for c in applied]
     if pending:
         lines.append(("\n**À valider dans l'onglet Mots-clés :**" if fr else "\n**To review in the Keywords tab:**"))
         lines += [f"- {sign[(c['kind'], c['action'])]} `{c['value']}`" for c in pending]

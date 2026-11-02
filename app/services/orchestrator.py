@@ -15,6 +15,8 @@ from app.services.log_source import find_context
 from app.services.prompts import ALERT_SCHEMA, label
 from app.utils.log_utils import clean_log_line, aggregate_lines, line_signature
 from app.utils import keyword_match
+from app.services import autopilot
+from app.services.keyword_tuning import error_level
 from app import logger
 from app.utils.notification_i18n import nt
 
@@ -56,6 +58,8 @@ class Orchestrator:
 
             keywords = db_rule.get_keywords()
             excluded = db_rule.get_excluded_patterns()
+            # Pilote automatique pas encore prêt : alerter quand même sur les lignes de niveau erreur explicite
+            observing = autopilot.is_observing(db_rule)
 
             # Filtrer les lignes contenant au moins un mot-clé (les exclusions sont prioritaires)
             matching_lines = []
@@ -75,8 +79,11 @@ class Orchestrator:
                     matching_lines.append(line)
                     matched_keywords.update(hits)
                     logger.debug("Orchestrator", f"Match '{db_rule.name}' | kw dans : {line[:120]}")
+                elif observing and error_level(line):
+                    matching_lines.append(line)
+                    matched_keywords.add(autopilot.OBSERVE_KEYWORD)
 
-            if not keywords:
+            if not keywords and not observing:
                 logger.debug("Orchestrator", f"Règle '{db_rule.name}' : aucun mot-clé configuré, ignorée")
                 return
 

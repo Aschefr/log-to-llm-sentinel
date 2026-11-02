@@ -761,7 +761,23 @@
     "tuning_off": "Désactivé",
     "tuning_auto_hint": "L'IA ajoute les mots-clés qui manquent et écarte le bruit, après des vérifications sur tes données. Chaque changement est annulable dans l'onglet Mots-clés.",
     "tuning_suggest_hint": "L'IA propose ; tu valides chaque changement dans l'onglet Mots-clés.",
-    "tuning_off_hint": "Les mots-clés ne changent que lorsque tu les modifies."
+    "tuning_off_hint": "Les mots-clés ne changent que lorsque tu les modifies.",
+    "ap_title": "Pilote automatique",
+    "ap_badge": "IA",
+    "ap_badge_title": "Défini par le pilote automatique. Modifie-le pour le reprendre en main.",
+    "ap_hint_new_on": "Indique seulement la source. L'IA lit l'historique du journal (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable.",
+    "ap_hint_new_off": "Tu définis toi-même les mots-clés et les réglages de la règle.",
+    "ap_hint_on": "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Un réglage que tu modifies n'est plus touché.",
+    "ap_hint_off": "Activé, le pilote relit l'historique et gère la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent.",
+    "ap_name_placeholder": "Laisse vide : l'IA le choisira",
+    "ap_context_placeholder": "Laisse vide : l'IA le rédigera d'après le journal",
+    "ap_status_learning": "Lecture de l'historique du journal…",
+    "ap_status_observing": "Observation jusqu'à {when} : pas assez d'historique. En attendant, la règle alerte sur les lignes de niveau erreur.",
+    "ap_status_cancelled": "Mise en place annulée. La règle alerte sur les lignes de niveau erreur ; lance une analyse de l'historique dans l'onglet Mots-clés pour reprendre.",
+    "ap_status_error": "La mise en place a échoué ({error}). Nouvel essai automatique dans quelques heures ; en attendant, la règle alerte sur les lignes de niveau erreur.",
+    "ap_status_active": "Règle en place. Le journal est relu chaque semaine.",
+    "kw_in_tab": "Les mots-clés et les lignes ignorées se gèrent dans l'onglet Mots-clés, avec leurs statistiques et l'historique des changements.",
+    "kw_open_tab": "Ouvrir l'onglet Mots-clés"
   },
   "rule": {
     "back": "← Toutes les règles",
@@ -987,7 +1003,14 @@
     "kw_status_pending": "à valider",
     "kw_status_rejected": "refusé",
     "kw_status_reverted": "annulé",
-    "kw_undo": "Annuler"
+    "kw_undo": "Annuler",
+    "ap_pill": "Pilote auto",
+    "ap_pill_learning": "Pilote auto · lecture de l'historique",
+    "ap_pill_observing": "Pilote auto · observation",
+    "ap_pill_error": "Pilote auto · en attente",
+    "ap_session_title": "Mise en place par le pilote automatique",
+    "ap_session_observing": "Pas assez d'historique dans ce journal : Sentinel observe la source jusqu'à {when}, puis l'IA définit la règle. En attendant, elle alerte sur les lignes de niveau erreur explicite.",
+    "ap_kw_none": "Pas encore de mot-clé : le pilote automatique les choisira. En attendant, la règle alerte sur les lignes de niveau erreur explicite."
   },
   "diag": {
     "title": "Diagnostic (lecture seule)",

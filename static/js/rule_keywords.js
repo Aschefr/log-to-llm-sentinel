@@ -29,6 +29,21 @@ const KW_STATUS = {
     reverted: ['rule.kw_status_reverted', 'annulé'],
 };
 const KW_ACTIVE = ['pending', 'scanning', 'refining'];
+const AP_FIELDS = {
+    name: ['rules.label_name', 'Nom'],
+    application_context: ['rf.app_context', 'Contexte applicatif'],
+    anti_spam_delay: ['rf.grouping_window', 'Fenêtre de regroupement'],
+    inactivity_period_hours: ['rf.notify_silent', 'Alerter si la source est muette'],
+};
+
+/** Settings defined by the autopilot in a session (name, context, rhythm). */
+function apValuesHtml(sum) {
+    const vals = sum.autopilot_values || {};
+    const keys = Object.keys(vals);
+    if (!keys.length) return '';
+    const fmt = (k, v) => k === 'anti_spam_delay' ? `${v} s` : k === 'inactivity_period_hours' ? `${v} h` : v;
+    return `<ul class="kw-session-changes">${keys.map(k => `<li><strong>${esc(T(...AP_FIELDS[k]))}</strong> : ${esc(fmt(k, vals[k]))}</li>`).join('')}</ul>`;
+}
 let kwLastSessionStatus = null;
 
 function kwLabel(map, key) { return map[key] ? T(...map[key]) : (key || ''); }
@@ -109,7 +124,9 @@ async function renderKeywords() {
     if (s && (KW_ACTIVE.includes(s.status) || minutesSince(s.validated_at || s.created_at) < 24 * 60)) {
         const sum = s.summary || {};
         let body;
-        if (s.status === 'pending' && s.mode === 'live') {
+        if (s.status === 'pending' && s.mode === 'live' && sum.autopilot) {
+            body = `<p>${esc(T('rule.ap_session_observing', 'Pas assez d’historique dans ce journal : Sentinel observe la source jusqu’à {when}, puis l’IA définit la règle. En attendant, elle alerte sur les lignes de niveau erreur explicite.', { when: fmtWhen(s.period_end) }))}</p>`;
+        } else if (s.status === 'pending' && s.mode === 'live') {
             body = `<p>${esc(T('rule.kw_session_observing', 'Observation en cours jusqu’à {when}. L’analyse commencera ensuite.', { when: fmtWhen(s.period_end) }))}</p>`;
         } else if (s.status === 'scanning' || s.status === 'pending') {
             body = `<p>${esc(T('rule.kw_session_scanning', 'Lecture du journal…'))}</p><div class="rp-progress"><div style="width:${s.progress}%"></div></div>`;
@@ -118,6 +135,7 @@ async function renderKeywords() {
         } else if (s.status === 'validated') {
             body = `<p>${esc(T('rule.kw_session_done', '{n} ligne(s) lues, {b} angle(s) mort(s), {k} mot(s)-clé(s) examiné(s) : {c} changement(s).',
                 { n: sum.lines || 0, b: sum.blind_spots || 0, k: sum.keywords_reviewed || 0, c: s.changes.length }))}</p>
+                ${apValuesHtml(sum)}
                 ${s.changes.length ? `<ul class="kw-session-changes">${s.changes.map(c => `<li><span class="mono">${esc(kwChangeText(c))}</span>
                     <span class="kw-status kw-status--${c.status}">${esc(kwLabel(KW_STATUS, c.status))}</span> <span class="rp-muted">${esc(c.reason)}</span></li>`).join('')}</ul>` : ''}`;
         } else if (s.status === 'reverted') {
@@ -128,7 +146,8 @@ async function renderKeywords() {
         const period = `${fmtWhen(s.period_start)} → ${fmtWhen(s.period_end)}`;
         session = `
         <section class="rp-card">
-            <div class="rp-card-head"><h2>${esc(s.mode === 'live' ? T('rule.kw_session_live', 'Observation') : T('rule.kw_session_history', 'Analyse de l’historique'))}</h2>
+            <div class="rp-card-head"><h2>${esc(sum.autopilot && !sum.refresh ? T('rule.ap_session_title', 'Mise en place par le pilote automatique')
+                : s.mode === 'live' ? T('rule.kw_session_live', 'Observation') : T('rule.kw_session_history', 'Analyse de l’historique'))}</h2>
                 <span class="rp-muted">${esc(period)}</span></div>
             ${body}
             <div class="rp-actions">
@@ -172,7 +191,9 @@ async function renderKeywords() {
             <thead><tr><th>${esc(T('rule.kw_keyword_col', 'Mot-clé'))}</th><th>${esc(T('rule.alerts_30d', 'Alertes · 30 jours'))}</th>
                 <th>${esc(T('rule.kw_lines_col', 'Lignes / jour'))}</th><th>${esc(T('rule.last', 'Dernier'))}</th><th>${esc(T('rule.kw_origin', 'Origine'))}</th><th></th></tr></thead>
             <tbody>${kwRows}</tbody></table></div>`
-            : `<p class="rp-muted">${esc(T('rule.kw_none', 'Aucun mot-clé : la règle ne déclenche rien. Lance une analyse de l’historique ou ajoute-en un.'))}</p>`}
+            : `<p class="rp-muted">${esc(RP.rule && RP.rule.autopilot && RP.rule.autopilot.enabled && RP.rule.autopilot.status !== 'active'
+                ? T('rule.ap_kw_none', 'Pas encore de mot-clé : le pilote automatique les choisira. En attendant, la règle alerte sur les lignes de niveau erreur explicite.')
+                : T('rule.kw_none', 'Aucun mot-clé : la règle ne déclenche rien. Lance une analyse de l’historique ou ajoute-en un.'))}</p>`}
         <form class="kw-add" onsubmit="kwAdd(event, 'keyword')">
             <input type="text" id="kw-add-keyword" placeholder="${esc(T('rule.kw_add_keyword', 'Ajouter un mot-clé'))}" aria-label="${esc(T('rule.kw_add_keyword', 'Ajouter un mot-clé'))}">
             <button class="btn btn-secondary btn-sm" type="submit">${esc(T('rule.kw_add', 'Ajouter'))}</button>

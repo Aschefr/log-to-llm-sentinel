@@ -52,6 +52,9 @@ class Rule(Base):
     keyword_stats_json = Column(Text, default="{}")           # {"days": {date: {"lines": n, "hits": {motif: n}}}, "reviews": {motif: iso}}
     keyword_tuned_at = Column(DateTime, nullable=True)        # Dernière revue par l'arbitre
 
+    # ── Pilote automatique (AP-1) ──
+    autopilot_json = Column(Text, default="{}")               # état du pilote : voir app/services/autopilot.py
+
     def get_keywords(self):
         import json
         try:

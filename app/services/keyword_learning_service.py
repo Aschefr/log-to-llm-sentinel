@@ -8,6 +8,10 @@ Toutes les lignes de la période sont regroupées en modèles (valeurs variables
 en un seul passage. L'arbitre IA reçoit les angles morts (modèles d'erreur qu'aucun mot-clé n'attrape)
 et, pour chaque mot-clé, les modèles qu'il attrape : il ajoute, retire ou exclut. Ses décisions passent
 les mêmes garde-fous que l'ajustement continu (keyword_tuning) et sont appliquées ou proposées.
+
+Session du pilote automatique (summary["autopilot"]) : sans historique suffisant, la session devient une observation
+de 24 h ; à la fin, l'IA définit aussi le nom et le contexte de la règle, et le rythme des lignes fixe la fenêtre de
+regroupement et le délai de silence (voir app/services/autopilot.py).
 """
 import asyncio
 import json
@@ -20,8 +24,10 @@ from typing import Callable, Optional
 from app import logger as app_logger
 from app.database import SessionLocal
 from app.models import GlobalConfig, KeywordChange, KeywordLearningSession, Rule
+from app.services import autopilot as ap
 from app.services import keyword_tuning as kt
 from app.services.app_config import config_to_dict
+from app.services.prompts import AUTOPILOT_PROFILE_SCHEMA
 from app.services.log_source import read_tail_lines, resolve_path
 from app.utils import keyword_match
 
@@ -29,6 +35,7 @@ MODES = ("history", "live")
 MAX_HOURS = {"history": 24 * 30, "live": 72}
 MAX_SCAN_BYTES = 300 * 1024 * 1024
 MAX_SIGNATURES = 20000
+MAX_TIMES_PER_TEMPLATE = 300    # instants gardés par modèle d'erreur (rythme des alertes, pilote automatique)
 BLIND_MIN_COUNT = 2
 BLIND_MAX = 12
 NOISE_MAX = 8
@@ -118,9 +125,10 @@ def source_files(path: Path) -> list:
 
 
 def scan(files: list, start: datetime, end: datetime, keywords: list, excluded: list,
-         progress: Callable[[int], None], start_offset: int = 0) -> dict:
+         progress: Callable[[int], None], start_offset: Optional[int] = None) -> dict:
     """Regroupe en modèles toutes les lignes de [start, end) (UTC). Une ligne sans horodatage hérite de la
-    précédente (traces sur plusieurs lignes). start_offset : position de départ dans le dernier fichier (mode live)."""
+    précédente (traces sur plusieurs lignes). start_offset : position de départ dans le dernier fichier (mode live,
+    0 = tout le fichier) ; ces lignes sont prises sans filtre de date."""
     now = datetime.utcnow()
     local_offset = estimate_local_offset(files[-1]) if files else timedelta(0)
     templates = {}
@@ -128,8 +136,9 @@ def scan(files: list, start: datetime, end: datetime, keywords: list, excluded: 
     done = 0
     lines_in, overflow = 0, 0
     first_ts = last_ts = None
+    gaps = []  # écarts d'au moins une minute entre deux lignes (silences habituels de la source)
     for i, f in enumerate(files):
-        live_file = start_offset and i == len(files) - 1 and f.stat().st_size >= start_offset
+        live_file = start_offset is not None and i == len(files) - 1 and f.stat().st_size >= start_offset
         current_ts = None
         with open(f, "rb") as fh:
             if live_file:
@@ -152,6 +161,8 @@ def scan(files: list, start: datetime, end: datetime, keywords: list, excluded: 
                         continue
                 lines_in += 1
                 if current_ts is not None:
+                    if last_ts is not None and (current_ts - last_ts).total_seconds() >= 60:
+                        gaps.append((current_ts - last_ts).total_seconds())
                     first_ts = first_ts or current_ts
                     last_ts = current_ts
                 status, hits = keyword_match.classify(line, keywords, excluded)
@@ -162,15 +173,18 @@ def scan(files: list, start: datetime, end: datetime, keywords: list, excluded: 
                         overflow += 1
                         continue
                     t = templates[sig] = {"count": 0, "examples": [], "status": status, "hits": set(hits),
-                                          "error_level": kt.error_level(line), "error_like": kt.error_like(line)}
+                                          "error_level": kt.error_level(line), "error_like": kt.error_like(line),
+                                          "times": []}
                 t["count"] += 1
                 if not t["error_like"] and kt.error_like(line):
                     t["error_like"], t["error_level"] = True, kt.error_level(line)
+                if t["error_like"] and current_ts is not None and len(t["times"]) < MAX_TIMES_PER_TEMPLATE:
+                    t["times"].append(current_ts)
                 if len(t["examples"]) < 3 and line[:500] not in t["examples"]:
                     t["examples"].append(line[:500])
     progress(100)
     return {"templates": templates, "lines": lines_in, "overflow": overflow, "first": first_ts, "last": last_ts,
-            "local_offset_h": local_offset.total_seconds() / 3600}
+            "local_offset_h": local_offset.total_seconds() / 3600, "gaps": gaps}
 
 
 def scan_candidates(db, rule: Rule, result: dict, days: float):
@@ -225,8 +239,10 @@ def _status(session_id: int) -> Optional[str]:
         db.close()
 
 
-def start_session(rule_id: int, mode: str = "history", hours: int = 168) -> int:
-    """Crée une session et lance la tâche. Lève ValueError si la demande est invalide."""
+def start_session(rule_id: int, mode: str = "history", hours: int = 168, refresh: bool = False) -> int:
+    """Crée une session et lance la tâche. Lève ValueError si la demande est invalide.
+    Pour une règle en pilote automatique pas encore prête, la session est celle du pilote (elle définit toute la règle) ;
+    refresh : relecture hebdomadaire du pilote (le contexte n'est revu que si le journal a changé)."""
     if mode not in MODES:
         raise ValueError("invalid_mode")
     hours = max(1, min(int(hours), MAX_HOURS[mode]))
@@ -242,6 +258,9 @@ def start_session(rule_id: int, mode: str = "history", hours: int = 168) -> int:
         now = datetime.utcnow()
         start, end = (now - timedelta(hours=hours), now) if mode == "history" else (now, now + timedelta(hours=hours))
         summary = {}
+        ap_state = ap.load(rule)
+        if ap_state.get("enabled") and (refresh or ap_state.get("status") != "active"):
+            summary.update({"autopilot": True, "refresh": refresh})
         if mode == "live":
             path = resolve_path(rule.log_file_path)
             summary["start_offset"] = path.stat().st_size if path.is_file() else 0
@@ -255,6 +274,11 @@ def start_session(rule_id: int, mode: str = "history", hours: int = 168) -> int:
         db.add(s)
         db.commit()
         rule.last_learning_session_id = s.id
+        if summary.get("autopilot"):
+            ap.set_state(rule, session_id=s.id, attempt_at=now.isoformat(),
+                         **({} if refresh else {"status": "observing" if mode == "live" else "learning",
+                                                "observe_until": end.isoformat() if mode == "live" else None,
+                                                "error": None}))
         db.commit()
         session_id = s.id
     finally:
@@ -281,6 +305,29 @@ async def resume_stuck_sessions():
         _launch(sid)
 
 
+def _to_observation(session_id: int, rule_id: int, summary: dict, reason: str) -> bool:
+    """Pilote sans historique suffisant : la session devient une observation de 24 h (lignes déjà présentes comprises).
+    False si la source a déjà été observée trop longtemps sans résultat."""
+    rounds = summary.get("observe_rounds", 0) + 1
+    if rounds > ap.OBSERVE_MAX_ROUNDS:
+        return False
+    now = datetime.utcnow()
+    end = now + timedelta(hours=ap.OBSERVE_HOURS)
+    summary.update({"observe_rounds": rounds, "start_offset": 0, "observe_reason": reason})
+    _update(session_id, mode="live", status="pending", period_start=now, period_end=end, completed_packets=0,
+            summary_json=json.dumps(summary))
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if rule:
+            ap.set_state(rule, status="observing", observe_until=end.isoformat(), observe_rounds=rounds)
+            db.commit()
+    finally:
+        db.close()
+    app_logger.info("Autopilot", f"Règle {rule_id} : {reason} — observation de {ap.OBSERVE_HOURS} h (tour {rounds})")
+    return True
+
+
 async def _run_session(session_id: int):
     try:
         db = SessionLocal()
@@ -293,6 +340,7 @@ async def _run_session(session_id: int):
             summary = json.loads(s.summary_json or "{}")
         finally:
             db.close()
+        autopilot = bool(summary.get("autopilot"))
 
         # Mode live : attendre la fin de l'observation
         while mode == "live" and datetime.utcnow() < end:
@@ -313,6 +361,9 @@ async def _run_session(session_id: int):
             db.close()
         files = source_files(path)
         if not files:
+            if autopilot and not summary.get("refresh") and _to_observation(
+                    session_id, rule_id, summary, "aucune ligne reçue pour l'instant"):
+                return await _run_session(session_id)
             raise RuntimeError(f"Fichier introuvable : {path}")
         if not all(os.access(f, os.R_OK) for f in files):
             raise RuntimeError(f"Fichier non lisible (permissions) : {path}")
@@ -320,70 +371,150 @@ async def _run_session(session_id: int):
         _update(session_id, status="scanning", completed_packets=0)
         result = await asyncio.to_thread(
             scan, files, start, end, keywords, excluded,
-            lambda pct: _update(session_id, completed_packets=pct), summary.get("start_offset", 0) if mode == "live" else 0)
+            lambda pct: _update(session_id, completed_packets=pct), summary.get("start_offset", 0) if mode == "live" else None)
         if _status(session_id) not in ACTIVE:
             return
         days = max(1.0, (end - start).total_seconds() / 86400)
+        span_h = (result["last"] - result["first"]).total_seconds() / 3600 if result["first"] and result["last"] else 0
         summary.update({"lines": result["lines"], "templates": len(result["templates"]), "overflow": result["overflow"],
                         "local_offset_h": result["local_offset_h"]})
+        if autopilot and not summary.get("refresh"):
+            short = mode == "history" and (result["lines"] < ap.MIN_HISTORY_LINES or span_h < ap.MIN_HISTORY_SPAN_H)
+            if (short or not result["lines"]) and _to_observation(
+                    session_id, rule_id, summary, "historique insuffisant" if result["lines"] else "aucune ligne reçue"):
+                return await _run_session(session_id)
         if not result["lines"]:
             _update(session_id, status="error", summary_json=json.dumps(summary),
                     error_message="Aucune ligne sur cette période : vérifie la période et que les lignes sont horodatées.")
+            _autopilot_error(session_id, "no_lines")
             return
 
         db = SessionLocal()
         try:
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             config = config_to_dict(db.query(GlobalConfig).first())
-            blind, noise = scan_candidates(db, rule, result, days)
+            lang = config.get("ollama_prompt_lang", "fr")
             period = f"{start:%Y-%m-%d %H:%M} → {end:%Y-%m-%d %H:%M} UTC, {result['lines']} lignes"
-            messages = kt.build_arbiter_messages(config.get("ollama_prompt_lang", "fr"), rule, blind, noise, period)
+            signatures = ap.top_signatures(result["templates"])
+            profile_messages = None
+            if autopilot and (not summary.get("refresh") or ap.profile_changed(ap.load(rule).get("signatures", []), signatures)):
+                profile_messages = ap.build_profile_messages(lang, rule, result, period)
+        finally:
+            db.close()
+
+        # Pilote : l'IA décrit d'abord le journal (nom, contexte), ce qui aide ensuite l'arbitre des mots-clés
+        ap_changes = []
+        if profile_messages:
+            _update(session_id, status="refining", summary_json=json.dumps(summary))
+            profile = await _tuning.ask_arbiter(profile_messages, config, label=f"profil session {session_id}",
+                                                schema=AUTOPILOT_PROFILE_SCHEMA, kind="AUTOPILOT") if _tuning else None
+            if _status(session_id) not in ACTIVE:
+                return
+            db = SessionLocal()
+            try:
+                rule = db.query(Rule).filter(Rule.id == rule_id).first()
+                ap_changes += ap.apply_profile(rule, profile)
+                db.commit()
+            finally:
+                db.close()
+            summary["profile"] = profile
+
+        db = SessionLocal()
+        try:
+            rule = db.query(Rule).filter(Rule.id == rule_id).first()
+            # Ajustement désactivé sur la règle : le pilote règle le reste, pas les mots-clés
+            blind, noise = scan_candidates(db, rule, result, days) if (rule.keyword_tuning_mode or "auto") != "off" else ([], [])
+            messages = kt.build_arbiter_messages(lang, rule, blind, noise, period)
         finally:
             db.close()
         summary.update({"blind_spots": len(blind), "keywords_reviewed": len(noise)})
         raw = [c["examples"][0][:200] for c in blind]
 
-        if not blind and not noise:
-            summary["changes"] = []
-            _update(session_id, status="validated", validated_at=datetime.utcnow(), summary_json=json.dumps(summary),
-                    raw_keywords_json=json.dumps(raw), final_keywords_json=json.dumps(keywords),
-                    final_exclusions_json=json.dumps(excluded))
-            return
-
-        _update(session_id, status="refining", summary_json=json.dumps(summary), raw_keywords_json=json.dumps(raw))
-        decision = await _tuning.ask_arbiter(messages, config, label=f"session {session_id}") if _tuning else None
-        _update(session_id, ollama_log_json=json.dumps({"prompt": messages[-1]["content"][:60000],
-                                                        "response": decision}, default=str))
-        if decision is None:
-            raise RuntimeError("L'IA n'a pas répondu (voir les logs de l'application).")
-        if _status(session_id) not in ACTIVE:
-            return
+        decision = None
+        if blind or noise:
+            _update(session_id, status="refining", summary_json=json.dumps(summary, default=str),
+                    raw_keywords_json=json.dumps(raw))
+            decision = await _tuning.ask_arbiter(messages, config, label=f"session {session_id}") if _tuning else None
+            if decision is None:
+                raise RuntimeError("L'IA n'a pas répondu (voir les logs de l'application).")
+            if _status(session_id) not in ACTIVE:
+                return
+        _update(session_id, ollama_log_json=json.dumps({
+            "prompt": messages[-1]["content"][:60000] if decision else None, "response": decision,
+            "profile_prompt": profile_messages[-1]["content"][:20000] if profile_messages else None,
+            "profile": summary.get("profile")}, default=str))
 
         db = SessionLocal()
         try:
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             changes = kt.apply_decisions(db, rule, decision, blind, noise, origin_blind="learning",
-                                         origin_noise="learning", session_id=session_id)
+                                         origin_noise="learning", session_id=session_id) if decision else []
+            if autopilot:
+                # Rythme réel : fenêtre de regroupement des lignes déclenchantes, délai de silence de la source
+                window = ap.grouping_window(ap.matched_timestamps(result["templates"], rule.get_keywords(),
+                                                                  rule.get_excluded_patterns()))
+                if window and ap.set_value(rule, "anti_spam_delay", window):
+                    ap_changes.append("anti_spam_delay")
+                silence = ap.silence_hours(result["gaps"], span_h)
+                if silence and ap.set_value(rule, "inactivity_period_hours", silence):
+                    ap_changes.append("inactivity_period_hours")
+                now_iso = datetime.utcnow().isoformat()
+                ap.set_state(rule, status="active", observe_until=None, error=None, signatures=signatures,
+                             profiled_at=now_iso if profile_messages else ap.load(rule).get("profiled_at"),
+                             refreshed_at=now_iso)
+                summary["autopilot_changes"] = ap_changes
+                summary["autopilot_values"] = {f: getattr(rule, f) for f in ap_changes}
             db.commit()
             result_changes = [kt.change_dict(c) for c in changes]
             summary["changes"] = [c["id"] for c in result_changes]
             s = db.query(KeywordLearningSession).filter(KeywordLearningSession.id == session_id).first()
             s.status, s.validated_at = "validated", datetime.utcnow()
-            s.summary_json = json.dumps(summary)
+            s.summary_json = json.dumps(summary, default=str)
+            s.raw_keywords_json = json.dumps(raw)
             s.final_keywords_json = json.dumps(rule.get_keywords())
             s.final_exclusions_json = json.dumps(rule.get_excluded_patterns())
             s.refine_rationale_json = json.dumps({c["value"]: c["reason"] for c in result_changes})
             db.commit()
             name, notify = rule.name, rule.notify_on_match
+            ap_lines = _autopilot_lines(rule, ap_changes, lang)
         finally:
             db.close()
-        fr = config.get("ollama_prompt_lang", "fr") == "fr"
-        await kt.notify_changes(name, notify, result_changes, config,
-                                title=(f"[Sentinel] 🎓 Apprentissage terminé — {name}" if fr else f"[Sentinel] 🎓 Learning done — {name}"))
-        app_logger.info("KeywordLearning", f"Session {session_id} terminée : {len(result_changes)} changement(s)")
+        fr = lang == "fr"
+        if autopilot and not summary.get("refresh"):
+            title = f"[Sentinel] 🧭 Pilote automatique — règle prête : {name}" if fr else f"[Sentinel] 🧭 Autopilot — rule ready: {name}"
+        else:
+            title = f"[Sentinel] 🎓 Apprentissage terminé — {name}" if fr else f"[Sentinel] 🎓 Learning done — {name}"
+        await kt.notify_changes(name, notify, result_changes, config, title=title, extra=ap_lines)
+        app_logger.info("KeywordLearning", f"Session {session_id} terminée : {len(result_changes)} changement(s)"
+                        + (f", pilote : {', '.join(ap_changes) or 'rien'}" if autopilot else ""))
     except Exception as e:
         app_logger.error("KeywordLearning", f"Session {session_id} : {e}")
         _update(session_id, status="error", error_message=str(e)[:500])
+        _autopilot_error(session_id, str(e))
+
+
+def _autopilot_lines(rule: Rule, fields: list, lang: str) -> list:
+    fr = lang == "fr"
+    labels = {"name": "Nom" if fr else "Name", "application_context": "Contexte" if fr else "Context",
+              "anti_spam_delay": "Fenêtre de regroupement" if fr else "Grouping window",
+              "inactivity_period_hours": "Alerte si la source est muette depuis" if fr else "Alert when the source is silent for"}
+    values = {"anti_spam_delay": f"{rule.anti_spam_delay} s", "inactivity_period_hours": f"{rule.inactivity_period_hours} h",
+              "name": rule.name, "application_context": (rule.application_context or "")[:300]}
+    return [f"- {labels[f]} : {values[f]}" for f in fields]
+
+
+def _autopilot_error(session_id: int, message: str):
+    """Échec de la session du pilote : la règle reste en phase d'observation (alertes de niveau erreur) ;
+    l'ajustement horaire relance le pilote plus tard."""
+    db = SessionLocal()
+    try:
+        s = db.query(KeywordLearningSession).filter(KeywordLearningSession.id == session_id).first()
+        rule = db.query(Rule).filter(Rule.id == s.rule_id).first() if s else None
+        if rule and ap.load(rule).get("session_id") == session_id and ap.load(rule).get("status") != "active":
+            ap.set_state(rule, status="error", error=message[:300], observe_until=None)
+            db.commit()
+    finally:
+        db.close()
 
 
 def cancel_session(session_id: int) -> bool:
@@ -394,6 +525,9 @@ def cancel_session(session_id: int) -> bool:
             return False
         if s.status in ACTIVE:
             s.status, s.error_message = "error", "Annulé par l'utilisateur"
+            rule = db.query(Rule).filter(Rule.id == s.rule_id).first()
+            if rule and ap.load(rule).get("session_id") == s.id and ap.load(rule).get("status") != "active":
+                ap.set_state(rule, status="error", error="cancelled", observe_until=None)
             db.commit()
         return True
     finally:
@@ -457,11 +591,16 @@ def session_exchange_text(session_id: int) -> Optional[str]:
             log = json.loads(s.ollama_log_json or "{}")
         except ValueError:
             log = {}
-        if not isinstance(log, dict) or "prompt" not in log:
+        if not isinstance(log, dict) or not (log.get("prompt") or log.get("profile_prompt")):
             return None
-        return (f"Sentinel — apprentissage des mots-clés, session #{s.id} (règle {s.rule_id})\n"
-                f"Période : {s.period_start:%Y-%m-%d %H:%M} → {s.period_end:%Y-%m-%d %H:%M} UTC\n\n"
-                f"=== Données envoyées à l'IA ===\n{log['prompt']}\n\n"
-                f"=== Décision de l'IA ===\n{json.dumps(log.get('response'), ensure_ascii=False, indent=2)}\n")
+        text = (f"Sentinel — apprentissage des mots-clés, session #{s.id} (règle {s.rule_id})\n"
+                f"Période : {s.period_start:%Y-%m-%d %H:%M} → {s.period_end:%Y-%m-%d %H:%M} UTC\n\n")
+        if log.get("profile_prompt"):
+            text += (f"=== Pilote automatique : extrait envoyé à l'IA ===\n{log['profile_prompt']}\n\n"
+                     f"=== Nom et contexte proposés ===\n{json.dumps(log.get('profile'), ensure_ascii=False, indent=2)}\n\n")
+        if log.get("prompt"):
+            text += (f"=== Données envoyées à l'IA ===\n{log['prompt']}\n\n"
+                     f"=== Décision de l'IA ===\n{json.dumps(log.get('response'), ensure_ascii=False, indent=2)}\n")
+        return text
     finally:
         db.close()

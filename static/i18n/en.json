@@ -761,7 +761,23 @@
     "tuning_off": "Off",
     "tuning_auto_hint": "The AI adds missing keywords and removes noise, after checks against your data. Every change can be undone in the Keywords tab.",
     "tuning_suggest_hint": "The AI suggests; you approve each change in the Keywords tab.",
-    "tuning_off_hint": "Keywords only change when you edit them."
+    "tuning_off_hint": "Keywords only change when you edit them.",
+    "ap_title": "Autopilot",
+    "ap_badge": "AI",
+    "ap_badge_title": "Set by the autopilot. Change it to take it over.",
+    "ap_hint_new_on": "Just give the source. The AI reads the log history (or watches it for 24 h if there is none) and sets the name, context, keywords, grouping window and silence delay. Everything stays editable.",
+    "ap_hint_new_off": "You set the keywords and the rule settings yourself.",
+    "ap_hint_on": "The AI keeps the rule up to date: keywords, context re-read every week, grouping window and silence delay. A setting you change is no longer touched.",
+    "ap_hint_off": "When on, the autopilot re-reads the history and manages the grouping window, the silence delay, and the context if it is empty. The name and what you wrote are kept.",
+    "ap_name_placeholder": "Leave empty: the AI will choose it",
+    "ap_context_placeholder": "Leave empty: the AI will write it from the log",
+    "ap_status_learning": "Reading the log history…",
+    "ap_status_observing": "Watching until {when}: not enough history. Meanwhile, the rule alerts on error-level lines.",
+    "ap_status_cancelled": "Setup cancelled. The rule alerts on error-level lines; run a history analysis in the Keywords tab to resume.",
+    "ap_status_error": "Setup failed ({error}). It will retry automatically in a few hours; meanwhile, the rule alerts on error-level lines.",
+    "ap_status_active": "Rule set up. The log is re-read every week.",
+    "kw_in_tab": "Keywords and ignored lines are managed in the Keywords tab, with their statistics and change history.",
+    "kw_open_tab": "Open the Keywords tab"
   },
   "rule": {
     "back": "← All rules",
@@ -987,7 +1003,14 @@
     "kw_status_pending": "to review",
     "kw_status_rejected": "rejected",
     "kw_status_reverted": "undone",
-    "kw_undo": "Undo"
+    "kw_undo": "Undo",
+    "ap_pill": "Autopilot",
+    "ap_pill_learning": "Autopilot · reading history",
+    "ap_pill_observing": "Autopilot · watching",
+    "ap_pill_error": "Autopilot · waiting",
+    "ap_session_title": "Setup by the autopilot",
+    "ap_session_observing": "Not enough history in this log: Sentinel watches the source until {when}, then the AI sets up the rule. Meanwhile, it alerts on explicit error-level lines.",
+    "ap_kw_none": "No keyword yet: the autopilot will choose them. Meanwhile, the rule alerts on explicit error-level lines."
   },
   "diag": {
     "title": "Diagnostics (read-only)",

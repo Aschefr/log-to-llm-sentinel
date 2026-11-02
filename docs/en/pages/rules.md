@@ -45,9 +45,9 @@ See [Incident Resolution](../features/resolution-tracking.md): closing condition
 See [Keyword tuning](../features/keyword-learning.md): tuning mode, history analysis and observation, changes to review, keywords and exclusions with their real hits and alerts, blind spots being watched, change history with undo.
 
 ### Settings tab
-Five sections:
-1. **Source**: name, local file (with file browser and preview), webhook URL or syslog hostname.
-2. **Detection**: trigger keywords, ignored lines (exclusions), the [automatic tuning](../features/keyword-learning.md) mode (and, for a new rule, *analyze the last 7 days* on creation) and the **grouping window** — lines detected during this window are analysed together in a single AI call.
+An **Autopilot** card, then five sections. Fields set by the [autopilot](../features/autopilot.md) carry an **AI** badge; change one to take it over.
+1. **Source**: name (optional for a new rule with the autopilot: the AI chooses it), local file (with file browser and preview), webhook URL or syslog hostname.
+2. **Detection**: the [automatic tuning](../features/keyword-learning.md) mode and the **grouping window** — lines detected during this window are analysed together in a single AI call. Keywords and ignored lines are typed here only when creating a manual rule (with *analyze the last 7 days* on creation); afterwards they are managed in the Keywords tab.
 3. **AI analysis**: application context (what this rule monitors and what is normal here) and the number of **context lines** read from the source before and after the detected lines.
 4. **Notifications**: notify alerts from a minimum severity, notify when an incident closes, alert when the source goes silent for N hours.
 5. **Return to normal**: see [Incident Resolution](../features/resolution-tracking.md).

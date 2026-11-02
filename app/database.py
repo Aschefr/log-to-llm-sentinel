@@ -137,6 +137,8 @@ def init_db():
         "ALTER TABLE keyword_learning_sessions ADD COLUMN previous_exclusions_json TEXT DEFAULT '[]'",
         "ALTER TABLE keyword_learning_sessions ADD COLUMN mode VARCHAR DEFAULT 'history'",
         "ALTER TABLE keyword_learning_sessions ADD COLUMN summary_json TEXT DEFAULT '{}'",
+        # AP-1: pilote automatique
+        "ALTER TABLE rules ADD COLUMN autopilot_json TEXT DEFAULT '{}'",
     ]
 
     with engine.connect() as conn:

@@ -28,6 +28,7 @@ Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. 
 - 🩺 **Read-only Infrastructure Diagnostics**: Instead of telling you to run `docker ps` or `df -h`, the chat AI can check container state, health, restarts and logs, and server disks, memory, network shares and services itself — through a read-only Docker socket proxy and an SSH key restricted to a fixed list of checks. See [Diagnostics](docs/en/features/diagnostics.md).
 - 📊 **AI Meta-Analysis**: Get the big picture. Schedule daily, weekly, or monthly reports that aggregate multiple detections into a high-level summary of your system's health and trends.
 
+- 🧭 **Autopilot**: Just give the log source. The local AI reads the history (or watches the source for 24 h), names the rule, describes what is normal in this log, picks the keywords, and sizes the grouping window and the silence alert from the real rhythm of the lines.
 - 🤖 **Self-tuning keywords**: Not sure what to look for? Leave the keywords empty: the local AI reads the log history, adds keywords for the errors nothing catches, and removes the noise — every change checked against your data and undoable.
 - 📨 **Syslog Server & Relay**: Turn Sentinel into a remote syslog UDP server (listening on port 10514 UDP on host). Ingest remote logs (e.g., from Unraid) and optionally forward them to a secondary syslog server as a relay.
 - 🔗 **Home Assistant Ready**: Use Webhooks to stream logs from your smart home directly to Sentinel.

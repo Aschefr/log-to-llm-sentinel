@@ -9,6 +9,7 @@ import os
 from app.database import SessionLocal
 from app.models import (Rule, Analysis, GlobalConfig, ResolutionVerdict, KeywordChange, KeywordTemplate,
                         KeywordLearningSession)
+from app.services import autopilot as ap
 from app.services import keyword_tuning as kt
 from app.services import keyword_learning_service as kls
 from app.utils import keyword_match
@@ -50,9 +51,9 @@ def _choice(value, allowed, field):
 
 
 class RuleCreate(BaseModel):
-    name: str
+    name: str = ""          # facultatif en pilote automatique : l'IA le choisit
     log_file_path: str
-    keywords: List[str]
+    keywords: List[str] = []
     application_context: str = ""
     enabled: bool = True
     notify_on_match: bool = True
@@ -79,6 +80,7 @@ class RuleCreate(BaseModel):
     probe_expect: str = ""
     keyword_tuning_mode: str = "auto"
     learn_history: bool = True  # Lancer l'apprentissage sur les 7 derniers jours à la création
+    autopilot: bool = False     # Pilote automatique : l'IA définit la règle (nom, contexte, mots-clés, rythme)
 
 
 class RuleUpdate(BaseModel):
@@ -111,6 +113,7 @@ class RuleUpdate(BaseModel):
     probe_target: Optional[str] = None
     probe_expect: Optional[str] = None
     keyword_tuning_mode: Optional[str] = None
+    autopilot: Optional[bool] = None
 
 
 class PatternBody(BaseModel):
@@ -283,6 +286,7 @@ def get_rule(rule_id: int):
             "keyword_tuning_mode": rule.keyword_tuning_mode or "auto",
             "keyword_pending": db.query(KeywordChange).filter(KeywordChange.rule_id == rule.id,
                                                               KeywordChange.status == "pending").count(),
+            "autopilot": ap.public(rule),
         }
     finally:
         db.close()
@@ -290,10 +294,15 @@ def get_rule(rule_id: int):
 
 @router.post("")
 async def create_rule(rule_data: RuleCreate):
+    name = rule_data.name.strip()
+    if not name and not rule_data.autopilot:
+        raise HTTPException(status_code=422, detail="name_required")
+    if not rule_data.log_file_path.strip():
+        raise HTTPException(status_code=422, detail="log_file_path_required")
     db = SessionLocal()
     try:
         rule = Rule(
-            name=rule_data.name,
+            name=name or ap.default_name(rule_data.log_file_path),
             log_file_path=rule_data.log_file_path,
             application_context=rule_data.application_context,
             enabled=rule_data.enabled,
@@ -321,6 +330,13 @@ async def create_rule(rule_data: RuleCreate):
         rule.set_keywords(rule_data.keywords)
         rule.set_excluded_patterns(rule_data.excluded_patterns)
         rule.set_resolution_patterns(rule_data.resolution_patterns)
+        if rule_data.autopilot:
+            ap.enable(rule, new_rule=True, user_values={"name": name, "application_context": rule_data.application_context.strip()})
+        # La surveillance part de la fin du fichier : l'historique est lu par l'apprentissage, pas rejoué en alertes
+        try:
+            rule.last_position = float(os.path.getsize(rule.log_file_path)) if os.path.isfile(rule.log_file_path) else 0.0
+        except OSError:
+            rule.last_position = 0.0
         db.add(rule)
         db.commit()
         db.refresh(rule)
@@ -333,8 +349,9 @@ async def create_rule(rule_data: RuleCreate):
             pass
 
         # Apprentissage initial : l'arbitre propose ou complète les mots-clés d'après l'historique
+        # (pilote automatique : toujours, et la session définit aussi le reste de la règle)
         session_id = None
-        if rule_data.learn_history and rule.keyword_tuning_mode != "off":
+        if rule_data.autopilot or (rule_data.learn_history and rule.keyword_tuning_mode != "off"):
             try:
                 session_id = kls.start_session(rule.id, "history", 168)
             except Exception:
@@ -345,7 +362,7 @@ async def create_rule(rule_data: RuleCreate):
 
 
 @router.put("/{rule_id}")
-def update_rule(rule_id: int, rule_data: RuleUpdate):
+async def update_rule(rule_id: int, rule_data: RuleUpdate):
     db = SessionLocal()
     try:
         rule = db.query(Rule).filter(Rule.id == rule_id).first()
@@ -412,10 +429,23 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.probe_expect = rule_data.probe_expect.strip()
         if rule_data.keyword_tuning_mode is not None:
             rule.keyword_tuning_mode = _choice(rule_data.keyword_tuning_mode, kt.MODES, "keyword_tuning_mode")
-        # Une modification à la main prime sur l'arbitre : il ne revient pas dessus
+        # Une modification à la main prime sur l'arbitre et sur le pilote : ils ne reviennent pas dessus
         kt.sync_manual_edit(db, rule, old_keywords, old_excluded)
+        ap.release_manual_edits(rule)
+        start_autopilot = False
+        if rule_data.autopilot is not None and rule_data.autopilot != ap.enabled(rule):
+            if rule_data.autopilot:
+                ap.enable(rule, new_rule=False)
+                start_autopilot = True
+            else:
+                ap.disable(rule)
 
         db.commit()
+        if start_autopilot:
+            try:
+                kls.start_session(rule.id, "history", 168)
+            except Exception:
+                pass
 
         # Recharger les règles Syslog
         try:

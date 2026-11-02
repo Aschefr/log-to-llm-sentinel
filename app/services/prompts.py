@@ -475,3 +475,54 @@ KEYWORD_LABELS = {
 def keyword_label(lang: str, key: str, **kwargs) -> str:
     text = KEYWORD_LABELS.get(lang, KEYWORD_LABELS["fr"]).get(key) or KEYWORD_LABELS["fr"][key]
     return text.format(**kwargs) if kwargs else text
+
+
+AUTOPILOT_PROFILE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string", "description": "Nom court de la règle (2 à 5 mots)"},
+        "application_context": {"type": "string", "description": "2 à 4 phrases"},
+    },
+    "required": ["name", "application_context"],
+}
+
+AUTOPILOT_PROFILE_SYSTEM = {
+    "fr": """Tu prépares une règle de surveillance de logs à partir d'un extrait du journal.
+Réponds avec :
+- name : un nom court et parlant pour la règle (2 à 5 mots, ex. « Nextcloud — serveur web », « Système Debian »).
+- application_context : 2 à 4 phrases qui décrivent ce que contient ce journal (système, application, services présents)
+  et ce qui y est normal (messages récurrents attendus, tâches planifiées, bruit habituel). Ce texte aidera ensuite l'IA
+  à juger chaque alerte : sois factuel et appuie-toi uniquement sur les lignes fournies, sans inventer de services absents.""",
+    "en": """You set up a log monitoring rule from an excerpt of the log.
+Answer with:
+- name: a short, meaningful name for the rule (2 to 5 words, e.g. "Nextcloud — web server", "Debian system").
+- application_context: 2 to 4 sentences describing what this log contains (system, application, services present)
+  and what is normal in it (expected recurring messages, scheduled jobs, usual noise). This text will then help the AI
+  judge each alert: be factual and rely only on the lines provided, without inventing services that are not there.""",
+}
+
+AUTOPILOT_LABELS = {
+    "fr": {
+        "source": "Source : {source}",
+        "period": "Période lue : {period}",
+        "volume": "{lines} ligne(s), {templates} modèle(s) de ligne distincts",
+        "user_context": "Contexte écrit par l'utilisateur (à garder en tête) : {context}",
+        "frequent_title": "=== Lignes les plus fréquentes (nombre, exemple) ===",
+        "errors_title": "=== Lignes d'erreur ===",
+        "line": "- ×{count} {example}",
+    },
+    "en": {
+        "source": "Source: {source}",
+        "period": "Period read: {period}",
+        "volume": "{lines} line(s), {templates} distinct line template(s)",
+        "user_context": "Context written by the user (keep it in mind): {context}",
+        "frequent_title": "=== Most frequent lines (count, example) ===",
+        "errors_title": "=== Error lines ===",
+        "line": "- ×{count} {example}",
+    },
+}
+
+
+def autopilot_label(lang: str, key: str, **kwargs) -> str:
+    text = AUTOPILOT_LABELS.get(lang, AUTOPILOT_LABELS["fr"]).get(key) or AUTOPILOT_LABELS["fr"][key]
+    return text.format(**kwargs) if kwargs else text
