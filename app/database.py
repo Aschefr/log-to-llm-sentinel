@@ -124,6 +124,11 @@ def init_db():
         "ALTER TABLE rules ADD COLUMN probe_type VARCHAR DEFAULT 'none'",
         "ALTER TABLE rules ADD COLUMN probe_target VARCHAR DEFAULT ''",
         "ALTER TABLE rules ADD COLUMN probe_expect VARCHAR DEFAULT ''",
+        # DIAG-01: diagnostic Docker (proxy en lecture seule) et serveur (SSH limité)
+        "ALTER TABLE global_config ADD COLUMN docker_proxy_url VARCHAR DEFAULT ''",
+        "ALTER TABLE global_config ADD COLUMN ssh_host VARCHAR DEFAULT ''",
+        "ALTER TABLE global_config ADD COLUMN ssh_port INTEGER DEFAULT 22",
+        "ALTER TABLE global_config ADD COLUMN ssh_user VARCHAR DEFAULT ''",
     ]
 
     with engine.connect() as conn:

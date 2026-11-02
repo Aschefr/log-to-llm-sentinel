@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
 from app import logger
-from app.services.llm_tools import TOOLS, execute_tool, tool_label, truncate_output
+from app.services.llm_tools import available_tools, execute_tool, tool_label, truncate_output
 from app.services.prompts import label
 
 TOOL_BUDGET_RATIO = 0.4   # part max du contexte occupée par les sorties d'outils
@@ -78,7 +78,7 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
     async def _turn():
         nonlocal calls, used
         for round_idx in range(limits.max_rounds + 1):
-            tools_now = TOOLS if use_tools and round_idx < limits.max_rounds and calls < limits.max_calls else None
+            tools_now = available_tools() if use_tools and round_idx < limits.max_rounds and calls < limits.max_calls else None
             if use_tools and tools_now is None:
                 messages.append({"role": "system", "content": label(lang, "tools_exhausted")})
 

@@ -286,6 +286,11 @@ class GlobalConfig(Base):
     syslog_enabled = Column(Boolean, default=False)
     syslog_forward_addr = Column(String, nullable=True)  # Format 'IP:port' or 'IP' (default port 514)
     log_rotation_limit_mb = Column(Integer, default=10)
+    # Diagnostic en lecture seule (outils du chat) : proxy du socket Docker et SSH limité à un script
+    docker_proxy_url = Column(String, default="")   # ex. http://docker-proxy:2375
+    ssh_host = Column(String, default="")
+    ssh_port = Column(Integer, default=22)
+    ssh_user = Column(String, default="")
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 class ChatConversation(Base):

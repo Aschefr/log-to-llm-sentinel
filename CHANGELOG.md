@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Docker diagnostics (read-only)**: Through a read-only Docker socket proxy (`tecnativa/docker-socket-proxy`, `CONTAINERS=1`, `INFO=1`, `POST=0`), the chat and investigation assistant can list containers and check their state, health and last healthchecks, restart count, exit code, OOM, logs and CPU/memory usage itself, instead of asking the user to run `docker ps` / `docker logs`. Environment variables and labels are never passed to the AI. Sentinel never mounts the Docker socket.
+- **Server diagnostics (restricted SSH)**: Sentinel generates an SSH key and the block to paste on the server (Linux or Unraid variant). On the server the key is restricted (`restrict,command=`) to a script that only runs a fixed list of read-only checks: overview, disk, memory, load, processes, network shares, network, kernel messages, system log, failed services, service status and journal. Service names are validated on both sides; the server's key fingerprint is pinned on first connection.
+- **Configuration › Diagnostics**: Proxy address with a connection test, key generation, copy-ready install blocks for Linux and Unraid, connection test showing the server overview. Diagnostic tools are only offered to the AI once configured, and only in the chat and investigations (never in the automatic alert analysis).
+- **Docker configurator**: Platform choice (docker compose or Unraid step-by-step), optional Docker diagnostics service, syslog port mapping. The repository `docker-compose.yml` includes the optional proxy.
+- **Diagnostics guide**: `docs/en/features/diagnostics.md` (what to type on the server, what to fill in Sentinel, how to revoke).
+
+### Changed
+- The Docker image now includes `openssh-client` (used only by server diagnostics).
+
 ## [1.4.1] - 2026-11-02
 
 ### Fixed

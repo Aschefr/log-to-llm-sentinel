@@ -18,6 +18,7 @@ from app import logger
 from app.database import SessionLocal
 from app.models import Analysis, Rule, ResolutionVerdict, MetaAnalysisConfig, ChatAction
 from app.services import log_source
+from app.services import diagnostics as diag
 from app.services.alert_analysis import analysis_lines, short_summary
 from app.utils.log_utils import clean_log_line, line_signature
 
@@ -416,6 +417,42 @@ async def apply_action(action_id: int) -> dict:
         db.close()
 
 
+# ── Diagnostic de l'infrastructure (lecture seule, si configuré) ──────────────
+
+def _diag(fn, *args):
+    try:
+        return diag.as_text(fn(*args))
+    except diag.DiagnosticError as e:
+        raise ToolError(str(e))
+
+
+def docker_list_containers(db, only_problems=False, **_):
+    rows = _diag(diag.docker_containers)
+    data = json.loads(rows)
+    if only_problems:
+        data = [c for c in data if c["state"] != "running" or "unhealthy" in (c["status"] or "") or "Restarting" in (c["status"] or "")]
+    if not data:
+        return "Aucun conteneur en anomalie." if only_problems else "Aucun conteneur."
+    return "\n".join(f"- {c['name']} — {c['state']} — {c['status']} — {c['image']}" for c in data)
+
+
+def docker_container_status(db, name, **_):
+    return _diag(diag.docker_container_status, name)
+
+
+def docker_container_logs(db, name, lines=100, since_minutes=None, **_):
+    out = _diag(diag.docker_container_logs, name, _clip(lines, 1, diag.MAX_LOG_LINES, 100), since_minutes)
+    return out or "(aucune ligne)"
+
+
+def docker_container_stats(db, name, **_):
+    return _diag(diag.docker_container_stats, name)
+
+
+def host_check(db, check, target=None, **_):
+    return _diag(diag.run_host_check, check, target)
+
+
 # ── Définitions (format Ollama) et exécution ───────────────────────────────────
 
 def _fn(name, description, properties, required=()):
@@ -451,10 +488,34 @@ TOOLS = [
          "analysis_id": _INT, "config_id": _INT, "value": {"type": "string"}}, ["action", "reason"]),
 ]
 
+DOCKER_TOOLS = [
+    _fn("docker_list_containers", "Liste les conteneurs Docker du serveur (nom, état, statut avec santé et durée, image). only_problems=true : seulement ceux arrêtés, en redémarrage ou unhealthy.",
+        {"only_problems": {"type": "boolean"}}),
+    _fn("docker_container_status", "État détaillé d'un conteneur Docker : statut, santé et derniers healthchecks, nombre de redémarrages, code de sortie, OOM, dates de démarrage et d'arrêt, montages, réseaux.",
+        {"name": {"type": "string"}}, ["name"]),
+    _fn("docker_container_logs", "Dernières lignes des logs d'un conteneur Docker (200 max), éventuellement limitées aux since_minutes dernières minutes.",
+        {"name": {"type": "string"}, "lines": _INT, "since_minutes": _INT}, ["name"]),
+    _fn("docker_container_stats", "Consommation instantanée d'un conteneur Docker : CPU, mémoire et limite, processus, réseau.",
+        {"name": {"type": "string"}}, ["name"]),
+]
+HOST_TOOLS = [
+    _fn("host_check", "Contrôle en lecture seule du serveur hôte. check : overview (charge, mémoire, disques), disk, memory, load, processes, mounts (partages réseau NFS/SMB), network, kernel (derniers messages du noyau), syslog, failed-services, service (état d'un service systemd, target = nom), journal (journal d'un service systemd, target = nom).",
+        {"check": {"type": "string", "enum": list(diag.HOST_CHECKS)}, "target": {"type": "string"}}, ["check"]),
+]
+
+
+def available_tools() -> list:
+    """Outils du chat : les outils de diagnostic ne sont proposés au LLM que s'ils sont configurés."""
+    avail = diag.availability()
+    return TOOLS + (DOCKER_TOOLS if avail["docker"] else []) + (HOST_TOOLS if avail["host"] else [])
+
+
 _EXECUTORS = {
     "list_rules": list_rules, "tail_logs": tail_logs, "get_log_context": get_log_context, "search_logs": search_logs,
     "find_correlated_events": find_correlated_events, "list_analyses": list_analyses, "get_analysis": get_analysis,
     "get_rule_stats": get_rule_stats, "get_resolution_history": get_resolution_history, "propose_action": propose_action,
+    "docker_list_containers": docker_list_containers, "docker_container_status": docker_container_status,
+    "docker_container_logs": docker_container_logs, "docker_container_stats": docker_container_stats, "host_check": host_check,
 }
 
 
@@ -472,6 +533,11 @@ def tool_label(name: str, args: dict, lang: str = "fr") -> str:
         "get_rule_stats": f"Statistiques{r}",
         "get_resolution_history": f"Historique de résolution{r}",
         "propose_action": f"Proposition : {args.get('action', '')}",
+        "docker_list_containers": "Conteneurs Docker" + (" en anomalie" if args.get("only_problems") else ""),
+        "docker_container_status": f"État du conteneur {args.get('name', '')}",
+        "docker_container_logs": f"Logs du conteneur {args.get('name', '')}",
+        "docker_container_stats": f"Consommation du conteneur {args.get('name', '')}",
+        "host_check": f"Serveur : {args.get('check', '')}" + (f" {args['target']}" if args.get("target") else ""),
     }
     en = {
         "list_rules": "Rule list",
@@ -484,6 +550,11 @@ def tool_label(name: str, args: dict, lang: str = "fr") -> str:
         "get_rule_stats": f"Statistics{r}",
         "get_resolution_history": f"Resolution history{r}",
         "propose_action": f"Proposal: {args.get('action', '')}",
+        "docker_list_containers": "Docker containers" + (" with problems" if args.get("only_problems") else ""),
+        "docker_container_status": f"Container status {args.get('name', '')}",
+        "docker_container_logs": f"Container logs {args.get('name', '')}",
+        "docker_container_stats": f"Container usage {args.get('name', '')}",
+        "host_check": f"Host: {args.get('check', '')}" + (f" {args['target']}" if args.get("target") else ""),
     }
     return (en if lang == "en" else fr).get(name, name)
 

@@ -25,6 +25,7 @@ Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. 
 
 - 🧠 **Smart AI Analysis**: Don't just get alerted; get an explanation. Sentinel uses Ollama to analyze log context and provide a human-readable diagnosis.
 - 💬 **Interactive AI Chat**: Deepen any diagnosis by starting a conversation with the AI. The dedicated chat interface allows you to ask follow-up questions and brainstorm solutions in real-time.
+- 🩺 **Read-only Infrastructure Diagnostics**: Instead of telling you to run `docker ps` or `df -h`, the chat AI can check container state, health, restarts and logs, and server disks, memory, network shares and services itself — through a read-only Docker socket proxy and an SSH key restricted to a fixed list of checks. See [Diagnostics](docs/en/features/diagnostics.md).
 - 📊 **AI Meta-Analysis**: Get the big picture. Schedule daily, weekly, or monthly reports that aggregate multiple detections into a high-level summary of your system's health and trends.
 
 - 🤖 **Keyword Auto-Learning**: Not sure what to look for? Let the AI scan your historical logs. It will automatically suggest and validate the most important keywords to monitor.

@@ -148,12 +148,24 @@ You have tools to read the log sources and Sentinel's history (rules, analyses, 
 - Call propose_action BEFORE writing your final answer, then mention the proposal in that answer: the user should not see your answer continue after the proposal.""",
 }
 
+DIAG_TOOLS_INSTRUCTIONS = {
+    "fr": """=== Diagnostic de l'infrastructure ===
+Tu peux vérifier toi-même l'état réel du serveur (lecture seule) : {tools}.
+- Quand une vérification relève de ces outils (état d'un conteneur, redémarrages, healthcheck, logs d'un conteneur, disque, mémoire, partages réseau, service), fais-la au lieu de demander à l'utilisateur de lancer docker ps, docker logs, df, free ou systemctl.
+- Ces outils ne modifient rien : ne propose jamais de redémarrer un conteneur ou un service comme si tu pouvais le faire.""",
+    "en": """=== Infrastructure diagnostics ===
+You can check the actual state of the server yourself (read-only): {tools}.
+- When a check falls within these tools (container state, restarts, healthcheck, container logs, disk, memory, network shares, service), run it instead of asking the user to run docker ps, docker logs, df, free or systemctl.
+- These tools change nothing: never present restarting a container or a service as something you can do.""",
+}
+
 INVESTIGATION_PROMPT = {
     "fr": """Lance une investigation complète de l'alerte #{analysis_id} (règle #{rule_id}) :
 1. Récupère le contexte élargi autour des lignes déclenchantes.
 2. Vérifie la récurrence et les statistiques de la règle.
 3. Cherche des événements corrélés sur les autres règles au même moment.
 4. Consulte l'historique de résolution si utile.
+   Si des outils de diagnostic (docker_*, host_check) sont disponibles, vérifie l'état réel des conteneurs ou services concernés.
 5. Si une action est clairement justifiée, propose-la via propose_action à ce stade, avant le rapport.
 
 Puis rends un rapport structuré : **Constat**, **Hypothèses classées** (avec les éléments qui les appuient ou les contredisent), **Vérifications à faire** (commandes concrètes), **Recommandation** (en mentionnant l'éventuelle action proposée).""",
@@ -162,6 +174,7 @@ Puis rends un rapport structuré : **Constat**, **Hypothèses classées** (avec 
 2. Check the rule's recurrence and statistics.
 3. Look for correlated events on the other rules at the same time.
 4. Check the resolution history if useful.
+   If diagnostic tools (docker_*, host_check) are available, check the actual state of the containers or services involved.
 5. If an action is clearly justified, propose it with propose_action at this point, before the report.
 
 Then write a structured report: **Findings**, **Ranked hypotheses** (with the evidence for and against), **Checks to run** (concrete commands), **Recommendation** (mentioning any proposed action).""",

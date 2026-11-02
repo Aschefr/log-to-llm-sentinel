@@ -18,7 +18,8 @@ Sentinel detects critical log events, automatically collects surrounding applica
 ### ⚙️ Deep-Dive Features
 * [**Keyword Auto-Learning**](features/keyword-learning.md) — How the AI scans historical logs to learn alert patterns.
 * [**Inactivity Monitoring**](features/inactivity-monitoring.md) — Tracking log ingestion gaps to alert on dead processes.
-* [**Incident Resolution & AI Verdicts**](features/resolution-tracking.md) — Auto-detecting resolution states, auditing weight relevance, and AI confirmation rules.
+* [**Incident Resolution**](features/resolution-tracking.md) — Adaptive calm, health probes, AI validation modes and suggested patterns.
+* [**Infrastructure Diagnostics**](features/diagnostics.md) — Let the chat AI check containers and the server itself (read-only Docker proxy, restricted SSH key), with step-by-step setup for Linux and Unraid.
 
 ### 🛠️ Setup & Ingestion Wizards
 * **[Docker Configurator](../../docker-setup.html)** — Interactive wizard to generate custom `docker-compose.yml` configurations with GPU acceleration and journal bridges.

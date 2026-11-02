@@ -418,6 +418,94 @@
             </div>
         </section>
 
+        <section class="config-section config-section-full" id="diagnostics-section">
+            <h2><span aria-hidden="true">🩺 </span><span data-i18n="diag.title">Diagnostic (lecture seule)</span></h2>
+            <p class="form-hint diag-intro" data-i18n="diag.intro">Permet à l'IA du chat et de l'investigation de vérifier elle-même l'état réel de ton infrastructure (conteneurs, disque, mémoire, services) au lieu de te demander de lancer docker ps ou df. Tout est en lecture seule : rien ne peut être démarré, arrêté ou modifié.</p>
+
+            <div class="diag-grid">
+                <!-- ── Docker ── -->
+                <div class="diag-card">
+                    <div class="diag-card-head">
+                        <h3 data-i18n="diag.docker_title">Conteneurs Docker</h3>
+                        <span class="diag-status" id="diag-docker-status"></span>
+                    </div>
+                    <p class="form-hint" data-i18n="diag.docker_hint">Via un proxy du socket Docker qui n'autorise que la lecture (état, santé, redémarrages, logs, consommation). Sentinel ne monte jamais le socket lui-même.</p>
+                    <div class="form-group">
+                        <label for="diag-docker-url" data-i18n="diag.docker_url">Adresse du proxy</label>
+                        <input type="text" id="diag-docker-url" class="mono" placeholder="http://docker-proxy:2375">
+                    </div>
+                    <div class="diag-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" id="diag-docker-test" data-i18n="diag.test">Tester</button>
+                        <button type="button" class="btn btn-primary btn-sm" id="diag-docker-save" data-i18n="common.save">Enregistrer</button>
+                        <span class="form-hint" id="diag-docker-result"></span>
+                    </div>
+                    <details class="diag-howto">
+                        <summary data-i18n="diag.howto">Comment l'installer ?</summary>
+                        <div class="rp-seg diag-platforms" role="group" data-target="docker">
+                            <button type="button" class="active" data-platform="compose">Docker compose</button>
+                            <button type="button" data-platform="unraid">Unraid</button>
+                        </div>
+                        <div class="diag-howto-body" data-howto="docker-compose">
+                            <p class="form-hint" data-i18n="diag.docker_compose_hint">Ajoute ce service dans le même docker-compose.yml que Sentinel, puis lance docker compose up -d. Adresse à renseigner : http://docker-proxy:2375</p>
+                            <pre class="diag-code" id="diag-docker-compose-code"></pre>
+                            <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-docker-compose-code" data-i18n="common.copy">Copier</button>
+                        </div>
+                        <div class="diag-howto-body hidden" data-howto="docker-unraid">
+                            <ol class="diag-steps">
+                                <li data-i18n-html="diag.unraid_step1">Dans le terminal d'Unraid, crée un réseau dédié (une seule fois) : <code>docker network create sentinel</code>. Pour le voir dans la liste des réseaux, active <i>Paramètres › Docker › Preserve user defined networks</i>.</li>
+                                <li data-i18n-html="diag.unraid_step2">Dans l'onglet Apps, installe le modèle <b>Log-to-LLM-Sentinel-Docker-Proxy</b> et choisis le réseau <code>sentinel</code>.</li>
+                                <li data-i18n-html="diag.unraid_step3">Modifie le conteneur Log-to-LLM-Sentinel et choisis aussi le réseau <code>sentinel</code>.</li>
+                                <li data-i18n-html="diag.unraid_step4">Adresse à renseigner : <code>http://sentinel-docker-proxy:2375</code></li>
+                            </ol>
+                            <p class="form-hint" data-i18n="diag.unraid_no_port">Ne publie pas le port du proxy sur ton réseau : même en lecture seule, il expose la configuration de tous tes conteneurs.</p>
+                        </div>
+                    </details>
+                </div>
+
+                <!-- ── Serveur (SSH) ── -->
+                <div class="diag-card">
+                    <div class="diag-card-head">
+                        <h3 data-i18n="diag.host_title">Serveur (SSH limité)</h3>
+                        <span class="diag-status" id="diag-host-status"></span>
+                    </div>
+                    <p class="form-hint" data-i18n="diag.host_hint">Une clé SSH générée par Sentinel, autorisée sur le serveur uniquement pour un script de contrôles en lecture seule (disque, mémoire, charge, partages réseau, services). Même volée, elle ne permet rien d'autre.</p>
+                    <ol class="diag-steps">
+                        <li>
+                            <span data-i18n="diag.step_key">Génère la clé de Sentinel.</span>
+                            <div class="diag-actions">
+                                <button type="button" class="btn btn-secondary btn-sm" id="diag-key-generate" data-i18n="diag.generate_key">Générer la clé</button>
+                                <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-key-regenerate" data-i18n="diag.regenerate_key">Régénérer</button>
+                            </div>
+                            <code class="diag-pubkey hidden" id="diag-pubkey"></code>
+                        </li>
+                        <li>
+                            <span data-i18n="diag.step_install">Colle ce bloc dans un terminal du serveur.</span>
+                            <div class="rp-seg diag-platforms" role="group" data-target="ssh">
+                                <button type="button" class="active" data-platform="linux">Linux</button>
+                                <button type="button" data-platform="unraid">Unraid</button>
+                            </div>
+                            <pre class="diag-code" id="diag-ssh-snippet"></pre>
+                            <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-ssh-snippet" data-i18n="common.copy">Copier</button>
+                        </li>
+                        <li>
+                            <span data-i18n="diag.step_settings">Renseigne l'adresse du serveur et l'utilisateur indiqué à la fin du bloc, puis teste.</span>
+                            <div class="diag-fields">
+                                <label class="rf-stack"><span data-i18n="diag.ssh_host">Adresse du serveur</span><input type="text" id="diag-ssh-host" class="mono" placeholder="192.168.1.10"></label>
+                                <label class="rf-stack"><span data-i18n="diag.ssh_port">Port</span><input type="number" id="diag-ssh-port" min="1" max="65535" value="22"></label>
+                                <label class="rf-stack"><span data-i18n="diag.ssh_user">Utilisateur</span><input type="text" id="diag-ssh-user" class="mono" placeholder="sentinel-diag"></label>
+                            </div>
+                            <div class="diag-actions">
+                                <button type="button" class="btn btn-primary btn-sm" id="diag-ssh-save" data-i18n="common.save">Enregistrer</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="diag-ssh-test" data-i18n="diag.test_connection">Tester la connexion</button>
+                                <span class="form-hint" id="diag-ssh-result"></span>
+                            </div>
+                            <pre class="diag-code hidden" id="diag-ssh-output"></pre>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+        </section>
+
         <section class="config-section config-section-full">
             <h2><span aria-hidden="true">🛠️ </span><span data-i18n="config.debug_title">Debug</span></h2>
             <div class="form-group checkbox-group">
@@ -469,4 +557,5 @@
 
 {% block scripts %}
 <script src="/static/js/config.js?v=4"></script>
+<script src="/static/js/diagnostics_config.js?v=1"></script>
 {% endblock %}

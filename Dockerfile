@@ -2,8 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# openssh-client : diagnostic serveur optionnel (clé SSH limitée à un script côté serveur)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
+    git openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
