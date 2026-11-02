@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.5.1] - 2026-11-02
 
 ### Changed
 - **Diagnostics setup**: A single **Test and save** button per card tests the values typed in the form and saves them when the test succeeds (**Save anyway** is offered when it fails; an empty field disables). The proxy address and SSH user are now real pre-filled values matching the selected platform (docker compose / Unraid, Linux / Unraid) instead of placeholders, and the server address is pre-filled with the server IP from the general settings. The SSH test no longer requires saving first.
