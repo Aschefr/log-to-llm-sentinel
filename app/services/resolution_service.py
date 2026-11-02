@@ -8,6 +8,10 @@ from typing import List, Dict, Any, Optional
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig, ResolutionVerdict
 from app.utils.notification_i18n import nt
+from app.services.alert_analysis import analysis_lines, short_summary, messages_to_text, _format_duration
+from app.services.app_config import config_to_dict, llm_options
+from app.services.log_source import resolve_path, read_tail_lines
+from app.services.prompts import RESOLUTION_SCHEMA, RESOLUTION_SYSTEM, resolution_label
 from app import logger
 
 
@@ -21,6 +25,20 @@ SEVERITY_LEVELS = {"info": 0, "warning": 1, "critical": 2}
 # ── Decay temporel des patterns ──────────────────────────────────────────
 PATTERN_DECAY_DAYS = 14            # Jours sans validation avant decrement automatique
 PATTERN_DECAY_INTERVAL_HOURS = 6   # Intervalle de verification du decay
+
+# ── Garde-fous des tentatives ────────────────────────────────────────────
+RETRY_COOLDOWN_MINUTES = 5         # Attente apres un rejet avant une nouvelle tentative par motif
+                                   # (apres un rejet par timeout : un delai complet)
+VERDICT_RETENTION_DAYS = 30        # Les verdicts plus anciens sont purges...
+VERDICT_KEEP_PER_RULE = 20         # ...sauf les N plus recents de chaque regle
+
+# ── Auto-apprentissage : motifs refuses ──────────────────────────────────
+LEARNED_PATTERN_MIN_LEN = 5
+GENERIC_PATTERNS = {
+    "success", "successful", "successfully", "succeeded", "finished", "started", "starting",
+    "running", "stopped", "exiting", "queued", "restart", "restarted", "normal", "level=info",
+    "message repeated", "repeated",
+}
 
 
 def clean_ollama_json(response: str) -> str:
@@ -72,6 +90,32 @@ def _read_tail_lines(file_path: str, n: int = 30) -> List[str]:
         return []
 
 
+def _tail(log_file_path: str, n: int = 30) -> List[str]:
+    """Dernières lignes non vides de la source d'une règle (fichier, webhook ou syslog)."""
+    lines = read_tail_lines(resolve_path(log_file_path), max_bytes=256 * 1024)
+    return [l.strip() for l in lines if l.strip()][-n:]
+
+
+def _is_error_line(line: str, keywords: List[str], excluded: List[str]) -> bool:
+    """Même critère que l'orchestrateur : la ligne déclencherait la règle."""
+    low = line.lower()
+    if any(p.lower() in low for p in excluded):
+        return False
+    return any(k.lower() in low for k in keywords)
+
+
+def _is_learnable_pattern(pattern: str, keywords: List[str], error_lines: List[str], context_lines: List[str]) -> bool:
+    """Un motif appris doit être spécifique, absent des lignes d'erreur et réellement présent dans les logs."""
+    low = pattern.lower()
+    if len(low) < LEARNED_PATTERN_MIN_LEN or low in GENERIC_PATTERNS:
+        return False
+    if any(k.lower() in low or low in k.lower() for k in keywords):
+        return False
+    if any(low in l.lower() for l in error_lines):
+        return False
+    return any(low in l.lower() for l in context_lines)
+
+
 class ResolutionService:
     """Détecte et valide le retour à la normale des règles en alerte."""
 
@@ -83,6 +127,9 @@ class ResolutionService:
         #     "started_at": datetime,
         #     "last_error_at": datetime,
         #     "max_severity": str ("info", "warning", "critical"),
+        #     "attempting": bool (une tentative de resolution est en cours),
+        #     "next_attempt_at": datetime | None (pas de nouvelle tentative avant, apres un rejet),
+        #     "lines_since_error": int | None (lignes normales recues depuis la derniere erreur ; None = inconnu),
         # }
         self._alert_states = {}
         self._state_lock = asyncio.Lock()
@@ -97,13 +144,22 @@ class ResolutionService:
             rules = db.query(Rule).filter(Rule.alert_status != "normal").all()
             for rule in rules:
                 max_sev = self._get_max_severity_for_rule(rule.id, db)
+                # Une validation interrompue par l'arret ne reprendra pas : la regle repasse en alerte
+                if rule.alert_status == "resolving":
+                    rule.alert_status = "alert"
+                last = db.query(Analysis).filter(
+                    Analysis.rule_id == rule.id, Analysis.resolution_status == None
+                ).order_by(Analysis.analyzed_at.desc()).first()
+                last_error_at = (last.analyzed_at if last else None) or rule.alert_started_at or datetime.utcnow()
                 self._alert_states[rule.id] = {
-                    "status": rule.alert_status or "normal",
-                    "started_at": rule.alert_started_at,
-                    "last_error_at": rule.alert_started_at,  # Fallback
+                    "status": rule.alert_status,
+                    "started_at": rule.alert_started_at or last_error_at,
+                    "last_error_at": last_error_at,
                     "max_severity": max_sev,
+                    "lines_since_error": None,
                 }
                 logger.info("ResolutionService", f"Etat d'alerte restaure pour la regle '{rule.name}': {rule.alert_status} (severite max: {max_sev})")
+            db.commit()
         except Exception as e:
             logger.error("ResolutionService", f"Erreur lors de la restauration des etats d'alerte : {e}")
         finally:
@@ -192,6 +248,7 @@ class ResolutionService:
                         "started_at": now,
                         "last_error_at": now,
                         "max_severity": severity,
+                        "lines_since_error": 0,
                     }
                     rule.alert_status = "alert"
                     rule.alert_started_at = now
@@ -200,6 +257,8 @@ class ResolutionService:
                 else:
                     self._alert_states[rule_id]["status"] = "alert"
                     self._alert_states[rule_id]["last_error_at"] = now
+                    self._alert_states[rule_id]["lines_since_error"] = 0
+                    self._alert_states[rule_id]["next_attempt_at"] = None
                     # Mise a jour max_severity si la nouvelle est plus haute
                     current_max = self._alert_states[rule_id].get("max_severity", "info")
                     if SEVERITY_LEVELS.get(severity, 0) > SEVERITY_LEVELS.get(current_max, 0):
@@ -224,7 +283,19 @@ class ResolutionService:
         if not state or state["status"] not in ("alert", "resolving"):
             return
 
+        # Un motif de resolution ne peut pas venir d'une ligne qui declenche elle-meme la regle
+        keywords = rule.get_keywords()
+        excluded = rule.get_excluded_patterns()
+        lines = [l for l in lines if not _is_error_line(l, keywords, excluded)]
+        if state.get("lines_since_error") is not None:
+            state["lines_since_error"] += len(lines)
+
         if rule.resolution_mode not in ("pattern", "both"):
+            return
+
+        # Une seule tentative a la fois, et pas de nouvel essai juste apres un rejet
+        next_attempt_at = state.get("next_attempt_at")
+        if state.get("attempting") or (next_attempt_at and datetime.utcnow() < next_attempt_at):
             return
 
         # Tri des patterns par poids decroissant (patterns les plus fiables en priorite)
@@ -260,7 +331,8 @@ class ResolutionService:
         db = SessionLocal()
         try:
             for rule_id, state in list(self._alert_states.items()):
-                if state["status"] != "alert":  # Ignorer 'resolving' : une validation IA est déjà en cours
+                # Ignorer 'resolving' et les tentatives en cours : une validation IA est déjà lancée
+                if state["status"] != "alert" or state.get("attempting"):
                     continue
 
                 rule = db.query(Rule).filter(Rule.id == rule_id).first()
@@ -276,14 +348,24 @@ class ResolutionService:
 
                 timeout_mins = rule.resolution_timeout_minutes or 30
                 last_err = state["last_error_at"]
+                next_attempt_at = state.get("next_attempt_at")
+                now = datetime.utcnow()
 
-                if last_err and (datetime.utcnow() - last_err >= timedelta(minutes=timeout_mins)):
+                if last_err and (now - last_err >= timedelta(minutes=timeout_mins)) and (not next_attempt_at or now >= next_attempt_at):
                     logger.info("ResolutionService", f"Timeout de résolution atteint ({timeout_mins} min) pour la règle '{rule.name}'")
-                    await self._try_resolve(rule_id, trigger=f"Timeout ({timeout_mins} min)", context_lines=[], resolution_line=f"Inactivité de l'erreur supérieure à {timeout_mins} minutes", resolution_patterns=[])
+                    # Les dernières lignes du log servent de preuve à la validation IA (pas d'auto-apprentissage sur timeout)
+                    context = await asyncio.to_thread(_tail, rule.log_file_path) if rule.resolution_ai_enabled and rule.log_file_path else []
+                    await self._try_resolve(rule_id, trigger=f"Timeout ({timeout_mins} min)", context_lines=context, resolution_line=f"Inactivité de l'erreur supérieure à {timeout_mins} minutes", resolution_patterns=[])
         except Exception as e:
             logger.error("ResolutionService", f"Erreur dans check_timeout_resolutions : {e}")
         finally:
             db.close()
+
+    def _defer_next_attempt(self, rule: Rule, pattern_triggered: bool):
+        """Apres un rejet : pas de nouvelle tentative avant un delai (un timeout complet pour le declencheur timeout)."""
+        minutes = RETRY_COOLDOWN_MINUTES if pattern_triggered else (rule.resolution_timeout_minutes or 30)
+        if rule.id in self._alert_states:
+            self._alert_states[rule.id]["next_attempt_at"] = datetime.utcnow() + timedelta(minutes=minutes)
 
     async def _try_resolve(self, rule_id: int, trigger: str, context_lines: List[str], resolution_line: str = None, resolution_patterns: List[str] = None):
         """Tente la resolution avec validation IA optionnelle.
@@ -293,272 +375,281 @@ class ResolutionService:
           Phase 1 (lock court) : lecture config + transition vers 'resolving'
           Phase 2 (sans lock)  : appel IA potentiellement long (jusqu'a 180s)
           Phase 3 (lock court) : application du resultat en memoire et BDD
+        Une seule tentative par regle a la fois ; elle est abandonnee si une erreur survient pendant la validation.
         """
         # === Phase 1 : Transition vers 'resolving' ===
         max_severity = "info"
         use_ai = False
         notify_search = False
+        pattern_triggered = bool(resolution_patterns)
 
         async with self._state_lock:
+            state = self._alert_states.get(rule_id)
+            if not state or state.get("attempting"):
+                return
             db = SessionLocal()
             try:
                 rule = db.query(Rule).filter(Rule.id == rule_id).first()
                 if not rule:
                     return
 
-                max_severity = self._alert_states.get(rule_id, {}).get("max_severity", "info")
+                max_severity = state.get("max_severity", "info")
                 use_ai = bool(rule.resolution_ai_enabled)
                 notify_search = bool(rule.resolution_notify_search)
+                error_snapshot = state.get("last_error_at")
 
-                self._alert_states[rule_id]["status"] = "resolving"
+                state["status"] = "resolving"
                 rule.alert_status = "resolving"
                 db.commit()
+                state["attempting"] = True
             except Exception as e:
                 logger.error("ResolutionService", f"Erreur phase 1 de _try_resolve pour rule_id {rule_id} : {e}")
                 return
             finally:
                 db.close()
 
-        # === Phase 2 : Appel IA (sans lock — potentiellement long) ===
-        verdict = None
-        ai_accepted = False
-        low_confidence_rejected = False
-        effective_threshold = AI_CONFIDENCE_THRESHOLD
+        try:
+            # === Phase 2 : Appel IA (sans lock — potentiellement long) ===
+            verdict = None
+            ai_accepted = False
+            low_confidence_rejected = False
+            effective_threshold = AI_CONFIDENCE_THRESHOLD
 
-        if use_ai:
-            db = SessionLocal()
-            try:
-                rule = db.query(Rule).filter(Rule.id == rule_id).first()
-                if not rule:
-                    raise Exception("Regle introuvable avant appel IA")
+            if use_ai:
+                db = SessionLocal()
+                try:
+                    rule = db.query(Rule).filter(Rule.id == rule_id).first()
+                    if not rule:
+                        raise Exception("Regle introuvable avant appel IA")
 
-                if notify_search:
-                    await self._send_notification_for(db, rule, "search", trigger=trigger)
+                    if notify_search:
+                        await self._send_notification_for(db, rule, "search", trigger=trigger)
 
-                verdict = await self._validate_with_ai(db, rule, trigger, context_lines, resolution_patterns)
-                confidence = verdict.get("confidence", 0)
+                    verdict = await self._validate_with_ai(db, rule, trigger, context_lines, resolution_patterns, resolution_line)
+                    confidence = verdict.get("confidence", 0)
 
-                # Seuil de confiance dynamique : si le pattern a un poids >= cutoff, seuil reduit
-                if resolution_patterns:
-                    weighted = rule.get_weighted_resolution_patterns()
-                    for item in weighted:
-                        if item.get("pattern", "") in resolution_patterns:
-                            if item.get("weight", 1) >= AI_CONFIDENCE_WEIGHT_CUTOFF:
-                                effective_threshold = AI_CONFIDENCE_THRESHOLD_LOW
-                                logger.debug("ResolutionService", f"Seuil de confiance reduit a {effective_threshold}% (pattern poids={item.get('weight')})")
-                            break
+                    # Seuil de confiance dynamique : si le pattern a un poids >= cutoff, seuil reduit
+                    if resolution_patterns:
+                        weighted = rule.get_weighted_resolution_patterns()
+                        for item in weighted:
+                            if item.get("pattern", "") in resolution_patterns:
+                                if item.get("weight", 1) >= AI_CONFIDENCE_WEIGHT_CUTOFF:
+                                    effective_threshold = AI_CONFIDENCE_THRESHOLD_LOW
+                                    logger.debug("ResolutionService", f"Seuil de confiance reduit a {effective_threshold}% (pattern poids={item.get('weight')})")
+                                break
 
-                if verdict.get("resolved") and confidence < effective_threshold:
-                    logger.info("ResolutionService",
-                                f"Resolution acceptee par l'IA mais confiance trop basse ({confidence}% < {effective_threshold}%) pour '{rule.name}'. Rejet.")
-                    low_confidence_rejected = True
-                    verdict["resolved"] = False
-                    verdict["explanation"] = f"{verdict.get('explanation', '')} [Rejete : confiance {confidence}% < seuil {effective_threshold}%]"
+                    if verdict.get("resolved") and confidence < effective_threshold:
+                        logger.info("ResolutionService",
+                                    f"Resolution acceptee par l'IA mais confiance trop basse ({confidence}% < {effective_threshold}%) pour '{rule.name}'. Rejet.")
+                        low_confidence_rejected = True
+                        verdict["resolved"] = False
+                        verdict["explanation"] = f"{verdict.get('explanation', '')} [Rejete : confiance {confidence}% < seuil {effective_threshold}%]"
 
-                ai_accepted = bool(verdict.get("resolved"))
+                    ai_accepted = bool(verdict.get("resolved"))
 
-            except Exception as e:
-                logger.error("ResolutionService", f"Erreur phase 2 (appel IA) de _try_resolve pour rule_id {rule_id} : {e}")
-                # Restaurer l'etat 'alert' en memoire ET en BDD
-                async with self._state_lock:
-                    db_err = SessionLocal()
+                except Exception as e:
+                    logger.error("ResolutionService", f"Erreur phase 2 (appel IA) de _try_resolve pour rule_id {rule_id} : {e}")
+                    # Restaurer l'etat 'alert' en memoire ET en BDD
+                    async with self._state_lock:
+                        db_err = SessionLocal()
+                        try:
+                            rule_err = db_err.query(Rule).filter(Rule.id == rule_id).first()
+                            if rule_id in self._alert_states:
+                                self._alert_states[rule_id]["status"] = "alert"
+                            if rule_err:
+                                rule_err.alert_status = "alert"
+                                db_err.commit()
+                                self._defer_next_attempt(rule_err, pattern_triggered)
+                        except Exception:
+                            pass
+                        finally:
+                            db_err.close()
+                    return
+                finally:
+                    db.close()
+            else:
+                # Pas d'IA : resolution directe
+                ai_accepted = True
+
+            # === Phase 3 : Application du resultat (lock court) ===
+            async with self._state_lock:
+                db = SessionLocal()
+                try:
+                    rule = db.query(Rule).filter(Rule.id == rule_id).first()
+                    if not rule:
+                        return
+
+                    # Une erreur est arrivee pendant la validation : le probleme n'est pas termine
+                    state = self._alert_states.get(rule_id) or {}
+                    if state.get("last_error_at") != error_snapshot:
+                        logger.info("ResolutionService", f"Nouvelle erreur pendant la validation pour '{rule.name}' : tentative abandonnee.")
+                        state["status"] = "alert"
+                        rule.alert_status = "alert"
+                        db.commit()
+                        return
+
+                    confidence = verdict.get("confidence", 0) if verdict else 0
+
+                    if not use_ai:
+                        # Resolution directe sans validation IA
+                        self._record_verdict(db, rule_id, trigger, outcome="accepted_no_ai",
+                                             max_severity=max_severity, context_lines=context_lines,
+                                             resolution_line=resolution_line, resolution_patterns=resolution_patterns)
+                        await self._mark_resolved(db, rule_id, trigger, context_lines=context_lines,
+                                                  resolution_line=resolution_line, resolution_patterns=resolution_patterns)
+
+                    elif low_confidence_rejected:
+                        # Confiance IA insuffisante
+                        self._record_verdict(db, rule_id, trigger, outcome="rejected_low_confidence",
+                                             ai_resolved=True, ai_confidence=confidence,
+                                             ai_explanation=verdict.get("explanation"),
+                                             max_severity=max_severity, context_lines=context_lines,
+                                             resolution_line=resolution_line, resolution_patterns=resolution_patterns)
+                        self._alert_states[rule_id]["status"] = "alert"
+                        rule.alert_status = "alert"
+                        db.commit()
+                        self._defer_next_attempt(rule, pattern_triggered)
+                        if rule.resolution_notify_search:
+                            await self._send_notification_for(db, rule, "denied")
+
+                    elif ai_accepted:
+                        # Resolution validee par l'IA : le motif declencheur gagne en fiabilite
+                        logger.info("ResolutionService", f"Resolution validee par l'IA pour '{rule.name}' avec {confidence}% de confiance.")
+                        for pat in resolution_patterns or []:
+                            rule.increment_pattern_weight(pat)
+                        self._record_verdict(db, rule_id, trigger, outcome="accepted",
+                                             ai_resolved=True, ai_confidence=confidence,
+                                             ai_explanation=verdict.get("explanation"),
+                                             max_severity=max_severity, context_lines=context_lines,
+                                             resolution_line=resolution_line, resolution_patterns=resolution_patterns)
+                        await self._mark_resolved(db, rule_id, trigger,
+                                                  ai_explanation=verdict.get("explanation"),
+                                                  confidence=confidence,
+                                                  context_lines=context_lines,
+                                                  resolution_line=resolution_line,
+                                                  resolution_patterns=resolution_patterns,
+                                                  learn=pattern_triggered)
+
+                    else:
+                        # Rejetee par l'IA
+                        self._record_verdict(db, rule_id, trigger, outcome="rejected_ai",
+                                             ai_resolved=False, ai_confidence=confidence,
+                                             ai_explanation=verdict.get("explanation") if verdict else None,
+                                             max_severity=max_severity, context_lines=context_lines,
+                                             resolution_line=resolution_line, resolution_patterns=resolution_patterns)
+                        logger.info("ResolutionService", f"Resolution rejetee par l'IA pour '{rule.name}'. Explication: {verdict.get('explanation') if verdict else 'N/A'}")
+                        self._alert_states[rule_id]["status"] = "alert"
+                        rule.alert_status = "alert"
+                        db.commit()
+                        self._defer_next_attempt(rule, pattern_triggered)
+                        if rule.resolution_notify_search:
+                            await self._send_notification_for(db, rule, "denied")
+
+                except Exception as e:
+                    logger.error("ResolutionService", f"Erreur phase 3 de _try_resolve pour rule_id {rule_id} : {e}")
+                    # Restaurer l'etat 'alert' en memoire ET en BDD (BUG-RES-02)
+                    if rule_id in self._alert_states:
+                        self._alert_states[rule_id]["status"] = "alert"
                     try:
-                        rule_err = db_err.query(Rule).filter(Rule.id == rule_id).first()
-                        if rule_id in self._alert_states:
-                            self._alert_states[rule_id]["status"] = "alert"
-                        if rule_err:
-                            rule_err.alert_status = "alert"
-                            db_err.commit()
+                        rule.alert_status = "alert"
+                        db.commit()
                     except Exception:
                         pass
-                    finally:
-                        db_err.close()
-                return
-            finally:
-                db.close()
+                finally:
+                    db.close()
+        finally:
+            if rule_id in self._alert_states:
+                self._alert_states[rule_id]["attempting"] = False
+
+    def _build_resolution_messages(self, db, rule: Rule, config: dict, context_lines: List[str],
+                                   resolution_patterns: List[str] = None, resolution_line: str = None) -> list:
+        """Messages de validation : incident (resumes des analyses non resolues), declencheur, vitalite du log, dernieres lignes."""
+        lang = config.get("ollama_prompt_lang", "fr")
+        state = self._alert_states.get(rule.id, {})
+        now = datetime.utcnow()
+        started = state.get("started_at") or now
+        last_err = state.get("last_error_at") or started
+
+        parts = [resolution_label(lang, "rule", name=rule.name)]
+        if rule.application_context:
+            parts.append(resolution_label(lang, "app_context", context=rule.application_context))
+        parts.append("\n" + resolution_label(lang, "incident", started=f"{started:%Y-%m-%d %H:%M} UTC",
+                                             duration=_format_duration((now - started).total_seconds()),
+                                             since=int((now - last_err).total_seconds() // 60)))
+        analyses = db.query(Analysis).filter(
+            Analysis.rule_id == rule.id, Analysis.resolution_status == None
+        ).order_by(Analysis.analyzed_at.desc()).limit(5).all()
+        if analyses:
+            parts.append(resolution_label(lang, "analyses"))
+            for a in reversed(analyses):
+                when = f"{a.analyzed_at:%Y-%m-%d %H:%M}" if a.analyzed_at else "?"
+                parts.append(f"- [{when} UTC] {(a.severity or 'info').upper()} : {short_summary(a)}")
+
+        if resolution_patterns:
+            parts.append("\n" + resolution_label(lang, "check_pattern", pattern=resolution_patterns[0], line=(resolution_line or "")[:500]))
         else:
-            # Pas d'IA : resolution directe
-            ai_accepted = True
+            parts.append("\n" + resolution_label(lang, "check_timeout", minutes=rule.resolution_timeout_minutes or 30))
+        count = state.get("lines_since_error")
+        parts.append(resolution_label(lang, "liveness", count=count) if count is not None else resolution_label(lang, "liveness_unknown"))
 
-        # === Phase 3 : Application du resultat (lock court) ===
-        async with self._state_lock:
-            db = SessionLocal()
-            try:
-                rule = db.query(Rule).filter(Rule.id == rule_id).first()
-                if not rule:
-                    return
+        parts.append("\n" + resolution_label(lang, "recent"))
+        parts.append("\n".join(l[:500] for l in context_lines[-30:]) if context_lines else resolution_label(lang, "no_recent"))
 
-                confidence = verdict.get("confidence", 0) if verdict else 0
+        system = RESOLUTION_SYSTEM.get(lang, RESOLUTION_SYSTEM["fr"])
+        if (config.get("system_prompt") or "").strip():
+            system = f"{config['system_prompt'].strip()}\n\n{system}"
+        return [{"role": "system", "content": system}, {"role": "user", "content": "\n".join(parts)}]
 
-                if not use_ai:
-                    # Resolution directe sans validation IA
-                    self._record_verdict(db, rule_id, trigger, outcome="accepted_no_ai",
-                                         max_severity=max_severity, context_lines=context_lines,
-                                         resolution_line=resolution_line, resolution_patterns=resolution_patterns)
-                    await self._mark_resolved(db, rule_id, trigger, context_lines=context_lines,
-                                              resolution_line=resolution_line, resolution_patterns=resolution_patterns)
-
-                elif low_confidence_rejected:
-                    # Confiance IA insuffisante
-                    self._record_verdict(db, rule_id, trigger, outcome="rejected_low_confidence",
-                                         ai_resolved=True, ai_confidence=confidence,
-                                         ai_explanation=verdict.get("explanation"),
-                                         max_severity=max_severity, context_lines=context_lines,
-                                         resolution_line=resolution_line, resolution_patterns=resolution_patterns)
-                    self._alert_states[rule_id]["status"] = "alert"
-                    rule.alert_status = "alert"
-                    db.commit()
-                    if rule.resolution_notify_search:
-                        await self._send_notification_for(db, rule, "denied")
-
-                elif ai_accepted:
-                    # Resolution validee par l'IA
-                    logger.info("ResolutionService", f"Resolution validee par l'IA pour '{rule.name}' avec {confidence}% de confiance.")
-                    self._record_verdict(db, rule_id, trigger, outcome="accepted",
-                                         ai_resolved=True, ai_confidence=confidence,
-                                         ai_explanation=verdict.get("explanation"),
-                                         max_severity=max_severity, context_lines=context_lines,
-                                         resolution_line=resolution_line, resolution_patterns=resolution_patterns)
-                    await self._mark_resolved(db, rule_id, trigger,
-                                              ai_explanation=verdict.get("explanation"),
-                                              confidence=confidence,
-                                              context_lines=context_lines,
-                                              resolution_line=resolution_line,
-                                              resolution_patterns=resolution_patterns)
-
-                else:
-                    # Rejetee par l'IA
-                    self._record_verdict(db, rule_id, trigger, outcome="rejected_ai",
-                                         ai_resolved=False, ai_confidence=confidence,
-                                         ai_explanation=verdict.get("explanation") if verdict else None,
-                                         max_severity=max_severity, context_lines=context_lines,
-                                         resolution_line=resolution_line, resolution_patterns=resolution_patterns)
-                    logger.info("ResolutionService", f"Resolution rejetee par l'IA pour '{rule.name}'. Explication: {verdict.get('explanation') if verdict else 'N/A'}")
-                    self._alert_states[rule_id]["status"] = "alert"
-                    rule.alert_status = "alert"
-                    db.commit()
-                    if rule.resolution_notify_search:
-                        await self._send_notification_for(db, rule, "denied")
-
-            except Exception as e:
-                logger.error("ResolutionService", f"Erreur phase 3 de _try_resolve pour rule_id {rule_id} : {e}")
-                # Restaurer l'etat 'alert' en memoire ET en BDD (BUG-RES-02)
-                if rule_id in self._alert_states:
-                    self._alert_states[rule_id]["status"] = "alert"
-                try:
-                    rule.alert_status = "alert"
-                    db.commit()
-                except Exception:
-                    pass
-            finally:
-                db.close()
-
-    async def _validate_with_ai(self, db, rule: Rule, trigger: str, context_lines: List[str], resolution_patterns: List[str] = None) -> dict:
-        """Envoie a Ollama le contexte pour obtenir un verdict de retour a la normale.
-        Inclut les patterns de resolution et leur poids pour aider le LLM a contextualiser."""
+    async def _validate_with_ai(self, db, rule: Rule, trigger: str, context_lines: List[str],
+                                resolution_patterns: List[str] = None, resolution_line: str = None) -> dict:
+        """Demande a Ollama un verdict structure de retour a la normale."""
         try:
-            config = db.query(GlobalConfig).first()
-            if not config:
-                return {"resolved": False, "confidence": 0, "explanation": "Pas de configuration globale"}
-
-            lang = config.ollama_prompt_lang or "fr"
-            last_analysis = db.query(Analysis).filter(Analysis.rule_id == rule.id).order_by(Analysis.analyzed_at.desc()).first()
-            error_details = last_analysis.triggered_line if last_analysis else "Inconnue"
-            error_analysis = last_analysis.ollama_response if last_analysis else "Inconnue"
-
-            recent_logs = "\n".join(context_lines[-20:]) if context_lines else "Pas de logs récents (Timeout)"
-
-            if lang == "en":
-                patterns_info = ""
-                if resolution_patterns:
-                    patterns_info = f"\nResolution patterns that triggered this check: {', '.join(resolution_patterns)}"
-                prompt = f"""You are checking if a system issue has resolved.
-Rule name: {rule.name}
-Application context: {rule.application_context}
-Initial triggering error: {error_details}
-Error analysis: {error_analysis}
-Trigger for resolution check: {trigger}{patterns_info}
-Recent logs to check:
-{recent_logs}
-
-Determine if the situation has returned to normal (resolved: true) or if the issue is still ongoing (resolved: false).
-Format your response as a JSON object with keys:
-- "resolved": boolean
-- "confidence": integer (0 to 100)
-- "explanation": string containing a short explanation in English
-
-Return ONLY the raw JSON object, without markdown formatting or code blocks.
-"""
-            else:
-                patterns_info = ""
-                if resolution_patterns:
-                    patterns_info = f"\nPatterns de resolution ayant declenche cette verification : {', '.join(resolution_patterns)}"
-                prompt = f"""Tu dois verifier si un probleme systeme est resolu et si la situation est revenue a la normale.
-Nom de la regle: {rule.name}
-Contexte applicatif: {rule.application_context}
-Erreur declenchante initiale: {error_details}
-Analyse initiale de l'erreur: {error_analysis}
-Declencheur de la verification de resolution: {trigger}{patterns_info}
-Logs recents a examiner:
-{recent_logs}
-
-Determine si la situation est revenue a la normale (resolved: true) ou si le probleme persiste (resolved: false).
-Formate ta reponse sous forme d'un objet JSON avec les cles :
-- "resolved": boolean (true/false)
-- "confidence": entier (de 0 a 100)
-- "explanation": string contenant une courte explication en francais
-
-Retourne UNIQUEMENT l'objet JSON brut, sans formatage markdown ni bloc de code.
-"""
-
+            config = config_to_dict(db.query(GlobalConfig).first())
             if not self.orchestrator:
                 return {"resolved": False, "confidence": 0, "explanation": "Orchestrateur non injecté"}
 
-            logger.debug("ResolutionService", f"Appel Ollama pour validation de résolution de '{rule.name}'...")
-            
+            messages = self._build_resolution_messages(db, rule, config, context_lines, resolution_patterns, resolution_line)
+            logger.debug("ResolutionService", f"Appel Ollama pour validation de résolution de '{rule.name}' ({trigger})...")
+
             async with self.orchestrator._ollama_semaphore:
                 try:
-                    response = await asyncio.wait_for(
-                        self.orchestrator.ollama.analyze_async(
-                            prompt=prompt,
-                            url=config.ollama_url,
-                            model=config.ollama_model,
-                            think=config.ollama_think,
-                            options={
-                                "temperature": 0.1,
-                                "num_ctx": 4096
-                            }
+                    res = await asyncio.wait_for(
+                        self.orchestrator.ollama.chat(
+                            messages,
+                            url=config.get("ollama_url"),
+                            model=config.get("ollama_model"),
+                            think=config.get("ollama_think", False),
+                            options=llm_options(config, temperature=0.1),
+                            format=RESOLUTION_SCHEMA,
                         ),
                         timeout=180.0
                     )
                 except asyncio.TimeoutError:
-                    response = '{"resolved": false, "confidence": 0, "explanation": "Timeout Ollama (180s)"}'
+                    res = {"content": "", "error": "Timeout Ollama (180s)"}
 
-            logger.debug("ResolutionService", f"Réponse Ollama brute: {response}")
-            
-            cleaned = clean_ollama_json(response)
+            content = res.get("content") or ""
+            logger.add_ollama_log(messages_to_text(messages), content or res.get("error") or "", "RESOLUTION")
+            if res.get("error") or not content:
+                return {"resolved": False, "confidence": 0, "explanation": f"Erreur Ollama : {res.get('error') or 'aucune réponse'}"}
 
             try:
-                data = json.loads(cleaned)
+                data = json.loads(clean_ollama_json(content))
                 return {
                     "resolved": bool(data.get("resolved", False)),
                     "confidence": int(data.get("confidence", 0)),
                     "explanation": str(data.get("explanation", "Aucune explication fournie"))
                 }
             except Exception as e:
-                logger.error("ResolutionService", f"Erreur de parsing JSON de la réponse Ollama: {e}. Contenu: {cleaned}")
-                lower_resp = response.lower()
-                if '"resolved": true' in lower_resp or '"resolved":true' in lower_resp:
-                    return {"resolved": True, "confidence": 70, "explanation": "Validation (parsing fallback)"}
-                return {"resolved": False, "confidence": 0, "explanation": f"Erreur parsing réponse : {response[:100]}"}
+                logger.error("ResolutionService", f"Erreur de parsing JSON de la réponse Ollama: {e}. Contenu: {content[:300]}")
+                return {"resolved": False, "confidence": 0, "explanation": f"Erreur parsing réponse : {content[:100]}"}
 
         except Exception as e:
             logger.error("ResolutionService", f"Erreur lors de la validation IA : {e}")
             return {"resolved": False, "confidence": 0, "explanation": str(e)}
 
-    async def _mark_resolved(self, db, rule_id: int, trigger: str, ai_explanation: str = None, confidence: int = None, context_lines: List[str] = None, resolution_line: str = None, resolution_patterns: List[str] = None):
+    async def _mark_resolved(self, db, rule_id: int, trigger: str, ai_explanation: str = None, confidence: int = None, context_lines: List[str] = None, resolution_line: str = None, resolution_patterns: List[str] = None, learn: bool = True):
         """Passe la règle en 'normal', met à jour la BDD, et envoie la notification.
-        Réutilise la session DB du parent."""
+        Réutilise la session DB du parent. learn=False : pas d'auto-apprentissage (ex. résolution par timeout)."""
         try:
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             if not rule:
@@ -590,6 +681,7 @@ Retourne UNIQUEMENT l'objet JSON brut, sans formatage markdown ni bloc de code.
                 Analysis.rule_id == rule_id,
                 Analysis.resolution_status == None
             ).all()
+            error_lines = [l for a in pending_analyses for l in analysis_lines(a)]
             for analysis in pending_analyses:
                 analysis.resolved_at = now
                 analysis.resolution_status = "resolved"
@@ -606,8 +698,8 @@ Retourne UNIQUEMENT l'objet JSON brut, sans formatage markdown ni bloc de code.
                                                   duration=duration_str, trigger=trigger,
                                                   explanation=ai_explanation, confidence=confidence)
 
-            if rule.resolution_ai_enabled and context_lines:
-                asyncio.create_task(self._extract_resolution_keywords(rule_id, context_lines))
+            if rule.resolution_ai_enabled and context_lines and learn:
+                asyncio.create_task(self._extract_resolution_keywords(rule_id, context_lines, error_lines))
 
         except Exception as e:
             logger.error("ResolutionService", f"Erreur lors du marquage comme résolu : {e}")
@@ -649,8 +741,10 @@ Retourne UNIQUEMENT l'objet JSON brut, sans formatage markdown ni bloc de code.
             finally:
                 db.close()
 
-    async def _extract_resolution_keywords(self, rule_id: int, context_lines: List[str]):
-        """Apres validation IA ou override, extrait les patterns de resolution et incremente leur poids."""
+    async def _extract_resolution_keywords(self, rule_id: int, context_lines: List[str], error_lines: List[str] = None):
+        """Apres validation IA ou override, propose de nouveaux patterns de resolution (poids 1).
+        Les candidats generiques, presents dans les lignes d'erreur de l'incident ou absents des logs sont refuses ;
+        le poids d'un pattern n'augmente que lorsqu'il declenche une resolution validee (voir _try_resolve)."""
         db = SessionLocal()
         try:
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
@@ -664,7 +758,10 @@ Retourne UNIQUEMENT l'objet JSON brut, sans formatage markdown ni bloc de code.
             # Recuperation des mots-cles d'erreur actifs pour contextualiser les patterns
             error_keywords = rule.get_keywords()
 
-            recent_logs = "\n".join(context_lines[-30:]) if context_lines else ""
+            # Seules les lignes normales sont proposees au LLM : une ligne d'erreur ne signale pas un retour a la normale
+            excluded = rule.get_excluded_patterns()
+            normal_lines = [l for l in context_lines if not _is_error_line(l, error_keywords, excluded)]
+            recent_logs = "\n".join(normal_lines[-30:])
             if not recent_logs:
                 return
 
@@ -700,10 +797,7 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
                             url=config.ollama_url,
                             model=config.ollama_model,
                             think=False,
-                            options={
-                                "temperature": 0.2,
-                                "num_ctx": 4096
-                            }
+                            options=llm_options(config_to_dict(config), temperature=0.2)
                         ),
                         timeout=90.0
                     )
@@ -715,12 +809,19 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
             try:
                 new_patterns = json.loads(cleaned)
                 if isinstance(new_patterns, list):
+                    existing = {p.lower() for p in rule.get_resolution_patterns()}
                     added = []
                     for pat in new_patterns:
                         pat_cleaned = str(pat).strip()
                         if pat_cleaned:
                             # increment_pattern_weight gere ajout/mise a jour du poids
+                            if pat_cleaned.lower() in existing:
+                                continue
+                            if not _is_learnable_pattern(pat_cleaned, error_keywords, error_lines or [], normal_lines):
+                                logger.debug("ResolutionService", f"Pattern appris refuse pour '{rule.name}' : '{pat_cleaned}'")
+                                continue
                             rule.increment_pattern_weight(pat_cleaned, error_keywords=error_keywords)
+                            existing.add(pat_cleaned.lower())
                             added.append(pat_cleaned)
                     if added:
                         db.commit()
@@ -730,6 +831,60 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
 
         except Exception as e:
             logger.error("ResolutionService", f"Erreur lors de l'auto-apprentissage de resolution : {e}")
+        finally:
+            db.close()
+
+    def reopen_incident(self, db, rule: Rule, resolved_since: datetime):
+        """Annule une resolution jugee fausse par l'utilisateur : la regle repasse en alerte avec les analyses
+        que cette resolution avait cloturees (resolved_at dans les 2 minutes suivant le verdict). Commit par l'appelant."""
+        reopened = db.query(Analysis).filter(
+            Analysis.rule_id == rule.id,
+            Analysis.resolution_status == "resolved",
+            Analysis.resolved_at >= resolved_since,
+            Analysis.resolved_at <= resolved_since + timedelta(minutes=2),
+        ).all()
+        for a in reopened:
+            a.resolved_at = None
+            a.resolution_status = None
+            a.resolution_line = None
+            a.resolution_patterns_json = "[]"
+            a.resolution_ai_explanation = None
+            a.resolution_ai_confidence = None
+        now = datetime.utcnow()
+        started = min((a.analyzed_at for a in reopened if a.analyzed_at), default=now)
+        rule.alert_status = "alert"
+        rule.alert_started_at = started
+        db.flush()
+        self._alert_states[rule.id] = {
+            "status": "alert",
+            "started_at": started,
+            "last_error_at": now,  # le delai d'inactivite repart de maintenant
+            "max_severity": self._get_max_severity_for_rule(rule.id, db),
+            "lines_since_error": None,
+        }
+        logger.info("ResolutionService", f"Resolution annulee (faux positif) pour '{rule.name}' : {len(reopened)} analyse(s) rouverte(s)")
+
+    def purge_old_verdicts(self):
+        """Supprime les verdicts de plus de VERDICT_RETENTION_DAYS jours, en gardant les VERDICT_KEEP_PER_RULE plus recents par regle."""
+        db = SessionLocal()
+        try:
+            cutoff = datetime.utcnow() - timedelta(days=VERDICT_RETENTION_DAYS)
+            removed = 0
+            for (rule_id,) in db.query(ResolutionVerdict.rule_id).distinct().all():
+                keep_ids = [vid for (vid,) in db.query(ResolutionVerdict.id).filter(
+                    ResolutionVerdict.rule_id == rule_id
+                ).order_by(ResolutionVerdict.created_at.desc()).limit(VERDICT_KEEP_PER_RULE).all()]
+                q = db.query(ResolutionVerdict).filter(ResolutionVerdict.rule_id == rule_id, ResolutionVerdict.created_at < cutoff)
+                if keep_ids:
+                    q = q.filter(~ResolutionVerdict.id.in_(keep_ids))
+                removed += q.delete(synchronize_session=False)
+            db.commit()
+            if removed:
+                logger.info("ResolutionService", f"Purge : {removed} verdict(s) de resolution de plus de {VERDICT_RETENTION_DAYS} jours supprime(s)")
+            return removed
+        except Exception as e:
+            logger.error("ResolutionService", f"Erreur dans purge_old_verdicts : {e}")
+            return 0
         finally:
             db.close()
 
@@ -960,10 +1115,7 @@ Retourne UNIQUEMENT l'objet JSON brut, sans formatage markdown ni bloc de code.
                             url=config.ollama_url,
                             model=config.ollama_model,
                             think=False,
-                            options={
-                                "temperature": 0.3,
-                                "num_ctx": 4096
-                            }
+                            options=llm_options(config_to_dict(config), temperature=0.3)
                         ),
                         timeout=120.0
                     )

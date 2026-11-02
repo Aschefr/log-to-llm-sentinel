@@ -266,3 +266,68 @@ META_LABELS = {
 def meta_label(lang: str, key: str, **kwargs):
     text = META_LABELS.get(lang, META_LABELS["fr"]).get(key) or META_LABELS["fr"][key]
     return text.format(**kwargs) if kwargs and isinstance(text, str) else text
+
+
+# Validation du retour à la normale d'une règle en alerte
+RESOLUTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "explanation": {"type": "string"},
+        "resolved": {"type": "boolean"},
+        "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+    },
+    "required": ["explanation", "resolved", "confidence"],
+}
+
+RESOLUTION_SYSTEM = {
+    "fr": """Tu vérifies si un incident détecté par un outil de surveillance de logs est terminé (retour à la normale).
+
+Méthode :
+- Appuie-toi uniquement sur les données fournies.
+- Vérification par délai d'inactivité : l'absence de nouvelle erreur pendant tout le délai EST l'élément principal en faveur de la résolution. Ne rejette pas au seul motif qu'aucune ligne de succès n'est visible. Si le log a continué d'écrire des lignes normales, c'est un signe supplémentaire de bonne santé ; s'il est resté totalement muet, le service est peut-être arrêté : tiens-en compte selon le contexte.
+- Vérification par motif de résolution : confirme que la ligne indique bien la fin du problème décrit par l'incident, et non une étape d'un redémarrage en boucle ou d'une erreur répétée.
+- "explanation" : une ou deux phrases en français, rédigées avant le verdict.
+- "resolved" : true si l'incident est terminé, false s'il persiste.
+- "confidence" : ta certitude dans ce verdict, de 0 (aucune) à 100 (totale).""",
+    "en": """You check whether an incident detected by a log monitoring tool is over (return to normal).
+
+Method:
+- Rely only on the data provided.
+- Inactivity timeout check: the absence of any new error during the whole timeout IS the main evidence for resolution. Do not reject only because no success line is visible. If the log kept writing normal lines, that is an additional sign of health; if it stayed completely silent, the service may be stopped: take it into account depending on the context.
+- Resolution pattern check: confirm that the line really indicates the end of the problem described by the incident, and not a step of a restart loop or a repeated error.
+- "explanation": one or two sentences in English, written before the verdict.
+- "resolved": true if the incident is over, false if it persists.
+- "confidence": your certainty in this verdict, from 0 (none) to 100 (complete).""",
+}
+
+RESOLUTION_LABELS = {
+    "fr": {
+        "rule": "Règle : {name}",
+        "app_context": "Contexte applicatif : {context}",
+        "incident": "=== Incident en cours ===\nDébut : {started} (durée {duration})\nDernière erreur : il y a {since} min",
+        "analyses": "Analyses de l'incident (plus récentes en dernier) :",
+        "check_timeout": "=== Vérification ===\nDéclencheur : délai d'inactivité de {minutes} min atteint, aucune nouvelle erreur détectée.",
+        "check_pattern": "=== Vérification ===\nDéclencheur : la ligne suivante contient le motif de résolution « {pattern} » :\n{line}",
+        "liveness": "Lignes normales reçues depuis la dernière erreur : {count}",
+        "liveness_unknown": "Lignes normales reçues depuis la dernière erreur : inconnu (redémarrage de Sentinel)",
+        "recent": "=== Dernières lignes du log ===",
+        "no_recent": "(aucune ligne disponible)",
+    },
+    "en": {
+        "rule": "Rule: {name}",
+        "app_context": "Application context: {context}",
+        "incident": "=== Ongoing incident ===\nStarted: {started} (duration {duration})\nLast error: {since} min ago",
+        "analyses": "Incident analyses (most recent last):",
+        "check_timeout": "=== Check ===\nTrigger: inactivity timeout of {minutes} min reached, no new error detected.",
+        "check_pattern": "=== Check ===\nTrigger: the following line contains the resolution pattern \"{pattern}\":\n{line}",
+        "liveness": "Normal lines received since the last error: {count}",
+        "liveness_unknown": "Normal lines received since the last error: unknown (Sentinel restarted)",
+        "recent": "=== Last log lines ===",
+        "no_recent": "(no line available)",
+    },
+}
+
+
+def resolution_label(lang: str, key: str, **kwargs) -> str:
+    text = RESOLUTION_LABELS.get(lang, RESOLUTION_LABELS["fr"]).get(key) or RESOLUTION_LABELS["fr"][key]
+    return text.format(**kwargs) if kwargs else text

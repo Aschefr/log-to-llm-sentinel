@@ -604,6 +604,7 @@ async def mark_verdict_false_positive(verdict_id: int):
             raise HTTPException(status_code=404, detail="rule_not_found")
 
         # Mise a jour du verdict
+        previous_outcome = verdict.outcome
         verdict.outcome = "false_positive_user"
         
         # Decrementation du poids des patterns impliques
@@ -612,10 +613,8 @@ async def mark_verdict_false_positive(verdict_id: int):
             rule.decrement_pattern_weight(pattern)
 
         # Si la regle est actuellement 'normal' suite a ce verdict accepte, on la remet en alerte
-        if rule.alert_status == "normal" and verdict.outcome in ("accepted", "accepted_no_ai", "manual"):
-            rule.alert_status = "alert"
-            if _resolution_service and verdict.rule_id in _resolution_service._alert_states:
-                _resolution_service._alert_states[verdict.rule_id]["status"] = "alert"
+        if rule.alert_status == "normal" and previous_outcome in ("accepted", "accepted_no_ai", "manual") and _resolution_service:
+            _resolution_service.reopen_incident(db, rule, verdict.created_at)
 
         db.commit()
         return {"status": "ok", "patterns_decremented": patterns}

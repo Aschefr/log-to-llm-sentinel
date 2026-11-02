@@ -227,6 +227,7 @@ async def lifespan(app: FastAPI):
         while True:
             try:
                 await resolution_service.decay_stale_patterns()
+                await asyncio.to_thread(resolution_service.purge_old_verdicts)
             except Exception as e:
                 print(f"[Main] Erreur pattern decay: {e}")
             await asyncio.sleep(interval)

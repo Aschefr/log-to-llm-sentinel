@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Resolution Check Loop**: When the AI rejected an inactivity-timeout resolution, the check ran again every minute (one full LLM call each time — tens of thousands of calls on some instances). After a rejection the next timeout attempt now waits a full timeout period, and a pattern-triggered attempt waits 5 minutes.
+- **Concurrent Resolution Attempts**: New log batches could start another resolution attempt while one was still being validated, piling up LLM calls behind the alert analyses. Only one attempt per rule runs at a time.
+- **Resolution Despite a New Error**: If an error arrived while the AI was validating, a positive verdict still resolved the incident. The attempt is now abandoned.
+- **Resolution Patterns Matched on Error Lines**: Lines that trigger the rule (keyword match, not excluded) can no longer satisfy a resolution pattern.
+- **Self-Learning Polluted the Patterns**: Learned resolution patterns are now rejected when they are generic (`exiting`, `Starting`, `message repeated`…), contain or are contained in an error keyword, appear in the incident's error lines, or do not occur in the logs. Only normal lines are sent to the LLM, existing patterns are no longer re-weighted each time the LLM proposes them (a pattern's weight now only grows when it triggers an AI-validated resolution), and timeout resolutions no longer feed the learning.
+- **"False Positive" Did Not Reopen the Incident**: The verdict outcome was overwritten before being tested, so the rule never went back to alert. The rule now returns to alert with the analyses that resolution had closed.
+- **Restart Recovery**: A rule caught in `resolving` during a restart was never checked again by timeout; it is restored as `alert`, and the last error time is taken from the latest unresolved analysis instead of the incident start.
+
+### Changed
+- **AI Resolution Check**: Uses structured output and the configured context size (the fixed 4096 caused a model reload between calls). The prompt now contains the incident (start, duration, time since the last error, summaries of its unresolved analyses), the trigger, the number of normal lines received since the last error, and the last lines of the source — including for timeout checks, which previously sent no logs at all and were almost always rejected. The global system prompt applies.
+- **Resolution Verdict Retention**: Verdicts older than 30 days are purged (the 20 most recent per rule are always kept).
+
 ## [1.3.0] - 2026-11-01
 
 ### Added
