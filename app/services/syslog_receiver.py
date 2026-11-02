@@ -239,9 +239,14 @@ class SyslogReceiver:
                     db.close()
 
 
+DETECTED_MAX_AGE_DAYS = 7
+
+
 def detected_hosts() -> list:
-    """Hôtes qui ont envoyé des lignes (un fichier par hôte), avec le nom d'hôte exact relu dans la dernière ligne."""
+    """Hôtes qui ont envoyé des lignes ces derniers jours (un fichier par hôte), avec le nom d'hôte exact relu dans
+    la dernière ligne."""
     out = []
+    oldest = datetime.now(timezone.utc).timestamp() - DETECTED_MAX_AGE_DAYS * 86400
     if not _SYSLOG_LOG_DIR.is_dir():
         return out
     for fp in _SYSLOG_LOG_DIR.glob("*.log"):
@@ -249,6 +254,8 @@ def detected_hosts() -> list:
             continue
         try:
             stat = fp.stat()
+            if stat.st_mtime < oldest:  # source qui n'envoie plus rien
+                continue
             with open(fp, "rb") as f:
                 f.seek(max(0, stat.st_size - 8192))
                 tail = f.read().decode("utf-8", errors="ignore").splitlines()
