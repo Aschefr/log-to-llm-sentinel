@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.4.0] - 2026-11-02
 
 ### Added
 - **Rules overview**: The Rules page now lists every rule — disabled ones included, with a toggle to re-enable them — with its state, alerts over 7 days, last incident summary, median MTTR and source liveness, plus global indicators (rules in alert, alerts over 7 days, median MTTR, silent sources), state filters and a search field.
