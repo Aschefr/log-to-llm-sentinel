@@ -14,9 +14,30 @@ from app.models import Rule, GlobalConfig
 
 logger = logging.getLogger(__name__)
 
-# Pattern RFC 3164 : <PRI>MMM DD HH:MM:SS hostname process[pid]: message
-# Parfois le pid ou le process ou la PRI manque, nous faisons un regex tolérant
-SYSLOG_REGEX = re.compile(r"^(?:<(\d+)>)?([A-Za-z]{3}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+([^\s]+)\s+(.*)$")
+# RFC 3164 : <PRI>MMM DD HH:MM:SS hostname process[pid]: message (PRI parfois absente)
+SYSLOG_3164 = re.compile(r"^(?:<(\d+)>)?([A-Za-z]{3}\s+\d+\s+\d{2}:\d{2}:\d{2})\s+(.*)$")
+# RFC 5424 : <PRI>VERSION TIMESTAMP HOSTNAME APP PROCID MSGID ...
+SYSLOG_5424 = re.compile(r"^<(\d+)>\d{1,2}\s+(\S+)\s+(\S+)\s+(.*)$")
+# Seconde date ISO après l'en-tête (UniFi : « Nov 02 17:48:08 2026-11-02T17:48:08.617Z Dream Machine … CEF:0|… »)
+_ISO_TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\S+\s+")
+
+
+def parse_host(line: str) -> tuple:
+    """(nom d'hôte, message) d'une ligne syslog. Un message CEF (UniFi…) a un nom d'hôte qui peut contenir des espaces :
+    c'est tout ce qui précède « CEF: »."""
+    m = SYSLOG_5424.match(line)
+    if m:
+        host = m.group(3)
+        return (host if host != "-" else "unknown"), m.group(4)
+    m = SYSLOG_3164.match(line)
+    if not m:
+        return "unknown", line
+    rest = _ISO_TS.sub("", m.group(3), count=1)
+    cef = rest.find("CEF:")
+    if cef > 0:
+        return rest[:cef].strip() or "unknown", rest[cef:]
+    host, _, message = rest.partition(" ")
+    return host or "unknown", message
 
 _orchestrator = None
 _BUFFER_MAX = 2000
@@ -168,16 +189,7 @@ class SyslogReceiver:
         await self.start()
 
     def process_raw_line(self, line: str):
-        # Match RFC 3164
-        match = SYSLOG_REGEX.match(line)
-        if match:
-            pri, timestamp, hostname, message = match.groups()
-        else:
-            # Fallback if unparseable
-            hostname = "unknown"
-            message = line
-
-        # Clean/sanitize hostname
+        hostname, message = parse_host(line)
         hostname = hostname.strip()
 
         # Check if there is an active rule for this hostname
@@ -225,6 +237,35 @@ class SyslogReceiver:
                     logger.error(f"Error executing orchestrator check for syslog line: {ex}")
                 finally:
                     db.close()
+
+
+def detected_hosts() -> list:
+    """Hôtes qui ont envoyé des lignes (un fichier par hôte), avec le nom d'hôte exact relu dans la dernière ligne."""
+    out = []
+    if not _SYSLOG_LOG_DIR.is_dir():
+        return out
+    for fp in _SYSLOG_LOG_DIR.glob("*.log"):
+        if fp.name == ".log":  # récepteur général (*)
+            continue
+        try:
+            stat = fp.stat()
+            with open(fp, "rb") as f:
+                f.seek(max(0, stat.st_size - 8192))
+                tail = f.read().decode("utf-8", errors="ignore").splitlines()
+            with open(fp, "rb") as f:
+                count = sum(chunk.count(b"\n") for chunk in iter(lambda: f.read(1 << 20), b""))
+        except OSError:
+            continue
+        last = tail[-1] if tail else ""
+        raw = last.split("  ", 1)[1] if "  " in last else last  # ligne horodatée par Sentinel : « date  ligne »
+        host = parse_host(raw)[0] if raw else fp.stem
+        # Fichiers d'une version précédente nommés d'après une date (en-têtes mal lus) : ignorés
+        if _ISO_TS.match(fp.stem + " ") or host == "unknown" and fp.stem != "unknown":
+            continue
+        out.append({"hostname": host, "lines": count, "last_seen": datetime.fromtimestamp(stat.st_mtime, timezone.utc)
+                    .strftime("%Y-%m-%dT%H:%M:%SZ"), "last_line": raw[:300]})
+    out.sort(key=lambda h: h["last_seen"], reverse=True)
+    return out
 
 
 # Global instance

@@ -172,6 +172,7 @@ function setupRuleForm(opts = {}) {
                 pathInputEl.removeAttribute('required');
                 if (syslogHostnameEl) syslogHostnameEl.setAttribute('required', 'required');
                 pathInputEl.value = '';
+                loadSyslogHosts();
             } else {
                 pathGroup.classList.remove('hidden');
                 webhookGroup.classList.add('hidden');
@@ -302,6 +303,35 @@ async function testProbe() {
         out.textContent = '✗ ' + e.message;
         out.className = 'form-hint rf-ko';
     }
+}
+
+/* ── Syslog: sources already sending lines ─────────────────────────────────── */
+let _syslogHostsTimer = null;
+
+/** List the hosts that sent lines; refreshed while the syslog source is shown (to catch the first message). */
+async function loadSyslogHosts() {
+    const list = document.getElementById('syslog-detected-list');
+    const group = document.getElementById('syslog-group');
+    if (!list || !group) return;
+    clearTimeout(_syslogHostsTimer);
+    if (group.classList.contains('hidden') || !group.offsetParent) return;
+    let hosts = [];
+    try { hosts = (await apiFetch('/api/monitor/syslog/hosts')).hosts || []; } catch (_) { /* liste facultative */ }
+    const editedId = parseInt(document.getElementById('rule-id').value) || null;
+    const current = (document.getElementById('syslog-hostname').value || '').trim();
+    list.innerHTML = hosts.length ? hosts.map(h => {
+        const taken = h.rule && h.rule.id !== editedId;
+        const when = new Date(h.last_seen).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const meta = taken ? _rfT('rf.syslog_taken', 'déjà suivie par « {name} »').replace('{name}', h.rule.name)
+            : _rfT('rf.syslog_host_meta', '{n} ligne(s) · dernière {when}').replace('{n}', h.lines).replace('{when}', when);
+        return `<button type="button" class="rf-detected-item${h.hostname === current ? ' active' : ''}" data-host="${escapeHtml(h.hostname)}" ${taken ? 'disabled' : ''} title="${escapeHtml(h.last_line)}">
+            <strong>${escapeHtml(h.hostname)}</strong><span>${escapeHtml(meta)}</span></button>`;
+    }).join('') : `<span class="form-hint">${escapeHtml(_rfT('rf.syslog_none', "Aucune ligne reçue pour l'instant. Configure l'envoi depuis ta source : elle apparaîtra ici dès son premier message."))}</span>`;
+    list.querySelectorAll('.rf-detected-item:not([disabled])').forEach(b => b.addEventListener('click', () => {
+        document.getElementById('syslog-hostname').value = b.dataset.host;
+        list.querySelectorAll('.rf-detected-item').forEach(x => x.classList.toggle('active', x === b));
+    }));
+    _syslogHostsTimer = setTimeout(loadSyslogHosts, 5000);
 }
 
 /* ── Webhook helpers ───────────────────────────────────────────────────────── */

@@ -192,6 +192,19 @@ def mark_all_analyses_viewed(rule_id: int):
 
 
 
+@router.get("/syslog/hosts")
+def syslog_hosts():
+    """Sources syslog détectées (hôtes qui ont déjà envoyé des lignes) et la règle qui suit chacune, s'il y en a une."""
+    from app.services.syslog_receiver import detected_hosts
+    db = SessionLocal()
+    try:
+        rules = {r.log_file_path.split(":", 1)[1].strip(): {"id": r.id, "name": r.name}
+                 for r in db.query(Rule).filter(Rule.log_file_path.like("[SYSLOG]:%")).all()}
+    finally:
+        db.close()
+    return {"hosts": [{**h, "rule": rules.get(h["hostname"])} for h in detected_hosts()]}
+
+
 @router.get("/syslog/tail/{hostname}")
 def tail_syslog(
     hostname: str,

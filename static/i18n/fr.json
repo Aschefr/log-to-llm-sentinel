@@ -777,7 +777,11 @@
     "ap_status_error": "La mise en place a échoué ({error}). Nouvel essai automatique dans quelques heures ; en attendant, la règle alerte sur les lignes de niveau erreur.",
     "ap_status_active": "Règle en place. Le journal est relu chaque semaine.",
     "kw_in_tab": "Les mots-clés et les lignes ignorées se gèrent dans l'onglet Mots-clés, avec leurs statistiques et l'historique des changements.",
-    "kw_open_tab": "Ouvrir l'onglet Mots-clés"
+    "kw_open_tab": "Ouvrir l'onglet Mots-clés",
+    "syslog_detected": "Sources détectées",
+    "syslog_taken": "déjà suivie par « {name} »",
+    "syslog_host_meta": "{n} ligne(s) · dernière {when}",
+    "syslog_none": "Aucune ligne reçue pour l'instant. Configure l'envoi depuis ta source : elle apparaîtra ici dès son premier message."
   },
   "rule": {
     "back": "← Toutes les règles",

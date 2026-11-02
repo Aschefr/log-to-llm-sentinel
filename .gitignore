@@ -38,3 +38,6 @@ data/syslog/Exposed.log
 data/syslog/.log
 .env
 .env
+# Lignes syslog reçues (données réelles)
+data/syslog/
+data/webhooks/

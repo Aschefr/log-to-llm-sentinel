@@ -88,6 +88,10 @@
                 <label for="syslog-hostname" data-i18n="rules.syslog_hostname_label">Hostname du serveur Syslog</label>
                 <input type="text" id="syslog-hostname" data-i18n-placeholder="rules.syslog_hostname_placeholder" placeholder="ex: Tower">
                 <div class="form-hint" data-i18n-html="rules.syslog_hostname_hint">Le hostname envoyé par le serveur dans son en-tête syslog (ex: <i>Tower</i> pour votre Unraid). Utilisez <code>*</code> pour un récepteur général.</div>
+                <div class="rf-detected" id="syslog-detected">
+                    <span class="rf-label" data-i18n="rf.syslog_detected">Sources détectées</span>
+                    <div class="rf-detected-list" id="syslog-detected-list"></div>
+                </div>
                 <div class="rf-codebox rf-codebox--info">
                     <strong data-i18n="rules.syslog_info_title">Configuration de l'envoi depuis votre source (ex: Unraid) :</strong>
                     <span><span data-i18n="config.syslog_info_ip">Adresse IP :</span> <code id="syslog-rule-current-ip">...</code> · <span data-i18n="config.syslog_info_port">Port :</span> <code>10514</code> · <span data-i18n="config.syslog_info_proto">Protocole :</span> <code>UDP</code></span>

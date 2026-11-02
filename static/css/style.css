@@ -3266,5 +3266,14 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 #rf-autopilot .rf-option-text { flex: 1; min-width: 0; }
 #rf-ap-status { margin-top: 0.25rem; }
 .rf-kw-link { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0 0 1rem; }
+/* Sources syslog détectées */
+.rf-detected { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.85rem; }
+.rf-detected-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.rf-detected-item { display: flex; flex-direction: column; align-items: flex-start; gap: 0.1rem; max-width: 100%; padding: 0.45rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-secondary); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
+.rf-detected-item strong { font-size: 0.85rem; overflow-wrap: anywhere; }
+.rf-detected-item span { font-size: 0.72rem; color: var(--text-secondary); }
+.rf-detected-item:hover:not([disabled]), .rf-detected-item.active { border-color: var(--accent); }
+.rf-detected-item.active { background: rgba(59, 130, 246, 0.1); }
+.rf-detected-item[disabled] { opacity: 0.55; cursor: default; }
 .btn.is-flagged { border-color: var(--warning); color: var(--warning); }
 @media (max-width: 768px) { .kw-change { flex-direction: column; } .kw-learn-group { flex-wrap: wrap; } }

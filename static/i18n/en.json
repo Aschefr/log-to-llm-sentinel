@@ -777,7 +777,11 @@
     "ap_status_error": "Setup failed ({error}). It will retry automatically in a few hours; meanwhile, the rule alerts on error-level lines.",
     "ap_status_active": "Rule set up. The log is re-read every week.",
     "kw_in_tab": "Keywords and ignored lines are managed in the Keywords tab, with their statistics and change history.",
-    "kw_open_tab": "Open the Keywords tab"
+    "kw_open_tab": "Open the Keywords tab",
+    "syslog_detected": "Detected sources",
+    "syslog_taken": "already followed by \"{name}\"",
+    "syslog_host_meta": "{n} line(s) · last {when}",
+    "syslog_none": "No line received yet. Set up sending from your source: it will show up here with its first message."
   },
   "rule": {
     "back": "← All rules",
