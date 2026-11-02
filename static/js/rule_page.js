@@ -220,8 +220,8 @@ function autopilotJourneyHtml(j) {
         ready ? T('rule.ap_step_keywords_done', '{k} mot(s)-clé(s), {x} exclusion(s).', { k: j.rule.keywords, x: j.rule.exclusions })
             : T('rule.ap_step_keywords_todo', 'Les lignes qui méritent une alerte, vérifiées sur les vraies lignes du journal.'));
     step('rhythm', ready ? 'done' : 'todo', T('rule.ap_step_rhythm', 'Rythme de la source'),
-        ready ? T('rule.ap_step_rhythm_done', 'Regroupement des lignes sur {s} s · alerte si la source se tait plus de {h} h.', { s: j.rule.anti_spam_delay, h: j.rule.inactivity_period_hours })
-            : T('rule.ap_step_rhythm_todo', 'Fenêtre de regroupement et délai de silence, calculés sur le rythme réel des lignes.'));
+        ready ? T('rule.ap_step_rhythm_done', 'Regroupement des lignes sur {s} s · alerte si la source se tait plus de {h} h · notifications à partir de {sev}.', { s: j.rule.anti_spam_delay, h: j.rule.inactivity_period_hours, sev: j.rule.notify_severity_threshold })
+            : T('rule.ap_step_rhythm_todo', 'Fenêtre de regroupement, délai de silence et seuil de notification, d’après le rythme réel des lignes et des alertes.'));
     step('ready', ready ? 'done' : 'todo', T('rule.ap_step_ready', 'Règle prête'),
         ready ? T('rule.ap_step_ready_done', 'Le journal sera relu chaque semaine (prochaine relecture {when}).', { when: fmtWhen(j.next_refresh_at) })
             : T('rule.ap_step_ready_todo', 'Une notification résumera ce qui a été défini.'));
@@ -795,7 +795,7 @@ async function renderResolution() {
             <thead><tr><th>${esc(T('rule.pattern', 'Motif'))}</th><th>${esc(T('rule.origin', 'Origine'))}</th><th>${esc(T('rule.reliability', 'Fiabilité'))}</th><th>${esc(T('rule.triggers', 'Déclenchements'))}</th><th>${esc(T('rule.last_validation', 'Dernière validation'))}</th><th></th></tr></thead>
             <tbody>${r.patterns.map(p => `<tr>
                 <td class="mono">${esc(p.pattern)}</td>
-                <td>${esc(p.origin === 'manual' ? T('rule.origin_manual', 'Manuel') : T('rule.origin_learned', 'Appris'))}</td>
+                <td>${esc(p.origin === 'manual' ? T('rule.origin_manual', 'Manuel') : p.origin === 'autopilot' ? T('rule.origin_autopilot', 'Pilote auto') : T('rule.origin_learned', 'Appris'))}</td>
                 <td><span class="rp-weight"><span style="width:${Math.min(100, Math.round(100 * (p.weight || 1) / maxWeight))}%"></span></span> <span class="rp-muted">${esc(T('rule.weight', 'poids {n}', { n: p.weight || 1 }))}</span></td>
                 <td>${esc(T('rule.hits', '{ok} acceptés · {ko} refusés', { ok: p.hits_ok, ko: p.hits_ko }))}</td>
                 <td>${p.last_validated_at ? esc(fmtWhen(p.last_validated_at)) : '—'}</td>

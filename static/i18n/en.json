@@ -765,9 +765,9 @@
     "ap_title": "Autopilot",
     "ap_badge": "AI",
     "ap_badge_title": "Set by the autopilot. Change it to take it over.",
-    "ap_hint_new_on": "Just pick the log to watch. The AI reads its history (or watches it for 24 h if there is none) and sets the name, context, keywords, grouping window and silence delay. Everything stays editable afterwards in Settings.",
+    "ap_hint_new_on": "Just pick the log to watch. The AI reads its history (or watches it for 24 h if there is none), then manages everything: name, context, keywords, grouping window, silence delay, notification threshold and return-to-normal lines. Everything stays editable afterwards in Settings.",
     "ap_hint_new_off": "You set the keywords and the rule settings yourself.",
-    "ap_hint_on": "The AI keeps the rule up to date: keywords, context re-read every week, grouping window and silence delay. To see or change what it set, switch to Manual.",
+    "ap_hint_on": "The AI manages the whole rule without asking you anything: keywords, context re-read every week, grouping window, silence delay, notification threshold and return-to-normal lines. To see or change what it set, switch to Manual.",
     "ap_hint_off": "You manage this rule's settings yourself. The autopilot can take them over anytime.",
     "ap_name_placeholder": "Leave empty: the AI will choose it",
     "ap_context_placeholder": "Leave empty: the AI will write it from the log",
@@ -786,7 +786,7 @@
     "ap_tagline": "The AI takes care of everything",
     "manual_title": "Manual",
     "manual_tagline": "I set everything myself",
-    "ap_hint_enable": "When you save, the autopilot re-reads the log history and takes over the grouping window, the silence delay, and the context if it is empty. The name and what you wrote are kept.",
+    "ap_hint_enable": "When you save, the autopilot re-reads the log history and takes over the grouping window, the silence delay, the notification threshold, the return-to-normal lines, and the context if it is empty. The name and what you wrote are kept.",
     "ap_hint_disable": "Settings marked AI were set by the autopilot. Saving in Manual stops it: everything stays as it is and you manage it yourself. You can switch it back on anytime."
   },
   "rule": {
@@ -1039,15 +1039,19 @@
     "ap_step_keywords_done": "{k} keyword(s), {x} exclusion(s).",
     "ap_step_keywords_todo": "The lines worth an alert, checked against the real lines of the log.",
     "ap_step_rhythm": "Rhythm of the source",
-    "ap_step_rhythm_done": "Lines grouped over {s} s · alert when the source is silent for more than {h} h.",
-    "ap_step_rhythm_todo": "Grouping window and silence delay, computed from the real rhythm of the lines.",
+    "ap_step_rhythm_done": "Lines grouped over {s} s · alert when the source is silent for more than {h} h · notifications from {sev}.",
+    "ap_step_rhythm_todo": "Grouping window, silence delay and notification threshold, from the real rhythm of the lines and alerts.",
     "ap_step_ready": "Rule ready",
     "ap_step_ready_done": "The log will be re-read every week (next re-read {when}).",
     "ap_step_ready_todo": "A notification will sum up what was set.",
     "ap_journey_done": "done",
     "ap_journey_progress": "step {n} of {t}",
     "ap_journey_details": "Details in the Keywords tab",
-    "ap_step_history_brief": "{n} line(s) over only {h} h: not enough hindsight to set up the rule."
+    "ap_step_history_brief": "{n} line(s) over only {h} h: not enough hindsight to set up the rule.",
+    "kw_status_dismissed": "dismissed by the autopilot",
+    "kw_apply_anyway": "Apply anyway",
+    "kw_apply_anyway_title": "The autopilot dismissed it to be safe ({why}).",
+    "origin_autopilot": "Autopilot"
   },
   "diag": {
     "title": "Diagnostics (read-only)",

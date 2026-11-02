@@ -3,7 +3,10 @@
 L'utilisateur ne donne que la source. Sentinel lit l'historique (ou observe 24 h s'il n'y en a pas), puis :
 - l'IA définit le nom de la règle et le contexte de l'application (ce que contient ce journal, ce qui y est normal) ;
 - l'arbitre des mots-clés (keyword_tuning) choisit les mots-clés et les exclusions ;
-- la fenêtre de regroupement et le délai de silence sont calculés sur le rythme réel des lignes, sans IA.
+- la fenêtre de regroupement et le délai de silence sont calculés sur le rythme réel des lignes, sans IA ;
+- le seuil de notification suit les alertes réelles (relevé à « warning » quand presque tout est « info ») ;
+- les motifs de retour à la normale appris sont appliqués directement s'ils passent des garde-fous ;
+- un changement de mot-clé que les garde-fous retiennent est écarté (journalisé), jamais laissé en attente.
 
 Pendant l'observation, la règle alerte seulement sur les lignes de niveau erreur explicite.
 Chaque semaine, l'historique est relu : le contexte est revu si le contenu du journal a nettement changé.
@@ -18,13 +21,20 @@ import math
 from datetime import datetime, timedelta
 from typing import List, Optional
 
-from app.models import Rule
+from app.models import Analysis, Rule
 from app.services.prompts import AUTOPILOT_PROFILE_SCHEMA, AUTOPILOT_PROFILE_SYSTEM, autopilot_label
 from app.services.log_source import source_type
 from app.utils import keyword_match
 from app.utils.log_utils import clean_log_line
 
-MANAGED_FIELDS = ("name", "application_context", "anti_spam_delay", "inactivity_period_hours")
+MANAGED_FIELDS = ("name", "application_context", "anti_spam_delay", "inactivity_period_hours", "notify_severity_threshold")
+RHYTHM_FIELDS = ("anti_spam_delay", "inactivity_period_hours", "notify_severity_threshold")  # toujours gérés à l'activation
+STATE_VERSION = 2               # 2 : seuil de notification géré
+NOTIFY_MIN_ALERTS = 10          # alertes sur 30 jours avant de juger le seuil de notification
+NOTIFY_LOW_SHARE = 0.7          # part d'alertes « info » (ou signalées pas pertinentes) qui fait passer à « warning »
+SEVERITIES = ("info", "warning", "critical")
+PATTERN_MAX_SHARE = 0.2         # un motif de retour à la normale présent dans plus de 20 % des lignes ne signale rien
+AUTOPILOT_PATTERNS_MAX = 8      # motifs appris actifs au plus, par règle
 OBSERVE_HOURS = 24
 OBSERVE_MAX_ROUNDS = 7          # une source toujours muette n'est pas observée indéfiniment
 MIN_HISTORY_LINES = 50          # en dessous, l'historique ne suffit pas : observation
@@ -82,12 +92,11 @@ def enable(rule: Rule, new_rule: bool, user_values: Optional[dict] = None):
     le nom et un contexte déjà écrit, et gère la fenêtre de regroupement et le délai de silence."""
     user_values = user_values or {}
     if new_rule:
-        managed = [f for f in MANAGED_FIELDS if f in ("anti_spam_delay", "inactivity_period_hours") or not user_values.get(f)]
+        managed = [f for f in MANAGED_FIELDS if f in RHYTHM_FIELDS or not user_values.get(f)]
     else:
-        managed = ["anti_spam_delay", "inactivity_period_hours"] + ([] if (rule.application_context or "").strip()
-                                                                   else ["application_context"])
+        managed = list(RHYTHM_FIELDS) + ([] if (rule.application_context or "").strip() else ["application_context"])
     data = load(rule)
-    data.update({"enabled": True, "status": "learning", "managed": managed,
+    data.update({"enabled": True, "status": "learning", "managed": managed, "v": STATE_VERSION,
                  "values": {f: getattr(rule, f) for f in managed}, "error": None})
     save(rule, data)
 
@@ -222,6 +231,59 @@ def history_too_short(lines: int, span_h: float) -> bool:
     """L'historique ne suffit pas pour définir la règle : trop peu de lignes, ou peu de lignes sur peu de temps.
     Un journal très actif (Docker Desktop tourne son fichier toutes les 2 h) suffit même sur quelques heures."""
     return lines < MIN_HISTORY_LINES or (span_h < MIN_HISTORY_SPAN_H and lines < RICH_HISTORY_LINES)
+
+
+def upgrade_state(rule: Rule):
+    """Règles mises sous pilote par une version précédente : le seuil de notification, resté à sa valeur par défaut,
+    passe sous la gestion du pilote."""
+    data = load(rule)
+    if not data.get("enabled") or data.get("v", 1) >= STATE_VERSION:
+        return
+    if (rule.notify_severity_threshold or "info") == "info" and "notify_severity_threshold" not in data.get("managed", []):
+        data.setdefault("managed", []).append("notify_severity_threshold")
+        data.setdefault("values", {})["notify_severity_threshold"] = rule.notify_severity_threshold or "info"
+    data["v"] = STATE_VERSION
+    save(rule, data)
+
+
+def notification_threshold(db, rule: Rule) -> Optional[tuple]:
+    """Seuil de notification que justifient les alertes des 30 derniers jours : « warning » quand au moins 70 % d'au
+    moins 10 alertes sont « info » ou signalées pas pertinentes. Jamais plus bas que le seuil actuel. None sinon."""
+    since = datetime.utcnow() - timedelta(days=30)
+    rows = db.query(Analysis.severity, Analysis.feedback).filter(Analysis.rule_id == rule.id,
+                                                                 Analysis.analyzed_at >= since).all()
+    if len(rows) < NOTIFY_MIN_ALERTS:
+        return None
+    low = sum(1 for sev, fb in rows if (sev or "info").lower() == "info" or fb == "irrelevant")
+    current = rule.notify_severity_threshold or "info"
+    if low / len(rows) >= NOTIFY_LOW_SHARE and SEVERITIES.index(current) < SEVERITIES.index("warning"):
+        return "warning", {"alerts": len(rows), "low": low}
+    return None
+
+
+def apply_notification_threshold(db, rule: Rule) -> bool:
+    found = notification_threshold(db, rule)
+    if found and set_value(rule, "notify_severity_threshold", found[0]):
+        set_state(rule, notify_basis=found[1])
+        return True
+    return False
+
+
+def pattern_is_safe(db, rule: Rule, pattern: str, recent_lines: List[str]) -> bool:
+    """Garde-fous d'un motif de retour à la normale appliqué sans validation : absent de toutes les lignes ayant
+    déclenché une alerte depuis 30 jours, et pas présent dans une grande partie des lignes du journal (il ne
+    signalerait plus rien)."""
+    from app.services.alert_analysis import analysis_lines
+    low = pattern.lower()
+    since = datetime.utcnow() - timedelta(days=30)
+    for a in db.query(Analysis).filter(Analysis.rule_id == rule.id, Analysis.analyzed_at >= since).all():
+        if any(low in l.lower() for l in analysis_lines(a)):
+            return False
+    if recent_lines:
+        share = sum(1 for l in recent_lines if low in l.lower()) / len(recent_lines)
+        if share > PATTERN_MAX_SHARE:
+            return False
+    return True
 
 
 def observe_until(hours: int = OBSERVE_HOURS) -> str:

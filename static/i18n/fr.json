@@ -765,9 +765,9 @@
     "ap_title": "Pilote automatique",
     "ap_badge": "IA",
     "ap_badge_title": "Défini par le pilote automatique. Modifie-le pour le reprendre en main.",
-    "ap_hint_new_on": "Choisis seulement le journal à surveiller. L'IA lit son historique (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable ensuite dans les Réglages.",
+    "ap_hint_new_on": "Choisis seulement le journal à surveiller. L'IA lit son historique (ou l'observe 24 h s'il n'y en a pas), puis gère tout : nom, contexte, mots-clés, fenêtre de regroupement, délai de silence, seuil de notification et lignes de retour à la normale. Tout reste modifiable ensuite dans les Réglages.",
     "ap_hint_new_off": "Tu définis toi-même les mots-clés et les réglages de la règle.",
-    "ap_hint_on": "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Pour voir ou modifier ce qu'elle a défini, passe en Manuel.",
+    "ap_hint_on": "L'IA gère toute la règle sans rien te demander : mots-clés, contexte relu chaque semaine, fenêtre de regroupement, délai de silence, seuil de notification et lignes de retour à la normale. Pour voir ou modifier ce qu'elle a défini, passe en Manuel.",
     "ap_hint_off": "Tu gères toi-même les réglages de cette règle. Le pilote automatique peut les reprendre à tout moment.",
     "ap_name_placeholder": "Laisse vide : l'IA le choisira",
     "ap_context_placeholder": "Laisse vide : l'IA le rédigera d'après le journal",
@@ -786,7 +786,7 @@
     "ap_tagline": "L'IA s'occupe de tout",
     "manual_title": "Manuel",
     "manual_tagline": "Je règle tout moi-même",
-    "ap_hint_enable": "En enregistrant, le pilote relit l'historique du journal et reprend la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent.",
+    "ap_hint_enable": "En enregistrant, le pilote relit l'historique du journal et reprend la fenêtre de regroupement, le délai de silence, le seuil de notification, les lignes de retour à la normale et le contexte s'il est vide. Le nom et ce que tu as écrit restent.",
     "ap_hint_disable": "Les réglages marqués IA ont été définis par le pilote. En enregistrant en Manuel, le pilote s'arrête : tout reste tel quel et tu le gères toi-même. Tu peux le réactiver quand tu veux."
   },
   "rule": {
@@ -1039,15 +1039,19 @@
     "ap_step_keywords_done": "{k} mot(s)-clé(s), {x} exclusion(s).",
     "ap_step_keywords_todo": "Les lignes qui méritent une alerte, vérifiées sur les vraies lignes du journal.",
     "ap_step_rhythm": "Rythme de la source",
-    "ap_step_rhythm_done": "Regroupement des lignes sur {s} s · alerte si la source se tait plus de {h} h.",
-    "ap_step_rhythm_todo": "Fenêtre de regroupement et délai de silence, calculés sur le rythme réel des lignes.",
+    "ap_step_rhythm_done": "Regroupement des lignes sur {s} s · alerte si la source se tait plus de {h} h · notifications à partir de {sev}.",
+    "ap_step_rhythm_todo": "Fenêtre de regroupement, délai de silence et seuil de notification, d'après le rythme réel des lignes et des alertes.",
     "ap_step_ready": "Règle prête",
     "ap_step_ready_done": "Le journal sera relu chaque semaine (prochaine relecture {when}).",
     "ap_step_ready_todo": "Une notification résumera ce qui a été défini.",
     "ap_journey_done": "terminée",
     "ap_journey_progress": "étape {n} sur {t}",
     "ap_journey_details": "Détails dans l'onglet Mots-clés",
-    "ap_step_history_brief": "{n} ligne(s) sur {h} h seulement : trop peu de recul pour définir la règle."
+    "ap_step_history_brief": "{n} ligne(s) sur {h} h seulement : trop peu de recul pour définir la règle.",
+    "kw_status_dismissed": "écarté par le pilote",
+    "kw_apply_anyway": "Appliquer quand même",
+    "kw_apply_anyway_title": "Le pilote l'a écarté par prudence ({why}).",
+    "origin_autopilot": "Pilote auto"
   },
   "diag": {
     "title": "Diagnostic (lecture seule)",

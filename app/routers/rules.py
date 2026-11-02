@@ -507,7 +507,8 @@ def _autopilot_journey(db, rule: Rule) -> Optional[dict]:
         "observation_alerts": db.query(Analysis).filter(
             Analysis.rule_id == rule.id, Analysis.matched_keywords_json.like(f'%{ap.OBSERVE_KEYWORD}%')).count(),
         "rule": {"name": rule.name, "keywords": len(rule.get_keywords()), "exclusions": len(rule.get_excluded_patterns()),
-                 "anti_spam_delay": rule.anti_spam_delay, "inactivity_period_hours": rule.inactivity_period_hours},
+                 "anti_spam_delay": rule.anti_spam_delay, "inactivity_period_hours": rule.inactivity_period_hours,
+                 "notify_severity_threshold": rule.notify_severity_threshold or "info"},
     }
 
 
@@ -987,8 +988,11 @@ def decide_keyword_change(rule_id: int, change_id: int, action: str):
 
 @router.post("/{rule_id}/keywords/review")
 async def review_rule_keywords(rule_id: int):
-    """Demande une revue immédiate à l'arbitre (en tâche de fond)."""
+    """Demande une revue immédiate à l'arbitre et, en pilote automatique, la maintenance du pilote (en tâche de fond)."""
     if not keyword_tuning:
         raise HTTPException(status_code=503, detail="keyword_tuning_unavailable")
-    asyncio.create_task(keyword_tuning.review_rule(rule_id))
+    async def review():
+        await keyword_tuning.autopilot_maintenance(rule_id)  # sans effet hors pilote automatique
+        await keyword_tuning.review_rule(rule_id)
+    asyncio.create_task(review())
     return {"status": "started"}

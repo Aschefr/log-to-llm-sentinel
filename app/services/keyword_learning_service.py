@@ -481,6 +481,10 @@ async def _run_session(session_id: int):
                 silence = ap.silence_hours(result["gaps"], span_h)
                 if silence and ap.set_value(rule, "inactivity_period_hours", silence):
                     ap_changes.append("inactivity_period_hours")
+                ap.upgrade_state(rule)
+                if ap.apply_notification_threshold(db, rule):
+                    ap_changes.append("notify_severity_threshold")
+                kt.dismiss_pending(db, rule)
                 now_iso = datetime.utcnow().isoformat()
                 ap.set_state(rule, status="active", observe_until=None, error=None, signatures=signatures,
                              profiled_at=now_iso if profile_messages else ap.load(rule).get("profiled_at"),
@@ -520,8 +524,10 @@ def _autopilot_lines(rule: Rule, fields: list, lang: str) -> list:
     fr = lang == "fr"
     labels = {"name": "Nom" if fr else "Name", "application_context": "Contexte" if fr else "Context",
               "anti_spam_delay": "Fenêtre de regroupement" if fr else "Grouping window",
-              "inactivity_period_hours": "Alerte si la source est muette depuis" if fr else "Alert when the source is silent for"}
+              "inactivity_period_hours": "Alerte si la source est muette depuis" if fr else "Alert when the source is silent for",
+              "notify_severity_threshold": "Notifications à partir de" if fr else "Notifications from"}
     values = {"anti_spam_delay": f"{rule.anti_spam_delay} s", "inactivity_period_hours": f"{rule.inactivity_period_hours} h",
+              "notify_severity_threshold": rule.notify_severity_threshold or "info",
               "name": rule.name, "application_context": (rule.application_context or "")[:300]}
     return [f"- {labels[f]} : {values[f]}" for f in fields]
 

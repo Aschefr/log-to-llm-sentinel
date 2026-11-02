@@ -27,6 +27,7 @@ const KW_STATUS = {
     pending: ['rule.kw_status_pending', 'à valider'],
     rejected: ['rule.kw_status_rejected', 'refusé'],
     reverted: ['rule.kw_status_reverted', 'annulé'],
+    dismissed: ['rule.kw_status_dismissed', 'écarté par le pilote'],
 };
 const KW_ACTIVE = ['pending', 'scanning', 'refining'];
 const AP_FIELDS = {
@@ -238,9 +239,10 @@ async function renderKeywords() {
                     <td>${esc(fmtWhen(c.decided_at || c.created_at))}</td>
                     <td class="mono">${esc(kwChangeText(c))}</td>
                     <td>${esc(kwLabel(KW_ORIGINS, c.origin))}</td>
-                    <td class="kw-reason">${esc(c.reason)}${c.hold_reason === 'manual_edit' ? ` <span class="rp-muted">(${esc(kwLabel(KW_HOLDS, 'manual_edit'))})</span>` : ''}</td>
+                    <td class="kw-reason">${esc(c.reason)}${c.hold_reason === 'manual_edit' || c.status === 'dismissed' ? ` <span class="rp-muted">(${esc(kwLabel(KW_HOLDS, c.hold_reason))})</span>` : ''}</td>
                     <td><span class="kw-status kw-status--${c.status}">${esc(kwLabel(KW_STATUS, c.status))}</span></td>
-                    <td>${c.status === 'applied' ? `<button class="btn btn-secondary btn-sm" onclick="kwDecide(${c.id}, 'revert', this)">${esc(T('rule.kw_undo', 'Annuler'))}</button>` : ''}</td>
+                    <td>${c.status === 'applied' ? `<button class="btn btn-secondary btn-sm" onclick="kwDecide(${c.id}, 'revert', this)">${esc(T('rule.kw_undo', 'Annuler'))}</button>`
+                        : c.status === 'dismissed' ? `<button class="btn btn-secondary btn-sm" title="${esc(T('rule.kw_apply_anyway_title', 'Le pilote l’a écarté par prudence ({why}).', { why: kwLabel(KW_HOLDS, c.hold_reason) }))}" onclick="kwDecide(${c.id}, 'accept', this)">${esc(T('rule.kw_apply_anyway', 'Appliquer quand même'))}</button>` : ''}</td>
                 </tr>`).join('')}</tbody>
             </table></div>
         </details>

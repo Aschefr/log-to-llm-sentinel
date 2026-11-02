@@ -870,21 +870,38 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
             try:
                 new_patterns = json.loads(cleaned)
                 if isinstance(new_patterns, list):
+                    from app.services import autopilot
+                    autonomous = autopilot.enabled(rule)
+                    known = {p.get("pattern", "").lower() for p in rule.get_weighted_resolution_patterns()}
                     pending = sum(1 for p in rule.get_weighted_resolution_patterns() if p.get("status") == "suggested")
+                    learned_active = sum(1 for p in rule.get_weighted_resolution_patterns()
+                                         if p.get("status", "active") == "active" and p.get("origin") in ("learned", "autopilot"))
+                    recent = await asyncio.to_thread(_tail, rule.log_file_path, 5000) if autonomous else []
                     added = []
                     for pat in new_patterns:
                         pat_cleaned = str(pat).strip()
-                        if not pat_cleaned or pending + len(added) >= MAX_PENDING_SUGGESTIONS:
+                        if not pat_cleaned or pat_cleaned.lower() in known:
+                            continue
+                        if (learned_active if autonomous else pending) + len(added) >= \
+                                (autopilot.AUTOPILOT_PATTERNS_MAX if autonomous else MAX_PENDING_SUGGESTIONS):
                             continue
                         if not _is_learnable_pattern(pat_cleaned, error_keywords, error_lines or [], normal_lines):
                             logger.debug("ResolutionService", f"Pattern appris refuse pour '{rule.name}' : '{pat_cleaned}'")
                             continue
-                        # Suggestion en attente de validation par l'utilisateur (ignorée si déjà connue)
-                        if rule.suggest_pattern(pat_cleaned, error_keywords=error_keywords):
+                        if autonomous:
+                            # Pilote automatique : appliqué directement s'il passe aussi les garde-fous sur l'historique
+                            if not autopilot.pattern_is_safe(db, rule, pat_cleaned, recent):
+                                logger.debug("ResolutionService", f"Motif écarté par le pilote pour '{rule.name}' : '{pat_cleaned}'")
+                                continue
+                            rule.set_pattern_status(pat_cleaned, "active", origin="autopilot")
+                            added.append(pat_cleaned)
+                        # Sinon : suggestion en attente de validation par l'utilisateur
+                        elif rule.suggest_pattern(pat_cleaned, error_keywords=error_keywords):
                             added.append(pat_cleaned)
                     if added:
                         db.commit()
-                        logger.info("ResolutionService", f"Auto-apprentissage: {len(added)} motif(s) proposé(s) pour '{rule.name}': {added}")
+                        logger.info("ResolutionService", f"Auto-apprentissage: {len(added)} motif(s) "
+                                    f"{'appliqué(s) par le pilote' if autonomous else 'proposé(s)'} pour '{rule.name}': {added}")
             except Exception as e:
                 logger.error("ResolutionService", f"Erreur parsing mots-cles d'apprentissage: {e}. Contenu: {cleaned}")
 

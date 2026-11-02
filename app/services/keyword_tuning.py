@@ -47,6 +47,7 @@ AUTO_CONFIDENCE = 70
 MAX_KEYWORD_PER_DAY = 200      # au-delà, un nouveau mot-clé risque de noyer la règle : proposé, pas appliqué
 VALUE_MIN_LEN, VALUE_MAX_LEN = 3, 80
 CHANGES_RETENTION_DAYS = 180
+DISMISSED_RETRY_DAYS = 30      # pilote automatique : un changement écarté peut être reproposé après ce délai
 TEMPLATES_RETENTION_DAYS = 30
 
 MODES = ("auto", "suggest", "off")
@@ -249,10 +250,17 @@ class KeywordTuningService:
             rules = db.query(Rule).filter(Rule.enabled == True).all()
             ids = [r.id for r in rules if (r.keyword_tuning_mode or "auto") != "off"]
             autopilot_due = [(r.id, refresh) for r in rules for refresh in [autopilot_due_refresh(r)] if refresh is not None]
+            from app.services import autopilot as ap
+            autopilot_rules = [r.id for r in rules if ap.enabled(r)]
         finally:
             db.close()
-        # Pilote automatique : relecture hebdomadaire, ou nouvel essai après un échec
+        # Pilote automatique : réglages tenus à jour, relecture hebdomadaire, ou nouvel essai après un échec
         from app.services import keyword_learning_service as kls
+        for rule_id in autopilot_rules:
+            try:
+                await self.autopilot_maintenance(rule_id)
+            except Exception as e:
+                logger.error("Autopilot", f"Maintenance de la règle {rule_id} : {e}")
         for rule_id, refresh in autopilot_due:
             try:
                 kls.start_session(rule_id, "history", 168, refresh=refresh)
@@ -316,6 +324,50 @@ class KeywordTuningService:
             return result
         finally:
             self._reviewing.discard(rule_id)
+
+    async def autopilot_maintenance(self, rule_id: int) -> List[str]:
+        """Pilote automatique, à chaque revue : seuil de notification d'après les alertes, aucun changement laissé
+        en attente, motifs de retour à la normale suggérés tranchés. Notifie ce qui a changé."""
+        from app.services import autopilot as ap
+        from app.services.log_source import read_tail_lines, resolve_path
+        db = SessionLocal()
+        try:
+            rule = db.query(Rule).filter(Rule.id == rule_id).first()
+            if not rule or not ap.enabled(rule):
+                return []
+            config = config_to_dict(db.query(GlobalConfig).first())
+            fr = config.get("ollama_prompt_lang", "fr") == "fr"
+            ap.upgrade_state(rule)
+            lines = []
+            if ap.apply_notification_threshold(db, rule):
+                basis = ap.load(rule).get("notify_basis", {})
+                lines.append((f"- Notifications à partir de **{rule.notify_severity_threshold}** : {basis.get('low')} des "
+                              f"{basis.get('alerts')} alertes des 30 derniers jours étaient « info » ou pas pertinentes")
+                             if fr else (f"- Notifications from **{rule.notify_severity_threshold}**: {basis.get('low')} of the "
+                                         f"{basis.get('alerts')} alerts of the last 30 days were info or not relevant"))
+            dismiss_pending(db, rule)
+            recent = await asyncio.to_thread(lambda: read_tail_lines(resolve_path(rule.log_file_path))[-5000:])
+            for item in rule.get_weighted_resolution_patterns():
+                status, origin = item.get("status", "active"), item.get("origin")
+                # Suggestions en attente et motifs appris déjà actifs passent les garde-fous ; ceux écrits à la main restent
+                if status == "suggested" or (status == "active" and origin in ("learned", "autopilot")):
+                    safe = ap.pattern_is_safe(db, rule, item["pattern"], recent)
+                    if status == "suggested":
+                        rule.set_pattern_status(item["pattern"], "active" if safe else "rejected", origin="autopilot" if safe else None)
+                        if safe:
+                            lines.append(f"- {'Motif de retour à la normale' if fr else 'Return-to-normal pattern'} `{item['pattern']}`")
+                    elif not safe:
+                        rule.set_pattern_status(item["pattern"], "rejected")
+                        lines.append(f"- {'Motif de retour à la normale retiré (il apparaît aussi dans les erreurs ou presque partout)' if fr else 'Return-to-normal pattern removed (also in errors or almost everywhere)'} `{item['pattern']}`")
+            db.commit()
+            name, notify = rule.name, rule.notify_on_match
+        finally:
+            db.close()
+        if lines:
+            logger.info("Autopilot", f"Règle {rule_id} : " + " ; ".join(lines))
+            await notify_changes(name, notify, [], config, extra=lines,
+                                 title=(f"[Sentinel] 🧭 Pilote automatique — {name}"))
+        return lines
 
     async def ask_arbiter(self, messages: list, config: dict, label: str = "", schema: dict = KEYWORD_ARBITER_SCHEMA,
                           kind: str = "KEYWORDS") -> Optional[dict]:
@@ -545,11 +597,28 @@ def _value_problem(v: str) -> Optional[str]:
 
 
 def _already_decided(db, rule_id: int, kind: str, action: str, value: str) -> bool:
-    """Un changement identique a été refusé, annulé, ou attend déjà une décision."""
+    """Un changement identique a été refusé, annulé, attend déjà une décision, ou a été écarté par le pilote
+    automatique il y a moins de 30 jours."""
     rows = db.query(KeywordChange).filter(KeywordChange.rule_id == rule_id, KeywordChange.kind == kind,
                                           KeywordChange.action == action,
-                                          KeywordChange.status.in_(("rejected", "reverted", "pending"))).all()
-    return any(r.value.lower() == value.lower() for r in rows)
+                                          KeywordChange.status.in_(("rejected", "reverted", "pending", "dismissed"))).all()
+    recent = datetime.utcnow() - timedelta(days=DISMISSED_RETRY_DAYS)
+    return any(r.value.lower() == value.lower() and (r.status != "dismissed" or (r.created_at or recent) >= recent)
+               for r in rows)
+
+
+def _autopilot_on(rule: Rule) -> bool:
+    from app.services import autopilot as ap
+    return ap.enabled(rule)
+
+
+def dismiss_pending(db, rule: Rule):
+    """Pilote automatique : rien n'attend l'utilisateur. Les propositions retenues par un garde-fou sont écartées
+    (la règle reste telle quelle) ; celles du mode Suggestions, choisi par l'utilisateur, restent."""
+    now = datetime.utcnow()
+    for c in db.query(KeywordChange).filter(KeywordChange.rule_id == rule.id, KeywordChange.status == "pending",
+                                            KeywordChange.hold_reason != "suggest_mode").all():
+        c.status, c.decided_at = "dismissed", now
 
 
 def apply_change_to_rule(rule: Rule, kind: str, action: str, value: str) -> bool:
@@ -585,10 +654,12 @@ def record_change(db, rule: Rule, kind: str, action: str, value: str, origin: st
         if not apply_change_to_rule(rule, kind, action, value):
             return None
         status = "applied"
+    elif hold != "suggest_mode" and _autopilot_on(rule):
+        status = "dismissed"  # dans le doute, le pilote laisse la règle telle quelle
     change = KeywordChange(rule_id=rule.id, kind=kind, action=action, value=value, origin=origin, status=status,
                            reason=(reason or "")[:1000], confidence=confidence, hold_reason=hold,
                            evidence_json=json.dumps(evidence or {}, default=str)[:20000], session_id=session_id,
-                           decided_at=datetime.utcnow() if status == "applied" else None)
+                           decided_at=datetime.utcnow() if status in ("applied", "dismissed") else None)
     db.add(change)
     return change
 
@@ -718,7 +789,7 @@ def decide(db, change: KeywordChange, action: str) -> Optional[str]:
     rule = db.query(Rule).filter(Rule.id == change.rule_id).first()
     if not rule:
         return "rule_not_found"
-    if action == "accept" and change.status == "pending":
+    if action == "accept" and change.status in ("pending", "dismissed"):
         apply_change_to_rule(rule, change.kind, change.action, change.value)
         change.status = "applied"
     elif action == "reject" and change.status == "pending":
@@ -774,7 +845,7 @@ async def notify_changes(rule_name: str, notify: bool, changes: List[dict], conf
                          extra: Optional[List[str]] = None):
     """Une notification par revue. extra : lignes déjà formatées (réglages définis par le pilote automatique)."""
     applied = [c for c in changes if c["status"] == "applied"]
-    pending = [c for c in changes if c["status"] == "pending"]
+    pending = [c for c in changes if c["status"] == "pending"]  # (écartés par le pilote : seulement dans l'historique)
     if not notify or not (applied or pending or extra):
         return
     lang = config.get("ollama_prompt_lang", "fr")
@@ -804,7 +875,7 @@ def purge_old():
     try:
         now = datetime.utcnow()
         # Les refus et annulations sont gardés : ils empêchent de reproposer le même changement
-        db.query(KeywordChange).filter(KeywordChange.status == "applied",
+        db.query(KeywordChange).filter(KeywordChange.status.in_(("applied", "dismissed")),
                                        KeywordChange.created_at < now - timedelta(days=CHANGES_RETENTION_DAYS)).delete()
         db.query(KeywordTemplate).filter(KeywordTemplate.last_seen < now - timedelta(days=TEMPLATES_RETENTION_DAYS)).delete()
         db.commit()
