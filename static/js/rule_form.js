@@ -209,19 +209,28 @@ function _setAutopilot(on) {
     updateAutopilotUI();
 }
 
-/** Mode cards, AI badges, and the fields the autopilot makes unnecessary (new rule: only the source is shown)
- *  or moves to the Keywords tab (existing rule). */
+/** Mode cards and what they show. Autopilot: only the source (the AI sets the rest), for a new rule as for an
+ *  existing one. Manual: every setting; for a rule the autopilot was running, AI badges show what it set, and
+ *  saving stops it. Switching back to the autopilot and saving starts it again. */
 function updateAutopilotUI() {
     const on = !!document.getElementById('rule-autopilot')?.checked;
     const isNew = !document.getElementById('rule-id').value;
-    document.getElementById('rule-form')?.classList.toggle('rf--minimal', isNew && on);
+    const wasOn = !!(_rfAutopilot && _rfAutopilot.enabled);
+    document.getElementById('rule-form')?.classList.toggle('rf--minimal', on);
     const hint = document.getElementById('rf-ap-hint');
     if (hint) {
-        hint.textContent = isNew
-            ? (on ? _rfT('rf.ap_hint_new_on', "Choisis seulement le journal à surveiller. L'IA lit son historique (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable ensuite dans les Réglages.")
-                  : _rfT('rf.ap_hint_new_off', 'Tu définis toi-même les mots-clés et les réglages de la règle.'))
-            : (on ? _rfT('rf.ap_hint_on', "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Un réglage que tu modifies n'est plus touché.")
-                  : _rfT('rf.ap_hint_off', "Activé, le pilote relit l'historique et gère la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent."));
+        let text;
+        if (isNew) {
+            text = on ? _rfT('rf.ap_hint_new_on', "Choisis seulement le journal à surveiller. L'IA lit son historique (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable ensuite dans les Réglages.")
+                : _rfT('rf.ap_hint_new_off', 'Tu définis toi-même les mots-clés et les réglages de la règle.');
+        } else if (on) {
+            text = wasOn ? _rfT('rf.ap_hint_on', "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Pour voir ou modifier ce qu'elle a défini, passe en Manuel.")
+                : _rfT('rf.ap_hint_enable', "En enregistrant, le pilote relit l'historique du journal et reprend la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent.");
+        } else {
+            text = wasOn ? _rfT('rf.ap_hint_disable', "Les réglages marqués IA ont été définis par le pilote. En enregistrant en Manuel, le pilote s'arrête : tout reste tel quel et tu le gères toi-même. Tu peux le réactiver quand tu veux.")
+                : _rfT('rf.ap_hint_off', 'Tu gères toi-même les réglages de cette règle. Le pilote automatique peut les reprendre à tout moment.');
+        }
+        hint.textContent = text;
     }
     // Keywords: typed in the form only for a new manual rule
     document.querySelectorAll('.rf-kw-field').forEach(el => el.classList.toggle('hidden', !isNew || on));
@@ -237,12 +246,12 @@ function updateAutopilotUI() {
     if (context) {
         context.placeholder = isNew && on ? _rfT('rf.ap_context_placeholder', "Laisse vide : l'IA le rédigera d'après le journal") : _rfT('rules.placeholder_context', 'Description du contexte...');
     }
-    // AI badges: fields still managed by the autopilot of an existing rule
-    const managed = (_rfAutopilot && _rfAutopilot.enabled && on) ? (_rfAutopilot.managed || []) : [];
+    // AI badges (visible in Manual): what the running autopilot set and still manages
+    const managed = wasOn ? (_rfAutopilot.managed || []) : [];
     document.querySelectorAll('.rf-ai-badge').forEach(b => b.classList.toggle('hidden', !managed.includes(b.dataset.ap)));
     const status = document.getElementById('rf-ap-status');
     if (status) {
-        const text = (_rfAutopilot && _rfAutopilot.enabled && on) ? autopilotStatusText(_rfAutopilot) : '';
+        const text = wasOn && on ? autopilotStatusText(_rfAutopilot) : '';
         status.textContent = text;
         status.classList.toggle('hidden', !text);
     }

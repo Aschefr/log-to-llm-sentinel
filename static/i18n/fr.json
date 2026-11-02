@@ -767,8 +767,8 @@
     "ap_badge_title": "Défini par le pilote automatique. Modifie-le pour le reprendre en main.",
     "ap_hint_new_on": "Choisis seulement le journal à surveiller. L'IA lit son historique (ou l'observe 24 h s'il n'y en a pas) et définit le nom, le contexte, les mots-clés, la fenêtre de regroupement et le délai de silence. Tout reste modifiable ensuite dans les Réglages.",
     "ap_hint_new_off": "Tu définis toi-même les mots-clés et les réglages de la règle.",
-    "ap_hint_on": "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Un réglage que tu modifies n'est plus touché.",
-    "ap_hint_off": "Activé, le pilote relit l'historique et gère la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent.",
+    "ap_hint_on": "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Pour voir ou modifier ce qu'elle a défini, passe en Manuel.",
+    "ap_hint_off": "Tu gères toi-même les réglages de cette règle. Le pilote automatique peut les reprendre à tout moment.",
     "ap_name_placeholder": "Laisse vide : l'IA le choisira",
     "ap_context_placeholder": "Laisse vide : l'IA le rédigera d'après le journal",
     "ap_status_learning": "Lecture de l'historique du journal…",
@@ -785,7 +785,9 @@
     "mode": "Mode de la règle",
     "ap_tagline": "L'IA s'occupe de tout",
     "manual_title": "Manuel",
-    "manual_tagline": "Je règle tout moi-même"
+    "manual_tagline": "Je règle tout moi-même",
+    "ap_hint_enable": "En enregistrant, le pilote relit l'historique du journal et reprend la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent.",
+    "ap_hint_disable": "Les réglages marqués IA ont été définis par le pilote. En enregistrant en Manuel, le pilote s'arrête : tout reste tel quel et tu le gères toi-même. Tu peux le réactiver quand tu veux."
   },
   "rule": {
     "back": "← Toutes les règles",

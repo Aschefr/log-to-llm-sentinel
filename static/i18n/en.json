@@ -767,8 +767,8 @@
     "ap_badge_title": "Set by the autopilot. Change it to take it over.",
     "ap_hint_new_on": "Just pick the log to watch. The AI reads its history (or watches it for 24 h if there is none) and sets the name, context, keywords, grouping window and silence delay. Everything stays editable afterwards in Settings.",
     "ap_hint_new_off": "You set the keywords and the rule settings yourself.",
-    "ap_hint_on": "The AI keeps the rule up to date: keywords, context re-read every week, grouping window and silence delay. A setting you change is no longer touched.",
-    "ap_hint_off": "When on, the autopilot re-reads the history and manages the grouping window, the silence delay, and the context if it is empty. The name and what you wrote are kept.",
+    "ap_hint_on": "The AI keeps the rule up to date: keywords, context re-read every week, grouping window and silence delay. To see or change what it set, switch to Manual.",
+    "ap_hint_off": "You manage this rule's settings yourself. The autopilot can take them over anytime.",
     "ap_name_placeholder": "Leave empty: the AI will choose it",
     "ap_context_placeholder": "Leave empty: the AI will write it from the log",
     "ap_status_learning": "Reading the log history…",
@@ -785,7 +785,9 @@
     "mode": "Rule mode",
     "ap_tagline": "The AI takes care of everything",
     "manual_title": "Manual",
-    "manual_tagline": "I set everything myself"
+    "manual_tagline": "I set everything myself",
+    "ap_hint_enable": "When you save, the autopilot re-reads the log history and takes over the grouping window, the silence delay, and the context if it is empty. The name and what you wrote are kept.",
+    "ap_hint_disable": "Settings marked AI were set by the autopilot. Saving in Manual stops it: everything stays as it is and you manage it yourself. You can switch it back on anytime."
   },
   "rule": {
     "back": "← All rules",

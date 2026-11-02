@@ -30,7 +30,7 @@ While the rule is not set up yet, it alerts on lines that carry an **explicit er
 
 ## 4. You keep control
 
-* In **Settings**, the fields set by the autopilot carry an **AI** badge. Change one and the autopilot no longer touches it.
+* In **Settings**, a rule on autopilot only shows its source and the autopilot's state. Choose **Manual** to see every setting: the ones set by the autopilot carry an **AI** badge. Saving in Manual stops the autopilot and keeps everything as it is.
+* Choose **Autopilot** again and save to switch it back on: it re-reads the log history, keeps the rule's name and a context you wrote, and manages the grouping window, the silence delay, and the context if it is empty.
 * Keywords and exclusions are managed in the **Keywords** tab, where every change can be undone.
-* The autopilot can be switched on or off in Settings. Switched on for an existing rule, it keeps the rule's name and a context you wrote, and manages the grouping window, the silence delay, and the context if it is empty.
 * A *manual* rule (autopilot off) is set up by hand, as before; the quick templates fill a manual rule.
