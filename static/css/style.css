@@ -3285,6 +3285,24 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .rf--minimal .rf-nav, .rf--minimal #rf-detection, .rf--minimal #rf-analysis, .rf--minimal #rf-notifications,
 .rf--minimal #rf-resolution, .rf--minimal .rf-name-group { display: none; }
 .rf-kw-link { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin: 0 0 1rem; }
+/* Parcours de mise en place du pilote automatique */
+.ap-journey { border-color: rgba(59, 130, 246, 0.35); }
+.ap-steps { list-style: none; margin: 0.25rem 0 0.75rem; padding: 0; display: flex; flex-direction: column; }
+.ap-step { position: relative; display: flex; gap: 0.85rem; padding-bottom: 1rem; }
+.ap-step:last-child { padding-bottom: 0.25rem; }
+.ap-step:not(:last-child)::before { content: ''; position: absolute; left: 0.8rem; top: 1.75rem; bottom: 0.15rem; width: 2px; background: var(--border); }
+.ap-step--done:not(:last-child)::before, .ap-step--warn:not(:last-child)::before { background: rgba(16, 185, 129, 0.45); }
+.ap-step-mark { flex: none; width: 1.6rem; height: 1.6rem; display: grid; place-items: center; border-radius: 50%; font-size: 0.78rem; font-weight: 700; border: 2px solid var(--border); color: var(--text-secondary); background: var(--bg-primary); }
+.ap-step--done .ap-step-mark { background: var(--success); border-color: var(--success); color: #fff; }
+.ap-step--warn .ap-step-mark { background: var(--warning); border-color: var(--warning); color: #1a1714; }
+.ap-step--error .ap-step-mark { background: var(--danger); border-color: var(--danger); color: #fff; }
+.ap-step--active .ap-step-mark { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.18); }
+.ap-step--active .ap-step-mark::after { content: ''; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--accent); animation: ap-pulse 1.6s ease-in-out infinite; }
+@keyframes ap-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+@media (prefers-reduced-motion: reduce) { .ap-step--active .ap-step-mark::after { animation: none; } }
+.ap-step-body { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; padding-top: 0.1rem; font-size: 0.88rem; }
+.ap-step--todo .ap-step-body strong { color: var(--text-secondary); font-weight: 500; }
+.ap-progress { max-width: 420px; margin: 0.3rem 0 0.15rem; }
 /* Sources syslog détectées */
 .rf-detected { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.85rem; }
 .rf-detected-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }

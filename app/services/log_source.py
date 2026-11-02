@@ -37,6 +37,21 @@ def resolve_path(log_file_path: str) -> Path:
     return Path(log_file_path)
 
 
+def count_lines(path: Path, max_bytes: int = 64 * 1024 * 1024) -> int:
+    """Nombre de lignes du fichier (lecture bornée ; 0 si illisible)."""
+    try:
+        n, read = 0, 0
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                n += chunk.count(b"\n")
+                read += len(chunk)
+                if read >= max_bytes:
+                    break
+        return n
+    except OSError:
+        return 0
+
+
 def read_tail_lines(path: Path, max_bytes: int = 2 * 1024 * 1024) -> List[str]:
     """Lignes de la fin du fichier (au plus max_bytes lus). La première ligne partielle est ignorée."""
     try:

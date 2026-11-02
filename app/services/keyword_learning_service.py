@@ -311,6 +311,7 @@ def _to_observation(session_id: int, rule_id: int, summary: dict, reason: str) -
     rounds = summary.get("observe_rounds", 0) + 1
     if rounds > ap.OBSERVE_MAX_ROUNDS:
         return False
+    summary.setdefault("history_lines", summary.get("lines", 0))  # ce que l'historique contenait (parcours du pilote)
     now = datetime.utcnow()
     end = now + timedelta(hours=ap.OBSERVE_HOURS)
     summary.update({"observe_rounds": rounds, "start_offset": 0, "observe_reason": reason})

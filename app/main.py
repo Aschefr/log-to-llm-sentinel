@@ -187,8 +187,10 @@ async def lifespan(app: FastAPI):
             try:
                 now = datetime.utcnow()
                 rules = db.query(Rule).filter(Rule.enabled == True, Rule.inactivity_warning_enabled == True, Rule.inactivity_notified == False).all()
+                from app.services import autopilot
                 for rule in rules:
-                    if rule.last_line_received_at:
+                    # Pilote automatique en mise en place : le délai de silence n'est pas encore calculé
+                    if rule.last_line_received_at and not autopilot.is_observing(rule):
                         delta = now - rule.last_line_received_at
                         if delta > timedelta(hours=rule.inactivity_period_hours):
                             if rule.inactivity_notify:

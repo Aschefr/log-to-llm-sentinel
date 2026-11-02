@@ -117,10 +117,13 @@ def recurring_events(analyses: List[Analysis], limit: int = 5) -> List[dict]:
 
 
 def is_muted(rule: Rule, now: datetime) -> bool:
-    if not rule.enabled or not rule.inactivity_period_hours:
+    """Source muette depuis plus que le délai choisi. Pas pendant la mise en place par le pilote automatique
+    (délai pas encore calculé), ni pour une règle récente qui attend sa première ligne."""
+    from app.services import autopilot
+    if not rule.enabled or not rule.inactivity_period_hours or autopilot.is_observing(rule):
         return False
     if not rule.last_line_received_at:
-        return True
+        return bool(rule.created_at) and now - rule.created_at > timedelta(hours=rule.inactivity_period_hours)
     return now - rule.last_line_received_at > timedelta(hours=rule.inactivity_period_hours)
 
 

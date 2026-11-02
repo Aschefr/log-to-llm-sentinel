@@ -17,6 +17,7 @@ from app.services.orchestrator import Orchestrator
 from app.services.app_config import config_to_dict
 from app.services import rule_stats
 from app.services.probe_service import run_probe, PROBE_TYPES
+from app.services.log_source import count_lines, resolve_path
 from app.utils.log_utils import clean_log_line
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
@@ -483,6 +484,33 @@ def delete_rule(rule_id: int):
         db.close()
 
 
+def _autopilot_journey(db, rule: Rule) -> Optional[dict]:
+    """Où en est le pilote automatique : état, session en cours, source, ce qui a été défini."""
+    state = ap.public(rule)
+    if not state["enabled"]:
+        return None
+    data = ap.load(rule)
+    path = resolve_path(rule.log_file_path)
+    try:
+        last_at = datetime.utcfromtimestamp(path.stat().st_mtime) if path.is_file() else None
+    except OSError:
+        last_at = None
+    refreshed = data.get("refreshed_at")
+    return {
+        **state,
+        "refreshed_at": refreshed + "Z" if refreshed else None,
+        "next_refresh_at": (datetime.fromisoformat(refreshed) + timedelta(days=ap.REFRESH_DAYS)).isoformat() + "Z"
+        if refreshed else None,
+        "observe_until": state["observe_until"] + "Z" if state.get("observe_until") else None,
+        "session": kls.get_session_status(state["session_id"]) if state.get("session_id") else None,
+        "source": {"lines": count_lines(path) if path.is_file() else 0, "last_at": rule_stats.iso(last_at)},
+        "observation_alerts": db.query(Analysis).filter(
+            Analysis.rule_id == rule.id, Analysis.matched_keywords_json.like(f'%{ap.OBSERVE_KEYWORD}%')).count(),
+        "rule": {"name": rule.name, "keywords": len(rule.get_keywords()), "exclusions": len(rule.get_excluded_patterns()),
+                 "anti_spam_delay": rule.anti_spam_delay, "inactivity_period_hours": rule.inactivity_period_hours},
+    }
+
+
 def _snapshot(rule: Rule) -> Optional[dict]:
     snap = resolution_service.incident_snapshot(rule) if resolution_service else None
     if not snap:
@@ -523,6 +551,7 @@ def rule_summary(rule_id: int):
         latest = db.query(Analysis).filter(Analysis.rule_id == rule_id).order_by(Analysis.analyzed_at.desc()).limit(3).all()
         return {
             "incident": incident,
+            "autopilot": _autopilot_journey(db, rule),
             "activity": {
                 "buffer_active": bool(buf.get("task")),
                 "buffer_lines": len(buf.get("lines", [])),

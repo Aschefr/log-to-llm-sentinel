@@ -171,6 +171,84 @@ function selectTab(tab) {
     else if (tab === 'settings' && RP.id) editRule(RP.id);
 }
 
+/* ── Autopilot setup journey (overview) ─────────────────────────────────────── */
+/** Steps of the autopilot setup, ticked as the background work progresses. Shown until the rule is ready,
+ *  then for 24 h so the result can be read. */
+function autopilotJourneyHtml(j) {
+    if (!j || !j.enabled) return '';
+    const s = j.session || {};
+    const sum = s.summary || {};
+    const ready = j.status === 'active';
+    if (ready && !(j.refreshed_at && minutesSince(j.refreshed_at) < 24 * 60)) return '';
+    const observed = !!sum.observe_rounds;
+    const observing = s.mode === 'live' && s.status === 'pending';
+    const reading = !observing && ['pending', 'scanning'].includes(s.status);
+    const refining = s.status === 'refining';
+    const profiled = !!sum.profile || ready;
+    const steps = [];
+    const step = (key, state, title, detail, extra = '') => steps.push({ key, state, title, detail, extra });
+
+    step('source', j.source.lines ? 'done' : 'active', T('rule.ap_step_source', 'Source connectée'),
+        j.source.lines ? T('rule.ap_step_source_done', '{n} ligne(s) reçue(s) · dernière {when}', { n: j.source.lines.toLocaleString(), when: fmtWhen(j.source.last_at) })
+            : T('rule.ap_step_source_wait', 'En attente de la première ligne de la source…'));
+
+    if (observed) {
+        step('history', 'warn', T('rule.ap_step_history', 'Lecture de l’historique'),
+            T('rule.ap_step_history_short', '{n} ligne(s) trouvée(s) : pas assez pour définir la règle.', { n: sum.history_lines ?? sum.lines ?? 0 }));
+        let extra = '';
+        if (observing) {
+            const total = new Date(s.period_end) - new Date(s.period_start);
+            const pct = total > 0 ? Math.min(100, Math.max(0, 100 * (Date.now() - new Date(s.period_start)) / total)) : 0;
+            extra = `<div class="rp-progress ap-progress"><div style="width:${pct.toFixed(1)}%"></div></div>
+                <span class="rp-muted">${esc(T('rule.ap_step_observe_alerts', 'En attendant, la règle alerte sur les lignes de niveau erreur explicite : {n} alerte(s) jusqu’ici.', { n: j.observation_alerts }))}</span>`;
+        }
+        step('observe', observing ? 'active' : 'done', T('rule.ap_step_observe', 'Observation de la source'),
+            observing ? T('rule.ap_step_observe_active', 'Jusqu’à {when}, encore {left}.', { when: fmtWhen(s.period_end), left: fmtMinutes(-minutesSince(s.period_end)) })
+                : T('rule.ap_step_observe_done', '{n} ligne(s) observée(s).', { n: (sum.lines || 0).toLocaleString() }), extra);
+    } else {
+        step('history', reading ? 'active' : 'done', T('rule.ap_step_history', 'Lecture de l’historique'),
+            reading ? T('rule.ap_step_history_active', 'Lecture des 7 derniers jours du journal…') : T('rule.ap_step_history_done', '{n} ligne(s) lues, regroupées en {t} modèle(s).', { n: (sum.lines || 0).toLocaleString(), t: (sum.templates || 0).toLocaleString() }),
+            reading ? `<div class="rp-progress ap-progress"><div style="width:${s.progress || 0}%"></div></div>` : '');
+    }
+
+    step('profile', profiled ? 'done' : refining ? 'active' : 'todo', T('rule.ap_step_profile', 'L’IA décrit le journal'),
+        profiled ? T('rule.ap_step_profile_done', 'Règle nommée « {name} », contexte rédigé.', { name: j.rule.name })
+            : T('rule.ap_step_profile_todo', 'Elle lit un extrait du journal pour nommer la règle et décrire ce qui y est normal.'));
+    step('keywords', ready ? 'done' : refining && profiled ? 'active' : 'todo', T('rule.ap_step_keywords', 'L’IA choisit les mots-clés'),
+        ready ? T('rule.ap_step_keywords_done', '{k} mot(s)-clé(s), {x} exclusion(s).', { k: j.rule.keywords, x: j.rule.exclusions })
+            : T('rule.ap_step_keywords_todo', 'Les lignes qui méritent une alerte, vérifiées sur les vraies lignes du journal.'));
+    step('rhythm', ready ? 'done' : 'todo', T('rule.ap_step_rhythm', 'Rythme de la source'),
+        ready ? T('rule.ap_step_rhythm_done', 'Regroupement des lignes sur {s} s · alerte si la source se tait plus de {h} h.', { s: j.rule.anti_spam_delay, h: j.rule.inactivity_period_hours })
+            : T('rule.ap_step_rhythm_todo', 'Fenêtre de regroupement et délai de silence, calculés sur le rythme réel des lignes.'));
+    step('ready', ready ? 'done' : 'todo', T('rule.ap_step_ready', 'Règle prête'),
+        ready ? T('rule.ap_step_ready_done', 'Le journal sera relu chaque semaine (prochaine relecture {when}).', { when: fmtWhen(j.next_refresh_at) })
+            : T('rule.ap_step_ready_todo', 'Une notification résumera ce qui a été défini.'));
+
+    // Failure: shown on the first unfinished step
+    if (j.status === 'error') {
+        const cur = steps.find(x => !['done', 'warn'].includes(x.state));
+        if (cur) { cur.state = 'error'; cur.extra = `<span class="rp-ko">${esc(autopilotStatusText(j))}</span>`; }
+    } else {
+        // Only one active step at a time (the first one)
+        let seen = false;
+        steps.forEach(x => { if (x.state === 'active') { if (seen) x.state = 'todo'; seen = true; } });
+    }
+    const doneCount = steps.filter(x => ['done', 'warn'].includes(x.state)).length;
+    const icon = st => ({ done: '✓', warn: '!', error: '✕', active: '', todo: '' }[st]);
+    return `
+    <section class="rp-card ap-journey" aria-live="polite">
+        <div class="rp-card-head"><h2>🧭 ${esc(T('rule.ap_session_title', 'Mise en place par le pilote automatique'))}</h2>
+            <span class="rp-muted">${esc(ready ? T('rule.ap_journey_done', 'terminée') : T('rule.ap_journey_progress', 'étape {n} sur {t}', { n: Math.min(steps.length, doneCount + 1), t: steps.length }))}</span></div>
+        <ol class="ap-steps">
+            ${steps.map(x => `<li class="ap-step ap-step--${x.state}">
+                <span class="ap-step-mark" aria-hidden="true">${icon(x.state)}</span>
+                <div class="ap-step-body"><strong>${esc(x.title)}</strong><span class="rp-muted">${esc(x.detail)}</span>${x.extra}</div>
+            </li>`).join('')}
+        </ol>
+        <div class="rp-actions"><a class="btn btn-secondary btn-sm" href="#keywords">${esc(T('rule.ap_journey_details', 'Détails dans l’onglet Mots-clés'))}</a></div>
+    </section>`;
+}
+
 /* ── Header ────────────────────────────────────────────────────────────────── */
 async function loadHeader() {
     try {
@@ -384,7 +462,7 @@ async function renderOverview() {
         </a>`).join('') : `<p class="rp-muted">${esc(T('rule.no_alert_30d', 'Aucune alerte enregistrée.'))}</p>`}
     </section>`;
 
-    panel.innerHTML = incidentHtml + activityHtml + statsHtml + recHtml + latestHtml;
+    panel.innerHTML = autopilotJourneyHtml(s.autopilot) + incidentHtml + activityHtml + statsHtml + recHtml + latestHtml;
 }
 
 function nextCheckText(iso) {
