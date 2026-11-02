@@ -432,11 +432,11 @@
                     <p class="form-hint" data-i18n="diag.docker_hint">Via un proxy du socket Docker qui n'autorise que la lecture (état, santé, redémarrages, logs, consommation). Sentinel ne monte jamais le socket lui-même.</p>
                     <div class="form-group">
                         <label for="diag-docker-url" data-i18n="diag.docker_url">Adresse du proxy</label>
-                        <input type="text" id="diag-docker-url" class="mono" placeholder="http://docker-proxy:2375">
+                        <input type="text" id="diag-docker-url" class="mono" placeholder="http://docker-proxy:2375" spellcheck="false">
                     </div>
                     <div class="diag-actions">
-                        <button type="button" class="btn btn-secondary btn-sm" id="diag-docker-test" data-i18n="diag.test">Tester</button>
-                        <button type="button" class="btn btn-primary btn-sm" id="diag-docker-save" data-i18n="common.save">Enregistrer</button>
+                        <button type="button" class="btn btn-primary btn-sm" id="diag-docker-test" data-i18n="diag.test_save">Tester et enregistrer</button>
+                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-docker-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
                         <span class="form-hint" id="diag-docker-result"></span>
                     </div>
                     <details class="diag-howto">
@@ -446,7 +446,7 @@
                             <button type="button" data-platform="unraid">Unraid</button>
                         </div>
                         <div class="diag-howto-body" data-howto="docker-compose">
-                            <p class="form-hint" data-i18n="diag.docker_compose_hint">Ajoute ce service dans le même docker-compose.yml que Sentinel, puis lance docker compose up -d. Adresse à renseigner : http://docker-proxy:2375</p>
+                            <p class="form-hint" data-i18n="diag.docker_compose_hint">Ajoute ce service dans le même docker-compose.yml que Sentinel, puis lance docker compose up -d. L'adresse http://docker-proxy:2375 est déjà pré-remplie.</p>
                             <pre class="diag-code" id="diag-docker-compose-code"></pre>
                             <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-docker-compose-code" data-i18n="common.copy">Copier</button>
                         </div>
@@ -455,7 +455,7 @@
                                 <li data-i18n-html="diag.unraid_step1">Dans le terminal d'Unraid, crée un réseau dédié (une seule fois) : <code>docker network create sentinel</code>. Pour le voir dans la liste des réseaux, active <i>Paramètres › Docker › Preserve user defined networks</i>.</li>
                                 <li data-i18n-html="diag.unraid_step2">Dans l'onglet Apps, installe le modèle <b>Log-to-LLM-Sentinel-Docker-Proxy</b> et choisis le réseau <code>sentinel</code>.</li>
                                 <li data-i18n-html="diag.unraid_step3">Modifie le conteneur Log-to-LLM-Sentinel et choisis aussi le réseau <code>sentinel</code>.</li>
-                                <li data-i18n-html="diag.unraid_step4">Adresse à renseigner : <code>http://sentinel-docker-proxy:2375</code></li>
+                                <li data-i18n-html="diag.unraid_step4">L'adresse <code>http://sentinel-docker-proxy:2375</code> est pré-remplie : clique sur Tester et enregistrer.</li>
                             </ol>
                             <p class="form-hint" data-i18n="diag.unraid_no_port">Ne publie pas le port du proxy sur ton réseau : même en lecture seule, il expose la configuration de tous tes conteneurs.</p>
                         </div>
@@ -488,15 +488,15 @@
                             <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-ssh-snippet" data-i18n="common.copy">Copier</button>
                         </li>
                         <li>
-                            <span data-i18n="diag.step_settings">Renseigne l'adresse du serveur et l'utilisateur indiqué à la fin du bloc, puis teste.</span>
+                            <span data-i18n="diag.step_settings">Vérifie l'adresse du serveur et l'utilisateur indiqué à la fin du bloc, puis clique sur Tester et enregistrer.</span>
                             <div class="diag-fields">
-                                <label class="rf-stack"><span data-i18n="diag.ssh_host">Adresse du serveur</span><input type="text" id="diag-ssh-host" class="mono" placeholder="192.168.1.10"></label>
+                                <label class="rf-stack"><span data-i18n="diag.ssh_host">Adresse du serveur</span><input type="text" id="diag-ssh-host" class="mono" placeholder="192.168.1.10" spellcheck="false"></label>
                                 <label class="rf-stack"><span data-i18n="diag.ssh_port">Port</span><input type="number" id="diag-ssh-port" min="1" max="65535" value="22"></label>
-                                <label class="rf-stack"><span data-i18n="diag.ssh_user">Utilisateur</span><input type="text" id="diag-ssh-user" class="mono" placeholder="sentinel-diag"></label>
+                                <label class="rf-stack"><span data-i18n="diag.ssh_user">Utilisateur</span><input type="text" id="diag-ssh-user" class="mono" placeholder="sentinel-diag" spellcheck="false"></label>
                             </div>
                             <div class="diag-actions">
-                                <button type="button" class="btn btn-primary btn-sm" id="diag-ssh-save" data-i18n="common.save">Enregistrer</button>
-                                <button type="button" class="btn btn-secondary btn-sm" id="diag-ssh-test" data-i18n="diag.test_connection">Tester la connexion</button>
+                                <button type="button" class="btn btn-primary btn-sm" id="diag-ssh-test" data-i18n="diag.test_save">Tester et enregistrer</button>
+                                <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-ssh-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
                                 <span class="form-hint" id="diag-ssh-result"></span>
                             </div>
                             <pre class="diag-code hidden" id="diag-ssh-output"></pre>
@@ -556,6 +556,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=4"></script>
-<script src="/static/js/diagnostics_config.js?v=2"></script>
+<script src="/static/js/config.js?v=5"></script>
+<script src="/static/js/diagnostics_config.js?v=3"></script>
 {% endblock %}

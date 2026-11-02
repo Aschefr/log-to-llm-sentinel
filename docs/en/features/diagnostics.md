@@ -35,7 +35,7 @@ Add this service to the same `docker-compose.yml` as Sentinel (the [configurator
     restart: unless-stopped
 ```
 
-Run `docker compose up -d`, then in Sentinel: **Configuration › Diagnostics › Docker containers**, address `http://docker-proxy:2375`, **Test**, **Save**.
+Run `docker compose up -d`, then in Sentinel: **Configuration › Diagnostics › Docker containers**, the address `http://docker-proxy:2375` is already filled in: click **Test and save**.
 
 ### Unraid
 Unraid has no compose and containers on its default bridge cannot reach each other by name, so both containers go on a dedicated network:
@@ -43,7 +43,7 @@ Unraid has no compose and containers on its default bridge cannot reach each oth
 1. In the Unraid terminal, once: `docker network create sentinel`. To see it in the *Network type* list, *Settings › Docker › Preserve user defined networks* must be set to **Yes** (the Docker service has to be stopped to change it).
 2. **Apps** tab → install **Log-to-LLM-Sentinel-Docker-Proxy** → *Network type*: `sentinel`. Do not add a port mapping.
 3. Edit the **Log-to-LLM-Sentinel** container → *Network type*: `sentinel`.
-4. Sentinel → **Configuration › Diagnostics**: address `http://sentinel-docker-proxy:2375`, **Test**, **Save**.
+4. Sentinel → **Configuration › Diagnostics**: choose the Unraid tab under *How to install it?* so the address `http://sentinel-docker-proxy:2375` is filled in, then click **Test and save**.
 
 > Do not publish the proxy port on your LAN: even read-only, it exposes the configuration of every container (including environment variables). Sentinel strips environment variables and labels before passing container details to the AI.
 
@@ -72,11 +72,11 @@ Choose your platform, click **Copy** and paste the block in a terminal on the se
 The block can be pasted again safely (it replaces its previous key line).
 
 ### Step 3 — fill in Sentinel
-- **Server address**: the server's LAN IP (as reachable from the Sentinel container).
+- **Server address**: the server's LAN IP (as reachable from the Sentinel container); pre-filled with the server IP from the general settings when set.
 - **Port**: `22` unless you changed it.
-- **User**: shown at the end of the block — `sentinel-diag` on Linux, `root` on Unraid.
+- **User**: shown at the end of the block — `sentinel-diag` on Linux, `root` on Unraid (pre-filled for the selected platform).
 
-Click **Save**, then **Test the connection**: the output of the `overview` check is shown with the server's key fingerprint, which Sentinel remembers (connections fail if it changes).
+Click **Test and save**: the values typed in the form are tested and saved only if the connection works (a **Save anyway** button appears otherwise). The output of the `overview` check is shown with the server's key fingerprint, which Sentinel remembers (connections fail if it changes).
 
 ### Available checks
 `overview`, `disk`, `memory`, `load`, `processes`, `mounts`, `network`, `kernel`, `syslog`, `array`, `failed-services`, `service <name>`, `journal <name>`.
@@ -86,7 +86,7 @@ Click **Save**, then **Test the connection**: the output of the `overview` check
 - Unraid has no systemd: `service`, `journal` and `failed-services` point to `syslog`, `array` and `processes` instead.
 
 ### Updating the script
-The script carries a version number. When a new Sentinel version improves it, **Test the connection** warns that the installed script is outdated: paste the step 2 block again (the key does not change).
+The script carries a version number. When a new Sentinel version improves it, **Test and save** warns that the installed script is outdated: paste the step 2 block again (the key does not change).
 
 ### Revoking access
 - Linux: `sudo userdel -r sentinel-diag && sudo rm /usr/local/bin/sentinel-diag`

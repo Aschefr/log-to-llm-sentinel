@@ -89,10 +89,21 @@ def ssh_install(platform: str = "linux"):
 
 
 @router.post("/ssh/test")
-async def test_ssh():
+async def test_ssh(body: Optional[DiagSettings] = None):
+    """Teste les valeurs saisies (body) sans les enregistrer ; à défaut, la configuration enregistrée."""
+    cfg = diag.settings()
+    if body:
+        if body.ssh_host is not None:
+            cfg["ssh_host"] = body.ssh_host.strip()
+        if body.ssh_port is not None:
+            cfg["ssh_port"] = body.ssh_port
+        if body.ssh_user is not None:
+            cfg["ssh_user"] = body.ssh_user.strip()
+    if not 1 <= int(cfg["ssh_port"]) <= 65535:
+        return {"ok": False, "error": "port SSH invalide"}
     try:
-        out = await asyncio.to_thread(diag.run_host_check, "overview")
-        version = await asyncio.to_thread(diag.installed_script_version)
+        out = await asyncio.to_thread(diag.run_host_check, "overview", None, cfg)
+        version = await asyncio.to_thread(diag.installed_script_version, cfg)
         return {"ok": True, "output": out[:3000], "host_fingerprint": diag.host_fingerprint(),
                 "script_version": version, "script_outdated": version != diag.DIAG_SCRIPT_VERSION}
     except diag.DiagnosticError as e:

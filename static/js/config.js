@@ -406,7 +406,9 @@ function setupForm() {
     }
 
     // Auto-save logic
-    const inputs = form.querySelectorAll('input, select, textarea');
+    // La section Diagnostic a son propre « Tester et enregistrer » (API dédiée) : hors auto-save
+    const inputs = Array.from(form.querySelectorAll('input, select, textarea'))
+        .filter(input => !input.closest('#diagnostics-section'));
     let modifiedInputs = new Set();
     
     const debouncedSave = debounce(async () => {

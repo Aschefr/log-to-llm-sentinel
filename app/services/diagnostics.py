@@ -314,9 +314,9 @@ def _script() -> str:
     return DIAG_SCRIPT.replace("@VERSION@", DIAG_SCRIPT_VERSION)
 
 
-def installed_script_version() -> Optional[str]:
+def installed_script_version(cfg: Optional[dict] = None) -> Optional[str]:
     """Version du script installé sur le serveur (None si ancien script sans numéro de version)."""
-    out = run_host_check("overview", _raw="version")
+    out = run_host_check("overview", cfg=cfg, _raw="version")
     m = re.match(r"^sentinel-diag (\S+)$", out.strip())
     return m.group(1) if m else None
 
