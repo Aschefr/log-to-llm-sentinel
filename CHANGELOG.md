@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.3.1] - 2026-11-02
 
 ### Fixed
 - **Resolution Check Loop**: When the AI rejected an inactivity-timeout resolution, the check ran again every minute (one full LLM call each time — tens of thousands of calls on some instances). After a rejection the next timeout attempt now waits a full timeout period, and a pattern-triggered attempt waits 5 minutes.
