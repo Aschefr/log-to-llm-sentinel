@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.4.1] - 2026-11-02
 
 ### Fixed
 - **Learned patterns describing a failure**: Phrases such as "login failed" or "connection timed out" are no longer suggested as return-to-normal patterns (failure words are filtered out, in English and French).
