@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.5.0] - 2026-11-02
 
 ### Added
 - **Docker diagnostics (read-only)**: Through a read-only Docker socket proxy (`tecnativa/docker-socket-proxy`, `CONTAINERS=1`, `INFO=1`, `POST=0`), the chat and investigation assistant can list containers and check their state, health and last healthchecks, restart count, exit code, OOM, logs and CPU/memory usage itself, instead of asking the user to run `docker ps` / `docker logs`. Environment variables and labels are never passed to the AI. Sentinel never mounts the Docker socket.
