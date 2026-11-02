@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Chat**: a reply could stay stuck on "thinking" until the page was reloaded when the model took long to start answering (busy with an analysis, loading…): an idle connection was closed by a proxy or the browser and the page did not reconnect. The stream now sends a keep-alive every 14 s, disables proxy buffering, reconnects when the connection closes before the end, and reloads the conversation if the generation is no longer known by the server.
+- **Rule page**: opening unread alerts now updates the unread count of the Analyses tab and of the *Unread* filter right away (only *Mark all as read* did).
+
 ## [1.6.0] - 2026-11-02
 
 ### Added

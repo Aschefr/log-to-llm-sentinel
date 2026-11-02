@@ -659,33 +659,8 @@ async function markAnalysisAsViewed(analysisId) {
             if (dot) dot.remove();
         }
 
-        // If on the monitor page, decrement local unviewed count and re-render tabs
-        if (typeof activeRuleId !== 'undefined' && activeRuleId !== null) {
-            if (typeof monitorRules !== 'undefined' && Array.isArray(monitorRules)) {
-                const rule = monitorRules.find(r => r.id === activeRuleId);
-                if (rule) {
-                    let severity = null;
-                    if (card) {
-                        const badge = card.querySelector('.severity-badge');
-                        if (badge) {
-                            if (badge.classList.contains('critical')) severity = 'critical';
-                            else if (badge.classList.contains('warning')) severity = 'warning';
-                            else if (badge.classList.contains('info')) severity = 'info';
-                        }
-                    }
-                    if (rule.unviewed_count > 0) {
-                        rule.unviewed_count--;
-                    }
-                    if (severity && rule.stats && rule.stats[severity] > 0) {
-                        rule.stats[severity]--;
-                        if (rule.stats.total > 0) rule.stats.total--;
-                    }
-                    if (typeof renderTabs === 'function') {
-                        renderTabs();
-                    }
-                }
-            }
-        }
+        // Let the page update its unread counters (rule page tab badge and filters)
+        document.dispatchEvent(new CustomEvent('analysis-viewed', { detail: { id: analysisId } }));
     } catch (e) {
         console.error("Failed to mark analysis as viewed:", e);
         _viewedAnalysesCache.delete(analysisId);

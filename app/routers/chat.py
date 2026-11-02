@@ -625,9 +625,11 @@ async def stream_chat(task_id: str, from_pos: int = 0):
 
     async def generator():
         pos = from_pos
+        idle = 0.0
         while True:
             buf = entry.token_buffer
             if pos < len(buf):
+                idle = 0.0
                 # Envoyer les tokens en attente (rattrapage ou nouveaux)
                 for token in buf[pos:]:
                     pos += 1
@@ -643,9 +645,18 @@ async def stream_chat(task_id: str, from_pos: int = 0):
                 break
             else:
                 # Attendre de nouveaux tokens (polling léger)
-                await task_manager.wait_for_token(entry, timeout=2.0)
+                if await task_manager.wait_for_token(entry, timeout=2.0):
+                    idle = 0.0
+                else:
+                    idle += 2.0
+                    # Commentaire SSE pendant les longues attentes (modèle occupé par une analyse,
+                    # chargement…) : sinon un proxy ou le navigateur ferme la connexion inactive
+                    if idle >= 14.0:
+                        idle = 0.0
+                        yield ": keepalive\n\n"
 
-    return StreamingResponse(generator(), media_type="text/event-stream")
+    return StreamingResponse(generator(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.get("/api/pending/{conv_id}")

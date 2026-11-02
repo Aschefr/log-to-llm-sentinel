@@ -1879,6 +1879,17 @@ async function readStream(taskId, fromPos, signal) {
 
     try {
         const response = await fetch(`/chat/api/stream/${taskId}?from_pos=${fromPos}`, { signal });
+        if (response.status === 404) {
+            // Tâche inconnue (serveur redémarré, tâche nettoyée) : la réponse éventuelle est en BDD
+            if (_activeTaskId === taskId) {
+                _activeTaskId = null;
+                _streamFullText = '';
+                unlockActionCards();
+                setSendBtn(false);
+                if (activeConvId) loadHistory(activeConvId);
+            }
+            return;
+        }
         if (!response.ok) throw new Error('Stream unavailable');
 
         const reader = response.body.getReader();
@@ -1962,17 +1973,19 @@ async function readStream(taskId, fromPos, signal) {
                 } catch (_) {}
             }
         }
+        // Connexion fermée sans fin de génération (proxy, veille réseau…) : se reconnecter
+        console.warn('[Chat] Stream fermé avant la fin, reconnexion dans 2s');
     } catch (e) {
         if (e.name === 'AbortError') return; // Annulation volontaire (changement d'onglet)
         // Erreur réseau : réessayer après un délai
         console.warn('[Chat] Stream interrompu, retry dans 2s', e);
-        setTimeout(() => {
-            if (_activeTaskId === taskId) {
-                _streamAbort = new AbortController();
-                readStream(taskId, _streamPos, _streamAbort.signal);
-            }
-        }, 2000);
     }
+    setTimeout(() => {
+        if (_activeTaskId === taskId && !signal.aborted) {
+            _streamAbort = new AbortController();
+            readStream(taskId, _streamPos, _streamAbort.signal);
+        }
+    }, 2000);
 }
 
 // ── Reconnexion automatique au retour sur l'onglet ───────────────────────────

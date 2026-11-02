@@ -197,9 +197,7 @@ async function loadHeader() {
 
         setKwBadge(rule.keyword_pending || 0);
         const counts = (await apiFetch(`/api/dashboard/recent?limit=1&rule_id=${RP.id}`)).counts || {};
-        const badge = document.getElementById('rp-unread-badge');
-        badge.textContent = counts.unread || '';
-        badge.classList.toggle('hidden', !counts.unread);
+        setUnreadBadge(counts.unread);
         return rule;
     } catch (e) {
         document.getElementById('rp-name').textContent = T('rule.not_found', 'Règle introuvable');
@@ -402,7 +400,22 @@ function goToSettings(sectionId) {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+function setUnreadBadge(n) {
+    const badge = document.getElementById('rp-unread-badge');
+    badge.textContent = n || '';
+    badge.classList.toggle('hidden', !n);
+}
+
 /* ── Analyses tab ──────────────────────────────────────────────────────────── */
+// An alert opened on this page (common.js markAnalysisAsViewed): update the counters without reloading
+document.addEventListener('analysis-viewed', () => {
+    setUnreadBadge(Math.max(0, (parseInt(document.getElementById('rp-unread-badge').textContent) || 0) - 1));
+    if (RP.an.counts && RP.an.counts.unread > 0) {
+        RP.an.counts.unread--;
+        renderAnalysisFilters();
+    }
+});
+
 function setupAnalysesToolbar() {
     document.getElementById('an-period').addEventListener('change', e => { RP.an.period = e.target.value; loadAnalyses(true); });
     document.getElementById('an-open-only').addEventListener('change', e => { RP.an.openOnly = e.target.checked; loadAnalyses(true); });
