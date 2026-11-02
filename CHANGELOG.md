@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.6.0] - 2026-11-02
 
 ### Added
 - **Self-tuning keywords**: The local AI acts as an arbiter that keeps each rule's keywords and exclusions up to date. Sentinel counts, per day, the lines matched by every keyword and exclusion, and groups the error lines that no keyword catches ("blind spots") into templates. Every hour the arbiter decides (structured output) to add a keyword for recurring blind spots, and to keep, exclude or remove noisy keywords (mostly `info` alerts, or alerts flagged *Not relevant*). Each decision is checked against the data before being applied: the keyword or exclusion must literally appear in the real lines, must not be generic or contain a variable part, an exclusion must not hide a `warning`/`critical` alert of the last 30 days nor neutralize a keyword, the last keyword is never removed. Checked decisions are applied (mode *Automatic*, default); the others are offered for review. Rejected or undone changes are never proposed again, and manual edits win. One notification sums up each review.
