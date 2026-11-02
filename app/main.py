@@ -115,6 +115,7 @@ async def lifespan(app: FastAPI):
     chat_router.set_orchestrator(orchestrator)
     config.set_orchestrator(orchestrator)
     rules.set_orchestrator(orchestrator)
+    rules.set_resolution_service(resolution_service)
     webhook_router.set_orchestrator(orchestrator)
 
     # Initialiser et démarrer le récepteur Syslog (UDP 514)

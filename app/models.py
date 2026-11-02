@@ -34,12 +34,18 @@ class Rule(Base):
     # ── Resolution surveillance (MON-18) ──
     alert_status = Column(String, default="normal")          # 'normal' | 'alert' | 'resolving'
     alert_started_at = Column(DateTime, nullable=True)       # Timestamp du passage en alerte
-    resolution_mode = Column(String, default="timeout")      # 'timeout' | 'pattern' | 'both'
+    resolution_mode = Column(String, default="timeout")      # 'disabled' | 'timeout' | 'both' (timeout + lignes de succès) ; 'pattern' : ancien mode, migré en 'both'
     resolution_timeout_minutes = Column(Integer, default=30) # Durée sans erreur → résolu
     resolution_patterns_json = Column(Text, default="[]")    # Patterns de résolution (ex: ["connected", "restored"])
     resolution_ai_enabled = Column(Boolean, default=False)   # Validation IA optionnelle
     resolution_notify_search = Column(Boolean, default=False)# Notifier quand l'IA cherche
     resolution_notify_resolved = Column(Boolean, default=True)# Notifier quand résolu
+    resolution_calm_mode = Column(String, default="adaptive") # 'adaptive' (3 × intervalle observé, min. timeout) | 'fixed'
+    resolution_ai_mode = Column(String, default="ambiguous")  # 'ambiguous' (lignes de succès seulement) | 'always' | 'never'
+    resolution_learn = Column(Boolean, default=True)          # Proposer des motifs appris par l'IA (validation utilisateur)
+    probe_type = Column(String, default="none")               # Sonde de santé : 'none' | 'http' | 'tcp'
+    probe_target = Column(String, default="")                 # URL (http) ou hôte:port (tcp)
+    probe_expect = Column(String, default="")                 # Codes HTTP attendus (ex. "200" ou "200,204") ; vide = 2xx/3xx
 
     def get_keywords(self):
         import json
@@ -71,7 +77,7 @@ class Rule(Base):
                 return []
             # Format enrichi : [{"pattern": ..., "weight": ..., "error_keywords": [...]}]
             if isinstance(data[0], dict):
-                return [item["pattern"] for item in data if item.get("pattern")]
+                return [item["pattern"] for item in data if item.get("pattern") and item.get("status", "active") == "active"]
             # Format legacy : ["pattern1", "pattern2"]
             return [str(p) for p in data if p]
         except Exception:
@@ -150,6 +156,43 @@ class Rule(Base):
             else:
                 updated.append(item)
         self.set_weighted_resolution_patterns(updated)
+
+    def get_active_weighted_patterns(self):
+        """Motifs utilisés pour la détection (hors suggestions en attente et motifs refusés)."""
+        return [p for p in self.get_weighted_resolution_patterns() if p.get("status", "active") == "active"]
+
+    def suggest_pattern(self, pattern: str, error_keywords: list = None) -> bool:
+        """Ajoute un motif appris en attente de validation. Faux s'il est déjà connu (actif, suggéré ou refusé)."""
+        weighted = self.get_weighted_resolution_patterns()
+        if any(item.get("pattern", "").lower() == pattern.lower() for item in weighted):
+            return False
+        weighted.append({
+            "pattern": pattern,
+            "weight": 1,
+            "error_keywords": error_keywords or [],
+            "status": "suggested",
+            "origin": "learned",
+            "last_validated_at": datetime.utcnow().isoformat() + "Z",  # une suggestion ignorée expire avec le decay
+        })
+        self.set_weighted_resolution_patterns(weighted)
+        return True
+
+    def set_pattern_status(self, pattern: str, status: str, origin: str = None) -> bool:
+        """Change le statut d'un motif ('active' | 'rejected'), en l'ajoutant s'il n'existe pas."""
+        weighted = self.get_weighted_resolution_patterns()
+        now_iso = datetime.utcnow().isoformat() + "Z"
+        for item in weighted:
+            if item.get("pattern", "").lower() == pattern.lower():
+                item["status"] = status
+                item["last_validated_at"] = now_iso
+                if origin:
+                    item["origin"] = origin
+                break
+        else:
+            weighted.append({"pattern": pattern, "weight": 1, "error_keywords": [], "status": status,
+                             "origin": origin or "manual", "last_validated_at": now_iso})
+        self.set_weighted_resolution_patterns(weighted)
+        return True
 
     def remove_pattern(self, pattern: str):
         """Supprime un pattern specifique de la liste."""

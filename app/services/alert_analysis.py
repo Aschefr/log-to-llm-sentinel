@@ -34,12 +34,20 @@ def analysis_lines(a: Analysis) -> List[str]:
     return [l for l in lines if not l.startswith("... [")]
 
 
+_SUMMARY_TAG = re.compile(r"^[-*_#\s]*(r[ée]sum[ée](\s+court)?|summary|tl;?dr)\s*[*_]*\s*:\s*[*_]*\s*", re.IGNORECASE)
+_CONFIDENCE_LINE = re.compile(r"^[*_\s]*(confiance|confidence)\b", re.IGNORECASE)
+
+
 def short_summary(a: Analysis, max_len: int = 300) -> str:
     """Résumé court d'une analyse : champ structuré, sinon dernier paragraphe du texte (anciennes analyses)."""
     text = a.summary
     if not text:
-        paras = [p.strip() for p in (a.ollama_response or "").split("\n\n") if p.strip()]
-        text = paras[-1] if paras else ""
+        paras = [p.strip() for p in (a.ollama_response or "").split("\n\n") if p.strip().strip("-")]
+        # Paragraphe « Résumé : … » s'il existe (format structuré et anciens prompts), sinon le dernier hors confiance
+        tagged = [p for p in paras if _SUMMARY_TAG.match(p)]
+        rest = [p for p in paras if not _CONFIDENCE_LINE.match(p)]
+        text = _SUMMARY_TAG.sub("", tagged[0]) if tagged else (rest[-1] if rest else "")
+        text = text.replace("**", "").replace("__", "").strip("*_ ")
     text = " ".join(text.split())
     return text if len(text) <= max_len else text[:max_len] + "…"
 

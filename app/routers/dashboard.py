@@ -11,6 +11,8 @@ except ImportError:
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis
+from app.services import rule_stats
+from app.services.alert_analysis import short_summary
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -89,7 +91,8 @@ def get_stats():
 
 
 @router.get("/recent")
-def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = None, severity: str | None = None):
+def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = None, severity: str | None = None,
+                        unread: bool = False, open_only: bool = False, days: int | None = None):
     db = SessionLocal()
     try:
         # Jointure explicite pour récupérer l'objet Analysis et le nom de la Règle associée
@@ -97,13 +100,27 @@ def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = 
         
         if rule_id is not None:
             q = q.filter(Analysis.rule_id == rule_id)
+        if days:
+            q = q.filter(Analysis.analyzed_at >= datetime.utcnow() - timedelta(days=days))
+        if open_only:
+            q = q.filter(Analysis.resolution_status == None)
+        # Compteurs des filtres (avant filtre sévérité / non lues), pour l'onglet Analyses d'une règle
+        counts = None
+        if rule_id is not None:
+            from sqlalchemy import func
+            counts = {"total": q.count(), "unread": q.filter(Analysis.viewed == False).count()}
+            for sev, n in q.with_entities(Analysis.severity, func.count(Analysis.id)).group_by(Analysis.severity).all():
+                counts[sev or "info"] = counts.get(sev or "info", 0) + n
         if severity:
             q = q.filter(Analysis.severity == severity)
+        if unread:
+            q = q.filter(Analysis.viewed == False)
 
         total = q.count()
         results = q.order_by(Analysis.analyzed_at.desc()).offset(offset).limit(limit).all()
         
         import json as _json
+        recurrence = rule_stats.recurrence_counts(db, [a for a, _ in results])
         analyses = [
             {
                 "id": a.id,
@@ -122,10 +139,13 @@ def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = 
                 "resolution_patterns": _json.loads(a.resolution_patterns_json) if a.resolution_patterns_json else [],
                 "resolution_ai_explanation": a.resolution_ai_explanation,
                 "resolution_ai_confidence": a.resolution_ai_confidence,
+                "summary": short_summary(a, 220) if (a.summary or a.ollama_response) else None,
+                "recurrence_7d": recurrence.get(a.id, 0),
+                "resolution_minutes": rule_stats.resolution_minutes(a),
             }
             for a, rule_name in results
         ]
-        return {"analyses": analyses, "has_more": (offset + limit) < total, "total": total}
+        return {"analyses": analyses, "has_more": (offset + limit) < total, "total": total, "counts": counts}
     finally:
         db.close()
 @router.delete("/analyses/{analysis_id}")

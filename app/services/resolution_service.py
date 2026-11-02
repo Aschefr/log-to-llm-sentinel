@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import collections
+import statistics
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
@@ -12,6 +13,7 @@ from app.services.alert_analysis import analysis_lines, short_summary, messages_
 from app.services.app_config import config_to_dict, llm_options
 from app.services.log_source import resolve_path, read_tail_lines
 from app.services.prompts import RESOLUTION_SCHEMA, RESOLUTION_SYSTEM, resolution_label
+from app.services.probe_service import run_probe, PROBE_TYPES
 from app import logger
 
 
@@ -31,6 +33,13 @@ RETRY_COOLDOWN_MINUTES = 5         # Attente apres un rejet avant une nouvelle t
                                    # (apres un rejet par timeout : un delai complet)
 VERDICT_RETENTION_DAYS = 30        # Les verdicts plus anciens sont purges...
 VERDICT_KEEP_PER_RULE = 20         # ...sauf les N plus recents de chaque regle
+
+# ── Calme requis et sonde ────────────────────────────────────────────────
+ADAPTIVE_CALM_FACTOR = 3           # Calme adaptatif : 3 x l'intervalle median entre les erreurs de l'incident...
+ADAPTIVE_CALM_MAX_MINUTES = 1440   # ...plafonne a 24 h (et jamais sous le timeout de la regle)
+MAX_ERROR_TIMES = 20               # Horodatages d'erreur conserves par incident
+PROBE_REFRESH_SECONDS = 60         # Frequence de la sonde pendant un incident
+MAX_PENDING_SUGGESTIONS = 10       # Suggestions de motifs en attente de validation, par regle
 
 # ── Auto-apprentissage : motifs refuses ──────────────────────────────────
 LEARNED_PATTERN_MIN_LEN = 5
@@ -147,16 +156,17 @@ class ResolutionService:
                 # Une validation interrompue par l'arret ne reprendra pas : la regle repasse en alerte
                 if rule.alert_status == "resolving":
                     rule.alert_status = "alert"
-                last = db.query(Analysis).filter(
-                    Analysis.rule_id == rule.id, Analysis.resolution_status == None
-                ).order_by(Analysis.analyzed_at.desc()).first()
-                last_error_at = (last.analyzed_at if last else None) or rule.alert_started_at or datetime.utcnow()
+                error_times = [a.analyzed_at for a in db.query(Analysis).filter(
+                    Analysis.rule_id == rule.id, Analysis.resolution_status == None, Analysis.analyzed_at != None
+                ).order_by(Analysis.analyzed_at).all()][-MAX_ERROR_TIMES:]
+                last_error_at = (error_times[-1] if error_times else None) or rule.alert_started_at or datetime.utcnow()
                 self._alert_states[rule.id] = {
                     "status": rule.alert_status,
                     "started_at": rule.alert_started_at or last_error_at,
                     "last_error_at": last_error_at,
                     "max_severity": max_sev,
                     "lines_since_error": None,
+                    "error_times": error_times,
                 }
                 logger.info("ResolutionService", f"Etat d'alerte restaure pour la regle '{rule.name}': {rule.alert_status} (severite max: {max_sev})")
             db.commit()
@@ -249,6 +259,7 @@ class ResolutionService:
                         "last_error_at": now,
                         "max_severity": severity,
                         "lines_since_error": 0,
+                        "error_times": [now],
                     }
                     rule.alert_status = "alert"
                     rule.alert_started_at = now
@@ -259,6 +270,9 @@ class ResolutionService:
                     self._alert_states[rule_id]["last_error_at"] = now
                     self._alert_states[rule_id]["lines_since_error"] = 0
                     self._alert_states[rule_id]["next_attempt_at"] = None
+                    times = self._alert_states[rule_id].setdefault("error_times", [])
+                    times.append(now)
+                    del times[:-MAX_ERROR_TIMES]
                     # Mise a jour max_severity si la nouvelle est plus haute
                     current_max = self._alert_states[rule_id].get("max_severity", "info")
                     if SEVERITY_LEVELS.get(severity, 0) > SEVERITY_LEVELS.get(current_max, 0):
@@ -299,7 +313,7 @@ class ResolutionService:
             return
 
         # Tri des patterns par poids decroissant (patterns les plus fiables en priorite)
-        weighted = rule.get_weighted_resolution_patterns()
+        weighted = rule.get_active_weighted_patterns()
         weighted_sorted = sorted(weighted, key=lambda x: x.get("weight", 1), reverse=True)
         patterns = [(item["pattern"], item.get("weight", 1)) for item in weighted_sorted if item.get("pattern")]
 
@@ -323,7 +337,8 @@ class ResolutionService:
 
         if matched_line:
             logger.info("ResolutionService", f"Pattern de resolution '{matched_pattern}' (poids={matched_weight}) detecte dans : {matched_line[:120]}")
-            await self._try_resolve(rule.id, trigger=f"Pattern match: '{matched_pattern}'", context_lines=lines, resolution_line=matched_line, resolution_patterns=[matched_pattern])
+            await self._try_resolve(rule.id, trigger=f"Pattern match: '{matched_pattern}'", context_lines=lines, resolution_line=matched_line,
+                                    resolution_patterns=[matched_pattern], use_ai=(rule.resolution_ai_mode or "ambiguous") != "never")
 
 
     async def check_timeout_resolutions(self):
@@ -343,31 +358,80 @@ class ResolutionService:
                 if rule.resolution_mode == "disabled":
                     continue
 
-                if rule.resolution_mode not in ("timeout", "both"):
-                    continue
+                now = datetime.utcnow()
+                has_probe = rule.probe_type in PROBE_TYPES and bool((rule.probe_target or "").strip())
+                if has_probe:
+                    probe = state.get("probe")
+                    if not probe or (now - probe["at"]).total_seconds() >= PROBE_REFRESH_SECONDS:
+                        state["probe"] = await run_probe(rule.probe_type, rule.probe_target, rule.probe_expect)
 
-                timeout_mins = rule.resolution_timeout_minutes or 30
+                calm_mins = self.required_calm_minutes(rule, state)
                 last_err = state["last_error_at"]
                 next_attempt_at = state.get("next_attempt_at")
-                now = datetime.utcnow()
 
-                if last_err and (now - last_err >= timedelta(minutes=timeout_mins)) and (not next_attempt_at or now >= next_attempt_at):
-                    logger.info("ResolutionService", f"Timeout de résolution atteint ({timeout_mins} min) pour la règle '{rule.name}'")
+                if last_err and (now - last_err >= timedelta(minutes=calm_mins)) and (not next_attempt_at or now >= next_attempt_at):
+                    # Tant que la sonde échoue, l'incident reste ouvert, même si le log est muet
+                    if has_probe and not state["probe"]["ok"]:
+                        continue
+                    logger.info("ResolutionService", f"Calme requis atteint ({calm_mins} min) pour la règle '{rule.name}'")
+                    use_ai = (rule.resolution_ai_mode or "ambiguous") == "always"
+                    trigger = f"Timeout ({calm_mins} min)" + (" + probe OK" if has_probe else "")
                     # Les dernières lignes du log servent de preuve à la validation IA (pas d'auto-apprentissage sur timeout)
-                    context = await asyncio.to_thread(_tail, rule.log_file_path) if rule.resolution_ai_enabled and rule.log_file_path else []
-                    await self._try_resolve(rule_id, trigger=f"Timeout ({timeout_mins} min)", context_lines=context, resolution_line=f"Inactivité de l'erreur supérieure à {timeout_mins} minutes", resolution_patterns=[])
+                    context = await asyncio.to_thread(_tail, rule.log_file_path) if use_ai and rule.log_file_path else []
+                    await self._try_resolve(rule_id, trigger=trigger, context_lines=context,
+                                            resolution_line=f"Inactivité de l'erreur supérieure à {calm_mins} minutes",
+                                            resolution_patterns=[], use_ai=use_ai)
         except Exception as e:
             logger.error("ResolutionService", f"Erreur dans check_timeout_resolutions : {e}")
         finally:
             db.close()
 
+    def required_calm_minutes(self, rule: Rule, state: dict) -> int:
+        """Durée sans erreur exigée avant de clore l'incident.
+        Adaptatif : ADAPTIVE_CALM_FACTOR x l'intervalle médian entre les erreurs de l'incident, au moins le timeout de la règle."""
+        base = rule.resolution_timeout_minutes or 30
+        if (rule.resolution_calm_mode or "adaptive") != "adaptive":
+            return base
+        times = sorted(state.get("error_times") or [])
+        gaps = [(b - a).total_seconds() / 60 for a, b in zip(times, times[1:]) if b > a]
+        if not gaps:
+            return base
+        return int(min(max(base, ADAPTIVE_CALM_FACTOR * statistics.median(gaps)), ADAPTIVE_CALM_MAX_MINUTES))
+
+    def incident_snapshot(self, rule: Rule) -> Optional[dict]:
+        """État de l'incident en cours pour l'interface (None si la règle est normale)."""
+        state = self._alert_states.get(rule.id)
+        if not state or state.get("status", "normal") == "normal":
+            return None
+        now = datetime.utcnow()
+        calm = self.required_calm_minutes(rule, state)
+        last_err = state.get("last_error_at")
+        next_check = last_err + timedelta(minutes=calm) if last_err else None
+        if state.get("next_attempt_at") and (not next_check or state["next_attempt_at"] > next_check):
+            next_check = state["next_attempt_at"]
+        probe = state.get("probe")
+        return {
+            "status": state.get("status"),
+            "started_at": state.get("started_at"),
+            "last_error_at": last_err,
+            "max_severity": state.get("max_severity", "info"),
+            "required_calm_minutes": calm,
+            "calm_elapsed_minutes": int((now - last_err).total_seconds() // 60) if last_err else None,
+            "next_check_at": next_check,
+            "lines_since_error": state.get("lines_since_error"),
+            "attempting": bool(state.get("attempting")),
+            "probe": dict(probe) if probe else None,
+        }
+
     def _defer_next_attempt(self, rule: Rule, pattern_triggered: bool):
-        """Apres un rejet : pas de nouvelle tentative avant un delai (un timeout complet pour le declencheur timeout)."""
-        minutes = RETRY_COOLDOWN_MINUTES if pattern_triggered else (rule.resolution_timeout_minutes or 30)
+        """Apres un rejet : pas de nouvelle tentative avant un delai (un calme complet pour le declencheur timeout)."""
+        state = self._alert_states.get(rule.id) or {}
+        minutes = RETRY_COOLDOWN_MINUTES if pattern_triggered else self.required_calm_minutes(rule, state)
         if rule.id in self._alert_states:
             self._alert_states[rule.id]["next_attempt_at"] = datetime.utcnow() + timedelta(minutes=minutes)
 
-    async def _try_resolve(self, rule_id: int, trigger: str, context_lines: List[str], resolution_line: str = None, resolution_patterns: List[str] = None):
+    async def _try_resolve(self, rule_id: int, trigger: str, context_lines: List[str], resolution_line: str = None,
+                           resolution_patterns: List[str] = None, use_ai: bool = False):
         """Tente la resolution avec validation IA optionnelle.
         Enregistre systematiquement un ResolutionVerdict pour chaque tentative.
 
@@ -379,8 +443,6 @@ class ResolutionService:
         """
         # === Phase 1 : Transition vers 'resolving' ===
         max_severity = "info"
-        use_ai = False
-        notify_search = False
         pattern_triggered = bool(resolution_patterns)
 
         async with self._state_lock:
@@ -394,8 +456,6 @@ class ResolutionService:
                     return
 
                 max_severity = state.get("max_severity", "info")
-                use_ai = bool(rule.resolution_ai_enabled)
-                notify_search = bool(rule.resolution_notify_search)
                 error_snapshot = state.get("last_error_at")
 
                 state["status"] = "resolving"
@@ -421,9 +481,6 @@ class ResolutionService:
                     rule = db.query(Rule).filter(Rule.id == rule_id).first()
                     if not rule:
                         raise Exception("Regle introuvable avant appel IA")
-
-                    if notify_search:
-                        await self._send_notification_for(db, rule, "search", trigger=trigger)
 
                     verdict = await self._validate_with_ai(db, rule, trigger, context_lines, resolution_patterns, resolution_line)
                     confidence = verdict.get("confidence", 0)
@@ -509,8 +566,6 @@ class ResolutionService:
                         rule.alert_status = "alert"
                         db.commit()
                         self._defer_next_attempt(rule, pattern_triggered)
-                        if rule.resolution_notify_search:
-                            await self._send_notification_for(db, rule, "denied")
 
                     elif ai_accepted:
                         # Resolution validee par l'IA : le motif declencheur gagne en fiabilite
@@ -542,8 +597,6 @@ class ResolutionService:
                         rule.alert_status = "alert"
                         db.commit()
                         self._defer_next_attempt(rule, pattern_triggered)
-                        if rule.resolution_notify_search:
-                            await self._send_notification_for(db, rule, "denied")
 
                 except Exception as e:
                     logger.error("ResolutionService", f"Erreur phase 3 de _try_resolve pour rule_id {rule_id} : {e}")
@@ -588,9 +641,12 @@ class ResolutionService:
         if resolution_patterns:
             parts.append("\n" + resolution_label(lang, "check_pattern", pattern=resolution_patterns[0], line=(resolution_line or "")[:500]))
         else:
-            parts.append("\n" + resolution_label(lang, "check_timeout", minutes=rule.resolution_timeout_minutes or 30))
+            parts.append("\n" + resolution_label(lang, "check_timeout", minutes=self.required_calm_minutes(rule, state)))
         count = state.get("lines_since_error")
         parts.append(resolution_label(lang, "liveness", count=count) if count is not None else resolution_label(lang, "liveness_unknown"))
+        if state.get("probe"):
+            parts.append(resolution_label(lang, "probe", detail=state["probe"]["detail"],
+                                          result=resolution_label(lang, "probe_ok" if state["probe"]["ok"] else "probe_ko")))
 
         parts.append("\n" + resolution_label(lang, "recent"))
         parts.append("\n".join(l[:500] for l in context_lines[-30:]) if context_lines else resolution_label(lang, "no_recent"))
@@ -698,7 +754,7 @@ class ResolutionService:
                                                   duration=duration_str, trigger=trigger,
                                                   explanation=ai_explanation, confidence=confidence)
 
-            if rule.resolution_ai_enabled and context_lines and learn:
+            if learn and context_lines and rule.resolution_learn and (rule.resolution_ai_mode or "ambiguous") != "never":
                 asyncio.create_task(self._extract_resolution_keywords(rule_id, context_lines, error_lines))
 
         except Exception as e:
@@ -809,23 +865,21 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
             try:
                 new_patterns = json.loads(cleaned)
                 if isinstance(new_patterns, list):
-                    existing = {p.lower() for p in rule.get_resolution_patterns()}
+                    pending = sum(1 for p in rule.get_weighted_resolution_patterns() if p.get("status") == "suggested")
                     added = []
                     for pat in new_patterns:
                         pat_cleaned = str(pat).strip()
-                        if pat_cleaned:
-                            # increment_pattern_weight gere ajout/mise a jour du poids
-                            if pat_cleaned.lower() in existing:
-                                continue
-                            if not _is_learnable_pattern(pat_cleaned, error_keywords, error_lines or [], normal_lines):
-                                logger.debug("ResolutionService", f"Pattern appris refuse pour '{rule.name}' : '{pat_cleaned}'")
-                                continue
-                            rule.increment_pattern_weight(pat_cleaned, error_keywords=error_keywords)
-                            existing.add(pat_cleaned.lower())
+                        if not pat_cleaned or pending + len(added) >= MAX_PENDING_SUGGESTIONS:
+                            continue
+                        if not _is_learnable_pattern(pat_cleaned, error_keywords, error_lines or [], normal_lines):
+                            logger.debug("ResolutionService", f"Pattern appris refuse pour '{rule.name}' : '{pat_cleaned}'")
+                            continue
+                        # Suggestion en attente de validation par l'utilisateur (ignorée si déjà connue)
+                        if rule.suggest_pattern(pat_cleaned, error_keywords=error_keywords):
                             added.append(pat_cleaned)
                     if added:
                         db.commit()
-                        logger.info("ResolutionService", f"Auto-apprentissage: {len(added)} pattern(s) enrichis/ajoutes pour '{rule.name}': {added}")
+                        logger.info("ResolutionService", f"Auto-apprentissage: {len(added)} motif(s) proposé(s) pour '{rule.name}': {added}")
             except Exception as e:
                 logger.error("ResolutionService", f"Erreur parsing mots-cles d'apprentissage: {e}. Contenu: {cleaned}")
 
@@ -861,6 +915,7 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
             "last_error_at": now,  # le delai d'inactivite repart de maintenant
             "max_severity": self._get_max_severity_for_rule(rule.id, db),
             "lines_since_error": None,
+            "error_times": sorted(a.analyzed_at for a in reopened if a.analyzed_at)[-MAX_ERROR_TIMES:],
         }
         logger.info("ResolutionService", f"Resolution annulee (faux positif) pour '{rule.name}' : {len(reopened)} analyse(s) rouverte(s)")
 
@@ -906,27 +961,7 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
             instance_prefix = f"[{config.instance_name}] " if config.instance_name else ""
             notif_config = _get_notification_config(config)
 
-            if notif_type == "search":
-                trigger = kwargs.get("trigger", "")
-                subject = f"{instance_prefix}{nt('resolution_ai_searching', lang).format(rule_name=rule.name)}"
-                body = f"""
-                <h3>🔍 {nt('resolution_ai_searching', lang).format(rule_name=rule.name)}</h3>
-                <p><strong>{nt('rule', lang)}:</strong> {rule.name}</p>
-                <p><strong>{nt('trigger', lang)}:</strong> {trigger}</p>
-                """
-                if config.notification_method in ("apprise", "discord"):
-                    body = f"🔍 {nt('resolution_ai_searching', lang).format(rule_name=rule.name)}\n\n**{nt('trigger', lang)}:** {trigger}"
-
-            elif notif_type == "denied":
-                subject = f"{instance_prefix}[Sentinel] {nt('resolution_ai_denied', lang)}"
-                body = f"""
-                <h3>⚠️ {nt('resolution_ai_denied', lang)}</h3>
-                <p><strong>{nt('rule', lang)}:</strong> {rule.name}</p>
-                """
-                if config.notification_method in ("apprise", "discord"):
-                    body = f"⚠️ **[Sentinel]** {nt('resolution_ai_denied', lang)} ({rule.name})"
-
-            elif notif_type == "resolved":
+            if notif_type == "resolved":
                 duration = kwargs.get("duration", "N/A")
                 trigger = kwargs.get("trigger", "")
                 explanation = kwargs.get("explanation")

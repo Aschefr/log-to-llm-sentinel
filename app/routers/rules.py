@@ -1,23 +1,42 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import asyncio
 import json
 import os
 
 from app.database import SessionLocal
-from app.models import Rule, Analysis, GlobalConfig
+from app.models import Rule, Analysis, GlobalConfig, ResolutionVerdict
 from app.services.orchestrator import Orchestrator
 from app.services.app_config import config_to_dict
+from app.services import rule_stats
+from app.services.probe_service import run_probe, PROBE_TYPES
 from app.utils.log_utils import clean_log_line
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
 orchestrator = None
+resolution_service = None
+
+CALM_MODES = ("adaptive", "fixed")
+AI_MODES = ("ambiguous", "always", "never")
+PROBE_CHOICES = ("none",) + PROBE_TYPES
+
 
 def set_orchestrator(o):
     global orchestrator
     orchestrator = o
+
+
+def set_resolution_service(s):
+    global resolution_service
+    resolution_service = s
+
+
+def _choice(value, allowed, field):
+    if value not in allowed:
+        raise HTTPException(status_code=422, detail=f"invalid_{field}")
+    return value
 
 
 class RuleCreate(BaseModel):
@@ -42,6 +61,12 @@ class RuleCreate(BaseModel):
     resolution_ai_enabled: bool = False
     resolution_notify_search: bool = False
     resolution_notify_resolved: bool = True
+    resolution_calm_mode: str = "adaptive"
+    resolution_ai_mode: str = "ambiguous"
+    resolution_learn: bool = True
+    probe_type: str = "none"
+    probe_target: str = ""
+    probe_expect: str = ""
 
 
 class RuleUpdate(BaseModel):
@@ -67,6 +92,22 @@ class RuleUpdate(BaseModel):
     resolution_ai_enabled: Optional[bool] = None
     resolution_notify_search: Optional[bool] = None
     resolution_notify_resolved: Optional[bool] = None
+    resolution_calm_mode: Optional[str] = None
+    resolution_ai_mode: Optional[str] = None
+    resolution_learn: Optional[bool] = None
+    probe_type: Optional[str] = None
+    probe_target: Optional[str] = None
+    probe_expect: Optional[str] = None
+
+
+class PatternBody(BaseModel):
+    pattern: str
+
+
+class ProbeBody(BaseModel):
+    probe_type: str
+    probe_target: str
+    probe_expect: str = ""
 
 
 @router.get("")
@@ -125,6 +166,67 @@ def get_rules():
         db.close()
 
 
+@router.get("/overview")
+def rules_overview():
+    """Vue d'ensemble : toutes les règles (désactivées comprises), état, alertes 7 j, dernier incident, MTTR, vitalité."""
+    db = SessionLocal()
+    try:
+        now = datetime.utcnow()
+        rules = db.query(Rule).all()
+        since30 = now - timedelta(days=30)
+        recent = db.query(Analysis).filter(Analysis.analyzed_at >= since30).all()
+        by_rule = {}
+        for a in recent:
+            by_rule.setdefault(a.rule_id, []).append(a)
+        items = []
+        for r in rules:
+            analyses = by_rule.get(r.id, [])
+            last = db.query(Analysis).filter(Analysis.rule_id == r.id).order_by(Analysis.analyzed_at.desc()).first()
+            open_count = db.query(Analysis).filter(Analysis.rule_id == r.id, Analysis.resolution_status == None).count() \
+                if (r.alert_status or "normal") != "normal" else 0
+            days7 = rule_stats.daily_counts(analyses, 7, now)
+            items.append({
+                "id": r.id,
+                "name": r.name,
+                "enabled": bool(r.enabled),
+                "source": rule_stats.source_info(r.log_file_path),
+                "alert_status": r.alert_status or "normal",
+                "alert_started_at": rule_stats.iso(r.alert_started_at),
+                "open_count": open_count,
+                "days7": days7,
+                "total7": sum(d["critical"] + d["warning"] + d["info"] for d in days7),
+                "last": rule_stats.analysis_brief(last) if last else None,
+                "mttr30_minutes": rule_stats.median_mttr(analyses),
+                "last_line_received_at": rule_stats.iso(r.last_line_received_at),
+                "inactivity_period_hours": r.inactivity_period_hours,
+                "muted": rule_stats.is_muted(r, now),
+            })
+        # En alerte d'abord, puis règles actives par dernière alerte, désactivées à la fin
+        items.sort(key=lambda i: (not i["enabled"], i["alert_status"] == "normal",
+                                  -(datetime.fromisoformat(i["last"]["analyzed_at"][:-1]).timestamp() if i["last"] else 0)))
+        return {
+            "rules": items,
+            "kpis": {
+                "alert_count": sum(1 for i in items if i["enabled"] and i["alert_status"] != "normal"),
+                "total7": sum(i["total7"] for i in items),
+                "mttr30_minutes": rule_stats.median_mttr(recent),
+                "muted_count": sum(1 for i in items if i["muted"]),
+            },
+        }
+    finally:
+        db.close()
+
+
+@router.post("/probe-test")
+async def probe_test(body: ProbeBody):
+    """Teste une sonde de santé avant de l'enregistrer."""
+    _choice(body.probe_type, PROBE_TYPES, "probe_type")
+    if not body.probe_target.strip():
+        raise HTTPException(status_code=422, detail="probe_target_required")
+    res = await run_probe(body.probe_type, body.probe_target, body.probe_expect)
+    return {**res, "at": rule_stats.iso(res["at"])}
+
+
 @router.get("/{rule_id}")
 def get_rule(rule_id: int):
     db = SessionLocal()
@@ -159,6 +261,12 @@ def get_rule(rule_id: int):
             "resolution_ai_enabled": rule.resolution_ai_enabled or False,
             "resolution_notify_search": rule.resolution_notify_search or False,
             "resolution_notify_resolved": rule.resolution_notify_resolved or False,
+            "resolution_calm_mode": rule.resolution_calm_mode or "adaptive",
+            "resolution_ai_mode": rule.resolution_ai_mode or "ambiguous",
+            "resolution_learn": rule.resolution_learn is not False,
+            "probe_type": rule.probe_type or "none",
+            "probe_target": rule.probe_target or "",
+            "probe_expect": rule.probe_expect or "",
         }
     finally:
         db.close()
@@ -184,9 +292,14 @@ def create_rule(rule_data: RuleCreate):
             alert_status=rule_data.alert_status,
             resolution_mode=rule_data.resolution_mode,
             resolution_timeout_minutes=rule_data.resolution_timeout_minutes,
-            resolution_ai_enabled=rule_data.resolution_ai_enabled,
-            resolution_notify_search=rule_data.resolution_notify_search,
             resolution_notify_resolved=rule_data.resolution_notify_resolved,
+            resolution_calm_mode=_choice(rule_data.resolution_calm_mode, CALM_MODES, "calm_mode"),
+            resolution_ai_mode=_choice(rule_data.resolution_ai_mode, AI_MODES, "ai_mode"),
+            resolution_ai_enabled=rule_data.resolution_ai_mode != "never",
+            resolution_learn=rule_data.resolution_learn,
+            probe_type=_choice(rule_data.probe_type, PROBE_CHOICES, "probe_type"),
+            probe_target=rule_data.probe_target.strip(),
+            probe_expect=rule_data.probe_expect.strip(),
         )
         rule.set_keywords(rule_data.keywords)
         rule.set_excluded_patterns(rule_data.excluded_patterns)
@@ -259,6 +372,19 @@ def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.resolution_notify_search = rule_data.resolution_notify_search
         if rule_data.resolution_notify_resolved is not None:
             rule.resolution_notify_resolved = rule_data.resolution_notify_resolved
+        if rule_data.resolution_calm_mode is not None:
+            rule.resolution_calm_mode = _choice(rule_data.resolution_calm_mode, CALM_MODES, "calm_mode")
+        if rule_data.resolution_ai_mode is not None:
+            rule.resolution_ai_mode = _choice(rule_data.resolution_ai_mode, AI_MODES, "ai_mode")
+            rule.resolution_ai_enabled = rule.resolution_ai_mode != "never"
+        if rule_data.resolution_learn is not None:
+            rule.resolution_learn = rule_data.resolution_learn
+        if rule_data.probe_type is not None:
+            rule.probe_type = _choice(rule_data.probe_type, PROBE_CHOICES, "probe_type")
+        if rule_data.probe_target is not None:
+            rule.probe_target = rule_data.probe_target.strip()
+        if rule_data.probe_expect is not None:
+            rule.probe_expect = rule_data.probe_expect.strip()
 
         db.commit()
 
@@ -294,6 +420,169 @@ def delete_rule(rule_id: int):
         return {"message": "Règle supprimée"}
     finally:
         db.close()
+
+
+def _snapshot(rule: Rule) -> Optional[dict]:
+    snap = resolution_service.incident_snapshot(rule) if resolution_service else None
+    if not snap:
+        return None
+    for key in ("started_at", "last_error_at", "next_check_at"):
+        snap[key] = rule_stats.iso(snap[key])
+    if snap.get("probe"):
+        snap["probe"] = {**snap["probe"], "at": rule_stats.iso(snap["probe"]["at"])}
+    return snap
+
+
+@router.get("/{rule_id}/summary")
+def rule_summary(rule_id: int):
+    """Onglet Vue d'ensemble d'une règle : incident en cours, activité, statistiques 30 j, événements récurrents."""
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="rule_not_found")
+        now = datetime.utcnow()
+        analyses = db.query(Analysis).filter(Analysis.rule_id == rule_id,
+                                             Analysis.analyzed_at >= now - timedelta(days=30)).all()
+        open_analyses = sorted((a for a in db.query(Analysis).filter(Analysis.rule_id == rule_id,
+                                                                    Analysis.resolution_status == None).all()
+                                if a.analyzed_at), key=lambda a: a.analyzed_at)
+        incident = _snapshot(rule)
+        if incident:
+            incident["open_count"] = len(open_analyses)
+            incident["summary"] = rule_stats.analysis_brief(open_analyses[-1])["summary"] if open_analyses else None
+        resolved = [a for a in analyses if a.resolution_status == "resolved"]
+        auto_resolved = [a for a in resolved if (a.resolution_line or "") != "Resolution manuelle par l'utilisateur"]
+        verdicts_ai = db.query(ResolutionVerdict).filter(ResolutionVerdict.rule_id == rule_id,
+                                                         ResolutionVerdict.created_at >= now - timedelta(days=30),
+                                                         ResolutionVerdict.ai_confidence != None).count()
+        buf = (orchestrator._buffers.get(rule_id) if orchestrator else None) or {}
+        last = db.query(Analysis).filter(Analysis.rule_id == rule_id).order_by(Analysis.analyzed_at.desc()).first()
+        week = [a for a in analyses if a.analyzed_at >= now - timedelta(days=7)]
+        latest = db.query(Analysis).filter(Analysis.rule_id == rule_id).order_by(Analysis.analyzed_at.desc()).limit(3).all()
+        return {
+            "incident": incident,
+            "activity": {
+                "buffer_active": bool(buf.get("task")),
+                "buffer_lines": len(buf.get("lines", [])),
+                "last_line_received_at": rule_stats.iso(rule.last_line_received_at),
+                "muted": rule_stats.is_muted(rule, now),
+                "inactivity_period_hours": rule.inactivity_period_hours,
+                "last_analysis_at": rule_stats.iso(last.analyzed_at) if last else None,
+                "last_analysis_severity": last.severity if last else None,
+            },
+            "stats30": {
+                "days": rule_stats.daily_counts(analyses, 30, now),
+                "total": len(analyses),
+                "mttr_minutes": rule_stats.median_mttr(analyses),
+                "auto_resolved": len(auto_resolved),
+                "resolved": len(resolved),
+                "notified": sum(1 for a in analyses if a.notified),
+                "ai_calls": len(analyses) + verdicts_ai,
+                "ai_checks": verdicts_ai,
+            },
+            "recurring": rule_stats.recurring_events(week),
+            "latest": [rule_stats.analysis_brief(a) for a in latest],
+        }
+    finally:
+        db.close()
+
+
+@router.get("/{rule_id}/resolution")
+def rule_resolution(rule_id: int):
+    """Onglet Résolution : conditions de clôture, chronologie de l'incident, motifs, historique des vérifications."""
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="rule_not_found")
+        now = datetime.utcnow()
+        verdicts = db.query(ResolutionVerdict).filter(
+            ResolutionVerdict.rule_id == rule_id, ResolutionVerdict.created_at >= now - timedelta(days=30)
+        ).order_by(ResolutionVerdict.created_at.desc()).all()
+        incident = _snapshot(rule)
+        timeline = []
+        if incident:
+            start = rule.alert_started_at or now
+            timeline.append({"kind": "opened", "at": rule_stats.iso(start)})
+            for a in db.query(Analysis).filter(Analysis.rule_id == rule_id, Analysis.resolution_status == None,
+                                               Analysis.analyzed_at != None).order_by(Analysis.analyzed_at).all():
+                timeline.append({"kind": "analysis", "at": rule_stats.iso(a.analyzed_at), "id": a.id,
+                                 "severity": a.severity or "info", "summary": rule_stats.analysis_brief(a)["summary"]})
+            for v in verdicts:
+                if v.created_at and v.created_at >= start:
+                    timeline.append({"kind": "verdict", "at": rule_stats.iso(v.created_at), "outcome": v.outcome,
+                                     "trigger": v.trigger, "confidence": v.ai_confidence,
+                                     "explanation": v.ai_explanation})
+            if incident.get("probe"):
+                timeline.append({"kind": "probe", "at": incident["probe"]["at"], "ok": incident["probe"]["ok"],
+                                 "detail": incident["probe"]["detail"]})
+            timeline.sort(key=lambda e: e["at"] or "")
+            if incident.get("next_check_at"):
+                timeline.append({"kind": "next", "at": incident["next_check_at"]})
+        counts = {}
+        for v in verdicts:
+            counts[v.outcome] = counts.get(v.outcome, 0) + 1
+        patterns = rule_stats.pattern_rows(rule, verdicts)
+        return {
+            "enabled": (rule.resolution_mode or "timeout") != "disabled",
+            "settings": {
+                "calm_mode": rule.resolution_calm_mode or "adaptive",
+                "timeout_minutes": rule.resolution_timeout_minutes or 30,
+                "success_lines": (rule.resolution_mode or "timeout") in ("pattern", "both"),
+                "ai_mode": rule.resolution_ai_mode or "ambiguous",
+                "learn": rule.resolution_learn is not False,
+                "probe_type": rule.probe_type or "none",
+                "probe_target": rule.probe_target or "",
+            },
+            "incident": incident,
+            "timeline": timeline,
+            "patterns": [p for p in patterns if p["status"] == "active"],
+            "suggestions": [p for p in patterns if p["status"] == "suggested"],
+            "verdicts": [{
+                "id": v.id, "at": rule_stats.iso(v.created_at), "trigger": v.trigger, "outcome": v.outcome,
+                "confidence": v.ai_confidence, "explanation": v.ai_explanation,
+                "resolution_line": v.resolution_line,
+                "patterns": json.loads(v.resolution_patterns_json or "[]"),
+            } for v in verdicts[:50]],
+            "verdict_counts": counts,
+        }
+    finally:
+        db.close()
+
+
+def _pattern_action(rule_id: int, pattern: str, action):
+    pattern = (pattern or "").strip()
+    if not pattern:
+        raise HTTPException(status_code=422, detail="pattern_required")
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="rule_not_found")
+        action(rule, pattern)
+        db.commit()
+        return {"status": "ok", "pattern": pattern}
+    finally:
+        db.close()
+
+
+@router.post("/{rule_id}/resolution-patterns")
+def add_resolution_pattern(rule_id: int, body: PatternBody):
+    """Ajoute un motif de résolution saisi par l'utilisateur."""
+    return _pattern_action(rule_id, body.pattern, lambda r, p: r.set_pattern_status(p, "active", origin="manual"))
+
+
+@router.post("/{rule_id}/resolution-patterns/accept")
+def accept_resolution_pattern(rule_id: int, body: PatternBody):
+    """Valide un motif suggéré par l'IA : il sert désormais à détecter le retour à la normale."""
+    return _pattern_action(rule_id, body.pattern, lambda r, p: r.set_pattern_status(p, "active", origin="learned"))
+
+
+@router.post("/{rule_id}/resolution-patterns/reject")
+def reject_resolution_pattern(rule_id: int, body: PatternBody):
+    """Refuse un motif suggéré : il ne sera plus proposé."""
+    return _pattern_action(rule_id, body.pattern, lambda r, p: r.set_pattern_status(p, "rejected"))
 
 
 def _read_last_lines(path: str, n: int = 5, max_bytes: int = 65536) -> List[str]:

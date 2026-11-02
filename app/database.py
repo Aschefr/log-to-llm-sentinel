@@ -115,6 +115,15 @@ def init_db():
         "ALTER TABLE meta_analysis_results ADD COLUMN tldr TEXT DEFAULT NULL",
         "ALTER TABLE meta_analysis_results ADD COLUMN status VARCHAR DEFAULT NULL",
         "ALTER TABLE meta_analysis_results ADD COLUMN result_json TEXT DEFAULT NULL",
+        # RES-14: calme adaptatif, sonde de santé, modes de validation IA, motifs suggérés
+        "ALTER TABLE rules ADD COLUMN resolution_calm_mode VARCHAR DEFAULT 'adaptive'",
+        "ALTER TABLE rules ADD COLUMN resolution_ai_mode VARCHAR DEFAULT NULL",
+        "UPDATE rules SET resolution_ai_mode = CASE WHEN resolution_ai_enabled THEN 'ambiguous' ELSE 'never' END WHERE resolution_ai_mode IS NULL",
+        "UPDATE rules SET resolution_mode = 'both' WHERE resolution_mode = 'pattern'",
+        "ALTER TABLE rules ADD COLUMN resolution_learn BOOLEAN DEFAULT 1",
+        "ALTER TABLE rules ADD COLUMN probe_type VARCHAR DEFAULT 'none'",
+        "ALTER TABLE rules ADD COLUMN probe_target VARCHAR DEFAULT ''",
+        "ALTER TABLE rules ADD COLUMN probe_expect VARCHAR DEFAULT ''",
     ]
 
     with engine.connect() as conn:
