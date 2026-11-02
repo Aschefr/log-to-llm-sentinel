@@ -2,6 +2,7 @@
 Indicateurs des règles pour l'interface : vue d'ensemble, page d'une règle, onglet Résolution.
 """
 import json
+import re
 import statistics
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
@@ -13,6 +14,7 @@ from app.utils.log_utils import line_signature
 
 SEVERITIES = ("critical", "warning", "info")
 ALL_DAY_HOURS = 8  # au-delà de N heures distinctes, un événement est « toute la journée »
+_GROUP_PREFIX = re.compile(r"^\[×\d+\]\s*")  # préfixe des lignes regroupées (ancien format)
 
 
 def iso(dt: Optional[datetime]) -> Optional[str]:
@@ -89,7 +91,7 @@ def recurring_events(analyses: List[Analysis], limit: int = 5) -> List[dict]:
     """Événements les plus fréquents (lignes identiques aux valeurs variables près)."""
     groups = {}
     for a in analyses:
-        lines = analysis_lines(a)
+        lines = [_GROUP_PREFIX.sub("", l) for l in analysis_lines(a)]
         for sig, n in Counter(line_signature(l) for l in lines).items():
             g = groups.setdefault(sig, {"signature": sig, "count": 0, "alerts": 0, "last_at": None,
                                         "hours": Counter(), "durations": []})

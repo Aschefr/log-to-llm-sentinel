@@ -10,8 +10,7 @@ Sentinel detects critical log events, automatically collects surrounding applica
 
 ### 🖥️ Page & Interface Guides
 * [**Dashboard**](pages/dashboard.md) — Main system stats, active rule summaries, MTTR logs, and recent analyses.
-* [**Rules Management**](pages/rules.md) — Configuring log sources (local files, webhook HTTP, Syslog UDP) and alert parameters.
-* [**Monitor**](pages/monitor.md) — Real-time log buffer, search filters, log freeze controls, and manual diagnostics.
+* [**Rules**](pages/rules.md) — Overview of every rule, then one page per rule: incident and statistics, live log, analyses, resolution and settings.
 * [**AI Analysis Center**](pages/chat.md) — Interactive log chat with dynamic context compression.
 * [**Meta-Analysis**](pages/meta-analysis.md) — Scheduling periodic synthese summaries of multiple rules.
 * [**Global Configuration**](pages/configuration.md) — SMTP, Apprise, Discord notification settings, Ollama model setups, and backups.

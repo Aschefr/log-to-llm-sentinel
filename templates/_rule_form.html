@@ -1,0 +1,260 @@
+{# ─── Rule settings form (Réglages tab of the rule page) ─── #}
+<form id="rule-form" class="rf" novalidate>
+    <input type="hidden" id="rule-id">
+    <nav class="rf-nav" aria-label="Sections" data-i18n-aria-label="rf.sections">
+        <a href="#rf-source" data-i18n="rf.section_source">Source</a>
+        <a href="#rf-detection" data-i18n="rf.section_detection">Détection</a>
+        <a href="#rf-analysis" data-i18n="rf.section_analysis">Analyse IA</a>
+        <a href="#rf-notifications" data-i18n="rf.section_notifications">Notifications</a>
+        <a href="#rf-resolution" data-i18n="rf.section_resolution">Retour à la normale</a>
+    </nav>
+
+    <div class="rf-sections">
+        <!-- Quick templates (new rule only) -->
+        <div id="modal-quick-templates" class="rf-card rf-templates">
+            <span class="rf-label" data-i18n="rules.quick_templates">Modèles rapides</span>
+            <div class="rf-row-wrap">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyTemplate('auth')" data-i18n="rules.template_auth">Connexions (auth.log)</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyTemplate('syslog')" data-i18n="rules.template_syslog">Système (syslog)</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="applyTemplate('journald')" data-i18n="rules.template_journald">Journald (Relais)</button>
+            </div>
+        </div>
+
+        <!-- ── Source ── -->
+        <section id="rf-source" class="rf-card">
+            <h2 data-i18n="rf.section_source">Source</h2>
+            <div class="form-group">
+                <label for="rule-name" data-i18n="rules.label_name">Nom</label>
+                <input type="text" id="rule-name" required data-i18n-placeholder="rules.placeholder_name" placeholder="Nom de la règle">
+            </div>
+            <div class="form-group">
+                <span class="rf-field-label" data-i18n="rules.label_source">Source des logs</span>
+                <div class="kw-tabs" role="tablist">
+                    <button type="button" class="source-card kw-tab kw-tab--active" data-source="local" role="tab" aria-selected="true"><span data-i18n="rules.source_local">Fichier Local</span></button>
+                    <button type="button" class="source-card kw-tab" data-source="webhook" role="tab" aria-selected="false"><span data-i18n="rules.source_webhook">Webhook API</span></button>
+                    <button type="button" class="source-card kw-tab" data-source="syslog" role="tab" aria-selected="false"><span data-i18n="rules.source_syslog">Syslog Server</span></button>
+                </div>
+            </div>
+            <div class="form-group" id="path-group">
+                <label for="rule-path" data-i18n="rules.label_path">Chemin du fichier log</label>
+                <div class="input-row">
+                    <input type="text" id="rule-path" required data-i18n-placeholder="rules.placeholder_path" placeholder="/logs/app.log">
+                    <button type="button" id="browse-logs-btn" class="btn btn-secondary btn-sm" data-i18n="rules.browse">Parcourir</button>
+                </div>
+                <div id="file-browser" class="file-browser hidden">
+                    <div class="file-browser-header">
+                        <div class="file-browser-breadcrumb" id="file-browser-breadcrumb"></div>
+                        <div class="file-browser-actions">
+                            <label class="inline-checkbox">
+                                <input type="checkbox" id="file-browser-show-hidden">
+                                <span data-i18n="rules.show_hidden_files">Afficher fichiers cachés</span>
+                            </label>
+                            <button type="button" id="file-browser-close" class="btn btn-secondary btn-sm" data-i18n="rules.close_browser">Fermer</button>
+                        </div>
+                    </div>
+                    <div id="file-browser-list" class="file-browser-list">
+                        <div class="loading" data-i18n="common.loading">Chargement...</div>
+                    </div>
+                    <div class="file-browser-hint" data-i18n-html="rules.file_browser_hint">
+                        Astuce : monte tes logs dans Docker (ex: volume vers <code>/logs</code>) puis sélectionne le fichier ici.
+                    </div>
+                </div>
+                <div id="file-preview-container" class="file-preview-container hidden">
+                    <div class="file-preview-header" data-i18n="rules.last_lines">Dernières lignes du fichier</div>
+                    <div id="file-preview-content" class="file-preview-content"></div>
+                </div>
+            </div>
+            <div class="form-group hidden" id="webhook-group">
+                <span class="rf-field-label" data-i18n="rules.webhook_url_label">URL du Webhook de Test/Prod</span>
+                <div class="form-hint" data-i18n="rules.webhook_hint">Utilise cette URL avec l'outil <b>webhook-setup.html</b> pour générer facilement tes scripts de surveillance.</div>
+                <div class="rf-codebox">
+                    <code id="webhook-curl-cmd"></code>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="copyModalWebhookUrl(this)" data-i18n-title="rules.webhook_copy_url_title" title="Copier l'URL"><span data-i18n="rules.webhook_copied_short">Copier</span></button>
+                </div>
+            </div>
+            <div class="form-group hidden" id="syslog-group">
+                <label for="syslog-hostname" data-i18n="rules.syslog_hostname_label">Hostname du serveur Syslog</label>
+                <input type="text" id="syslog-hostname" data-i18n-placeholder="rules.syslog_hostname_placeholder" placeholder="ex: Tower">
+                <div class="form-hint" data-i18n-html="rules.syslog_hostname_hint">Le hostname envoyé par le serveur dans son en-tête syslog (ex: <i>Tower</i> pour votre Unraid). Utilisez <code>*</code> pour un récepteur général.</div>
+                <div class="rf-codebox rf-codebox--info">
+                    <strong data-i18n="rules.syslog_info_title">Configuration de l'envoi depuis votre source (ex: Unraid) :</strong>
+                    <span><span data-i18n="config.syslog_info_ip">Adresse IP :</span> <code id="syslog-rule-current-ip">...</code> · <span data-i18n="config.syslog_info_port">Port :</span> <code>10514</code> · <span data-i18n="config.syslog_info_proto">Protocole :</span> <code>UDP</code></span>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Détection ── -->
+        <section id="rf-detection" class="rf-card">
+            <h2 data-i18n="rf.section_detection">Détection</h2>
+            <div class="form-group">
+                <span class="rf-field-label" data-i18n="rf.keywords">Mots-clés déclencheurs</span>
+                <div class="kw-tabs" role="tablist">
+                    <button type="button" id="kw-tab-manual" class="kw-tab kw-tab--active" role="tab" aria-selected="true" onclick="kwTabSwitch('manual')"><span data-i18n="kw.tab_manual">Mots-clés manuels</span></button>
+                    <button type="button" id="kw-tab-auto" class="kw-tab" role="tab" aria-selected="false" onclick="kwTabSwitch('auto')"><span data-i18n="kw.tab_auto">Auto-apprentissage</span></button>
+                </div>
+                <div id="kw-panel-manual" class="kw-tab-panel">
+                    <input type="text" id="rule-keywords" list="keywords-suggestions" data-i18n-placeholder="rules.placeholder_keywords" placeholder="error, exception, fatal" aria-label="Mots-clés">
+                    <datalist id="keywords-suggestions"></datalist>
+                    <div class="keyword-chips" id="keyword-chips"></div>
+                    <div class="form-hint" data-i18n="rules.keywords_hint">Clique sur une suggestion pour l'ajouter, ou écris librement.</div>
+                </div>
+                <div id="kw-panel-auto" class="kw-tab-panel kw-tab-panel--hidden">
+                    <div id="kw-wizard" class="kw-wizard"><div id="kw-wizard-body" class="kw-wizard-body"></div></div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="rule-excluded-patterns" data-i18n="rf.exclusions">Lignes ignorées</label>
+                <input type="text" id="rule-excluded-patterns" placeholder="com.docker.backend, GET /app/settings, healthcheck…" data-i18n-placeholder="rules.placeholder_exclusions">
+                <div class="form-hint" data-i18n="rf.exclusions_hint">Une ligne contenant l'un de ces termes (séparés par des virgules) est ignorée, même si un mot-clé correspond.</div>
+            </div>
+            <div class="form-group">
+                <label for="rule-anti-spam" data-i18n="rf.grouping_window">Fenêtre de regroupement</label>
+                <div class="rf-inline"><input type="number" id="rule-anti-spam" min="1" max="3600" value="60" class="rf-num"> <span data-i18n="rf.seconds">secondes</span></div>
+                <div class="form-hint" data-i18n="rf.grouping_window_hint">Les lignes détectées pendant cette fenêtre sont analysées ensemble, en un seul appel à l'IA.</div>
+            </div>
+        </section>
+
+        <!-- ── Analyse IA ── -->
+        <section id="rf-analysis" class="rf-card">
+            <h2 data-i18n="rf.section_analysis">Analyse IA</h2>
+            <div class="form-group">
+                <label for="rule-context" data-i18n="rf.app_context">Contexte applicatif</label>
+                <textarea id="rule-context" rows="3" data-i18n-placeholder="rules.placeholder_context" placeholder="Description du contexte..."></textarea>
+                <div class="form-hint" data-i18n="rf.app_context_hint">Décrit à l'IA ce que surveille cette règle et ce qui est normal ici.</div>
+            </div>
+            <div class="form-group">
+                <label for="rule-context-lines" data-i18n="rf.context_lines">Lignes de contexte autour de l'événement</label>
+                <div class="rf-inline"><input type="number" id="rule-context-lines" min="0" max="100" value="5" class="rf-num"> <span data-i18n="rf.before_after">avant et après</span></div>
+                <div class="form-hint" data-i18n="rf.context_lines_hint">Lues dans la source autour des lignes détectées, pour que l'IA voie ce qui s'est passé juste avant et juste après.</div>
+            </div>
+        </section>
+
+        <!-- ── Notifications ── -->
+        <section id="rf-notifications" class="rf-card">
+            <h2 data-i18n="rf.section_notifications">Notifications</h2>
+            <div class="rf-option">
+                <div class="rf-option-text">
+                    <span class="rf-option-title" data-i18n="rf.notify_alerts">Notifier les alertes</span>
+                    <span class="form-hint" data-i18n="rf.notify_alerts_hint">à partir de la sévérité choisie</span>
+                </div>
+                <div class="rf-option-controls">
+                    <div class="rf-seg" role="radiogroup" data-i18n-aria-label="rf.min_severity" aria-label="Sévérité minimale">
+                        <input type="radio" name="rule-severity-threshold" id="sev-info" value="info"><label for="sev-info">Info</label>
+                        <input type="radio" name="rule-severity-threshold" id="sev-warning" value="warning"><label for="sev-warning">Warning</label>
+                        <input type="radio" name="rule-severity-threshold" id="sev-critical" value="critical"><label for="sev-critical">Critical</label>
+                    </div>
+                    <label class="toggle-switch"><input type="checkbox" id="rule-notify" checked><span class="toggle-slider"></span><span class="sr-only" data-i18n="rf.notify_alerts">Notifier les alertes</span></label>
+                </div>
+            </div>
+            <div class="rf-option">
+                <div class="rf-option-text">
+                    <span class="rf-option-title" data-i18n="rf.notify_closed">Notifier la clôture d'un incident</span>
+                    <span class="form-hint" data-i18n="rf.notify_closed_hint">avec sa durée et la raison de la clôture</span>
+                </div>
+                <label class="toggle-switch"><input type="checkbox" id="rule-resolution-notify-resolved" checked><span class="toggle-slider"></span><span class="sr-only" data-i18n="rf.notify_closed">Notifier la clôture</span></label>
+            </div>
+            <div class="rf-option">
+                <div class="rf-option-text">
+                    <span class="rf-option-title" data-i18n="rf.notify_silent">Alerter si la source est muette</span>
+                    <span class="form-hint" data-i18n="rf.notify_silent_hint">aucune ligne reçue pendant la durée choisie</span>
+                </div>
+                <div class="rf-option-controls">
+                    <input type="number" id="rule-inactivity-period-hours" min="1" max="720" value="1" class="rf-num" aria-label="Heures"> <span>h</span>
+                    <label class="toggle-switch"><input type="checkbox" id="rule-inactivity-notify" checked><span class="toggle-slider"></span><span class="sr-only" data-i18n="rf.notify_silent">Alerter si la source est muette</span></label>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Retour à la normale ── -->
+        <section id="rf-resolution" class="rf-card">
+            <div class="rf-option rf-option--head">
+                <div class="rf-option-text">
+                    <h2 data-i18n="rf.section_resolution">Retour à la normale</h2>
+                    <span class="form-hint" data-i18n="rf.resolution_hint">Clore automatiquement un incident quand le problème a cessé.</span>
+                </div>
+                <label class="toggle-switch"><input type="checkbox" id="rule-resolution-enable" checked><span class="toggle-slider"></span><span class="sr-only" data-i18n="rf.section_resolution">Retour à la normale</span></label>
+            </div>
+            <div id="resolution-settings-container" class="rf-res">
+                <div class="rf-sub">
+                    <span class="rf-label" data-i18n="rf.calm">Calme requis</span>
+                    <div class="rf-radio-cards" role="radiogroup">
+                        <label class="rf-radio-card">
+                            <input type="radio" name="rule-resolution-calm-mode" value="adaptive" checked>
+                            <span><strong data-i18n="rf.calm_adaptive">Adaptatif (recommandé)</strong>
+                            <span class="form-hint" data-i18n="rf.calm_adaptive_hint">Trois fois l'intervalle observé entre les erreurs de l'incident, avec un minimum. Une erreur qui revient toutes les 2 h attend plus de 6 h avant d'être close.</span></span>
+                        </label>
+                        <label class="rf-radio-card">
+                            <input type="radio" name="rule-resolution-calm-mode" value="fixed">
+                            <span><strong data-i18n="rf.calm_fixed">Fixe</strong>
+                            <span class="form-hint" data-i18n="rf.calm_fixed_hint">Toujours la même durée sans erreur, quel que soit le rythme de l'incident.</span></span>
+                        </label>
+                    </div>
+                    <div class="rf-inline">
+                        <label for="rule-resolution-timeout" id="rf-calm-label" data-i18n="rf.calm_minimum">Minimum</label>
+                        <input type="number" id="rule-resolution-timeout" min="1" max="1440" value="30" class="rf-num"> <span>min</span>
+                    </div>
+                </div>
+
+                <div class="rf-sub">
+                    <span class="rf-label" data-i18n="rf.probe">Sonde de santé · optionnelle</span>
+                    <span class="form-hint" data-i18n="rf.probe_hint">Tant que la sonde échoue, l'incident reste ouvert, même si le log est muet.</span>
+                    <div class="rf-grid">
+                        <label class="rf-stack"><span data-i18n="rf.probe_type">Type</span>
+                            <select id="rule-probe-type">
+                                <option value="none" data-i18n="rf.probe_none">Aucune</option>
+                                <option value="http">HTTP(S)</option>
+                                <option value="tcp">TCP</option>
+                            </select>
+                        </label>
+                        <label class="rf-stack rf-span2 rf-probe-field"><span data-i18n="rf.probe_target">Cible</span>
+                            <input type="text" id="rule-probe-target" class="mono" placeholder="https://nextcloud.local/status.php">
+                        </label>
+                        <label class="rf-stack rf-probe-field rf-probe-http"><span data-i18n="rf.probe_expect">Codes attendus</span>
+                            <input type="text" id="rule-probe-expect" placeholder="200">
+                        </label>
+                    </div>
+                    <div class="rf-inline rf-probe-field">
+                        <button type="button" class="btn btn-secondary btn-sm" id="rf-probe-test" data-i18n="rf.probe_test">Tester la sonde</button>
+                        <span id="rf-probe-result" class="form-hint"></span>
+                    </div>
+                </div>
+
+                <div class="rf-sub">
+                    <span class="rf-label" data-i18n="rf.success_lines">Lignes de succès</span>
+                    <div class="rf-option">
+                        <div class="rf-option-text">
+                            <span class="rf-option-title" data-i18n="rf.success_check">Vérifier quand une ligne de succès apparaît</span>
+                            <span class="form-hint" data-i18n="rf.success_check_hint">Les motifs se gèrent dans l'onglet Résolution.</span>
+                        </div>
+                        <label class="toggle-switch"><input type="checkbox" id="rule-resolution-success" checked><span class="toggle-slider"></span><span class="sr-only" data-i18n="rf.success_check">Lignes de succès</span></label>
+                    </div>
+                    <div class="rf-option">
+                        <div class="rf-option-text">
+                            <span class="rf-option-title" data-i18n="rf.learn">Proposer des motifs appris par l'IA</span>
+                            <span class="form-hint" data-i18n="rf.learn_hint">ajoutés seulement après ta validation</span>
+                        </div>
+                        <label class="toggle-switch"><input type="checkbox" id="rule-resolution-learn" checked><span class="toggle-slider"></span><span class="sr-only" data-i18n="rf.learn">Proposer des motifs appris</span></label>
+                    </div>
+                </div>
+
+                <div class="rf-sub">
+                    <span class="rf-label" data-i18n="rf.ai_validation">Validation par l'IA</span>
+                    <div class="rf-seg" role="radiogroup" data-i18n-aria-label="rf.ai_validation" aria-label="Validation par l'IA">
+                        <input type="radio" name="rule-resolution-ai-mode" id="ai-ambiguous" value="ambiguous" checked><label for="ai-ambiguous" data-i18n="rf.ai_ambiguous">Si ambigu (recommandé)</label>
+                        <input type="radio" name="rule-resolution-ai-mode" id="ai-always" value="always"><label for="ai-always" data-i18n="rf.ai_always">Toujours</label>
+                        <input type="radio" name="rule-resolution-ai-mode" id="ai-never" value="never"><label for="ai-never" data-i18n="rf.ai_never">Jamais</label>
+                    </div>
+                    <span class="form-hint" id="rf-ai-hint"></span>
+                </div>
+            </div>
+        </section>
+
+        <div class="form-actions rf-actions">
+            <button type="button" id="cancel-rule" class="btn btn-secondary" data-i18n="common.cancel">Annuler</button>
+            <button type="button" id="kw-launch-main-btn" class="btn btn-primary hidden" onclick="_launchSession()">
+                <span data-i18n="kw.launch_full">Auto-apprentissage : Lancer l'analyse</span>
+            </button>
+            <button type="submit" class="btn btn-primary" data-i18n="common.save">Enregistrer</button>
+        </div>
+    </div>
+</form>

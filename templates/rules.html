@@ -3,27 +3,33 @@
 {% block title %}Règles - Log to LLM Sentinel{% endblock %}
 
 {% block content %}
-<div class="rules-page">
-    <div class="page-header">
-        <h1 data-i18n="rules.title">Gestion des Règles</h1>
-        <button id="add-rule-btn" class="btn btn-primary" data-i18n="rules.new_rule">+ Nouvelle règle</button>
+<div class="rules-overview">
+    <div class="page-header ro-header">
+        <div>
+            <h1 data-i18n="rules.title">Règles</h1>
+            <p class="ro-subtitle" id="ro-subtitle"></p>
+        </div>
+        <div class="ro-header-actions">
+            <input type="search" id="ro-search" class="ro-search" data-i18n-placeholder="rules.search_placeholder" placeholder="Filtrer par nom ou source…" aria-label="Filtrer les règles">
+            <a href="/rules/new" class="btn btn-primary" data-i18n="rules.new_rule">+ Nouvelle règle</a>
+        </div>
     </div>
 
-    <div id="rules-list" class="rules-list">
-        <div class="loading" data-i18n="rules.loading">Chargement des règles...</div>
-    </div>
+    <div class="ro-kpis" id="ro-kpis"></div>
 
-    <!-- Modal ajout/édition (shared partial) -->
-    {% include '_rule_modal.html' %}
+    <div class="ro-card">
+        <div class="ro-toolbar">
+            <div class="rp-seg" id="ro-filters" role="group" aria-label="Filtre d'état"></div>
+        </div>
+        <div class="ro-scroll">
+            <div class="ro-table" id="ro-table">
+                <div class="loading" data-i18n="rules.loading">Chargement des règles...</div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/rule_modal.js?v=2"></script>
-<script src="/static/js/rules.js?v=11"></script>
-
-
-<script src="/static/js/keyword_wizard.js?v=9"></script>
-
-
+<script src="/static/js/rules.js?v=12"></script>
 {% endblock %}

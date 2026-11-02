@@ -1,13 +1,13 @@
 /**
  * keyword_wizard.js
- * Keyword auto-learning wizard for the rule creation/edit modal.
+ * Keyword auto-learning wizard of the rule form (Réglages tab of the rule page).
  *
  * UX flow:
  * 1. User fills Name + Log path in rule form
  * 2. Clicks "🤖 Auto-apprendre" → wizard panel opens, "Enregistrer" is hidden
  * 3. User configures period + granularity (launch button grayed until name+path valid)
- * 4. "▶ Lancer l'analyse" → saves rule → starts session → closes modal
- * 5. Progress is shown in the rule card on the rules page
+ * 4. "▶ Lancer l'analyse" → saves rule → starts session
+ * 5. Progress is shown in the wizard panel of the rule page
  */
 
 /* ── State ─────────────────────────────────────────────────────────────── */
@@ -586,20 +586,9 @@ async function _launchSession() {
     let ruleId = null;
     try {
         const existingId = (document.getElementById('rule-id') || {}).value || '';
-        const kwRaw      = (document.getElementById('rule-keywords') || {}).value || '';
-        const ruleData = {
-            name:                      ruleName,
-            log_file_path:             logPath,
-            keywords:                  kwRaw.split(',').map(k => k.trim()).filter(Boolean),
-            application_context:       (document.getElementById('rule-context') || {}).value || '',
-            enabled:                   !!(document.getElementById('rule-enabled') || {checked: true}).checked,
-            notify_on_match:           !!(document.getElementById('rule-notify')  || {checked: true}).checked,
-            context_lines:             parseInt((document.getElementById('rule-context-lines') || {}).value) || 5,
-            anti_spam_delay:           parseInt((document.getElementById('rule-anti-spam')     || {}).value) || 60,
-            notify_severity_threshold: (document.getElementById('rule-severity-threshold') || {}).value || 'info',
-            excluded_patterns: ((document.getElementById('rule-excluded-patterns') || {}).value || '')
-                .split(',').map(p => p.trim()).filter(Boolean),
-        };
+        // Mêmes champs que le bouton Enregistrer du formulaire (rule_form.js)
+        const ruleData = { ..._ruleFormData(), name: ruleName, log_file_path: logPath };
+        if (!existingId) ruleData.enabled = true;
         const saved = await fetch(existingId ? `/api/rules/${existingId}` : '/api/rules', {
             method:  existingId ? 'PUT' : 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -638,21 +627,17 @@ async function _launchSession() {
         return;
     }
 
-    // Step 3: Close modal, reload rules list.
-    // rules.js _pollAllLearningSessions() will pick up the new session automatically.
-    document.getElementById('rule-modal').classList.add('hidden');
-    kwWizardClose();
-    
-    // If we are on the monitor page, refresh the rules list to show the auto-learning panel
-    if (window.loadMonitorRules) {
-        window.loadMonitorRules();
+    // Step 3: show the progress in the wizard panel (a new rule opens its own page first)
+    if (window.onKeywordSessionStarted) {
+        window.onKeywordSessionStarted(ruleId, sessionId, !(document.getElementById('rule-id') || {}).value);
+    } else {
+        await kwWizardLoadSession(sessionId);
     }
+}
 
-    // Remove this session from the completed-session cache in rules.js (if any)
-    // so that re-launching the same rule's session is properly re-polled.
-    if (typeof _completedSessions !== 'undefined') _completedSessions.delete(sessionId);
-
-    if (typeof loadRules === 'function') await loadRules();
+/** Tells the host page that the rule's keywords may have changed. */
+function _kwNotifyRuleChanged() {
+    if (window.onKeywordSessionChanged) window.onKeywordSessionChanged();
 }
 
 /* ── Card polling (progress in rule card after modal closes) ────────────── */
@@ -666,7 +651,7 @@ function _startCardPolling(sessionId, ruleId) {
                 clearInterval(_wizardCardTimer);
                 _wizardCardTimer = null;
                 // Final reload to show updated keywords
-                if (typeof loadRules === 'function') loadRules();
+                _kwNotifyRuleChanged();
             }
         } catch { /* ignore */ }
     }, 2000);
@@ -718,7 +703,7 @@ async function kwStopSession(sessionId) {
     try {
         await fetch(`/api/keyword-learning/${sessionId}`, { method: 'DELETE' });
         if (_wizardCardTimer) { clearInterval(_wizardCardTimer); _wizardCardTimer = null; }
-        if (typeof loadRules === 'function') loadRules();
+        _kwNotifyRuleChanged();
     } catch (e) {
         console.error('Stop session error:', e);
     }
@@ -729,7 +714,7 @@ async function kwRevertSession(sessionId) {
     if (!sessionId) return;
     try {
         await fetch(`/api/keyword-learning/${sessionId}/revert`, { method: 'POST' });
-        if (typeof loadRules === 'function') loadRules();
+        _kwNotifyRuleChanged();
     } catch (e) {
         console.error('Revert session error:', e);
     }

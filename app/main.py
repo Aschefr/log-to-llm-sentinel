@@ -18,6 +18,8 @@ class WebhookAccessLogFilter(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(WebhookAccessLogFilter())
 
 from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
+from urllib.parse import quote
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import os
@@ -308,14 +310,37 @@ def rules_page(request: Request):
     return templates.TemplateResponse("rules.html", {"request": request})
 
 
+@app.get("/rules/new")
+def new_rule_page(request: Request):
+    return templates.TemplateResponse("rule.html", {"request": request, "rule_id": None})
+
+
+@app.get("/rules/{rule_id}")
+def rule_page(request: Request, rule_id: int):
+    return templates.TemplateResponse("rule.html", {"request": request, "rule_id": rule_id})
+
+
 @app.get("/config")
 def config_page(request: Request):
     return templates.TemplateResponse("config.html", {"request": request})
 
 
 @app.get("/monitor")
-def monitor_page(request: Request):
-    return templates.TemplateResponse("monitor.html", {"request": request})
+def monitor_page(search: str = None, rule: int = None, line: str = None):
+    """Ancienne page Monitor : redirige vers la page de la règle (liens des notifications, du chat, etc.)."""
+    if search:
+        from app.database import SessionLocal
+        from app.models import Analysis
+        db = SessionLocal()
+        try:
+            a = db.query(Analysis).filter(Analysis.detection_id == search.strip().lstrip("#")).first()
+            if a:
+                return RedirectResponse(f"/rules/{a.rule_id}?analysis={a.id}#analyses")
+        finally:
+            db.close()
+    if rule:
+        return RedirectResponse(f"/rules/{rule}" + (f"?line={quote(line)}#log" if line else ""))
+    return RedirectResponse("/rules")
 
 @app.get("/meta-analysis")
 def meta_analysis_page(request: Request):

@@ -1,266 +1,152 @@
-// ─── Rules Page ─────────────────────────────────────────────────────────────
-// Page-specific logic: rule list, cards, templates, test, delete.
-// Modal logic (setup, save, edit, file browser) is in rule_modal.js (shared).
+// ─── Rules overview ─────────────────────────────────────────────────────────
+// Every rule (disabled ones included) with its state, alerts over 7 days, last
+// incident, MTTR and source liveness. A row opens the rule page.
 // ─────────────────────────────────────────────────────────────────────────────
 
+const RO = { data: null, filter: 'all', search: '' };
+
+function roT(key, fallback, vars) {
+    let s = window.t ? window.t(key) : key;
+    if (!s || s === key) s = fallback;
+    if (vars) Object.entries(vars).forEach(([k, v]) => { s = s.split(`{${k}}`).join(v); });
+    return s;
+}
+
+function roMinutes(m) {
+    if (m == null) return '—';
+    if (m < 1) return roT('rule.less_than_minute', '< 1 min');
+    if (m < 60) return `${Math.round(m)} min`;
+    if (m < 1440) { const h = Math.floor(m / 60), mm = Math.round(m % 60); return mm ? `${h} h ${String(mm).padStart(2, '0')}` : `${h} h`; }
+    return `${Math.floor(m / 1440)} ${roT('rule.day_short', 'j')}`;
+}
+
+function roWhen(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso), now = new Date();
+    const hm = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const y = new Date(now); y.setDate(now.getDate() - 1);
+    if (d.toDateString() === now.toDateString()) return hm;
+    if (d.toDateString() === y.toDateString()) return `${roT('rule.yesterday', 'hier')} ${hm}`;
+    return `${d.toLocaleDateString([], { day: '2-digit', month: '2-digit' })} ${hm}`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-    loadRules();
-
-    // Setup shared modal with Rules-specific onSave callback
-    setupRuleModal({ onSave: loadRules });
-
-    // Wire up "Add Rule" button (page-specific)
-    const addBtn = document.getElementById('add-rule-btn');
-    if (addBtn) {
-        addBtn.addEventListener('click', () => {
-            resetForm();
-            document.getElementById('rule-modal').classList.remove('hidden');
-        });
-    }
-
-    window.i18n?.onLanguageChange(() => {
-        loadRules();
-    });
+    loadOverview();
+    setInterval(loadOverview, 20000);
+    document.getElementById('ro-search').addEventListener('input', e => { RO.search = e.target.value.trim().toLowerCase(); render(); });
+    window.i18n?.onLanguageChange(render);
 });
 
-async function loadRules() {
+async function loadOverview() {
     try {
-        const rules = await apiFetch('/api/rules');
-        const container = document.getElementById('rules-list');
-
-        if (rules.length === 0) {
-            container.innerHTML = `<div class="loading">${window.t ? window.t('rules.no_rules') : 'No rules configured'}</div>`;
-            return;
-        }
-
-        container.innerHTML = rules.map(rule => `
-            <div class="rule-card" id="rule-card-${rule.id}">
-                <div class="rule-info">
-                    <h3>${escapeHtml(rule.name)}</h3>
-                    <p>${rule.log_file_path && rule.log_file_path.startsWith('[WEBHOOK]') 
-                        ? `<span class="chip" style="background:var(--primary);color:white;border:none">🔗 Webhook</span> 
-                           <button class="btn btn-secondary btn-sm" onclick="copyWebhookUrl('${rule.log_file_path.split(':')[1] || rule.id}', this)" title="${window.t('common.copy') || 'Copier'} URL curl">📋 ${window.t('common.copy') || 'Copier'} URL</button>` 
-                        : `📁 ${escapeHtml(rule.log_file_path)}`}</p>
-                    <p>🔑 ${rule.keywords.join(', ') || `<em style="opacity:.5">${window.t('rules.no_keywords_learning') || 'Aucun mot-clé (apprentissage en cours…)'}</em>`}</p>
-                    ${rule.application_context ? `<p>🧩 ${escapeHtml(rule.application_context)}</p>` : ''}
-                    <p>${rule.enabled ? `✅ ${window.t ? window.t('rules.enabled_status') : 'Enabled'}` : `❌ ${window.t ? window.t('rules.disabled_status') : 'Disabled'}`} | 🔔 ${rule.notify_on_match ? `${window.t ? window.t('rules.notification_threshold') : 'Threshold:'} ${rule.notify_severity_threshold || 'info'}` : (window.t ? window.t('rules.notifications_disabled') : 'Notifications disabled')}</p>
-                </div>
-                <div class="rule-actions">
-                    <button id="test-btn-${rule.id}" class="btn btn-secondary btn-sm" onclick="testRule(${rule.id})">🧪 ${window.t ? window.t('rules.test_rule') : 'Test'}</button>
-                    <button class="btn btn-secondary btn-sm" onclick="downloadRuleLog(${rule.id})">📥 ${window.t ? window.t('common.download') : 'Download'}</button>
-                    <button class="btn btn-primary btn-sm" onclick="editRule(${rule.id})">✏️ ${window.t ? window.t('common.edit') : 'Edit'}</button>
-                    <button class="btn btn-danger btn-sm" onclick="deleteRule(${rule.id}, this)">🗑️ ${window.t ? window.t('common.delete') : 'Delete'}</button>
-                </div>
-                <div class="rule-toggles" style="display:flex;flex-direction:column;gap:.5rem;flex-basis:100%">
-                    <div class="rule-last-line" style="display:flex;justify-content:space-between;align-items:center">
-                        <div>
-                            <strong>${window.t ? window.t('rules.last_detected_line') : 'Last detected line:'}</strong>
-                            <div class="last-line-content">${escapeHtml(rule.last_log_line || (window.t ? window.t('dashboard.no_line_found') : 'No line found or file inaccessible'))}</div>
-                        </div>
-                        <button class="btn btn-secondary btn-sm" onclick="window.location.href='/monitor?rule=${rule.id}&line=${encodeURIComponent(rule.last_log_line || '')}'">
-                            🔍 ${window.t ? window.t('common.view_in_monitor') || 'Voir dans Monitor' : 'Voir dans Monitor'}
-                        </button>
-                    </div>
-                    ${rule.last_learning_session_id ? `
-                    <div class="kw-card-panel" id="rule-learning-${rule.id}">
-                        <span class="kw-hint" style="opacity:.6">⏳ ${window.t('kw.loading_learning_session') || 'Chargement de la session d’apprentissage…'}</span>
-                    </div>` : ''}
-                </div>
-            </div>
-        `).join('');
-
-        // Fetch and render any active learning sessions
-        const activeSessions = rules.filter(r => r.last_learning_session_id);
-        if (activeSessions.length) _pollAllLearningSessions(activeSessions);
-
-    } catch (error) {
-        console.error('Erreur chargement règles:', error);
-    }
-}
-
-let _ruleSessionTimers = {};
-const _completedSessions = new Set(); // session IDs already finished — don't re-poll
-
-function _pollAllLearningSessions(rules) {
-    rules.forEach(rule => {
-        const sid = rule.last_learning_session_id;
-        // Skip sessions we already completed
-        if (_completedSessions.has(sid)) return;
-
-        // Clear existing timer for this rule
-        if (_ruleSessionTimers[rule.id]) {
-            clearInterval(_ruleSessionTimers[rule.id]);
-            delete _ruleSessionTimers[rule.id];
-        }
-        // Fetch once immediately
-        _fetchAndApplySession(rule.id, sid);
-        // Then poll every 3s
-        _ruleSessionTimers[rule.id] = setInterval(async () => {
-            const done = await _fetchAndApplySession(rule.id, sid);
-            if (done) {
-                clearInterval(_ruleSessionTimers[rule.id]);
-                delete _ruleSessionTimers[rule.id];
-                _completedSessions.add(sid);
-                // Update only the keywords line in this card, no full reload
-                _refreshCardKeywords(rule.id);
-            }
-        }, 3000);
-    });
-}
-
-/** Update only the keywords paragraph in a rule card without rebuilding the whole list */
-async function _refreshCardKeywords(ruleId) {
-    try {
-        const rules = await apiFetch('/api/rules');
-        const rule = rules.find(r => r.id === ruleId);
-        if (!rule) return;
-        const card = document.getElementById(`rule-card-${ruleId}`);
-        if (!card) return;
-        // Update keyword line (3rd <p> in .rule-info)
-        const kwLine = card.querySelector('.rule-info p:nth-child(3)');
-        if (kwLine) {
-            kwLine.innerHTML = `🔑 ${
-                rule.keywords.join(', ') ||
-                `<em style="opacity:.5">${window.t ? window.t('rules.no_keywords') : 'Aucun mot-clé'}</em>`
-            }`;
-        }
-    } catch(e) { /* silent */ }
-}
-
-async function _fetchAndApplySession(ruleId, sessionId) {
-    try {
-        const data = await fetch(`/api/keyword-learning/${sessionId}/status`).then(r => r.json());
-        const card = document.getElementById(`rule-learning-${ruleId}`);
-        // Card div not yet in DOM (loadRules still rendering) — don't stop polling
-        if (!card) return false;
-
-        const pct = data.total_packets > 0
-            ? Math.round((data.completed_packets / data.total_packets) * 100) : 0;
-
-        const _t = (key, fb, vars) => {
-            let s = window.t ? window.t(key) || fb : fb;
-            if (vars) Object.entries(vars).forEach(([k, v]) => { s = s.replace(`{${k}}`, v); });
-            return s;
-        };
-
-        const STATUS = {
-            pending:   '⏳ ' + _t('kw.card_pending',   'En attente de démarrage…'),
-            scanning:  '🔍 ' + _t('kw.card_scanning',  'Scan — {done}/{total} paquets ({pct}%)', { done: data.completed_packets, total: data.total_packets, pct }),
-            refining:  '🧠 ' + _t('kw.card_refining',  'Raffinement IA en cours…'),
-            validated: '✅ ' + _t('kw.card_validated', 'Apprentissage terminé'),
-            reverted:  '↩️ ' + _t('kw.card_reverted',  'Annulé — mots-clés restaurés'),
-            error:     '⚠️ ' + _t('kw.card_error',     'Erreur : {msg}', { msg: translateBackendError(data.error_message) || 'Inconnue' }),
-        };
-
-        const isActive = ['pending', 'scanning', 'refining'].includes(data.status);
-        const isDone   = ['validated', 'reverted', 'error'].includes(data.status);
-
-        // ── Render exact same layout as Monitor ──────────────────────────────
-        card.innerHTML = `
-            <span class="info-label">🤖 ${window.t ? window.t('monitor.autolearn_title') : 'Auto-learning'}</span>
-            <div class="kw-card-status">${STATUS[data.status] || data.status}</div>
-            ${data.status === 'scanning' ? `
-            <div style="margin:.3rem 0 .4rem">
-                <div class="kw-progress-bar-track"><div class="kw-progress-bar" style="width:${pct}%"></div></div>
-            </div>` : ''}
-            ${data.status === 'scanning' && data.raw_keywords?.length ? `
-            <div class="kw-tags-row" style="margin-top:.25rem;display:flex">
-                ${data.raw_keywords.slice(0, 8).map(k => `<span class="kw-tag kw-tag--raw">${escapeHtml(k)}</span>`).join('')}
-                ${data.raw_keywords.length > 8 ? `<span class="kw-hint" style="align-self:center">+${data.raw_keywords.length - 8}</span>` : ''}
-            </div>` : ''}
-            ${data.status === 'validated' && data.final_keywords?.length ? `
-            <div class="kw-tags-row" style="margin-top:.25rem;display:flex">
-                ${data.final_keywords.map(k => `<span class="kw-tag">${escapeHtml(k)}</span>`).join('')}
-            </div>` : ''}
-            <div class="kw-actions" style="margin-top:.4rem">
-                ${isActive ? `<button type="button" class="btn btn-danger btn-sm" onclick="kwStopSession(${sessionId})">⏹ ${_t('kw.stop_btn','Stop')}</button>` : ''}
-                ${data.status === 'validated' ? `<button type="button" class="btn btn-secondary btn-sm" onclick="kwRevertSession(${sessionId})">↩️ ${_t('kw.revert_btn','Revert')}</button>` : ''}
-                ${isDone ? `<a href="/api/keyword-learning/${sessionId}/log" download class="btn btn-secondary btn-sm">📥 Log</a>` : ''}
-            </div>
-        `;
-
-        return isDone;
-    } catch { return false; }
-}
-
-
-async function testRule(id) {
-    const btn = document.getElementById(`test-btn-${id}`);
-    const originalText = btn ? btn.innerHTML : (window.t ? window.t('rules.test_rule') : '🧪 Test');
-    
-    const abortController = new AbortController();
-    let stopBtn = null;
-    
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = window.t ? window.t('rules.test_in_progress') : 'Testing...';
-        btn.classList.add('pulse-animation');
-        
-        stopBtn = document.createElement('button');
-        stopBtn.className = 'btn btn-danger btn-sm';
-        stopBtn.style.marginLeft = '0.5rem';
-        stopBtn.innerHTML = window.t ? '🛑 ' + window.t('common.stop') : '🛑 Stop';
-        stopBtn.onclick = () => abortController.abort();
-        btn.parentNode.insertBefore(stopBtn, btn.nextSibling);
-    }
-
-    try {
-        await apiFetch(`/api/rules/${id}/test`, { 
-            method: 'POST',
-            signal: abortController.signal
-        });
-
-        if (btn) {
-            btn.innerHTML = window.t ? '✅ ' + window.t('common.done') : '✅ Done';
-            btn.classList.remove('pulse-animation');
-            btn.classList.add('btn-success-temporary');
-            setTimeout(() => {
-                if (document.getElementById(`test-btn-${id}`)) {
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    btn.classList.remove('btn-success-temporary');
-                }
-            }, 2500);
-        }
+        RO.data = await apiFetch('/api/rules/overview');
+        render();
     } catch (e) {
-        if (btn) {
-            btn.classList.remove('pulse-animation');
-            btn.classList.add('btn-danger');
-            if (e.name === 'AbortError') {
-                btn.innerHTML = window.t ? '❌ ' + window.t('rules.test_cancelled') : '❌ Cancelled';
-            } else {
-                console.error('Erreur test rule:', e);
-                btn.innerHTML = window.t ? '❌ ' + window.t('rules.test_error_btn') : '❌ Error';
-            }
-            setTimeout(() => {
-                if (document.getElementById(`test-btn-${id}`)) {
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                    btn.classList.remove('btn-danger');
-                }
-            }, 2500);
-        }
-    } finally {
-        if (stopBtn && stopBtn.parentNode) {
-            stopBtn.parentNode.removeChild(stopBtn);
-        }
+        document.getElementById('ro-table').innerHTML = `<div class="loading">${escapeHtml(roT('common.error', 'Erreur'))} : ${escapeHtml(e.message)}</div>`;
     }
 }
 
-async function deleteRule(id, btnElement) {
-    showInlineConfirm(btnElement, window.t ? window.t('rules.delete_confirm') : 'Are you sure you want to delete this rule?', async () => {
-        try {
-            await apiFetch(`/api/rules/${id}`, {
-                method: 'DELETE',
-            });
-            loadRules();
-        } catch (error) {
-            console.error('Erreur suppression règle:', error);
-            alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + error.message);
-        }
-    });
+function ruleState(r) {
+    if (!r.enabled) {
+        return r.alert_status !== 'normal'
+            ? { label: roT('rule.status_disabled', 'Désactivée'), sub: roT('rules.open_incident', 'incident non clos'), dot: 'rp-dot--warn', key: 'disabled' }
+            : { label: roT('rule.status_disabled', 'Désactivée'), sub: roT('rules.monitoring_stopped', 'surveillance arrêtée'), dot: 'rp-dot--idle', key: 'disabled' };
+    }
+    if (r.alert_status !== 'normal') {
+        const m = r.alert_started_at ? (Date.now() - new Date(r.alert_started_at).getTime()) / 60000 : null;
+        return { label: roT('rule.status_alert', 'En alerte'), sub: m != null ? roT('rules.since', 'depuis {d}', { d: roMinutes(m) }) : '', dot: 'rp-dot--alert', key: 'alert' };
+    }
+    return { label: roT('rule.status_normal', 'Normal'), sub: r.muted ? roT('rules.source_muted', 'source muette') : roT('rules.no_incident', 'aucun incident'), dot: 'rp-dot--ok', key: 'normal' };
 }
 
-function downloadRuleLog(ruleId) {
-    window.location.href = `/api/rules/${ruleId}/download`;
+function sourceText(src) {
+    if (src.type === 'webhook') return roT('rule.source_webhook', 'Webhook');
+    if (src.type === 'syslog') return `${roT('rule.source_syslog', 'Syslog')} · ${src.label}`;
+    return `${roT('rule.source_file', 'Fichier')} · ${src.label}`;
+}
+
+function render() {
+    if (!RO.data) return;
+    const { rules, kpis } = RO.data;
+    const states = rules.map(r => ({ r, s: ruleState(r) }));
+
+    document.getElementById('ro-subtitle').textContent = roT('rules.subtitle', '{n} règles · {a} active(s)', {
+        n: rules.length, a: rules.filter(r => r.enabled).length });
+    document.getElementById('ro-kpis').innerHTML = `
+        <div class="ro-kpi ${kpis.alert_count ? 'ro-kpi--alert' : ''}"><span class="rp-label">${escapeHtml(roT('rules.kpi_alert', 'En alerte'))}</span><strong>${kpis.alert_count}</strong></div>
+        <div class="ro-kpi"><span class="rp-label">${escapeHtml(roT('rules.kpi_alerts7', 'Alertes · 7 jours'))}</span><strong>${kpis.total7}</strong></div>
+        <div class="ro-kpi"><span class="rp-label">${escapeHtml(roT('rules.kpi_mttr', 'MTTR médian · 30 jours'))}</span><strong>${escapeHtml(roMinutes(kpis.mttr30_minutes))}</strong></div>
+        <div class="ro-kpi ${kpis.muted_count ? 'ro-kpi--warn' : ''}"><span class="rp-label">${escapeHtml(roT('rules.kpi_muted', 'Sources muettes'))}</span><strong>${kpis.muted_count}</strong></div>`;
+
+    const counts = { all: rules.length, alert: states.filter(x => x.s.key === 'alert').length,
+        active: rules.filter(r => r.enabled).length, disabled: rules.filter(r => !r.enabled).length };
+    document.getElementById('ro-filters').innerHTML = [['all', roT('rules.filter_all', 'Toutes')], ['alert', roT('rule.status_alert', 'En alerte')],
+        ['active', roT('rules.filter_active', 'Actives')], ['disabled', roT('rules.filter_disabled', 'Désactivées')]]
+        .map(([id, label]) => `<button type="button" class="${RO.filter === id ? 'active' : ''}" aria-pressed="${RO.filter === id}" onclick="RO.filter='${id}'; render()">${escapeHtml(label)} (${counts[id]})</button>`).join('');
+
+    const visible = states.filter(({ r, s }) => {
+        if (RO.filter === 'alert' && s.key !== 'alert') return false;
+        if (RO.filter === 'active' && !r.enabled) return false;
+        if (RO.filter === 'disabled' && r.enabled) return false;
+        if (RO.search && !`${r.name} ${r.source.label} ${r.source.type}`.toLowerCase().includes(RO.search)) return false;
+        return true;
+    });
+
+    const head = `<div class="ro-row ro-row--head" role="row">
+        <span>${escapeHtml(roT('rules.col_state', 'État'))}</span><span>${escapeHtml(roT('rules.col_rule', 'Règle'))}</span>
+        <span>${escapeHtml(roT('rules.col_alerts', 'Alertes 7 j'))}</span><span>${escapeHtml(roT('rules.col_incident', 'Dernier incident'))}</span>
+        <span>${escapeHtml(roT('rules.col_mttr', 'MTTR'))}</span><span>${escapeHtml(roT('rules.col_source', 'Source'))}</span>
+        <span>${escapeHtml(roT('rules.col_enabled', 'Activée'))}</span></div>`;
+    if (!rules.length) {
+        document.getElementById('ro-table').innerHTML = `<div class="ro-empty">${escapeHtml(roT('rules.no_rules', 'Aucune règle configurée.'))} <a href="/rules/new">${escapeHtml(roT('rules.create_first', 'Créer une règle'))}</a></div>`;
+        return;
+    }
+    document.getElementById('ro-table').innerHTML = head + (visible.map(({ r, s }) => rowHtml(r, s)).join('')
+        || `<div class="ro-empty">${escapeHtml(roT('rules.no_match', 'Aucune règle ne correspond.'))}</div>`);
+}
+
+function rowHtml(r, s) {
+    const max = Math.max(1, ...r.days7.map(d => d.critical + d.warning + d.info));
+    const bars = r.days7.map(d => {
+        const total = d.critical + d.warning + d.info;
+        const color = d.critical ? 'critical' : d.warning ? 'warning' : total ? 'info' : 'none';
+        return `<span class="ro-bar ro-bar--${color}" style="height:${total ? Math.max(4, Math.round(total / max * 26)) : 2}px"></span>`;
+    }).join('');
+    const last = r.last;
+    const lastWhen = last ? `${roWhen(last.analyzed_at)} · ${last.severity} · ${last.status === 'open'
+        ? roT('rules.open', 'ouvert') : roT('rule.resolved_after', 'résolu en {d}', { d: roMinutes(last.resolution_minutes) })}` : '—';
+    const ago = r.last_line_received_at
+        ? roT('rules.last_line_ago', 'dernière ligne {t}', { t: roT('rule.ago', 'il y a {d}', { d: roMinutes((Date.now() - new Date(r.last_line_received_at).getTime()) / 60000) }) })
+        : roT('rules.never_received', 'aucune ligne reçue');
+    const live = !r.enabled ? ['—', roT('rules.not_monitored', 'non surveillée'), '']
+        : r.muted ? [roT('rules.muted', 'Muette'), ago, 'rp-ko'] : [roT('rules.live', 'Active'), ago, 'rp-ok'];
+    return `
+    <div class="ro-row ${r.enabled ? '' : 'ro-row--off'}" role="row">
+        <a class="ro-link" href="/rules/${r.id}" aria-label="${escapeHtml(r.name)}"></a>
+        <span class="ro-state"><span class="ro-state-label"><span class="rp-dot ${s.dot}" aria-hidden="true"></span>${escapeHtml(s.label)}</span><span class="rp-muted">${escapeHtml(s.sub)}</span></span>
+        <span class="ro-name"><strong>${escapeHtml(r.name)}</strong><span class="mono rp-muted">${escapeHtml(sourceText(r.source))}</span></span>
+        <span class="ro-alerts"><span class="ro-bars" aria-hidden="true">${bars}</span><strong>${r.total7}</strong></span>
+        <span class="ro-incident"><span>${escapeHtml(last ? last.summary : roT('rules.no_alert', 'Aucune alerte.'))}</span><span class="rp-muted">${escapeHtml(lastWhen)}</span></span>
+        <span>${escapeHtml(roMinutes(r.mttr30_minutes))}</span>
+        <span class="ro-live"><span class="${live[2]}">${escapeHtml(live[0])}</span><span class="rp-muted">${escapeHtml(live[1])}</span></span>
+        <span class="ro-toggle">
+            <label class="toggle-switch" title="${escapeHtml(r.enabled ? roT('rules.disable', 'Désactiver') : roT('rules.enable', 'Réactiver'))}">
+                <input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="setEnabled(${r.id}, this)" aria-label="${escapeHtml((r.enabled ? roT('rules.disable', 'Désactiver') : roT('rules.enable', 'Réactiver')) + ' ' + r.name)}">
+                <span class="toggle-slider"></span>
+            </label>
+        </span>
+    </div>`;
+}
+
+async function setEnabled(id, input) {
+    const enabled = input.checked;
+    input.disabled = true;
+    try {
+        await apiFetch(`/api/rules/${id}`, { method: 'PUT', body: { enabled } });
+        await loadOverview();
+    } catch (e) {
+        input.checked = !enabled;
+        input.disabled = false;
+        alert(roT('common.error', 'Erreur') + ': ' + e.message);
+    }
 }

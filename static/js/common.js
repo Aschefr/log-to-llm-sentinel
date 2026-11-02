@@ -455,7 +455,7 @@ async function checkAppUpdate() {
 }
 
 // ─── Shared Analysis Card Template ──────────────────────────────────────────
-// Used by dashboard.js, monitor.js (analyses list, search result, line detail)
+// Used by dashboard.js and rule_page.js (analyses lists)
 // Options:
 //   collapsed  : bool  — start collapsed (default: true)
 //   showDelete : bool  — show delete button (default: false)
@@ -463,6 +463,15 @@ async function checkAppUpdate() {
 //   showRuleName: bool — show rule name in header (default: true)
 //   cardClass  : string — extra CSS class on wrapper (default: '')
 //   onToggle   : string — onclick function name for toggle (default: generic)
+
+/** Durée lisible à partir d'un nombre de minutes (« 34 min », « 1 h 05 », « 2 j »). */
+function formatMinutesShort(m) {
+    if (m == null) return '';
+    if (m < 1) return '< 1 min';
+    if (m < 60) return `${Math.round(m)} min`;
+    if (m < 1440) { const h = Math.floor(m / 60), mm = Math.round(m % 60); return mm ? `${h} h ${String(mm).padStart(2, '0')}` : `${h} h`; }
+    return `${Math.floor(m / 1440)} ${(window.t && window.t('rule.day_short') !== 'rule.day_short') ? window.t('rule.day_short') : 'j'}`;
+}
 
 function renderAnalysisCard(a, opts = {}) {
     const collapsed = opts.collapsed !== false;
@@ -499,7 +508,19 @@ function renderAnalysisCard(a, opts = {}) {
         ? `<strong>${_t('dashboard.rule_label', 'Rule:')} ${escapeHtml(a.rule_name)}</strong>`
         : '';
 
-    const resolvedBadge = a.resolution_status === 'resolved' ? `<span class="resolved-badge">${_t('monitor.badge_resolved', 'Résolu')}</span>` : '';
+    const resolvedBadge = a.resolution_status === 'resolved'
+        ? `<span class="resolved-badge">${a.resolution_minutes != null
+            ? escapeHtml(_t('common.resolved_in', 'Résolu en {d}').replace('{d}', formatMinutesShort(a.resolution_minutes)))
+            : _t('monitor.badge_resolved', 'Résolu')}</span>` : '';
+    // Récurrence sur 7 jours (même événement à des valeurs variables près)
+    let recurBadge = '';
+    if (a.recurrence_7d != null) {
+        recurBadge = a.recurrence_7d > 0
+            ? `<span class="recur-badge" title="${escapeHtml(_t('common.recurrence_title', 'Déjà vu dans les 7 jours précédents'))}">${escapeHtml(_t('common.recurrence', '× {n} en 7 j').replace('{n}', a.recurrence_7d))}</span>`
+            : `<span class="recur-badge recur-badge--new">${escapeHtml(_t('common.recurrence_new', 'nouveau'))}</span>`;
+    }
+    const summaryLine = a.summary && opts.showSummary !== false
+        ? `<div class="analysis-summary-line">${escapeHtml(a.summary)}</div>` : '';
 
     let resolutionBlock = '';
     if (a.resolution_status === 'resolved' && a.resolved_at && a.analyzed_at) {
@@ -566,7 +587,9 @@ function renderAnalysisCard(a, opts = {}) {
                 <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
                 <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
                 ${resolvedBadge}
+                ${recurBadge}
                 ${unreadIndicator}
+                ${summaryLine}
             </div>
             <div class="analysis-actions">
                 ${kwSummary}
@@ -588,7 +611,7 @@ function renderAnalysisCard(a, opts = {}) {
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); retryAnalysis(${a.id}, this)">🔄 ${_t('common.retry', 'Retry')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); notifyAnalysis(${a.id}, this)">🔔 ${_t('common.notify', 'Notify')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); togglePromptView(${a.id}, this)" title="${_t('common.view_prompt_title', 'Show the exact messages sent to the LLM')}">📜 ${_t('common.view_prompt', 'Prompt')}</button>
-                    ${a.detection_id ? `<button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); window.location.href='/monitor?search=${encodeURIComponent(a.detection_id)}'" title="${_t('common.view_in_monitor', 'View in Monitor')}">🔍 Monitor</button>` : ''}
+                    ${a.rule_id && !opts.hideRuleLink ? `<a class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" href="/rules/${a.rule_id}?analysis=${a.id}#analyses">🔍 ${_t('common.view_rule', 'Voir dans la règle')}</a>` : ''}
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openChat(${a.id})">💬 ${_t('common.deepen', 'Deepen')}</button>
                 <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); investigateAnalysis(${a.id})" title="${_t('common.investigate_title', 'Start an AI-guided investigation')}">🔎 ${_t('common.investigate', 'Investigate')}</button>

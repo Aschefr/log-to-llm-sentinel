@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Rules overview**: The Rules page now lists every rule — disabled ones included, with a toggle to re-enable them — with its state, alerts over 7 days, last incident summary, median MTTR and source liveness, plus global indicators (rules in alert, alerts over 7 days, median MTTR, silent sources), state filters and a search field.
+- **Rule page with tabs** (`/rules/{id}`): *Overview* (ongoing incident with next check, required calm, log liveness and probe result; activity; 30-day alert chart; MTTR, auto-resolution rate, notifications and AI calls; recurring events over 7 days with a shortcut to ignore them; latest analyses), *Live log* (the former Monitor viewer), *Analyses*, *Resolution* and *Settings*.
+- **Adaptive calm**: An incident now closes after three times the median interval between its errors (never below the rule's minimum, at most 24 h), so recurring errors no longer flap open/closed. A fixed duration remains available.
+- **Health probe**: Optional per-rule HTTP(S) or TCP probe, defined by the user and tested from the settings. During an incident it runs every 60 s; while it fails, the incident stays open even if the log is silent.
+- **AI validation modes**: *If ambiguous* (default — the AI only checks success lines, a full calm closes without an LLM call), *Always* or *Never*.
+- **Suggested resolution patterns**: Patterns learned by the AI are now suggestions to accept or reject in the Resolution tab; only accepted patterns are used, rejected ones are never suggested again and unreviewed ones expire after 14 days. Patterns show their origin and accepted/rejected trigger counts, and can be added manually.
+- **Analyses list**: Collapsed cards show the one-sentence summary, a 7-day recurrence badge and the resolution time; filters (unread, severity, period, open incidents only) show real counts.
+
+### Changed
+- **Monitor merged into the rule pages**: The Monitor menu entry is gone; old `/monitor` links (notifications, chat, meta-analysis) redirect to the matching rule page, analysis or log line.
+- **Rule settings** are a page with five sections (Source, Detection, AI analysis, Notifications, Return to normal) instead of a long modal. Renamed: *Grouping window* (anti-spam delay) and *Context lines around the event* (lines sent to Ollama). The two inactivity switches are merged into *Alert when the source goes silent*. Existing *success keyword only* rules now also close after the calm period.
+- **Resolution history** is shown 10 entries at a time, with readable triggers and verdicts.
+
+### Removed
+- The *Notify when the AI searches for a resolution* option and its "searching" / "denied" notifications.
+
+### Fixed
+- Legacy analyses without a stored summary now show their "Summary:" paragraph (markdown stripped) instead of their last paragraph.
+
 ## [1.3.1] - 2026-11-02
 
 ### Fixed

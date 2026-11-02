@@ -34,7 +34,7 @@ def analysis_lines(a: Analysis) -> List[str]:
     return [l for l in lines if not l.startswith("... [")]
 
 
-_SUMMARY_TAG = re.compile(r"^[-*_#\s]*(r[ée]sum[ée](\s+court)?|summary|tl;?dr)\s*[*_]*\s*:\s*[*_]*\s*", re.IGNORECASE)
+_SUMMARY_TAG = re.compile(r"^[-#\s]*(?:(?:\*\*|__)\s*(?:r[ée]sum[ée](?:\s+court)?|summary|tl;?dr)\s*:?\s*(?:\*\*|__)|[*_]*(?:r[ée]sum[ée](?:\s+court)?|summary|tl;?dr)\s*[*_]*\s*:)\s*:?\s*[*_]*\s*", re.IGNORECASE)
 _CONFIDENCE_LINE = re.compile(r"^[*_\s]*(confiance|confidence)\b", re.IGNORECASE)
 
 

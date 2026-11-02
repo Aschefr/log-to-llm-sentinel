@@ -1,36 +1,42 @@
-# Incident Resolution & AI Verdicts
+# Incident Resolution
 
-Log-to-LLM Sentinel automatically monitors when active alerts return to a normal state, helping teams track Mean Time to Resolution (MTTR) and audit transient issues.
-
----
-
-## 1. Resolution Trigger Modes
-Configure how Sentinel determines that a problem is solved under the rule modal:
-* **Inactivity Timeout**: The alert is resolved after a set period of minutes passes without any new matching errors.
-* **Success Keyword**: Resolves when a log line matches one of the defined "Resolution patterns" (e.g., `success, connection established, database recovered`).
-* **Timeout OR Success Keyword**: The incident resolves when the timeout expires or a success pattern is matched, whichever happens first.
+Sentinel tracks when an alert returns to normal, which feeds the MTTR and closes incidents without manual work. Everything is configured in the **Return to normal** section of a rule's Settings tab and observed in its **Resolution** tab.
 
 ---
 
-## 2. AI Verification Verdicts
-When a potential resolution is triggered, if **AI Validation** is enabled, Sentinel asks Ollama for a structured verdict (resolved, confidence, explanation):
-* **What the AI receives**: The incident (start, duration, time since the last error, summaries of its unresolved analyses), the trigger (timeout reached, or the line that matched a resolution pattern), the number of normal lines received since the last error (a silent log may mean the service stopped), and the last 30 lines of the source.
-* **Verdicts**:
-  * `Accepted`: The AI confirmed the resolution. The rule transitions to `Normal` and notifications are sent.
-  * `Rejected by AI`: The AI determined that the issue persists. Monitoring continues in alert status.
-  * `Rejected (low confidence)`: The AI's confidence was below 50% (30% for a pattern with a weight of 3 or more), so the incident remains unresolved.
-  * `Manual resolution`: The user clicked "Mark as resolved" in the Monitor panel, forcing a resolution.
-  * `False positive (user-marked)`: The user marked an accepted resolution as wrong: the weights of the patterns involved are decremented and, if the rule is still `Normal`, it goes back to alert with the analyses that resolution had closed.
-* **Safeguards**:
-  * Only one attempt per rule runs at a time, and an attempt is abandoned if a new error arrives during the AI check.
-  * After a rejection, the next timeout attempt waits a full timeout period; a pattern-triggered attempt waits 5 minutes.
-  * Lines that trigger the rule (error keyword, not excluded) never count as resolution lines.
-  * Verdicts older than 30 days are purged; the 20 most recent per rule are always kept.
+## 1. How an incident closes
+An incident opens with the first analysed alert of a rule and stays open until **all** these conditions are met:
+
+* **Calm**: no new error for the required duration.
+  * *Adaptive* (default): three times the median interval between the incident's errors, never below the rule's minimum and capped at 24 h. An error that comes back every 2 h therefore waits more than 6 h before the incident is closed, instead of flapping open/closed.
+  * *Fixed*: always the configured duration.
+* **Health probe** (optional): an HTTP(S) request (expected status codes, 2xx/3xx by default) or a TCP connection (`host:port`) defined by you. It runs every 60 s during an incident. As long as it fails, the incident stays open, even if the log is silent — which catches a service that crashed and stopped writing. Certificates are not verified (self-signed certificates are common on a LAN). Use **Test the probe** before saving.
+
+A **success line** can close the incident earlier: when a line contains one of the rule's success patterns (and is not itself an error line), Sentinel checks whether the problem is over.
 
 ---
 
-## 3. Pattern Auditing and Weights
-Sentinel implements a self-learning weight system for resolution patterns:
-* **Pattern Weights**: Each resolution pattern has a weight (starting at 1). It grows by 1 each time the pattern triggers a resolution validated by the AI, and decreases when the user marks a resolution as a false positive or when the pattern has not been validated for 14 days (it is removed at 0).
-* **Self-Learning**: After a pattern-triggered or manual resolution with AI Validation enabled, the AI may suggest new patterns from the normal log lines. Suggestions are discarded when they are generic (e.g. `exiting`, `Starting`, `message repeated`), overlap an error keyword, appear in the incident's error lines, or do not occur in the logs. Timeout resolutions do not feed the learning.
-* **AI Audit Button (🤖 AI Audit)**: Located in the Monitor resolution panel. Submits active resolution patterns to the AI, allowing it to purge irrelevant patterns based on the rule's context.
+## 2. AI validation
+* **If ambiguous** (recommended): the AI only checks success lines. A full calm (with a passing probe if configured) closes the incident without any LLM call.
+* **Always**: the AI also confirms closures after a full calm. Slower and uses the GPU more.
+* **Never**: no LLM call; the first success line or a full calm closes the incident.
+
+The AI receives the incident (start, duration, time since the last error, summaries of its open analyses), the trigger, the number of normal lines received since the last error, the probe result and the last 30 lines of the source, and answers with a structured verdict (resolved, confidence, explanation). Below 50 % confidence (30 % for a pattern with a weight of 3 or more) the verdict counts as a rejection.
+
+### Safeguards
+* One check per rule at a time; a check is abandoned if a new error arrives meanwhile.
+* After a rejection, the next calm check waits a full calm period and a success line is not considered again for 5 minutes.
+* Error lines (trigger keyword, not excluded) never count as success lines.
+* Check history is kept for 30 days (the 20 most recent per rule are always kept).
+
+---
+
+## 3. Resolution tab
+* **Closing the incident**: calm progress, probe state, log liveness and AI mode, with *Mark as resolved* and *Edit conditions*.
+* **Timeline**: incident opening, analyses, checks and their verdicts, probe result, next scheduled check.
+* **Success lines**: each pattern with its origin (manual or learned), reliability (weight), accepted/rejected triggers and last validation. Add a pattern manually or delete one; **AI pattern audit** asks the AI to remove irrelevant patterns.
+* **AI suggestions to review**: after a resolution triggered by a success line (or a manual one), the AI may suggest new patterns from the normal log lines. They are only used once you **Accept** them; **Reject** prevents them from being suggested again. Generic phrases (`exiting`, `Starting`, `message repeated`…), phrases found in the incident's error lines or overlapping an error keyword are never suggested. Unreviewed suggestions expire after 14 days.
+* **Check history · 30 days**: date, trigger, verdict (*Accepted by AI*, *Closed without AI*, *Rejected by AI*, *Rejected (low confidence)*, *Manual*, *False positive*), AI confidence and explanation. **False positive** on a closing verdict decrements the patterns involved and, if the rule is still normal, reopens the incident with the analyses that closure had resolved.
+
+## 4. Pattern weights
+A pattern's weight grows by 1 each time it triggers a resolution validated by the AI, and decreases when a resolution is marked as a false positive or when the pattern has not been validated for 14 days (it is removed at 0).

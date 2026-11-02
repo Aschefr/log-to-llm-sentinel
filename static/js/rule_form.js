@@ -1,14 +1,16 @@
-// ─── Rule Modal (shared) ────────────────────────────────────────────────────
-// Extracted from rules.js so both Rules page and Monitor page can reuse
-// the same rule creation/edit modal without code duplication.
+// ─── Rule form (Réglages tab of the rule page) ──────────────────────────────
+// Form logic shared by the rule page: source tabs, file browser, keywords,
+// resolution settings, save.
 //
 // Usage:
-//   setupRuleModal({ onSave: myReloadFn })
-//   setupKeywordSuggestions()
+//   setupRuleForm({ onSave(ruleId, isNew), onCancel() })
+//   editRule(id)   → fills the form with the rule
+//   resetForm()    → empty form for a new rule
 // ─────────────────────────────────────────────────────────────────────────────
 
-/* ── Callback set by host page ─────────────────────────────────────────────── */
-let _ruleModalOnSave = null;
+/* ── Callbacks set by host page ────────────────────────────────────────────── */
+let _ruleFormOnSave = null;
+let _ruleFormOnCancel = null;
 
 /**
  * crypto.randomUUID() is only available in secure contexts (HTTPS / localhost).
@@ -25,127 +27,20 @@ function _generateUUID() {
     });
 }
 
-/* ── Resolution Pattern Tags ───────────────────────────────────────────────── */
-let _resolutionPatterns = [];
-let _resolutionPatternsWeighted = [];  // Format enrichi [{pattern, weight, last_validated_at, error_keywords}]
-
-function _resTagT(key, fallback) {
-    return window.t ? window.t(key) : fallback;
+function _rfT(key, fallback) {
+    const v = window.t ? window.t(key) : key;
+    return (v && v !== key) ? v : fallback;
 }
 
-function _escHtml(s) {
-    const d = document.createElement('div');
-    d.textContent = s;
-    return d.innerHTML;
+/* ── Radio helpers ─────────────────────────────────────────────────────────── */
+function _radioValue(name, fallback) {
+    const el = document.querySelector(`input[name="${name}"]:checked`);
+    return el ? el.value : fallback;
 }
 
-/** Sync internal array → hidden input + UI */
-function _resTagsSync() {
-    const hidden = document.getElementById('rule-resolution-patterns');
-    if (hidden) hidden.value = _resolutionPatterns.join(',');
-
-    const countEl = document.getElementById('resolution-patterns-count');
-    const clearBtn = document.getElementById('resolution-patterns-clear-all');
-    const emptyEl = document.getElementById('resolution-patterns-empty');
-    const n = _resolutionPatterns.length;
-
-    if (countEl) {
-        countEl.style.display = n > 0 ? 'inline' : 'none';
-        countEl.textContent = _resTagT('rules.resolution_patterns_count', '{count} pattern(s)').replace('{count}', n);
-    }
-    if (clearBtn) clearBtn.style.display = n > 0 ? 'inline-flex' : 'none';
-    if (emptyEl) emptyEl.style.display = n === 0 ? 'inline' : 'none';
-}
-
-/** Render all tags from _resolutionPatterns */
-function _resTagsRender() {
-    const box = document.getElementById('resolution-patterns-tags');
-    if (!box) return;
-    // Keep the empty placeholder
-    const emptyEl = box.querySelector('#resolution-patterns-empty');
-    box.innerHTML = '';
-    if (emptyEl) box.appendChild(emptyEl);
-
-    _resolutionPatterns.forEach((p, idx) => {
-        const tag = document.createElement('span');
-        tag.className = 'res-tag';
-
-        // Chercher les infos de poids dans la version enrichie
-        const wInfo = _resolutionPatternsWeighted.find(
-            w => (w.pattern || '').toLowerCase() === p.toLowerCase()
-        );
-        const weight = wInfo ? (wInfo.weight || 1) : 1;
-        const lastValidated = wInfo ? wInfo.last_validated_at : null;
-
-        let weightBadge = '';
-        if (weight > 1) {
-            weightBadge = `<span class="res-tag-weight" title="${_resTagT('monitor.verdict_pattern_weight', 'Poids')}: ${weight}">${weight}</span>`;
-        }
-
-        let timeHint = '';
-        if (lastValidated) {
-            const ago = _relativeTime(lastValidated);
-            timeHint = `<span class="res-tag-time" title="${lastValidated}">${ago}</span>`;
-        }
-
-        tag.innerHTML = `${_escHtml(p)}${weightBadge}${timeHint}<button type="button" class="res-tag-remove" data-idx="${idx}" title="Remove">✕</button>`;
-        tag.querySelector('.res-tag-remove').addEventListener('click', (e) => {
-            e.preventDefault();
-            _resolutionPatterns.splice(idx, 1);
-            // Supprimer aussi de la version enrichie
-            _resolutionPatternsWeighted = _resolutionPatternsWeighted.filter(
-                w => (w.pattern || '').toLowerCase() !== p.toLowerCase()
-            );
-            _resTagsRender();
-        });
-        box.insertBefore(tag, emptyEl);
-    });
-    _resTagsSync();
-}
-
-/** Set patterns and render */
-function resTagsSet(patterns, weighted) {
-    _resolutionPatterns = (patterns || []).filter(p => p && p.trim()).map(p => p.trim());
-    _resolutionPatternsWeighted = weighted || [];
-    _resTagsRender();
-}
-
-/** Add one or more patterns (comma-separated string accepted) */
-function resTagsAdd(input) {
-    const parts = input.split(',').map(p => p.trim()).filter(p => p);
-    let added = 0;
-    parts.forEach(p => {
-        if (!_resolutionPatterns.includes(p)) {
-            _resolutionPatterns.push(p);
-            added++;
-        }
-    });
-    if (added) _resTagsRender();
-}
-
-/** Clear all patterns */
-function resTagsClear() {
-    _resolutionPatterns = [];
-    _resolutionPatternsWeighted = [];
-    _resTagsRender();
-}
-
-/** Relative time helper for last_validated_at */
-function _relativeTime(isoStr) {
-    try {
-        const dt = new Date(isoStr);
-        const now = new Date();
-        const diffMs = now - dt;
-        if (diffMs < 0) return '';
-        const diffMin = Math.floor(diffMs / 60000);
-        if (diffMin < 60) return `${diffMin}m`;
-        const diffH = Math.floor(diffMin / 60);
-        if (diffH < 24) return `${diffH}h`;
-        const diffD = Math.floor(diffH / 24);
-        return `${diffD}d`;
-    } catch (e) {
-        return '';
-    }
+function _setRadio(name, value) {
+    const el = document.querySelector(`input[name="${name}"][value="${value}"]`);
+    if (el) el.checked = true;
 }
 
 /* ── Keyword suggestions ───────────────────────────────────────────────────── */
@@ -193,22 +88,20 @@ function addKeywordToInput(keyword) {
     input.focus();
 }
 
-/* ── Modal setup ───────────────────────────────────────────────────────────── */
+/* ── Form setup ────────────────────────────────────────────────────────────── */
 
 /**
- * Wire up the rule modal (close/cancel/submit + file browser + source tabs).
+ * Wire up the rule form (submit + file browser + source tabs + resolution settings).
  * @param {Object} opts
- * @param {Function} opts.onSave - called after successful save (e.g. loadRules or loadMonitorRules)
+ * @param {Function} opts.onSave   - called after a successful save with (ruleId, isNew)
+ * @param {Function} opts.onCancel - called when the user cancels
  */
-function setupRuleModal(opts = {}) {
-    _ruleModalOnSave = opts.onSave || null;
+function setupRuleForm(opts = {}) {
+    _ruleFormOnSave = opts.onSave || null;
+    _ruleFormOnCancel = opts.onCancel || null;
 
-    const modal = document.getElementById('rule-modal');
-    const closeBtn = document.getElementById('close-modal');
-    const cancelBtn = document.getElementById('cancel-rule');
     const form = document.getElementById('rule-form');
-
-    if (!modal || !form) return;
+    if (!form) return;
 
     setupFileBrowser();
 
@@ -224,11 +117,12 @@ function setupRuleModal(opts = {}) {
             });
     }
 
-    if (closeBtn) closeBtn.addEventListener('click', () => { modal.classList.add('hidden'); if (_ruleModalOnSave) _ruleModalOnSave(); });
-    if (cancelBtn) cancelBtn.addEventListener('click', () => { modal.classList.add('hidden'); if (_ruleModalOnSave) _ruleModalOnSave(); });
+    const cancelBtn = document.getElementById('cancel-rule');
+    if (cancelBtn) cancelBtn.addEventListener('click', () => { if (_ruleFormOnCancel) _ruleFormOnCancel(); });
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
+        if (!form.reportValidity()) return;
         await saveRule();
     });
 
@@ -252,8 +146,9 @@ function setupRuleModal(opts = {}) {
 
     sourceCards.forEach(card => {
         card.addEventListener('click', () => {
-            sourceCards.forEach(c => c.classList.remove('kw-tab--active'));
+            sourceCards.forEach(c => { c.classList.remove('kw-tab--active'); c.setAttribute('aria-selected', 'false'); });
             card.classList.add('kw-tab--active');
+            card.setAttribute('aria-selected', 'true');
 
             if (card.dataset.source === 'webhook') {
                 pathGroup.classList.add('hidden');
@@ -285,142 +180,73 @@ function setupRuleModal(opts = {}) {
         });
     });
 
-    const inactCheck = document.getElementById('rule-inactivity-warning-enabled');
-    const inactContainer = document.getElementById('inactivity-hours-container');
-    if (inactCheck && inactContainer) {
-        inactCheck.addEventListener('change', () => {
-            inactContainer.style.display = inactCheck.checked ? 'flex' : 'none';
-        });
-    }
+    // ── Retour à la normale ──
+    ['rule-resolution-enable', 'rule-probe-type'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', updateResolutionUI);
+    });
+    document.querySelectorAll('input[name="rule-resolution-calm-mode"], input[name="rule-resolution-ai-mode"]')
+        .forEach(el => el.addEventListener('change', updateResolutionUI));
+    const notifyEl = document.getElementById('rule-notify');
+    if (notifyEl) notifyEl.addEventListener('change', updateResolutionUI);
 
+    const probeBtn = document.getElementById('rf-probe-test');
+    if (probeBtn) probeBtn.addEventListener('click', testProbe);
+
+    updateResolutionUI();
+    setupKeywordSuggestions();
+}
+
+/** Show/hide the dependent fields of the notification and resolution sections. */
+function updateResolutionUI() {
     const resEnable = document.getElementById('rule-resolution-enable');
     const resSettings = document.getElementById('resolution-settings-container');
-    const resAiEnable = document.getElementById('rule-resolution-ai-enabled');
-    const resAiOptions = document.getElementById('resolution-ai-options');
+    if (resEnable && resSettings) resSettings.classList.toggle('hidden', !resEnable.checked);
 
-    // ── Sélection de carte de mode ──
-    function _getResMode() {
-        const hidden = document.getElementById('rule-resolution-mode');
-        return hidden ? hidden.value : 'timeout';
+    const calmLabel = document.getElementById('rf-calm-label');
+    if (calmLabel) {
+        calmLabel.textContent = _radioValue('rule-resolution-calm-mode', 'adaptive') === 'adaptive'
+            ? _rfT('rf.calm_minimum', 'Minimum') : _rfT('rf.calm_duration', 'Durée');
     }
 
-    function _setResMode(mode) {
-        const hidden = document.getElementById('rule-resolution-mode');
-        if (hidden) hidden.value = mode;
+    const probeType = (document.getElementById('rule-probe-type') || {}).value || 'none';
+    document.querySelectorAll('.rf-probe-field').forEach(el => el.classList.toggle('hidden', probeType === 'none'));
+    document.querySelectorAll('.rf-probe-http').forEach(el => el.classList.toggle('hidden', probeType !== 'http'));
+    const target = document.getElementById('rule-probe-target');
+    if (target) target.placeholder = probeType === 'tcp' ? 'nextcloud.local:443' : 'https://nextcloud.local/status.php';
 
-        // Mettre à jour l'état visuel des cartes
-        document.querySelectorAll('#resolution-mode-cards .res-mode-card').forEach(card => {
-            card.classList.toggle('res-mode-card--active', card.dataset.mode === mode);
-        });
-
-        // Afficher/masquer les configs inline des cartes
-        const timeoutInline = document.getElementById('res-timeout-inline-config');
-        const bothInline = document.getElementById('res-both-inline-config');
-        if (timeoutInline) timeoutInline.style.display = (mode === 'timeout') ? 'flex' : 'none';
-        if (bothInline)    bothInline.style.display    = (mode === 'both')    ? 'flex' : 'none';
-
-        // Synchroniser le champ "both" avec le champ principal au changement de mode
-        const mainTimeout = document.getElementById('rule-resolution-timeout');
-        const bothTimeout = document.getElementById('rule-resolution-timeout-both');
-        if (bothTimeout && mainTimeout) {
-            if (mode === 'both') {
-                bothTimeout.value = mainTimeout.value;
-            }
-        }
+    const aiHint = document.getElementById('rf-ai-hint');
+    if (aiHint) {
+        const mode = _radioValue('rule-resolution-ai-mode', 'ambiguous');
+        aiHint.textContent = {
+            ambiguous: _rfT('rf.ai_ambiguous_hint', "L'IA ne vérifie que les lignes de succès. Un calme complet (avec sonde OK si configurée) clôt l'incident sans appel à l'IA."),
+            always: _rfT('rf.ai_always_hint', "L'IA confirme chaque clôture, y compris après un calme complet. Plus lent, plus coûteux."),
+            never: _rfT('rf.ai_never_hint', "Aucun appel à l'IA : la première ligne de succès ou le calme complet clôt l'incident."),
+        }[mode];
     }
 
-    // Clic sur une carte de mode
-    document.querySelectorAll('#resolution-mode-cards .res-mode-card').forEach(card => {
-        card.addEventListener('click', () => {
-            _setResMode(card.dataset.mode);
-            updateResolutionUI();
-        });
-        card.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                _setResMode(card.dataset.mode);
-                updateResolutionUI();
-            }
-        });
-    });
+    const notify = document.getElementById('rule-notify');
+    document.querySelectorAll('input[name="rule-severity-threshold"]').forEach(el => { el.disabled = notify && !notify.checked; });
+}
 
-    // Synchronisation bidirectionnelle timeout ↔ timeout-both
-    const mainTimeoutEl = document.getElementById('rule-resolution-timeout');
-    const bothTimeoutEl = document.getElementById('rule-resolution-timeout-both');
-    if (mainTimeoutEl && bothTimeoutEl) {
-        mainTimeoutEl.addEventListener('input', () => { bothTimeoutEl.value = mainTimeoutEl.value; });
-        bothTimeoutEl.addEventListener('input', () => { mainTimeoutEl.value = bothTimeoutEl.value; });
+async function testProbe() {
+    const out = document.getElementById('rf-probe-result');
+    const body = {
+        probe_type: document.getElementById('rule-probe-type').value,
+        probe_target: document.getElementById('rule-probe-target').value,
+        probe_expect: document.getElementById('rule-probe-expect').value,
+    };
+    if (!out) return;
+    out.textContent = _rfT('rf.probe_testing', 'Test en cours…');
+    out.className = 'form-hint';
+    try {
+        const res = await apiFetch('/api/rules/probe-test', { method: 'POST', body });
+        out.textContent = `${res.ok ? '✓' : '✗'} ${res.detail} · ${res.latency_ms} ms`;
+        out.className = 'form-hint ' + (res.ok ? 'rf-ok' : 'rf-ko');
+    } catch (e) {
+        out.textContent = '✗ ' + e.message;
+        out.className = 'form-hint rf-ko';
     }
-
-    function updateResolutionUI() {
-        if (!resEnable) return;
-        resSettings.style.display = resEnable.checked ? 'flex' : 'none';
-
-        if (resEnable.checked) {
-            const mode = _getResMode();
-            const resPatternsCont = document.getElementById('resolution-patterns-container');
-            if (resPatternsCont) {
-                const showPatterns = (mode === 'pattern' || mode === 'both');
-                resPatternsCont.style.display = showPatterns ? 'flex' : 'none';
-            }
-        }
-
-        if (resAiEnable && resAiOptions) {
-            if (resAiEnable.checked) {
-                resAiOptions.classList.remove('hidden');
-            } else {
-                resAiOptions.classList.add('hidden');
-            }
-        }
-    }
-    window.updateResolutionUI = updateResolutionUI;
-    window._setResMode = _setResMode;
-
-    if (resEnable) resEnable.addEventListener('change', updateResolutionUI);
-    if (resAiEnable) resAiEnable.addEventListener('change', updateResolutionUI);
-
-    // Initial display sync
-    updateResolutionUI();
-
-    // ── Resolution pattern tags wiring ──
-    const addBtn = document.getElementById('resolution-pattern-add-btn');
-    const addInput = document.getElementById('resolution-pattern-input');
-    const clearAllBtn = document.getElementById('resolution-patterns-clear-all');
-
-    if (addBtn && addInput) {
-        addBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (addInput.value.trim()) {
-                resTagsAdd(addInput.value);
-                addInput.value = '';
-                addInput.focus();
-            }
-        });
-        addInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                addBtn.click();
-            }
-        });
-    }
-    if (clearAllBtn) {
-        clearAllBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (typeof showInlineConfirm === 'function') {
-                showInlineConfirm(
-                    clearAllBtn,
-                    _resTagT('rules.resolution_patterns_confirm_clear', 'Delete all resolution patterns?'),
-                    () => { resTagsClear(); }
-                );
-            } else {
-                resTagsClear();
-            }
-        });
-    }
-    // Initial render (empty for new rule)
-    _resTagsRender();
-
-    setupKeywordSuggestions();
 }
 
 /* ── Webhook helpers ───────────────────────────────────────────────────────── */
@@ -502,64 +328,40 @@ function resetForm() {
     document.getElementById('rule-path').value = '';
     window._currentWebhookToken = null;
 
-    const sourceCards = document.querySelectorAll('.source-card');
-    sourceCards.forEach(c => c.classList.remove('kw-tab--active'));
-
     const localCard = document.querySelector('.source-card[data-source="local"]');
-    if (localCard) {
-        localCard.click();
-        document.getElementById('path-group').classList.remove('hidden');
-        document.getElementById('webhook-group').classList.add('hidden');
-        const syslogGroup = document.getElementById('syslog-group');
-        if (syslogGroup) syslogGroup.classList.add('hidden');
-        document.getElementById('rule-path').setAttribute('required', 'required');
-        const syslogHostnameEl = document.getElementById('syslog-hostname');
-        if (syslogHostnameEl) {
-            syslogHostnameEl.value = '';
-            syslogHostnameEl.removeAttribute('required');
-        }
-    }
+    if (localCard) localCard.click();
+    const syslogHostnameEl = document.getElementById('syslog-hostname');
+    if (syslogHostnameEl) syslogHostnameEl.value = '';
+
     document.getElementById('rule-keywords').value = '';
     document.getElementById('rule-context').value = '';
-    document.getElementById('rule-enabled').checked = true;
     document.getElementById('rule-notify').checked = true;
     document.getElementById('rule-context-lines').value = '5';
     document.getElementById('rule-anti-spam').value = '60';
-    document.getElementById('rule-severity-threshold').value = 'info';
-    const inactCheck = document.getElementById('rule-inactivity-warning-enabled');
-    if (inactCheck) {
-        inactCheck.checked = true;
-        document.getElementById('inactivity-hours-container').style.display = 'flex';
-        document.getElementById('rule-inactivity-period-hours').value = '1';
-        const inactNotify = document.getElementById('rule-inactivity-notify');
-        if (inactNotify) inactNotify.checked = true;
-    }
-    const exclEl = document.getElementById('rule-excluded-patterns');
-    if (exclEl) exclEl.value = '';
+    _setRadio('rule-severity-threshold', 'info');
+    document.getElementById('rule-inactivity-period-hours').value = '1';
+    document.getElementById('rule-inactivity-notify').checked = true;
+    document.getElementById('rule-excluded-patterns').value = '';
 
-    // MON-18
-    const resEnable = document.getElementById('rule-resolution-enable');
-    if (resEnable) {
-        resEnable.checked = true;
-        if (window._setResMode) window._setResMode('timeout'); else document.getElementById('rule-resolution-mode').value = 'timeout';
-        document.getElementById('rule-resolution-timeout').value = '30';
-        resTagsClear();
-        _resolutionPatternsWeighted = [];
-        document.getElementById('rule-resolution-ai-enabled').checked = false;
-        document.getElementById('rule-resolution-notify-search').checked = false;
-        document.getElementById('rule-resolution-notify-resolved').checked = true;
-        if (window.updateResolutionUI) window.updateResolutionUI();
-    }
+    document.getElementById('rule-resolution-enable').checked = true;
+    _setRadio('rule-resolution-calm-mode', 'adaptive');
+    document.getElementById('rule-resolution-timeout').value = '30';
+    document.getElementById('rule-resolution-success').checked = true;
+    document.getElementById('rule-resolution-learn').checked = true;
+    _setRadio('rule-resolution-ai-mode', 'ambiguous');
+    document.getElementById('rule-probe-type').value = 'none';
+    document.getElementById('rule-probe-target').value = '';
+    document.getElementById('rule-probe-expect').value = '';
+    document.getElementById('rule-resolution-notify-resolved').checked = true;
+    updateResolutionUI();
 
-    document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_new_title') : 'New rule';
     closeFileBrowser();
-
     const previewContainer = document.getElementById('file-preview-container');
     if (previewContainer) {
         previewContainer.classList.add('hidden');
         document.getElementById('file-preview-content').innerHTML = '';
     }
-    // Show quick templates for new rule
+    // Quick templates are offered for a new rule only
     const tpl = document.getElementById('modal-quick-templates');
     if (tpl) tpl.classList.remove('hidden');
     // Reset the keyword learning wizard and return to manual tab
@@ -567,8 +369,7 @@ function resetForm() {
 }
 
 /* ── Save rule ─────────────────────────────────────────────────────────────── */
-async function saveRule() {
-    const id = document.getElementById('rule-id').value;
+function _ruleFormData() {
     const activeCard = document.querySelector('.source-card.kw-tab--active');
     const isWebhook = activeCard && activeCard.dataset.source === 'webhook';
     const isSyslog = activeCard && activeCard.dataset.source === 'syslog';
@@ -580,32 +381,42 @@ async function saveRule() {
         logFilePath = '[SYSLOG]:' + (document.getElementById('syslog-hostname').value.trim() || '*');
     }
 
-    const data = {
+    const resolutionOn = document.getElementById('rule-resolution-enable').checked;
+    const silentAlert = document.getElementById('rule-inactivity-notify').checked;
+    return {
         name: document.getElementById('rule-name').value,
         log_file_path: logFilePath,
         keywords: document.getElementById('rule-keywords').value.split(',').map(k => k.trim()).filter(k => k),
         application_context: document.getElementById('rule-context').value,
-        enabled: document.getElementById('rule-enabled').checked,
         notify_on_match: document.getElementById('rule-notify').checked,
-        context_lines: parseInt(document.getElementById('rule-context-lines').value) || 5,
+        context_lines: Math.max(0, parseInt(document.getElementById('rule-context-lines').value) || 0),
         anti_spam_delay: parseInt(document.getElementById('rule-anti-spam').value) || 60,
-        notify_severity_threshold: document.getElementById('rule-severity-threshold').value,
-        inactivity_warning_enabled: document.getElementById('rule-inactivity-warning-enabled').checked,
-        inactivity_period_hours: parseInt(document.getElementById('rule-inactivity-period-hours').value) || 12,
-        inactivity_notify: document.getElementById('rule-inactivity-notify') ? document.getElementById('rule-inactivity-notify').checked : true,
-        excluded_patterns: ((document.getElementById('rule-excluded-patterns') || {}).value || '')
+        notify_severity_threshold: _radioValue('rule-severity-threshold', 'info'),
+        // La vitalité de la source est toujours affichée ; seule la notification est optionnelle
+        inactivity_warning_enabled: true,
+        inactivity_period_hours: parseInt(document.getElementById('rule-inactivity-period-hours').value) || 1,
+        inactivity_notify: silentAlert,
+        excluded_patterns: document.getElementById('rule-excluded-patterns').value
             .split(',').map(p => p.trim()).filter(p => p),
-        // MON-18
-        resolution_mode: document.getElementById('rule-resolution-enable').checked ? document.getElementById('rule-resolution-mode').value : 'disabled',
+        resolution_mode: !resolutionOn ? 'disabled'
+            : (document.getElementById('rule-resolution-success').checked ? 'both' : 'timeout'),
         resolution_timeout_minutes: parseInt(document.getElementById('rule-resolution-timeout').value) || 30,
-        resolution_patterns: [..._resolutionPatterns],
-        resolution_ai_enabled: document.getElementById('rule-resolution-ai-enabled').checked,
-        resolution_notify_search: document.getElementById('rule-resolution-notify-search').checked,
+        resolution_calm_mode: _radioValue('rule-resolution-calm-mode', 'adaptive'),
+        resolution_ai_mode: _radioValue('rule-resolution-ai-mode', 'ambiguous'),
+        resolution_learn: document.getElementById('rule-resolution-learn').checked,
         resolution_notify_resolved: document.getElementById('rule-resolution-notify-resolved').checked,
+        probe_type: document.getElementById('rule-probe-type').value,
+        probe_target: document.getElementById('rule-probe-target').value,
+        probe_expect: document.getElementById('rule-probe-expect').value,
     };
+}
+
+async function saveRule() {
+    const id = document.getElementById('rule-id').value;
+    const data = _ruleFormData();
 
     // If on manual tab, clear the learning session link so the auto tab
-    // is not selected next time and the rule card shows manual state
+    // is not selected next time
     const autoTabActive = document.getElementById('kw-tab-auto')
         ?.classList.contains('kw-tab--active');
     if (!autoTabActive && id) {
@@ -613,122 +424,85 @@ async function saveRule() {
     }
 
     try {
+        let savedId = id;
         if (id) {
-            await apiFetch(`/api/rules/${id}`, {
-                method: 'PUT',
-                body: data,
-            });
+            await apiFetch(`/api/rules/${id}`, { method: 'PUT', body: data });
         } else {
-            await apiFetch('/api/rules', {
-                method: 'POST',
-                body: data,
-            });
+            const res = await apiFetch('/api/rules', { method: 'POST', body: { ...data, enabled: true } });
+            savedId = res.id;
         }
 
         // Clean up wizard state if we were on the manual tab
         if (!autoTabActive && typeof kwWizardReset === 'function') {
             kwWizardReset();
         }
-
-        document.getElementById('rule-modal').classList.add('hidden');
-        if (_ruleModalOnSave) _ruleModalOnSave();
+        if (_ruleFormOnSave) _ruleFormOnSave(parseInt(savedId), !id);
     } catch (error) {
         console.error('Erreur sauvegarde règle:', error);
         alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + error.message);
     }
 }
 
-/* ── Edit rule (populate form + open modal) ────────────────────────────────── */
+/* ── Edit rule (fill the form) ─────────────────────────────────────────────── */
 async function editRule(id) {
     try {
         const rule = await apiFetch(`/api/rules/${id}`);
         document.getElementById('rule-id').value = rule.id;
         document.getElementById('rule-name').value = rule.name;
 
-        const sourceCards = document.querySelectorAll('.source-card');
-        sourceCards.forEach(c => c.classList.remove('kw-tab--active'));
-
         if (rule.log_file_path && rule.log_file_path.startsWith('[WEBHOOK]')) {
-            const webhookCard = document.querySelector('.source-card[data-source="webhook"]');
-            if (webhookCard) {
-                window._currentWebhookToken = rule.log_file_path.split(':')[1] || rule.id;
-                webhookCard.click();
-            }
+            window._currentWebhookToken = rule.log_file_path.split(':')[1] || rule.id;
+            document.querySelector('.source-card[data-source="webhook"]')?.click();
         } else if (rule.log_file_path && rule.log_file_path.startsWith('[SYSLOG]')) {
-            const syslogCard = document.querySelector('.source-card[data-source="syslog"]');
-            if (syslogCard) {
-                syslogCard.click();
-                const hostname = rule.log_file_path.split(':')[1] || '*';
-                const syslogHostnameEl = document.getElementById('syslog-hostname');
-                if (syslogHostnameEl) syslogHostnameEl.value = hostname;
-            }
+            document.querySelector('.source-card[data-source="syslog"]')?.click();
+            document.getElementById('syslog-hostname').value = rule.log_file_path.split(':')[1] || '*';
         } else {
-            const localCard = document.querySelector('.source-card[data-source="local"]');
-            if (localCard) {
-                localCard.click();
-            }
+            document.querySelector('.source-card[data-source="local"]')?.click();
             document.getElementById('rule-path').value = rule.log_file_path;
         }
 
         document.getElementById('rule-keywords').value = rule.keywords.join(', ');
         document.getElementById('rule-context').value = rule.application_context || '';
-        document.getElementById('rule-enabled').checked = rule.enabled;
         document.getElementById('rule-notify').checked = rule.notify_on_match;
-        document.getElementById('rule-context-lines').value = rule.context_lines || 5;
+        document.getElementById('rule-context-lines').value = rule.context_lines ?? 5;
         document.getElementById('rule-anti-spam').value = rule.anti_spam_delay || 60;
-        document.getElementById('rule-severity-threshold').value = rule.notify_severity_threshold || 'info';
-        
-        const inactCheck = document.getElementById('rule-inactivity-warning-enabled');
-        if (inactCheck) {
-            inactCheck.checked = rule.inactivity_warning_enabled;
-            document.getElementById('inactivity-hours-container').style.display = rule.inactivity_warning_enabled ? 'flex' : 'none';
-            document.getElementById('rule-inactivity-period-hours').value = rule.inactivity_period_hours || 12;
-            const inactNotify = document.getElementById('rule-inactivity-notify');
-            if (inactNotify) inactNotify.checked = rule.inactivity_notify !== false;
-        }
+        _setRadio('rule-severity-threshold', rule.notify_severity_threshold || 'info');
+        document.getElementById('rule-inactivity-period-hours').value = rule.inactivity_period_hours || 1;
+        document.getElementById('rule-inactivity-notify').checked = !!(rule.inactivity_warning_enabled && rule.inactivity_notify !== false);
+        document.getElementById('rule-excluded-patterns').value = (rule.excluded_patterns || []).join(', ');
 
-        const exclEl = document.getElementById('rule-excluded-patterns');
-        if (exclEl) exclEl.value = (rule.excluded_patterns || []).join(', ');
+        const hasRes = rule.resolution_mode !== 'disabled';
+        document.getElementById('rule-resolution-enable').checked = hasRes;
+        _setRadio('rule-resolution-calm-mode', rule.resolution_calm_mode || 'adaptive');
+        document.getElementById('rule-resolution-timeout').value = rule.resolution_timeout_minutes || 30;
+        document.getElementById('rule-resolution-success').checked = ['pattern', 'both'].includes(rule.resolution_mode);
+        document.getElementById('rule-resolution-learn').checked = rule.resolution_learn !== false;
+        _setRadio('rule-resolution-ai-mode', rule.resolution_ai_mode || 'ambiguous');
+        document.getElementById('rule-probe-type').value = rule.probe_type || 'none';
+        document.getElementById('rule-probe-target').value = rule.probe_target || '';
+        document.getElementById('rule-probe-expect').value = rule.probe_expect || '';
+        document.getElementById('rule-resolution-notify-resolved').checked = rule.resolution_notify_resolved !== false;
+        updateResolutionUI();
 
-        // MON-18
-        const resEnable = document.getElementById('rule-resolution-enable');
-        if (resEnable) {
-            const hasRes = rule.resolution_mode !== 'disabled';
-            resEnable.checked = hasRes;
-            const modeToSet = hasRes ? rule.resolution_mode : 'timeout';
-            if (window._setResMode) window._setResMode(modeToSet); else document.getElementById('rule-resolution-mode').value = modeToSet;
-            document.getElementById('rule-resolution-timeout').value = rule.resolution_timeout_minutes || 30;
-            resTagsSet(rule.resolution_patterns || [], rule.resolution_patterns_weighted || []);
-            document.getElementById('rule-resolution-ai-enabled').checked = rule.resolution_ai_enabled || false;
-            document.getElementById('rule-resolution-notify-search').checked = rule.resolution_notify_search || false;
-            document.getElementById('rule-resolution-notify-resolved').checked = rule.resolution_notify_resolved !== false;
-            if (window.updateResolutionUI) window.updateResolutionUI();
-        }
-
-        document.getElementById('modal-title').textContent = window.t ? window.t('rules.modal_edit_title') : 'Edit rule';
-        // Hide quick templates in edit mode
-        const tpl = document.getElementById('modal-quick-templates');
-        if (tpl) tpl.classList.add('hidden');
-        document.getElementById('rule-modal').classList.remove('hidden');
+        // Quick templates are for new rules only
+        document.getElementById('modal-quick-templates')?.classList.add('hidden');
         closeFileBrowser();
-        if (rule.log_file_path !== '[WEBHOOK]') {
+        if (!rule.log_file_path.startsWith('[WEBHOOK]') && !rule.log_file_path.startsWith('[SYSLOG]')) {
             fetchFilePreview(rule.log_file_path);
         } else {
-            const container = document.getElementById('file-preview-container');
-            if (container) container.classList.add('hidden');
+            document.getElementById('file-preview-container')?.classList.add('hidden');
         }
 
         // Only open auto-learning tab if the rule still has a linked session.
-        // If last_learning_session_id is null, the user saved from the manual tab
-        // → stay on manual tab (default).
         if (rule.last_learning_session_id && typeof kwWizardLoadSession === 'function') {
             await kwWizardLoadSession(rule.last_learning_session_id);
         } else if (typeof kwWizardReset === 'function') {
-            // Ensure wizard state is clean when opening on manual tab
             kwWizardReset();
         }
+        return rule;
     } catch (error) {
         console.error('Erreur chargement règle:', error);
+        return null;
     }
 }
 
@@ -926,8 +700,6 @@ function applyTemplate(type) {
         document.getElementById('rule-path').value = t.path;
         document.getElementById('rule-keywords').value = t.keywords;
         document.getElementById('rule-context').value = t.context;
-
-        document.getElementById('modal-title').textContent = window.t ? window.t('rules.new_rule_from_template') : 'New rule (Template)';
 
         fetchFilePreview(t.path);
     }
