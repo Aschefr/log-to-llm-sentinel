@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - A new rule on an existing log file starts watching at the end of the file: its history is read by the learning, no longer replayed as new lines (which could fire a burst of alerts on old events).
 
 ### Fixed
+- **Autopilot**: an event repeating all day (e.g. Docker Desktop's `event streamer: error: EOF`, every 10 seconds) no longer sends an analysis to the AI every 30 seconds nor keeps the rule in alert: once its last 3 analyses are rated `info`, it is only analyzed again every 6 hours.
 - **Dashboard**: the automatic refresh no longer closes the analysis being read, nor reloads the list from the start. The list is usable on a phone and with the keyboard (an analysis card opens with a real button, on every page).
 - Markdown rendering no longer depends on a CDN: without internet access the analyses list stopped displaying altogether. The library is now served by the application, with its version pinned.
 - A new rule that has not received any line yet is no longer shown as a *silent source* right away; and while the autopilot sets up a rule, the silence delay is not known yet, so no *silent source* warning is shown or sent.

@@ -149,6 +149,18 @@ class Orchestrator:
 
             config_dict = config_to_dict(db.query(GlobalConfig).first())
 
+            # Pilote automatique : un événement répétitif déjà jugé sans gravité ne repart pas vers l'IA
+            if autopilot.enabled(rule):
+                lines, quiet = autopilot.quiet_lines(db, rule, lines)
+                if quiet:
+                    autopilot.note_quiet(rule, quiet, config_dict.get("ollama_prompt_lang", "fr"))
+                    db.commit()
+                    logger.debug("Orchestrator", f"'{rule.name}' : {len(quiet)} événement(s) répétitif(s) non analysé(s)")
+                if not lines:
+                    return
+                matched_keywords = [k for k in matched_keywords if k == autopilot.OBSERVE_KEYWORD
+                                    or any(keyword_match.matching([k], l) for l in lines)]
+
             # Lignes brutes conservées (bornées) : servent au prompt, au retry et à la récurrence
             raw_lines = {"total": len(lines), "window_s": buffer_delay, "lines": lines[-MAX_STORED_LINES:]}
             if len(lines) > 1:

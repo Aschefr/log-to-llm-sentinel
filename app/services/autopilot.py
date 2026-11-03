@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from app.models import Analysis, Rule
+from app.utils.log_utils import line_signature
 from app.services.prompts import AUTOPILOT_PROFILE_SCHEMA, AUTOPILOT_PROFILE_SYSTEM, autopilot_label
 from app.services.log_source import source_type
 from app.utils import keyword_match
@@ -36,6 +37,10 @@ SEVERITIES = ("info", "warning", "critical")
 PATTERN_MAX_SHARE = 0.05        # un motif de retour à la normale présent dans plus de 5 % des lignes ne signale rien
 PATTERN_ERROR_DISTANCE = 3      # … ni un motif qui apparaît à 3 lignes ou moins d'une ligne d'alerte
 EVENTS_MAX = 20                 # décisions gardées pour l'activité du dashboard
+QUIET_MIN_ANALYSES = 3          # une ligne jugée sans gravité par ses 3 dernières analyses ne repart plus vers l'IA…
+QUIET_RECHECK_HOURS = 6         # … sauf une revérification toutes les 6 heures
+QUIET_LOOKBACK = 100            # analyses récentes consultées
+QUIET_KEPT = 30                 # événements répétitifs déjà annoncés, gardés pour ne pas les annoncer deux fois
 AUTOPILOT_PATTERNS_MAX = 8      # motifs appris actifs au plus, par règle
 OBSERVE_HOURS = 24
 OBSERVE_MAX_ROUNDS = 7          # une source toujours muette n'est pas observée indéfiniment
@@ -67,6 +72,52 @@ def log_event(rule: Rule, text: str):
     data = load(rule)
     data["events"] = (data.get("events", []) + [{"at": datetime.utcnow().isoformat(), "text": text[:300]}])[-EVENTS_MAX:]
     save(rule, data)
+
+
+def _harmless(a: Analysis) -> bool:
+    """Jugée sans gravité par l'IA ou signalée pas pertinente. Une analyse échouée (enregistrée en « info ») ne dit rien."""
+    if (a.ollama_response or "").startswith("[Erreur"):
+        return False
+    return a.feedback == "irrelevant" or a.severity == "info"
+
+
+def quiet_lines(db, rule: Rule, lines: List[str], now: Optional[datetime] = None) -> tuple:
+    """Sépare les lignes à analyser des événements répétitifs déjà jugés sans gravité : celles dont les 3 dernières
+    analyses contenant le même événement sont sans gravité, la plus récente datant de moins de 6 heures. Une gravité
+    plus élevée parmi elles, ou un événement nouveau, repart vers l'IA. Retourne (lignes à analyser, signatures tues)."""
+    from app.services.alert_analysis import analysis_lines
+    now = now or datetime.utcnow()
+    recent = db.query(Analysis).filter(Analysis.rule_id == rule.id).order_by(Analysis.analyzed_at.desc()).limit(QUIET_LOOKBACK).all()
+    history = {}
+    for a in recent:
+        for sig in {line_signature(l) for l in analysis_lines(a)}:
+            history.setdefault(sig, []).append(a)
+    kept, quiet = [], []
+    for line in lines:
+        sig = line_signature(line)
+        past = history.get(sig, [])[:QUIET_MIN_ANALYSES]
+        if len(past) == QUIET_MIN_ANALYSES and all(_harmless(a) for a in past) \
+                and now - past[0].analyzed_at < timedelta(hours=QUIET_RECHECK_HOURS):
+            if sig not in quiet:
+                quiet.append(sig)
+        else:
+            kept.append(line)
+    return kept, quiet
+
+
+def note_quiet(rule: Rule, signatures: List[str], lang: str):
+    """Annonce une seule fois chaque événement répétitif dans les décisions du pilote."""
+    data = load(rule)
+    known = data.get("quiet", [])
+    fresh = [s for s in signatures if s not in known]
+    if not fresh:
+        return
+    data["quiet"] = (known + fresh)[-QUIET_KEPT:]
+    save(rule, data)
+    for sig in fresh:
+        log_event(rule, (f"Événement répétitif jugé sans gravité : analysé seulement toutes les {QUIET_RECHECK_HOURS} h : `{sig[:140]}`"
+                         if lang == "fr" else
+                         f"Repeated event rated harmless: analyzed only every {QUIET_RECHECK_HOURS} h: `{sig[:140]}`"))
 
 
 def changes_text(rule: Rule, fields: List[str], lang: str) -> str:
