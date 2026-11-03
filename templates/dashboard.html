@@ -3,87 +3,48 @@
 {% block title %}Dashboard - Log to LLM Sentinel{% endblock %}
 
 {% block content %}
-<div class="dashboard">
-    <h1 data-i18n="dashboard.title">Dashboard</h1>
+<div class="dash">
+    <header class="dash-verdict dash-verdict--checking" id="dash-verdict">
+        <span class="dash-verdict-icon" id="dash-verdict-icon" aria-hidden="true"></span>
+        <div class="dash-verdict-text">
+            <h1 id="dash-verdict-title" aria-live="polite" data-i18n="dashboard.verdict_checking">Vérification…</h1>
+            <p id="dash-verdict-sub"></p>
+        </div>
+        <span class="dash-verdict-time" id="dash-verdict-time"></span>
+    </header>
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-value" id="total-rules">0</div>
-            <div class="stat-label" data-i18n="dashboard.total_rules">Règles totales</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="active-rules">0</div>
-            <div class="stat-label" data-i18n="dashboard.active_rules">Règles actives</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="total-analyses">0</div>
-            <div class="stat-label" data-i18n="dashboard.total_analyses">Analyses totales</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-value" id="today-analyses">0</div>
-            <div class="stat-label" data-i18n="dashboard.today_analyses">Analyses aujourd'hui</div>
-        </div>
-        <div class="stat-card" style="position: relative;">
-            <button class="btn-icon reset-mttr-btn" id="reset-mttr-btn" style="position: absolute; top: 0.5rem; right: 0.5rem;" title="Réinitialiser le MTTR" data-i18n-title="dashboard.reset_mttr_title">
-                <svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M17.65,6.35C16.2,4.9 14.21,4 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20C15.73,20 18.84,17.45 19.73,14H17.65C16.83,16.33 14.61,18 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6C13.66,6 15.14,6.69 16.22,7.78L13,11H20V4L17.65,6.35Z" /></svg>
-            </button>
-            <div class="stat-value" id="mttr-stat">—</div>
-            <div class="stat-label" data-i18n="dashboard.mttr_label">MTTR (Retour moyen à la normale)</div>
-        </div>
-    </div>
-
-    <div class="severity-grid">
-        <div class="severity-card critical clickable" data-severity="critical">
-            <div class="severity-value" id="critical-count">0</div>
-            <div class="severity-label" data-i18n="dashboard.critical">Critiques</div>
-        </div>
-        <div class="severity-card warning clickable" data-severity="warning">
-            <div class="severity-value" id="warning-count">0</div>
-            <div class="severity-label" data-i18n="dashboard.warning">Avertissements</div>
-        </div>
-        <div class="severity-card info clickable" data-severity="info">
-            <div class="severity-value" id="info-count">0</div>
-            <div class="severity-label" data-i18n="dashboard.info">Infos</div>
-        </div>
-    </div>
-    
-    <!-- État des fichiers logs -->
-    <section class="collapsible-section" style="margin-bottom: 2rem;">
-        <div class="section-header clickable" onclick="toggleSection('rules-status-container', 'rules-status-arrow')">
-            <h2 style="margin: 0;" data-i18n="dashboard.log_files_status">État des fichiers logs</h2>
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <span class="text-secondary" style="font-size: 0.8rem;" data-i18n="dashboard.monitoring_files">Monitoring des fichiers</span>
-                <svg id="rules-status-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
-            </div>
-        </div>
-        <div id="rules-status-container" class="hidden">
-            <div id="rules-status-list" class="rules-list" style="margin-top: 1rem;">
-                <div class="loading" data-i18n="dashboard.loading_logs">Chargement de l'état des logs...</div>
-            </div>
-        </div>
+    <section class="dash-section" aria-labelledby="dash-attention-title">
+        <h2 class="dash-heading" id="dash-attention-title" data-i18n="dashboard.attention_title">À traiter</h2>
+        <div id="dash-attention"></div>
     </section>
- 
-    <!-- Analyses récentes -->
-    <section class="collapsible-section recent-section">
-        <div class="section-header clickable" onclick="toggleSection('recent-analyses-container', 'recent-analyses-arrow')">
-            <div style="display: flex; align-items: baseline; gap: 1rem;">
-                <h2 style="margin: 0;" data-i18n="dashboard.recent_analyses">Analyses récentes</h2>
-                <span id="active-filter-label" class="filter-badge hidden" onclick="event.stopPropagation(); setSeverityFilter(null)"><span data-i18n="dashboard.filter_label">Filtre:</span> <span id="filter-name">--</span> ✖</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 1rem;">
-                <button class="btn btn-secondary btn-sm" id="clear-all-analyses-btn" onclick="event.stopPropagation()"><span aria-hidden="true">🗑️ </span><span data-i18n="dashboard.clear_all">Tout effacer</span></button>
-                <svg id="recent-analyses-arrow" class="section-arrow expanded" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
-            </div>
+
+    <div class="dash-grid">
+        <section class="dash-panel dash-trend" id="dash-trend" aria-labelledby="dash-trend-title">
+            <h2 class="dash-panel-title" id="dash-trend-title" data-i18n="dashboard.trend_title">Alertes · 7 jours</h2>
+            <div id="dash-trend-body"></div>
+            <div class="dash-tip hidden" id="dash-tip" role="status"></div>
+        </section>
+        <section class="dash-panel dash-pilot" aria-labelledby="dash-pilot-title">
+            <h2 class="dash-panel-title" id="dash-pilot-title" data-i18n="dashboard.pilot_title">Pilote automatique</h2>
+            <div id="dash-pilot"></div>
+        </section>
+        <section class="dash-panel dash-ollama-panel" aria-labelledby="dash-ollama-title">
+            <h2 class="dash-panel-title" id="dash-ollama-title" data-i18n="dashboard.ollama_title">Ollama</h2>
+            <div id="dash-ollama"></div>
+        </section>
+    </div>
+
+    <section class="dash-section" id="dash-history" aria-labelledby="dash-history-title">
+        <div class="dash-history-head">
+            <h2 class="dash-heading" id="dash-history-title" data-i18n="dashboard.history_title">Historique</h2>
+            <div class="rp-seg" id="dash-filters" role="group" data-i18n-aria-label="dashboard.history_title"></div>
         </div>
-        <div id="recent-analyses-container">
-            <div id="recent-analyses" class="analyses-list" style="margin-top: 1rem;">
-                <div class="loading" data-i18n="dashboard.loading">Chargement...</div>
-            </div>
-        </div>
+        <div id="dash-history-list" class="analyses-list"></div>
+        <div id="dash-history-state"></div>
     </section>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/dashboard.js?v=4"></script>
+<script src="/static/js/dashboard.js?v=5"></script>
 {% endblock %}

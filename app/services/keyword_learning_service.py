@@ -489,6 +489,8 @@ async def _run_session(session_id: int):
                 ap.set_state(rule, status="active", observe_until=None, error=None, signatures=signatures,
                              profiled_at=now_iso if profile_messages else ap.load(rule).get("profiled_at"),
                              refreshed_at=now_iso)
+                if ap_changes:
+                    ap.log_event(rule, ap.changes_text(rule, ap_changes, lang))
                 summary["autopilot_changes"] = ap_changes
                 summary["autopilot_values"] = {f: getattr(rule, f) for f in ap_changes}
             db.commit()

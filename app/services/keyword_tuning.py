@@ -366,6 +366,8 @@ class KeywordTuningService:
                         rule.set_pattern_status(item["pattern"], "rejected")
                         learned_active -= 1
                         lines.append(f"- {'Motif de retour à la normale retiré (il apparaît aussi dans les erreurs ou presque partout)' if fr else 'Return-to-normal pattern removed (also in errors or almost everywhere)'} `{item['pattern']}`")
+            for line in lines:
+                ap.log_event(rule, line.removeprefix("- "))
             db.commit()
             name, notify = rule.name, rule.notify_on_match
         finally:

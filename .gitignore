@@ -41,3 +41,6 @@ data/syslog/.log
 # Lignes syslog reçues (données réelles)
 data/syslog/
 data/webhooks/
+
+# Impeccable design tool working files
+.impeccable/

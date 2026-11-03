@@ -35,6 +35,7 @@ NOTIFY_LOW_SHARE = 0.7          # part d'alertes « info » (ou signalées pas p
 SEVERITIES = ("info", "warning", "critical")
 PATTERN_MAX_SHARE = 0.05        # un motif de retour à la normale présent dans plus de 5 % des lignes ne signale rien
 PATTERN_ERROR_DISTANCE = 3      # … ni un motif qui apparaît à 3 lignes ou moins d'une ligne d'alerte
+EVENTS_MAX = 20                 # décisions gardées pour l'activité du dashboard
 AUTOPILOT_PATTERNS_MAX = 8      # motifs appris actifs au plus, par règle
 OBSERVE_HOURS = 24
 OBSERVE_MAX_ROUNDS = 7          # une source toujours muette n'est pas observée indéfiniment
@@ -59,6 +60,30 @@ def load(rule: Rule) -> dict:
 
 def save(rule: Rule, data: dict):
     rule.autopilot_json = json.dumps(data, default=str)
+
+
+def log_event(rule: Rule, text: str):
+    """Garde une décision du pilote pour l'afficher sur le dashboard (les plus récentes seulement)."""
+    data = load(rule)
+    data["events"] = (data.get("events", []) + [{"at": datetime.utcnow().isoformat(), "text": text[:300]}])[-EVENTS_MAX:]
+    save(rule, data)
+
+
+def changes_text(rule: Rule, fields: List[str], lang: str) -> str:
+    """Résumé des réglages que le pilote vient de définir."""
+    fr = lang == "fr"
+    parts = []
+    if "name" in fields:
+        parts.append(f"nom « {rule.name} »" if fr else f"name \"{rule.name}\"")
+    if "application_context" in fields:
+        parts.append("contexte" if fr else "context")
+    if "anti_spam_delay" in fields:
+        parts.append(f"regroupement {rule.anti_spam_delay} s" if fr else f"grouping {rule.anti_spam_delay} s")
+    if "inactivity_period_hours" in fields:
+        parts.append(f"silence {rule.inactivity_period_hours} h")
+    if "notify_severity_threshold" in fields:
+        parts.append(f"notifications à partir de {rule.notify_severity_threshold}" if fr else f"notifications from {rule.notify_severity_threshold}")
+    return ("Réglages définis : " if fr else "Settings set: ") + ", ".join(parts)
 
 
 def enabled(rule: Rule) -> bool:

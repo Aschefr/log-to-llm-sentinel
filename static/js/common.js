@@ -251,7 +251,7 @@ async function askQuestion(analysisId, inputEl, contextPrompt = null, contextRes
         });
 
         if (res.status === 'ok') {
-            contentSpan.innerHTML = marked.parse(res.response);
+            contentSpan.innerHTML = renderMarkdown(res.response);
         } else {
             contentSpan.innerHTML = `${window.t ? window.t('common.error') : 'Erreur'} : ${res.detail}`;
         }
@@ -473,6 +473,12 @@ function formatMinutesShort(m) {
     return `${Math.floor(m / 1440)} ${(window.t && window.t('rule.day_short') !== 'rule.day_short') ? window.t('rule.day_short') : 'j'}`;
 }
 
+/** Markdown to HTML; plain text when the parser is not available, so a card always renders. */
+function renderMarkdown(text) {
+    if (window.marked) return marked.parse(text || '');
+    return `<p style="white-space: pre-wrap;">${escapeHtml(text || '')}</p>`;
+}
+
 function renderAnalysisCard(a, opts = {}) {
     const collapsed = opts.collapsed !== false;
     const showDelete = opts.showDelete || false;
@@ -581,7 +587,7 @@ function renderAnalysisCard(a, opts = {}) {
     <div class="${cardClass}${collapsedCls}${unreadCls}" id="analysis-card-${a.id}">
         <div class="analysis-header" onclick="toggleAnalysisCardGeneric(event, this.parentElement)" style="cursor: pointer;">
             <div>
-                <span class="collapse-toggle">${toggleArrow}</span>
+                <button type="button" class="collapse-toggle" aria-expanded="${!collapsed}" aria-label="${escapeHtml(_t('common.toggle_details', 'Afficher ou masquer le détail'))}">${toggleArrow}</button>
                 ${ruleName}
                 ${a.detection_id ? `<span class="detection-id-badge" style="margin-left:0.5rem">#${escapeHtml(a.detection_id)}</span>` : ''}
                 <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
@@ -604,7 +610,7 @@ function renderAnalysisCard(a, opts = {}) {
                 ${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')}
             </div>` : ''}
             <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
-            <div class="analysis-response markdown-body">${a.ollama_response ? marked.parse(a.ollama_response) : ''}</div>
+            <div class="analysis-response markdown-body">${a.ollama_response ? renderMarkdown(a.ollama_response) : ''}</div>
             ${resolutionBlock}
             <div class="analysis-footer">
                 <div style="display: flex; gap: 0.5rem;">
@@ -668,10 +674,13 @@ async function markAnalysisAsViewed(analysisId) {
 }
 
 function toggleAnalysisCardGeneric(event, card) {
-    if (event.target.closest('button, a, .btn')) return;
+    if (event.target.closest('button:not(.collapse-toggle), a, .btn')) return;
     const isCollapsed = card.classList.toggle('collapsed');
     const toggle = card.querySelector('.collapse-toggle');
-    if (toggle) toggle.textContent = isCollapsed ? '▶' : '▼';
+    if (toggle) {
+        toggle.textContent = isCollapsed ? '▶' : '▼';
+        toggle.setAttribute('aria-expanded', String(!isCollapsed));
+    }
 
     if (!isCollapsed) {
         const idAttr = card.id;

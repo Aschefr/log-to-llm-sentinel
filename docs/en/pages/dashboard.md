@@ -1,50 +1,53 @@
 # Dashboard Page
 
-![Dashboard](../../../screenshots/log-to-llm-sentinel_dashboard.png)
+The **Dashboard** is the home screen of Log-to-LLM Sentinel. It is a watch post: it first answers "is everything fine?", then shows only what needs an action.
 
-The **Dashboard** is the home screen of Log-to-LLM Sentinel. It provides an immediate overview of the system's operational health, statistics, and recent notifications.
-
----
-
-## 1. System Metrics Header
-At the top right of the navigation bar, three real-time server statistics are shown:
-* **App/Sys CPU**: Percentage of CPU utilized by the Sentinel process itself, contrasted with the host system's total CPU load.
-* **RAM**: Megabytes of system RAM consumed by the Sentinel container.
-* **Uptime**: Total duration the Sentinel server process has been running since the last startup.
+The page updates by itself every 15 seconds, and right away when you come back to its tab. An update never closes or moves what you are reading.
 
 ---
 
-## 2. Global Counters & Stats Cards
-The main section of the dashboard displays four summary cards containing:
-* **Total Rules**: The total number of monitoring rules configured in the system.
-* **Active Rules**: The count of rules that are currently enabled and actively listening to logs.
-* **Total Analyses**: The cumulative historical number of LLM log analysis records.
-* **Today's Analyses**: The count of LLM analyses completed since 00:00 UTC today, color-coded by severity:
-  * 🔴 **Critical** (High severity issues)
-  * 🟡 **Warning** (Medium severity warnings)
-  * 🔵 **Info** (Low severity or informational logs)
+## 1. Verdict
+The heading of the page, also shown in the browser tab:
+* **All good**: nothing needs attention.
+* **The list of problems** (e.g. *1 open alert · 1 silent source*): red when a critical alert is open, orange for anything else (an alert rated below critical, a silent source, an autopilot failure, an Ollama problem).
+* **Unknown state**: Sentinel stopped responding. The page never shows *All good* on old data, and offers **Retry**.
+* **No source is being watched** or **Monitoring is off**: there is no rule yet, or every rule is disabled.
+
+Below it: the number of sources watched and under observation, and the time of the last analysis.
 
 ---
 
-## 3. Mean Time to Resolution (MTTR)
-The dashboard calculates the average time taken to resolve incidents across all monitored rules:
-* **MTTR Display**: Shows the average duration of alerts from trigger time until incident resolution.
-* **Reset MTTR Button (↺)**: Allows administrators to reset the MTTR history. Clicking this clears all past resolution logs from the statistical calculation.
-  * *UI Control*: Triggers a custom modal confirmation (`showInlineConfirm`) to prevent accidental resets.
+## 2. Needs attention
+Only what calls for an action, most serious first:
+* **Open alerts**, with the AI's summary and how long they have been open. A row opens the alert on its rule page.
+* **Autopilot failures**: the autopilot will try again on its own.
+* **Ollama problems**: server unreachable, model not installed or no server configured.
+* **Silent sources**: no line for longer than the rule's limit. A rule under autopilot observation is not listed: its rhythm is not known yet, so its silence is shown in the Autopilot block instead.
+* **Unread analyses**: **View** opens the *Unread* filter of the history. They do not change the verdict.
 
 ---
 
-## 4. Log Files & Ingestion Status
-A dedicated table shows the live state of all monitored files:
-* **File Path**: The absolute target path on the host/container.
-* **Status**: Indicators such as `Normal`, `In Alert` 🔴, or `AI Checking...` 🟡.
-* **Last Log Received**: Shows the relative time elapsed since the last line was piped or read from this source (e.g., "Il y a 02:34" / "2:34 ago").
+## 3. Alerts over 7 days
+One bar per day, split by severity, with the total, the comparison with the previous 7 days and the median return to normal over 30 days (the same MTTR as the Rules page). Hover or focus a bar for its values, or open **Show the table**. Days follow the server's UTC calendar.
 
 ---
 
-## 5. Recent Analyses Feed
-A chronological list of recent alerts analyzed by Ollama:
-* **Expandable Cards**: Click any card to expand the full LLM explanation, view the matched line, and see the exact keywords.
-* **Severity Badges**: Color-coded banners depicting the incident severity.
-* **Clear All Button (🗑️)**: Located at the top right of the feed. Permanently deletes all historical analysis records from the database.
-  * *Confirmation Modal*: Requires clicking "Confirm" in the custom inline popup to execute.
+## 4. Autopilot
+The rules on autopilot with their state (reading the history, under observation until a given time, active, failed), then the latest decisions: settings defined, return-to-normal patterns applied or removed, keywords and exclusions changed or dismissed. A rule opens its page, where each decision can be reviewed.
+
+---
+
+## 5. Ollama
+The configured model and whether the server responds, with the analysis running and those waiting.
+
+---
+
+## 6. History
+Every analysis, newest first, filtered by severity or unread. A row opens the full explanation, the triggering lines and the actions (retry, notify, deepen in the chat, flag as not relevant, delete).
+
+---
+
+## Moved to Configuration
+*Reset the MTTR* and *Delete all analyses* are now in **Configuration > Maintenance**, each with a confirmation.
+
+The server statistics (CPU, RAM, uptime) stay in the navigation bar.

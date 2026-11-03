@@ -548,7 +548,7 @@ async function loadResultsForConfig(configId) {
                     ${idsHtml}
                 </div>
                 <div class="markdown-body" style="font-size: 0.95rem; background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 4px;">
-                    ${marked.parse(r.ollama_response || '')}
+                    ${renderMarkdown(r.ollama_response)}
                 </div>
                 ${ctxHtml}
             </div>

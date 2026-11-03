@@ -9,7 +9,7 @@ Sentinel detects critical log events, automatically collects surrounding applica
 ## Table of Contents
 
 ### 🖥️ Page & Interface Guides
-* [**Dashboard**](pages/dashboard.md) — Main system stats, active rule summaries, MTTR logs, and recent analyses.
+* [**Dashboard**](pages/dashboard.md) — Watch post: a verdict, what needs attention, the alert trend, the autopilot, Ollama and the history.
 * [**Rules**](pages/rules.md) — Overview of every rule, then one page per rule: incident and statistics, live log, analyses, resolution and settings.
 * [**AI Analysis Center**](pages/chat.md) — Interactive log chat with dynamic context compression.
 * [**Meta-Analysis**](pages/meta-analysis.md) — Scheduling periodic synthese summaries of multiple rules.

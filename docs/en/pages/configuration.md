@@ -47,6 +47,8 @@ Sentinel listens on UDP port 514 inside the container (mapped to host port 10514
 ---
 
 ## 4. Maintenance, Backup & Restore
+**Maintenance** also holds two resets, each with a confirmation: **Reset the MTTR** removes already resolved incidents from the calculation and keeps the analyses; **Delete all analyses** permanently deletes every analysis of every rule.
+
 * **Auto-Delete Old Data**: Toggle switch to purge old logs.
 * **Retention Period**: Purge frequency (`1 week`, `1 month`, `6 months`, `1 year`).
 * **Clean Up Now Button**: Triggers an immediate database cleanup.

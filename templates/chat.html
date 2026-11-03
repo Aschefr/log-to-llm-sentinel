@@ -1355,7 +1355,7 @@ function renderMath(el) {
  * Utilisation : el.innerHTML = marked.parse(text); renderMath(el);
  */
 function parseMd(text) {
-    return marked.parse(text || '');
+    return renderMarkdown(text);
 }
 
 /** Échappe une chaîne pour l'injection dans un attribut HTML data-* */

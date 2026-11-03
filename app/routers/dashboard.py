@@ -10,13 +10,20 @@ except ImportError:
     psutil = None
 
 from app.database import SessionLocal
-from app.models import Rule, Analysis
-from app.services import rule_stats
+from app.models import GlobalConfig, Rule, Analysis
+from app.services import dashboard_watch, rule_stats
+from app.services.app_config import config_to_dict
 from app.services.alert_analysis import short_summary
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 START_TIME = time.time()
+_orchestrator = None
+
+
+def set_orchestrator(orchestrator):
+    global _orchestrator
+    _orchestrator = orchestrator
 
 
 @router.get("/system-stats")
@@ -41,6 +48,27 @@ def get_system_stats():
             pass
             
     return stats
+
+
+@router.get("/watch")
+def get_watch():
+    """Poste de veille : ce qui demande une action, tendance, activité du pilote automatique."""
+    db = SessionLocal()
+    try:
+        return dashboard_watch.build(db)
+    finally:
+        db.close()
+
+
+@router.get("/ollama")
+def get_ollama_status():
+    """État d'Ollama, à part : un serveur injoignable ne doit pas retarder le reste de la page."""
+    db = SessionLocal()
+    try:
+        config = config_to_dict(db.query(GlobalConfig).first())
+    finally:
+        db.close()
+    return dashboard_watch.ollama_status(config, _orchestrator)
 
 
 @router.get("/stats")

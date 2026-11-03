@@ -816,6 +816,24 @@ function setupMaintenance() {
         });
     }
 
+    const resetActions = [
+        ['reset-mttr-btn', 'dashboard.confirm_reset_mttr', '/api/dashboard/reset-mttr', 'POST', 'config.reset_mttr_done'],
+        ['clear-all-analyses-btn', 'dashboard.confirm_clear_all', '/api/dashboard/analyses/all/confirm', 'DELETE', 'config.clear_all_done'],
+    ];
+    resetActions.forEach(([id, confirmKey, url, method, doneKey]) => {
+        const btn = document.getElementById(id);
+        btn?.addEventListener('click', () => {
+            showInlineConfirm(btn, window.t(confirmKey), async () => {
+                try {
+                    await apiFetch(url, { method });
+                    alert(window.t(doneKey));
+                } catch (error) {
+                    alert(`${window.t('common.error')} : ${error.message}`);
+                }
+            });
+        });
+    });
+
     const cleanupBtn = document.getElementById('cleanup-btn');
     if (cleanupBtn) {
         cleanupBtn.addEventListener('click', async () => {

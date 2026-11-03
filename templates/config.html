@@ -376,6 +376,18 @@
                             <span aria-hidden="true">🗑️ </span><span data-i18n="config.cleanup_btn">Nettoyer maintenant</span>
                         </button>
                     </div>
+
+                    <div class="config-reset">
+                        <h4 data-i18n="config.reset_title">Réinitialiser</h4>
+                        <div class="config-reset-row">
+                            <div class="form-hint" data-i18n="config.reset_mttr_hint">Retire les incidents déjà résolus du calcul du MTTR. Les analyses sont conservées.</div>
+                            <button type="button" id="reset-mttr-btn" class="btn btn-secondary btn-sm" data-i18n="dashboard.reset_mttr_title">Réinitialiser le MTTR</button>
+                        </div>
+                        <div class="config-reset-row">
+                            <div class="form-hint" data-i18n="config.clear_all_hint">Supprime définitivement toutes les analyses de toutes les règles.</div>
+                            <button type="button" id="clear-all-analyses-btn" class="btn btn-danger btn-sm" data-i18n="config.clear_all_btn">Effacer toutes les analyses</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -567,6 +579,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=5"></script>
+<script src="/static/js/config.js?v=6"></script>
 <script src="/static/js/diagnostics_config.js?v=4"></script>
 {% endblock %}

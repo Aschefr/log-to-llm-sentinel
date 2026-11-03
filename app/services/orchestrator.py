@@ -42,6 +42,11 @@ class Orchestrator:
         self._buffers = {}  # rule_id -> {"lines": [], "task": None, "detection_id": None, "matched_keywords": set()}
         self._ollama_semaphore = asyncio.Semaphore(1)
 
+    def ollama_load(self) -> dict:
+        """Appels au modèle : en cours (un seul à la fois) et en attente."""
+        semaphore = self._ollama_semaphore
+        return {"running": 1 if semaphore.locked() else 0, "waiting": len(semaphore._waiters or [])}
+
     async def handle_new_lines(self, rule: Rule, lines: List[str]):
         """Traite les nouvelles lignes pour une règle donnée."""
         db = SessionLocal()

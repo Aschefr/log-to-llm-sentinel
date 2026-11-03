@@ -1125,7 +1125,7 @@ async function onLineClick(el, ruleId) {
         <div class="detail-row"><span class="detail-label">${esc(T('monitor.severity', 'Sévérité'))}</span>${sevBadge(related.severity)}</div>
         <div class="detail-row"><span class="detail-label">${esc(T('monitor.analyzed_at', 'Analysée le'))}</span><span class="detail-value">${related.analyzed_at ? esc(formatDate(related.analyzed_at)) : '—'}</span></div>
         <div class="detail-row"><span class="detail-label">${esc(T('monitor.llm_response', 'Réponse IA'))}</span>
-            <div class="detail-value analysis-response markdown-body">${related.ollama_response ? marked.parse(related.ollama_response) : '—'}</div></div>
+            <div class="detail-value analysis-response markdown-body">${related.ollama_response ? renderMarkdown(related.ollama_response) : '—'}</div></div>
         <div class="detail-actions rp-actions">
             <button class="btn btn-secondary btn-sm" onclick="RP.focusAnalysisId=${related.id}; selectTab('analyses')">${esc(T('rule.open_analysis', 'Voir l’analyse'))}</button>
             <button class="btn btn-secondary btn-sm" onclick="togglePromptView(${related.id}, this)">📜 ${esc(T('common.view_prompt', 'Prompt'))}</button>

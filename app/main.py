@@ -119,6 +119,7 @@ async def lifespan(app: FastAPI):
     monitor_router.set_resolution_service(resolution_service)
     chat_router.set_orchestrator(orchestrator)
     config.set_orchestrator(orchestrator)
+    dashboard.set_orchestrator(orchestrator)
     rules.set_orchestrator(orchestrator)
     rules.set_resolution_service(resolution_service)
     rules.set_keyword_tuning(keyword_tuning)
