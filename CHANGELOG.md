@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
 - **Watchdog**: if the application's main loop stops responding for more than 5 seconds, the logs show where it is stuck (once per stall), to diagnose an unresponsive interface.
 
 ### Changed
+- **Analyses are grouped by event** on the dashboard and in a rule's Analyses tab: one row per event, with its number of occurrences and highest severity, and the other occurrences one click away. The unread count now counts events, and a simple repeat of an event you have read no longer makes it unread again. Nothing is deleted, and statistics still count every analysis.
 - *Reset the MTTR* and *Delete all analyses* moved from the dashboard to **Configuration > Maintenance**. The dashboard's MTTR is now the median over 30 days, the same as the Rules page.
 - Keywords and ignored lines are no longer edited in the Settings tab of an existing rule: the Keywords tab manages them (saving Settings never overwrites them anymore). They are still typed in the form when creating a manual rule.
 - A new rule on an existing log file starts watching at the end of the file: its history is read by the learning, no longer replayed as new lines (which could fire a burst of alerts on old events).
@@ -21,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - **E-mail notifications** now escape the log line, the AI's answer, keywords and the rule's name.
 
 ### Fixed
+- **Event recognition**: a date written `2026/11/03` (e.g. in nginx errors) made the same event look new every day, for the recurrence count and for the autopilot's repeated events.
 - **Deleting a rule** now also deletes its analyses, resolution history and learning sessions. Its number can be reused: a rule created afterwards could inherit them, and a pending autopilot session prevented its setup, then applied the deleted rule's source to it.
 - **Changing a rule's source**: a learning session still running on the old source is stopped, and a rule on autopilot starts learning again from the new source. A rule on autopilot whose setup could not start now retries by itself.
 - **Autopilot**: an event repeating all day (e.g. Docker Desktop's `event streamer: error: EOF`, every 10 seconds) no longer sends an analysis to the AI every 30 seconds nor keeps the rule in alert: once its last 3 analyses are rated `info`, it is only analyzed again every 6 hours.

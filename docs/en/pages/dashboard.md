@@ -23,7 +23,7 @@ Only what calls for an action, most serious first:
 * **Autopilot failures**: the autopilot will try again on its own.
 * **Ollama problems**: server unreachable, model not installed or no server configured.
 * **Silent sources**: no line for longer than the rule's limit. A rule under autopilot observation is not listed: its rhythm is not known yet, so its silence is shown in the Autopilot block instead.
-* **Unread analyses**: **View** opens the *Unread* filter of the history. They do not change the verdict.
+* **Unread events**: **View** opens the *Unread* filter of the history. They do not change the verdict.
 
 ---
 
@@ -43,7 +43,13 @@ The configured model and whether the server responds, with the analysis running 
 ---
 
 ## 6. History
-Every analysis, newest first, filtered by severity or unread. A row opens the full explanation, the triggering lines and the actions (retry, notify, deepen in the chat, flag as not relevant, delete).
+Analyses grouped by **event**: analyses of a rule with the same error lines (or the same lines when none looks like an error), apart from variable parts such as dates, durations, addresses and identifiers. A new error line always makes a new event. Newest first, filtered by severity or unread.
+
+* A row shows the latest summary, the number of occurrences and the event's highest severity. It opens the full explanation, the triggering lines, the actions (retry, notify, deepen in the chat, flag as not relevant, delete) and the list of the other occurrences.
+* The unread count is a count of events. Opening one marks all its occurrences as read. It becomes unread again only if a new occurrence is more serious than what you have read.
+* Nothing is deleted by grouping: statistics, the 7-day chart and the keyword tuning still count every analysis. Deleting a row deletes all the occurrences of that event.
+
+The **Analyses** tab of a rule works the same way.
 
 ---
 

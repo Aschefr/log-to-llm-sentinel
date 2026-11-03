@@ -77,8 +77,8 @@
     "silence_text": "No line for {d}.",
     "silence_never": "No line received.",
     "silence_limit": "limit: {h} h",
-    "unread_one": "{n} unread analysis",
-    "unread_many": "{n} unread analyses",
+    "unread_one": "{n} unread event",
+    "unread_many": "{n} unread events",
     "unread_action": "View",
     "trend_title": "Alerts · 7 days",
     "trend_none": "No alert in 7 days.",
@@ -122,7 +122,6 @@
     "filter_unread": "Unread",
     "history_none": "Analyses will appear here as soon as a rule triggers.",
     "history_none_filter": "No analysis for this filter.",
-    "confirm_delete": "Delete this analysis?",
     "attention_unknown": "Cannot tell what needs attention right now."
   },
   "rules": {
@@ -639,7 +638,12 @@
     "irrelevant_done": "Flagged not relevant",
     "irrelevant_title": "The AI will adjust the rule's keywords or exclusions so this kind of line no longer triggers it",
     "irrelevant_toast": "Thanks: the AI is reviewing the rule's keywords.",
-    "toggle_details": "Show or hide the details"
+    "toggle_details": "Show or hide the details",
+    "event_count_title": "{n} occurrences of this event",
+    "event_range": "{n} occurrences, from {first} to {last}",
+    "event_more": "Show the other occurrences",
+    "event_hide": "Hide the occurrences",
+    "confirm_delete_event": "Delete this event and its {n} occurrences?"
   },
   "meta": {
     "title": "Meta-Analysis",

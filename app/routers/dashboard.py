@@ -11,7 +11,7 @@ except ImportError:
 
 from app.database import SessionLocal
 from app.models import GlobalConfig, Rule, Analysis
-from app.services import dashboard_watch, rule_stats
+from app.services import analysis_events, dashboard_watch, rule_stats
 from app.services.app_config import config_to_dict
 from app.services.alert_analysis import short_summary
 
@@ -118,9 +118,68 @@ def get_stats():
         db.close()
 
 
+def _analysis_dict(a: Analysis, rule_name: str, recurrence: dict) -> dict:
+    import json as _json
+    return {
+        "id": a.id,
+        "rule_id": a.rule_id,
+        "rule_name": rule_name or f"Règle #{a.rule_id}",
+        "triggered_line": a.triggered_line,
+        "ollama_response": a.ollama_response,
+        "severity": a.severity,
+        "detection_id": a.detection_id,
+        "viewed": a.viewed,
+        "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
+        "matched_keywords": _json.loads(a.matched_keywords_json) if a.matched_keywords_json else [],
+        "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
+        "resolution_status": a.resolution_status,
+        "feedback": a.feedback,
+        "resolution_line": a.resolution_line,
+        "resolution_patterns": _json.loads(a.resolution_patterns_json) if a.resolution_patterns_json else [],
+        "resolution_ai_explanation": a.resolution_ai_explanation,
+        "resolution_ai_confidence": a.resolution_ai_confidence,
+        "summary": short_summary(a, 220) if (a.summary or a.ollama_response) else None,
+        "recurrence_7d": recurrence.get(a.id, 0),
+        "resolution_minutes": rule_stats.resolution_minutes(a),
+    }
+
+
+@router.get("/events")
+def get_events(limit: int = 20, offset: int = 0, rule_id: int | None = None, severity: str | None = None,
+               unread: bool = False, open_only: bool = False, days: int | None = None, focus: int | None = None):
+    """Analyses regroupées par événement : une ligne par événement, avec le nombre de répétitions."""
+    db = SessionLocal()
+    try:
+        events = analysis_events.summarize(db, rule_id=rule_id, days=days, open_only=open_only)
+        analysis_events.apply_focus(db, events, focus)
+        selected = analysis_events.select(events, severity=severity, unread=unread)
+        page = selected[offset:offset + limit]
+        by_id = {a.id: a for a in db.query(Analysis).filter(Analysis.id.in_([e["analysis_id"] for e in page])).all()}
+        for e in page:
+            e["analysis"] = _analysis_dict(by_id[e["analysis_id"]], e["rule_name"], {})
+        return {"events": page, "has_more": offset + limit < len(selected), "total": len(selected),
+                "counts": analysis_events.counts(events)}
+    finally:
+        db.close()
+
+
+@router.delete("/events/{rule_id}/{key}")
+def delete_event(rule_id: int, key: str):
+    """Supprime toutes les occurrences d'un événement."""
+    db = SessionLocal()
+    try:
+        deleted = db.query(Analysis).filter(Analysis.rule_id == rule_id, Analysis.event_key == key).delete()
+        db.commit()
+        if not deleted:
+            raise HTTPException(status_code=404, detail="event_not_found")
+        return {"status": "ok", "deleted": deleted}
+    finally:
+        db.close()
+
+
 @router.get("/recent")
 def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = None, severity: str | None = None,
-                        unread: bool = False, open_only: bool = False, days: int | None = None):
+                        unread: bool = False, open_only: bool = False, days: int | None = None, event_key: str | None = None):
     db = SessionLocal()
     try:
         # Jointure explicite pour récupérer l'objet Analysis et le nom de la Règle associée
@@ -128,6 +187,8 @@ def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = 
         
         if rule_id is not None:
             q = q.filter(Analysis.rule_id == rule_id)
+        if event_key:
+            q = q.filter(Analysis.event_key == event_key)
         if days:
             q = q.filter(Analysis.analyzed_at >= datetime.utcnow() - timedelta(days=days))
         if open_only:
@@ -147,33 +208,8 @@ def get_recent_analyses(limit: int = 10, offset: int = 0, rule_id: int | None = 
         total = q.count()
         results = q.order_by(Analysis.analyzed_at.desc()).offset(offset).limit(limit).all()
         
-        import json as _json
         recurrence = rule_stats.recurrence_counts(db, [a for a, _ in results])
-        analyses = [
-            {
-                "id": a.id,
-                "rule_id": a.rule_id,
-                "rule_name": rule_name or f"Règle #{a.rule_id}",
-                "triggered_line": a.triggered_line,
-                "ollama_response": a.ollama_response,
-                "severity": a.severity,
-                "detection_id": a.detection_id,
-                "viewed": a.viewed,
-                "analyzed_at": a.analyzed_at.isoformat() if a.analyzed_at else None,
-                "matched_keywords": _json.loads(a.matched_keywords_json) if a.matched_keywords_json else [],
-                "resolved_at": a.resolved_at.isoformat() if a.resolved_at else None,
-                "resolution_status": a.resolution_status,
-                "feedback": a.feedback,
-                "resolution_line": a.resolution_line,
-                "resolution_patterns": _json.loads(a.resolution_patterns_json) if a.resolution_patterns_json else [],
-                "resolution_ai_explanation": a.resolution_ai_explanation,
-                "resolution_ai_confidence": a.resolution_ai_confidence,
-                "summary": short_summary(a, 220) if (a.summary or a.ollama_response) else None,
-                "recurrence_7d": recurrence.get(a.id, 0),
-                "resolution_minutes": rule_stats.resolution_minutes(a),
-            }
-            for a, rule_name in results
-        ]
+        analyses = [_analysis_dict(a, rule_name, recurrence) for a, rule_name in results]
         return {"analyses": analyses, "has_more": (offset + limit) < total, "total": total, "counts": counts}
     finally:
         db.close()

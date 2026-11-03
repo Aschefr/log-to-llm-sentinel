@@ -281,7 +281,7 @@ async function loadHeader() {
 
         setKwBadge(rule.keyword_pending || 0);
         setAutopilotPill(rule.autopilot);
-        const counts = (await apiFetch(`/api/dashboard/recent?limit=1&rule_id=${RP.id}`)).counts || {};
+        const counts = (await apiFetch(`/api/dashboard/events?limit=1&rule_id=${RP.id}`)).counts || {};
         setUnreadBadge(counts.unread);
         return rule;
     } catch (e) {
@@ -507,14 +507,16 @@ function setUnreadBadge(n) {
 }
 
 /* ── Analyses tab ──────────────────────────────────────────────────────────── */
-// An alert opened on this page (common.js markAnalysisAsViewed): update the counters without reloading
-document.addEventListener('analysis-viewed', () => {
-    setUnreadBadge(Math.max(0, (parseInt(document.getElementById('rp-unread-badge').textContent) || 0) - 1));
-    if (RP.an.counts && RP.an.counts.unread > 0) {
-        RP.an.counts.unread--;
+// An alert opened on this page (common.js markAnalysisAsViewed) or an event deleted: update the counters without reloading
+async function refreshAnalysisCounts() {
+    try {
+        setUnreadBadge((await apiFetch(`/api/dashboard/events?limit=1&rule_id=${RP.id}`)).counts?.unread);
+        RP.an.counts = (await apiFetch(analysesUrl(0, 1))).counts;
         renderAnalysisFilters();
-    }
-});
+    } catch (_) { /* transient */ }
+}
+document.addEventListener('analysis-viewed', refreshAnalysisCounts);
+document.addEventListener('events-changed', refreshAnalysisCounts);
 
 function setupAnalysesToolbar() {
     document.getElementById('an-period').addEventListener('change', e => { RP.an.period = e.target.value; loadAnalyses(true); });
@@ -527,7 +529,8 @@ function setupAnalysesToolbar() {
 }
 
 function analysesUrl(offset, limit) {
-    let url = `/api/dashboard/recent?rule_id=${RP.id}&limit=${limit}&offset=${offset}`;
+    let url = `/api/dashboard/events?rule_id=${RP.id}&limit=${limit}&offset=${offset}`;
+    if (RP.focusAnalysisId) url += `&focus=${RP.focusAnalysisId}`;
     if (RP.an.period) url += `&days=${RP.an.period}`;
     if (RP.an.openOnly) url += '&open_only=true';
     if (RP.an.filter === 'unread') url += '&unread=true';
@@ -543,29 +546,27 @@ function renderAnalysisFilters() {
         `<button type="button" class="${RP.an.filter === id ? 'active' : ''}" aria-pressed="${RP.an.filter === id}" onclick="RP.an.filter='${id}'; loadAnalyses(true)">${esc(label)} (${n || 0})</button>`).join('');
 }
 
-function cardHtml(a, collapsed, extraClass = '') {
-    return renderAnalysisCard(a, { collapsed, showDelete: true, showCopy: true, showRuleName: false, hideRuleLink: true,
-        cardClass: 'analysis-card' + extraClass });
-}
+const RULE_CARD_OPTS = { showRuleName: false, hideRuleLink: true };
 
 async function loadAnalyses(reset) {
     const list = document.getElementById('an-list');
     const offset = reset ? 0 : RP.an.offset;
-    const limit = reset && RP.focusAnalysisId ? 60 : 20;
+    const focusId = reset ? RP.focusAnalysisId : null;
+    const limit = focusId ? 60 : 20;
     try {
         const res = await apiFetch(analysesUrl(offset, limit));
         RP.an.counts = res.counts;
         RP.an.hasMore = res.has_more;
         renderAnalysisFilters();
-        const html = res.analyses.map(a => cardHtml(a, !(RP.focusAnalysisId ? a.id === RP.focusAnalysisId : false))).join('');
         list.querySelector('.rp-more')?.remove();
-        if (reset) list.innerHTML = html || `<div class="no-logs">${esc(T('monitor.no_recent_analyses', 'Aucune analyse récente'))}</div>`;
-        else list.insertAdjacentHTML('beforeend', html);
-        RP.an.offset = offset + res.analyses.length;
+        if (reset) list.innerHTML = '';
+        list.append(...res.events.map(ev => renderEventCard(ev, { ...RULE_CARD_OPTS, collapsed: ev.analysis.id !== focusId })));
+        if (reset && !res.events.length) list.innerHTML = `<div class="no-logs">${esc(T('monitor.no_recent_analyses', 'Aucune analyse récente'))}</div>`;
+        RP.an.offset = offset + res.events.length;
         if (RP.an.hasMore) list.insertAdjacentHTML('beforeend', `<button class="btn btn-secondary rp-more" onclick="loadAnalyses(false)">${esc(T('monitor.show_more', 'Afficher plus'))}</button>`);
-        if (reset && RP.focusAnalysisId) {
-            const card = document.getElementById(`analysis-card-${RP.focusAnalysisId}`);
-            if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); markAnalysisAsViewed(RP.focusAnalysisId); }
+        if (focusId) {
+            const card = document.getElementById(`analysis-card-${focusId}`);
+            if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'start' }); markAnalysisAsViewed(focusId); }
             RP.focusAnalysisId = null;
         }
     } catch (e) {
@@ -575,29 +576,20 @@ async function loadAnalyses(reset) {
 
 async function pollAnalyses() {
     const list = document.getElementById('an-list');
-    const ids = [...list.querySelectorAll('.analysis-card')].map(c => parseInt(c.id.replace('analysis-card-', ''))).filter(Boolean);
-    if (!ids.length) return loadAnalyses(true);
+    if (!list.querySelector('.analysis-card')) return loadAnalyses(true);
     try {
-        const res = await apiFetch(analysesUrl(0, 10));
+        const res = await apiFetch(analysesUrl(0, Math.max(RP.an.offset, 10)));
+        const newest = list.querySelector('.analysis-card')?.dataset.event;
+        const changed = res.events[0] && `${res.events[0].rule_id}-${res.events[0].key}` !== newest;
         RP.an.counts = res.counts;
         renderAnalysisFilters();
-        const maxId = Math.max(...ids);
-        res.analyses.forEach(a => {
-            const existing = document.getElementById(`analysis-card-${a.id}`);
-            if (existing && (a.resolution_status === 'resolved') !== !!existing.querySelector('.resolved-badge')) {
-                const tmp = document.createElement('div');
-                tmp.innerHTML = cardHtml(a, existing.classList.contains('collapsed'));
-                existing.replaceWith(tmp.firstElementChild);
-            }
-        });
-        const fresh = res.analyses.filter(a => a.id > maxId);
-        if (fresh.length) {
-            list.insertAdjacentHTML('afterbegin', fresh.map(a => cardHtml(a, true, ' newly-added-highlight')).join(''));
-            RP.an.offset += fresh.length;
-            loadHeader();
-        }
+        reconcileEvents(list, res.events, { ...RULE_CARD_OPTS, freshClass: 'newly-added-highlight' });
+        RP.an.offset = Math.max(RP.an.offset, res.events.length);
+        if (changed) loadHeader();
     } catch (_) { /* transient */ }
 }
+
+document.addEventListener('events-changed', () => { if (RP.id) { loadAnalyses(true); loadHeader(); } });
 
 // Called by renderAnalysisCard buttons
 async function deleteAnalysis(id, btnElement) {

@@ -6,6 +6,7 @@ from datetime import datetime
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
+from app.services import analysis_events
 from app.services.orchestrator import Orchestrator
 from app.services.task_manager import task_manager
 from app.services.app_config import load_config_dict
@@ -150,7 +151,7 @@ def mark_analysis_viewed(analysis_id: int):
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if not analysis:
             raise HTTPException(status_code=404, detail="analysis_not_found")
-        analysis.viewed = True
+        analysis_events.mark_read(db, analysis)
         db.commit()
         return {"status": "ok"}
     finally:

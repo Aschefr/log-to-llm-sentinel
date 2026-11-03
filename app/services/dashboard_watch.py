@@ -12,6 +12,7 @@ from typing import Optional
 from sqlalchemy import func
 
 from app.models import Analysis, KeywordChange, Rule
+from app.services import analysis_events
 from app.services import autopilot as ap
 from app.services import rule_stats
 
@@ -92,12 +93,7 @@ def build(db) -> dict:
     ids = [r.id for r in rules]
     # Comme la liste des analyses, on ne compte que celles des règles existantes
     analyses = db.query(Analysis).filter(Analysis.analyzed_at >= now - timedelta(days=30), Analysis.rule_id.in_(ids)).all()
-    known = db.query(Analysis).filter(Analysis.rule_id.in_(ids))
-    counts = {"total": known.count(), "unread": known.filter(Analysis.viewed == False).count(), "critical": 0, "warning": 0, "info": 0}
-    for severity, n in known.with_entities(Analysis.severity, func.count(Analysis.id)).group_by(Analysis.severity).all():
-        key = severity if severity in rule_stats.SEVERITIES else "info"
-        counts[key] += n
-    last_analysis = known.with_entities(func.max(Analysis.analyzed_at)).scalar()
+    last_analysis = db.query(func.max(Analysis.analyzed_at)).filter(Analysis.rule_id.in_(ids)).scalar()
     return {
         "rules": {
             "total": len(rules),
@@ -112,7 +108,7 @@ def build(db) -> dict:
             "pilot_errors": [{"rule_id": r.id, "rule_name": r.name} for r in enabled
                              if ap.enabled(r) and ap.load(r).get("status") == "error" and ap.load(r).get("error") != "cancelled"],
         },
-        "counts": counts,
+        "counts": analysis_events.counts(analysis_events.summarize(db)),
         "trend": _trend(analyses, now),
         "pilot": _pilot(db, enabled),
     }

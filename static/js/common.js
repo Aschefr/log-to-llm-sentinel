@@ -498,7 +498,8 @@ function renderAnalysisCard(a, opts = {}) {
     const collapsedCls = collapsed ? ' collapsed' : '';
     const toggleArrow = collapsed ? '▶' : '▼';
 
-    const isUnread = a.viewed === false || a.viewed === 0;
+    const ev = opts.event;  // événement regroupant cette analyse, s'il y en a un
+    const isUnread = ev ? ev.unread : a.viewed === false || a.viewed === 0;
     const unreadCls = isUnread ? ' unread' : '';
     const unreadIndicator = isUnread ? `<span class="unread-dot-indicator" title="${_t('monitor.unviewed_tooltip', 'Non consultée')}">●</span>` : '';
 
@@ -514,7 +515,7 @@ function renderAnalysisCard(a, opts = {}) {
         </button>` : '';
 
     const deleteBtn = showDelete ? `
-        <button class="btn-icon delete-analysis-btn" onclick="event.stopPropagation(); deleteAnalysis(${a.id}, this)" title="${_t('common.delete_analysis', 'Delete')}">
+        <button class="btn-icon delete-analysis-btn" onclick="event.stopPropagation(); ${ev ? `deleteEvent(${ev.rule_id}, '${ev.key}', ${ev.count}, this)` : `deleteAnalysis(${a.id}, this)`}" title="${_t('common.delete_analysis', 'Delete')}">
             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
         </button>` : '';
 
@@ -528,7 +529,9 @@ function renderAnalysisCard(a, opts = {}) {
             : _t('monitor.badge_resolved', 'Résolu')}</span>` : '';
     // Récurrence sur 7 jours (même événement à des valeurs variables près)
     let recurBadge = '';
-    if (a.recurrence_7d != null) {
+    if (ev) {
+        if (ev.count > 1) recurBadge = `<span class="recur-badge event-count" title="${escapeHtml(_t('common.event_count_title', '{n} occurrences de cet événement').replace('{n}', ev.count))}">× ${ev.count}</span>`;
+    } else if (a.recurrence_7d != null) {
         recurBadge = a.recurrence_7d > 0
             ? `<span class="recur-badge" title="${escapeHtml(_t('common.recurrence_title', 'Déjà vu dans les 7 jours précédents'))}">${escapeHtml(_t('common.recurrence', '× {n} en 7 j').replace('{n}', a.recurrence_7d))}</span>`
             : `<span class="recur-badge recur-badge--new">${escapeHtml(_t('common.recurrence_new', 'nouveau'))}</span>`;
@@ -592,14 +595,14 @@ function renderAnalysisCard(a, opts = {}) {
     }
 
     return `
-    <div class="${cardClass}${collapsedCls}${unreadCls}" id="analysis-card-${a.id}">
+    <div class="${cardClass}${collapsedCls}${unreadCls}" id="analysis-card-${a.id}"${ev ? ` data-event="${ev.rule_id}-${ev.key}"` : ''}>
         <div class="analysis-header" onclick="toggleAnalysisCardGeneric(event, this.parentElement)" style="cursor: pointer;">
             <div>
                 <button type="button" class="collapse-toggle" aria-expanded="${!collapsed}" aria-label="${escapeHtml(_t('common.toggle_details', 'Afficher ou masquer le détail'))}">${toggleArrow}</button>
                 ${ruleName}
                 ${a.detection_id ? `<span class="detection-id-badge" style="margin-left:0.5rem">#${escapeHtml(a.detection_id)}</span>` : ''}
                 <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
-                <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                <span class="severity-badge ${escapeHtml(ev ? ev.severity : a.severity)}">${escapeHtml(ev ? ev.severity : a.severity)}</span>
                 ${resolvedBadge}
                 ${recurBadge}
                 ${unreadIndicator}
@@ -612,6 +615,7 @@ function renderAnalysisCard(a, opts = {}) {
             </div>
         </div>
         <div class="analysis-body">
+            ${ev && ev.count > 1 ? eventOccurrencesHtml(ev, a.id) : ''}
             ${a.matched_keywords && a.matched_keywords.length > 0 ? `
             <div class="analysis-keywords">
                 <span class="kw-label">${_t('monitor.keywords', 'Keywords')} :</span>
@@ -634,6 +638,118 @@ function renderAnalysisCard(a, opts = {}) {
             </div>
         </div>
     </div>`;
+}
+
+/* ── Analyses grouped by event ───────────────────────────────────────────── */
+
+function eventOccurrencesHtml(ev, shownId) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    const severities = ['critical', 'warning', 'info'].filter(s => ev.severities[s]).map(s => `${ev.severities[s]} ${s}`).join(' · ');
+    const range = _t('common.event_range', '{n} occurrences, du {first} au {last}').replace('{n}', ev.count)
+        .replace('{first}', formatDate(ev.first_at)).replace('{last}', formatDate(ev.last_at));
+    return `<div class="event-occurrences">
+        <span>${escapeHtml(range)} · ${escapeHtml(severities)}</span>
+        <button type="button" class="btn btn-secondary btn-sm" aria-expanded="false" data-rule="${ev.rule_id}" data-key="${ev.key}" data-shown="${shownId}" onclick="event.stopPropagation(); toggleOccurrences(this)">${escapeHtml(_t('common.event_more', 'Voir les autres occurrences'))}</button>
+        <div class="event-occurrence-list hidden"></div>
+    </div>`;
+}
+
+/** The other occurrences of an event, loaded when asked for. */
+async function toggleOccurrences(btn) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    const list = btn.nextElementSibling;
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    btn.textContent = open ? _t('common.event_hide', 'Masquer les occurrences') : _t('common.event_more', 'Voir les autres occurrences');
+    list.classList.toggle('hidden', !open);
+    if (open && !list.dataset.loaded) await loadOccurrences(btn, list, 0);
+}
+
+async function loadOccurrences(btn, list, offset) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    list.querySelector('.event-occurrence-more')?.remove();
+    try {
+        const res = await apiFetch(`/api/dashboard/recent?rule_id=${btn.dataset.rule}&event_key=${btn.dataset.key}&limit=30&offset=${offset}`);
+        list.dataset.loaded = '1';
+        list.insertAdjacentHTML('beforeend', res.analyses.filter(a => String(a.id) !== btn.dataset.shown).map(a => `
+            <a class="event-occurrence" href="/rules/${a.rule_id}?analysis=${a.id}#analyses">
+                <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
+                <span class="severity-badge ${escapeHtml(a.severity)}">${escapeHtml(a.severity)}</span>
+                <span class="event-occurrence-text">${escapeHtml(a.summary || '')}</span>
+            </a>`).join(''));
+        if (res.has_more) {
+            const more = document.createElement('button');
+            more.type = 'button';
+            more.className = 'btn btn-secondary btn-sm event-occurrence-more';
+            more.textContent = _t('monitor.show_more', 'Afficher plus');
+            more.addEventListener('click', e => { e.stopPropagation(); loadOccurrences(btn, list, offset + 30); });
+            list.append(more);
+        }
+    } catch (e) {
+        list.insertAdjacentHTML('beforeend', `<div class="rp-muted">${escapeHtml(_t('common.error', 'Erreur'))} : ${escapeHtml(e.message)}</div>`);
+    }
+}
+
+function deleteEvent(ruleId, key, count, btn) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    const message = count > 1 ? _t('common.confirm_delete_event', 'Supprimer cet événement et ses {n} occurrences ?').replace('{n}', count)
+        : _t('common.confirm_delete_analysis', 'Supprimer cette analyse ?');
+    showInlineConfirm(btn, message, async () => {
+        try {
+            await apiFetch(`/api/dashboard/events/${ruleId}/${key}`, { method: 'DELETE' });
+            document.querySelector(`[data-event="${ruleId}-${key}"]`)?.remove();
+            document.dispatchEvent(new CustomEvent('events-changed'));
+        } catch (e) {
+            alert(`${_t('common.error', 'Erreur')} : ${e.message}`);
+        }
+    });
+}
+
+function eventCardSignature(ev) {
+    const a = ev.analysis;
+    return [a.id, ev.unread, ev.count, ev.last_at, ev.severity, a.resolution_status, a.resolved_at, a.summary, a.feedback, (a.ollama_response || '').length].join('|');
+}
+
+/** Card of one event, as a DOM element. */
+function renderEventCard(ev, opts = {}) {
+    const template = document.createElement('template');
+    template.innerHTML = renderAnalysisCard(ev.analysis, { collapsed: true, showDelete: true, showCopy: true, ...opts, event: ev }).trim();
+    const el = template.content.firstElementChild;
+    el.dataset.signature = eventCardSignature(ev);
+    return el;
+}
+
+/** Merges fresh events into a list. A card being read (open, or holding the focus) is never replaced or removed. */
+function reconcileEvents(list, events, opts = {}) {
+    const { freshClass, ...cardOpts } = opts;
+    const isCard = el => el && el.classList.contains('analysis-card');
+    const idOf = ev => `${ev.rule_id}-${ev.key}`;
+    const incoming = new Set(events.map(idOf));
+    const reading = el => !el.classList.contains('collapsed') || el.contains(document.activeElement);
+    [...list.children].forEach(el => { if (isCard(el) && !incoming.has(el.dataset.event) && !reading(el)) el.remove(); });
+    const tail = [...list.children].find(el => !isCard(el)) || null;
+    let cursor = isCard(list.firstElementChild) ? list.firstElementChild : null;
+    const next = el => (isCard(el.nextElementSibling) ? el.nextElementSibling : null);
+    events.forEach(ev => {
+        while (cursor && !incoming.has(cursor.dataset.event)) cursor = next(cursor);
+        let el = list.querySelector(`:scope > [data-event="${idOf(ev)}"]`);
+        if (!el) {
+            el = renderEventCard(ev, cardOpts);
+            if (freshClass) el.classList.add(freshClass);
+        } else if (el.dataset.signature !== eventCardSignature(ev)) {
+            if (reading(el)) {
+                const badge = el.querySelector('.event-count');
+                if (badge) badge.textContent = `× ${ev.count}`;
+            } else {
+                const fresh = renderEventCard(ev, cardOpts);
+                if (el === cursor) cursor = fresh;
+                el.replaceWith(fresh);
+                el = fresh;
+            }
+        }
+        if (el === cursor) cursor = next(cursor);
+        else list.insertBefore(el, cursor || tail);
+    });
 }
 
 /** Flags (or unflags) an alert as not relevant: the keyword arbiter reviews the rule right away. */

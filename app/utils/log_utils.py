@@ -5,7 +5,10 @@ import re
 # Les petits nombres (< 4 chiffres) sont conservés : codes d'erreur / HTTP significatifs (error 13, 500).
 _SIG_REPEATED = re.compile(r"message repeated \d+ times: \[\s*(.*?)\s*\]\s*$")
 _SIG_RULES = [
+    (re.compile(r"^\[×\d+\]\s*"), ""),  # préfixe des lignes regroupées (ancien format)
     (re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?"), "<TS>"),
+    (re.compile(r"\b\d{4}[/-]\d{2}[/-]\d{2}\b"), "<DATE>"),
+    (re.compile(r"\b\d+(?:\.\d+)?\s?(?:µs|us|ms)\b|\b\d+\.\d+\s?s\b|(?<=\()\d+s(?=\))"), "<DUR>"),
     (re.compile(r"\b[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\b"), "<TS>"),
     (re.compile(r"\b\d{2}:\d{2}:\d{2}(?:[.,]\d+)?\b"), "<TS>"),
     (re.compile(r"^<\d+>"), ""),

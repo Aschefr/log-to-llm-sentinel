@@ -235,6 +235,7 @@ class Analysis(Base):
     resolution_ai_explanation = Column(Text, nullable=True)
     resolution_ai_confidence = Column(Integer, nullable=True)
     exclude_from_mttr = Column(Boolean, default=False)
+    event_key = Column(String, nullable=True)  # Empreinte des signatures de ses lignes : même clé, même événement
     feedback = Column(String, nullable=True)  # 'irrelevant' : signalée « pas pertinente » par l'utilisateur
 
 

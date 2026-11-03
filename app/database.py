@@ -139,6 +139,9 @@ def init_db():
         "ALTER TABLE keyword_learning_sessions ADD COLUMN summary_json TEXT DEFAULT '{}'",
         # AP-1: pilote automatique
         "ALTER TABLE rules ADD COLUMN autopilot_json TEXT DEFAULT '{}'",
+        # Regroupement des analyses par événement
+        "ALTER TABLE analyses ADD COLUMN event_key VARCHAR",
+        "CREATE INDEX IF NOT EXISTS ix_analyses_rule_event ON analyses (rule_id, event_key)",
     ]
 
     with engine.connect() as conn:
@@ -148,3 +151,10 @@ def init_db():
                 conn.commit()
             except Exception:
                 pass  # Colonne déjà présente
+
+    from app.services import analysis_events  # enregistre aussi le calcul de la clé à la création d'une analyse
+    db = SessionLocal()
+    try:
+        analysis_events.backfill(db)
+    finally:
+        db.close()

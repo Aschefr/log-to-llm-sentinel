@@ -77,8 +77,8 @@
     "silence_text": "Aucune ligne depuis {d}.",
     "silence_never": "Aucune ligne reçue.",
     "silence_limit": "limite : {h} h",
-    "unread_one": "{n} analyse non lue",
-    "unread_many": "{n} analyses non lues",
+    "unread_one": "{n} événement non lu",
+    "unread_many": "{n} événements non lus",
     "unread_action": "Voir",
     "trend_title": "Alertes · 7 jours",
     "trend_none": "Aucune alerte sur 7 jours.",
@@ -122,7 +122,6 @@
     "filter_unread": "Non lues",
     "history_none": "Les analyses apparaîtront ici dès qu'une règle se déclenchera.",
     "history_none_filter": "Aucune analyse pour ce filtre.",
-    "confirm_delete": "Supprimer cette analyse ?",
     "attention_unknown": "Impossible de savoir ce qui est à traiter pour le moment."
   },
   "rules": {
@@ -639,7 +638,12 @@
     "irrelevant_done": "Signalée pas pertinente",
     "irrelevant_title": "L'IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne",
     "irrelevant_toast": "Merci : l'IA réexamine les mots-clés de la règle.",
-    "toggle_details": "Afficher ou masquer le détail"
+    "toggle_details": "Afficher ou masquer le détail",
+    "event_count_title": "{n} occurrences de cet événement",
+    "event_range": "{n} occurrences, du {first} au {last}",
+    "event_more": "Voir les autres occurrences",
+    "event_hide": "Masquer les occurrences",
+    "confirm_delete_event": "Supprimer cet événement et ses {n} occurrences ?"
   },
   "meta": {
     "title": "Méta-Analyse",

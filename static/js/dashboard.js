@@ -61,7 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
     refresh();
     setInterval(() => { if (!document.hidden) refresh(); }, DASH_REFRESH_MS);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
-    document.addEventListener('analysis-viewed', loadWatch);
+    document.addEventListener('analysis-viewed', refresh);
+    document.addEventListener('events-changed', refresh);
     setupChartTip();
     window.i18n?.onLanguageChange(() => {
         renderAll();
@@ -206,7 +207,7 @@ function renderAttention() {
     const unread = DASH.watch.counts.unread;
     const unreadRow = unread ? `<button type="button" class="dash-row dash-row--unread" onclick="showUnread()">
         <span class="dash-tag">${escapeHtml(dT('dashboard.tag_read', 'À lire'))}</span>
-        <span class="dash-row-main"><strong>${escapeHtml(dCount(unread, 'dashboard.unread_one', '{n} analyse non lue', 'dashboard.unread_many', '{n} analyses non lues'))}</strong></span>
+        <span class="dash-row-main"><strong>${escapeHtml(dCount(unread, 'dashboard.unread_one', '{n} événement non lu', 'dashboard.unread_many', '{n} événements non lus'))}</strong></span>
         <span class="dash-row-when">${escapeHtml(dT('dashboard.unread_action', 'Voir'))}</span>
     </button>` : '';
     DASH.attentionReady = true;
@@ -392,52 +393,17 @@ function resetHistory() {
     loadHistory();
 }
 
-function cardSignature(a) {
-    return [a.viewed, a.severity, a.resolution_status, a.resolved_at, a.summary, a.feedback, (a.ollama_response || '').length].join('|');
-}
-
-function createCard(a) {
-    const template = document.createElement('template');
-    template.innerHTML = renderAnalysisCard(a, { collapsed: true, showDelete: true, showCopy: true, showRuleName: true }).trim();
-    const el = template.content.firstElementChild;
-    el.dataset.signature = cardSignature(a);
-    return el;
-}
-
-// Merges the fresh list into the page. A card being read (open, or holding the focus) is never replaced or removed.
-function reconcileHistory(list, analyses) {
-    const incoming = new Set(analyses.map(a => `analysis-card-${a.id}`));
-    [...list.children].forEach(el => { if (!incoming.has(el.id) && el.classList.contains('collapsed') && !el.contains(document.activeElement)) el.remove(); });
-    let cursor = list.firstElementChild;
-    const skipKept = () => { while (cursor && !incoming.has(cursor.id)) cursor = cursor.nextElementSibling; };
-    analyses.forEach(a => {
-        skipKept();
-        let el = document.getElementById(`analysis-card-${a.id}`);
-        if (!el) {
-            el = createCard(a);
-            if (DASH.historyReady) el.classList.add('dash-new');
-        } else if (el.dataset.signature !== cardSignature(a) && el.classList.contains('collapsed') && !el.contains(document.activeElement)) {
-            const fresh = createCard(a);
-            if (el === cursor) cursor = fresh;
-            el.replaceWith(fresh);
-            el = fresh;
-        }
-        if (el === cursor) cursor = cursor.nextElementSibling;
-        else list.insertBefore(el, cursor);
-    });
-}
-
 async function loadHistory(more = false) {
     const request = ++DASH.historyRequest;
     const limit = more ? DASH.loaded + DASH_PAGE_SIZE : Math.max(DASH.loaded, DASH_PAGE_SIZE);
-    let url = `/api/dashboard/recent?limit=${limit}&offset=0`;
+    let url = `/api/dashboard/events?limit=${limit}&offset=0`;
     if (DASH.filter === 'unread') url += '&unread=true';
     else if (DASH.filter !== 'all') url += `&severity=${DASH.filter}`;
     try {
         const res = await apiFetch(url);
         if (request !== DASH.historyRequest) return;
-        reconcileHistory(document.getElementById('dash-history-list'), res.analyses);
-        DASH.loaded = res.analyses.length;
+        reconcileEvents(document.getElementById('dash-history-list'), res.events, { showRuleName: true, freshClass: DASH.historyReady ? 'dash-new' : null });
+        DASH.loaded = res.events.length;
         DASH.hasMore = res.has_more;
         DASH.historyFailed = false;
         DASH.historyReady = true;
@@ -463,20 +429,6 @@ function renderHistoryState() {
     } else {
         dSetHtml(el, '');
     }
-}
-
-async function deleteAnalysis(id, btnElement) {
-    showInlineConfirm(btnElement, dT('dashboard.confirm_delete', 'Supprimer cette analyse ?'), async () => {
-        try {
-            await apiFetch(`/api/dashboard/analyses/${id}`, { method: 'DELETE' });
-            document.getElementById(`analysis-card-${id}`)?.remove();
-            loadWatch();
-            loadHistory();
-        } catch (error) {
-            console.error('Erreur suppression:', error);
-            alert(window.t ? window.t('common.error') : 'Erreur lors de la suppression');
-        }
-    });
 }
 
 function copyAnalysisText(btn) {
