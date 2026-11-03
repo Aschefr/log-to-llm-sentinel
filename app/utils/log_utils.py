@@ -6,6 +6,7 @@ import re
 _SIG_REPEATED = re.compile(r"message repeated \d+ times: \[\s*(.*?)\s*\]\s*$")
 _SIG_RULES = [
     (re.compile(r"^\[×\d+\]\s*"), ""),  # préfixe des lignes regroupées (ancien format)
+    (re.compile(r"\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b"), "<MAC>"),  # avant les heures : sa fin ressemble à 00:11:22
     (re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?"), "<TS>"),
     (re.compile(r"\b\d{4}[/-]\d{2}[/-]\d{2}\b"), "<DATE>"),
     (re.compile(r"\b\d+(?:\.\d+)?\s?(?:µs|us|ms)\b|\b\d+\.\d+\s?s\b|(?<=\()\d+s(?=\))"), "<DUR>"),
@@ -21,10 +22,54 @@ _SIG_RULES = [
 ]
 
 
+# Dans un objet JSON, ces champs disent de quel événement il s'agit : leur valeur compte, même chiffrée (status 500)
+_JSON_MEANINGFUL_KEY = re.compile(r"(?:^|_)(?:status|code|level|severity|type|event|action|state|reason|error|kind|category|result|outcome)$", re.I)
+_JSON_PLAIN_VALUE = re.compile(r"[A-Za-z_-]{1,40}")
+_JSON_INDEXED_KEY = re.compile(r"_\d+$")
+
+
+def _json_shape(key, value):
+    if isinstance(value, dict):
+        return {_JSON_INDEXED_KEY.sub("_*", k): _json_shape(k, v) for k, v in value.items()}
+    if isinstance(value, list):
+        shapes = []
+        for item in value:
+            shape = _json_shape(key, item)
+            if shape not in shapes:
+                shapes.append(shape)
+        return shapes
+    if value is None or isinstance(value, bool) or _JSON_MEANINGFUL_KEY.search(str(key)):
+        return value
+    if isinstance(value, (int, float)):
+        return "<N>"
+    text = str(value)
+    # Un message reste : ce sont les règles habituelles qui en retirent le variable. Le reste (domaine, chemin,
+    # identifiant, nombre en texte…) change d'une occurrence à l'autre sans changer l'événement.
+    if any(c.isspace() for c in text.strip()) or _JSON_PLAIN_VALUE.fullmatch(text):
+        return text
+    return "<V>"
+
+
+def _mask_json_values(line: str) -> str:
+    """Remplace un objet JSON dans la ligne par sa forme : ses champs, et seulement les valeurs qui distinguent
+    un événement d'un autre. Une liste de valeurs numérotées (query_0, query_1…) compte pour un seul champ."""
+    start = line.find('{"')
+    end = line.rfind("}")
+    if start < 0 or end < start:
+        return line
+    try:
+        data = json.loads(line[start:end + 1])
+    except ValueError:
+        return line
+    if not isinstance(data, dict):
+        return line
+    return line[:start] + json.dumps(_json_shape("", data), ensure_ascii=False, separators=(",", ":")) + line[end + 1:]
+
+
 def line_signature(line: str) -> str:
     """Gabarit d'une ligne : deux occurrences d'un même événement ont la même signature."""
     # "message repeated N times: [ X ]" → X, en gardant le préfixe (horodatage, hôte, processus)
-    sig = _SIG_REPEATED.sub(r"\1", clean_log_line(line).strip())
+    sig = _mask_json_values(_SIG_REPEATED.sub(r"\1", clean_log_line(line).strip()))
     for pattern, repl in _SIG_RULES:
         sig = pattern.sub(repl, sig)
     return sig.strip()[:300]

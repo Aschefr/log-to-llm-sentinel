@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - **Analyses are grouped by event** on the dashboard and in a rule's Analyses tab: one row per event, with its number of occurrences and highest severity, and the other occurrences one click away. The unread count now counts events, and a simple repeat of an event you have read no longer makes it unread again. Nothing is deleted, and statistics still count every analysis.
 - **Not relevant** now applies to the whole event, stays on when the event repeats at the same severity, and is told to the AI in the next analyses of that event, which it could not see before.
+- **One notification per problem**: an event that keeps repeating no longer notifies each time. It notifies the first time, when it becomes more serious, when it comes back after an incident was closed, and as a reminder every 6 hours with the number of repeats. An event flagged not relevant gets no reminder. Every repeat is still analyzed and counted.
 - **Lighter header**: on one line, with drawn icons instead of emoji, and controls of the same height. The clock is really the server's time, the one in the logs; it used to show the browser's time labelled as server time.
 - **New Configuration page**: six tabs (Ollama, Notifications, Sources, Diagnostics, Data, Advanced), each showing the real state of what it configures. A success is only kept for the settings that produced it. A setting is saved when you leave its field, with the result next to it, and **Test** buttons use what you just typed. The Sources tab lists the hosts detected.
 - **Application log file** (`data/logs/sentinel.log`, rotated) replaces the live debug panel, which only kept the last 100 lines and 20 Ollama calls in memory. Configuration > Advanced downloads it, and debug mode adds the full Ollama prompts to it.
@@ -35,6 +36,7 @@ All notable changes to this project will be documented in this file.
 - **E-mail notifications** now escape the log line, the AI's answer, keywords and the rule's name.
 
 ### Fixed
+- **Events recognized in JSON logs**: a line carrying a JSON object was treated as a new event whenever one of its values changed (a domain name, an identifier, a measure). Grouping and the repeated-event guard then did nothing, and such a source could send one notification a minute. Sentinel now keeps the fields of the object and what tells events apart (type, status, level, messages), and ignores the rest. MAC addresses are ignored too, like IP addresses. Existing analyses and notes are recalculated once.
 - **Meta-analysis failure**: when the AI failed, the error was saved as a report and its period was skipped for good. The failure is now shown, the period stays due, and a scheduled meta-analysis tries again at most once an hour.
 - **Deleting a rule** now removes it from the meta-analyses that followed it, as its number can be reused. One left with no rule is disabled, not widened to all rules.
 - **Autopilot description of a log**: it no longer judges events as normal or usual noise. The keyword arbiter then quoted that unproven judgment to ignore the same lines.

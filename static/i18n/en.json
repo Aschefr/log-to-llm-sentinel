@@ -926,7 +926,8 @@
     "resolution_ai_confirmed": "AI confirmed resolution with {confidence}% confidence.",
     "resolution_ai_denied": "AI did not confirm resolution for {rule_name}. Monitoring continues.",
     "resolution_manual": "Manual resolution by user.",
-    "resolution_filtered_severity": "Resolution notification skipped: incident severity below configured threshold."
+    "resolution_filtered_severity": "Resolution notification skipped: incident severity below configured threshold.",
+    "repeat_note": "This event repeated {n} time(s) since the last notification."
   },
   "api_errors": {
     "orchestrator_not_configured": "Orchestrator not configured",

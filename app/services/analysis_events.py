@@ -3,17 +3,24 @@ Regroupement des analyses par événement : les analyses d'une règle dont les l
 même événement. Rien n'est supprimé : les statistiques et l'apprentissage continuent de compter chaque analyse.
 """
 import hashlib
+import json
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from sqlalchemy import event
 
-from app.models import Analysis, Rule
+from app.models import Analysis, EventNote, GlobalConfig, Rule
 from app.services.alert_analysis import analysis_lines
 from app.services.rule_stats import SEVERITIES, iso
 from app.utils.log_utils import line_signature
 
 _RANK = {"info": 0, "warning": 1, "critical": 2}
+# À incrémenter quand le calcul des signatures change : les analyses et les notes existantes sont recalculées une fois
+EVENT_KEY_VERSION = 1
+REKEY_BATCH = 1000
+# Un événement qui continue ne notifie plus, mais ne se fait pas oublier non plus
+NOTIFY_REMINDER_HOURS = 6
+_CLOSED = ("resolved", "false_positive")
 
 
 def event_signatures(lines: List[str]) -> set:
@@ -46,6 +53,60 @@ def backfill(db):
         a.event_key = event_key(a)
     if rows:
         db.commit()
+
+
+def rekey(db):
+    """Le calcul des signatures a changé : sans ça, un même événement aurait une clé avant et une autre après, et
+    une note cesserait de s'appliquer. Une note dont toutes les analyses ont été purgées garde ses anciennes
+    signatures : ses lignes n'existent plus, rien ne permet de les recalculer."""
+    config = db.query(GlobalConfig).first()
+    if not config or (config.event_keys_version or 0) >= EVENT_KEY_VERSION:
+        return
+    renamed = {}
+    last_id = 0
+    while True:
+        rows = db.query(Analysis).filter(Analysis.id > last_id).order_by(Analysis.id).limit(REKEY_BATCH).all()
+        if not rows:
+            break
+        for a in rows:
+            signatures = event_signatures(analysis_lines(a))
+            new_key = key_of(signatures)
+            if new_key != a.event_key:
+                renamed[(a.rule_id, a.event_key)] = (new_key, signatures)
+                a.event_key = new_key
+        last_id = rows[-1].id
+        db.commit()
+    for note in db.query(EventNote).filter(EventNote.event_key != None).all():
+        found = renamed.get((note.rule_id, note.event_key))
+        if found:
+            note.event_key = found[0]
+            note.signatures_json = json.dumps(sorted(found[1]), ensure_ascii=False)
+    config.event_keys_version = EVENT_KEY_VERSION
+    db.commit()
+
+
+def notification_decision(db, analysis: Analysis, now: Optional[datetime] = None) -> Tuple[bool, int]:
+    """(notifier ?, répétitions restées silencieuses depuis la dernière notification de cet événement).
+
+    On notifie la première fois, quand c'est plus grave que tout ce qui a déjà été notifié, quand le précédent incident
+    était clos (l'utilisateur a été prévenu du retour à la normale), et en rappel si l'événement continue. Une analyse
+    dont l'envoi a échoué n'a pas été notifiée : la suivante retente. Un événement signalé « pas pertinent » n'a pas de
+    rappel, sauf s'il devient plus grave."""
+    now = now or datetime.utcnow()
+    same = db.query(Analysis).filter(Analysis.rule_id == analysis.rule_id, Analysis.event_key == analysis.event_key, Analysis.id != analysis.id)
+    last_sent = same.filter(Analysis.notified == True).order_by(Analysis.analyzed_at.desc(), Analysis.id.desc()).first()
+    if not last_sent:
+        return True, 0
+    previous = same.order_by(Analysis.analyzed_at.desc(), Analysis.id.desc()).first()
+    if previous.resolution_status in _CLOSED:
+        return True, 0
+    silent = same.filter(Analysis.analyzed_at > last_sent.analyzed_at).count()
+    sent_rank = max(_rank(row[0]) for row in same.filter(Analysis.notified == True).with_entities(Analysis.severity).all())
+    if _rank(analysis.severity) > sent_rank:
+        return True, silent
+    if previous.feedback == "irrelevant":
+        return False, silent
+    return now - last_sent.analyzed_at >= timedelta(hours=NOTIFY_REMINDER_HOURS), silent
 
 
 def _rank(severity: Optional[str]) -> int:

@@ -926,7 +926,8 @@
     "resolution_ai_confirmed": "L'IA a confirmé la résolution avec {confidence}% de confiance.",
     "resolution_ai_denied": "L'IA n'a pas confirmé la résolution pour {rule_name}. Surveillance maintenue.",
     "resolution_manual": "Résolution manuelle par l'utilisateur.",
-    "resolution_filtered_severity": "Notification de resolution ignoree : severite de l'incident inferieure au seuil configure."
+    "resolution_filtered_severity": "Notification de resolution ignoree : severite de l'incident inferieure au seuil configure.",
+    "repeat_note": "Cet événement s'est répété {n} fois depuis la dernière notification."
   },
   "api_errors": {
     "orchestrator_not_configured": "Orchestrateur non configuré",

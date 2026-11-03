@@ -7,7 +7,7 @@ from datetime import datetime
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
-from app.services import monitoring
+from app.services import analysis_events, monitoring
 from app.services.ollama_service import OllamaService
 from app.services.notification_service import NotificationService
 from app.services.app_config import config_to_dict, llm_options
@@ -299,9 +299,15 @@ class Orchestrator:
                 should_notify = False
                 logger.debug("Orchestrator", f"Notification ignorée: la sévérité '{severity}' est inférieure au seuil '{rule.notify_severity_threshold}'.")
 
+        repeats = 0
+        if should_notify:
+            should_notify, repeats = analysis_events.notification_decision(db, analysis)
+            if not should_notify:
+                logger.debug("Orchestrator", f"'{rule.name}' : événement déjà signalé, {repeats} répétition(s) sans notification.")
+
         if should_notify:
             try:
-                await self.trigger_notification(analysis, rule, config, db)
+                await self.trigger_notification(analysis, rule, config, db, repeats=repeats)
             except Exception as e:
                 logger.error("Orchestrator", f"Erreur lors de l'envoi de la notification d'alerte : {e}")
 
@@ -309,7 +315,7 @@ class Orchestrator:
         if self.resolution_service:
             await self.resolution_service.on_error_detected(rule.id, severity=severity)
             
-    async def trigger_notification(self, analysis: Analysis, rule: Rule, config: dict, db) -> bool:
+    async def trigger_notification(self, analysis: Analysis, rule: Rule, config: dict, db, repeats: int = 0) -> bool:
         """Envoie manuellement ou automatiquement une notification pour une analyse existante."""
         severity = analysis.severity
         detection_id = analysis.detection_id
@@ -406,6 +412,10 @@ class Orchestrator:
 {summary}
 
 {nt('full_analysis_available', lang)}"""
+
+        if repeats:
+            note = nt('repeat_note', lang).format(n=repeats)
+            notify_body += f"\n\n{note}" if is_short_channel else f"<p><em>{html.escape(note)}</em></p>"
 
         sent = await asyncio.to_thread(self.notifier.send, subject, notify_body, config)
         analysis.notified = bool(sent)

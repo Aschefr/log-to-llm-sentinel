@@ -272,6 +272,7 @@ class GlobalConfig(Base):
     smtp_recipient = Column(String, default="")
     smtp_tls = Column(Boolean, default=True)  # legacy
     smtp_ssl_mode = Column(String, default="starttls")  # 'ssl' | 'starttls' | 'none'
+    event_keys_version = Column(Integer, default=0)  # Version du calcul des clés d'événement déjà appliquée aux analyses
     monitoring_paused = Column(Boolean, default=False)  # Interrupteur général : plus rien d'automatique tant qu'il est coupé
     monitoring_paused_at = Column(DateTime, nullable=True)
     ollama_url = Column(String, default="http://ollama:11434")
