@@ -30,14 +30,17 @@ class NotificationService:
         logger.debug("Notification", f"Méthode de notification : {method}")
 
         if method == "smtp":
-            return self._send_smtp(subject, body, config, to_email)
+            sent = self._send_smtp(subject, body, config, to_email)
         elif method == "apprise":
-            return self._send_apprise(subject, body, config)
+            sent = self._send_apprise(subject, body, config)
         elif method == "discord":
-            return self._send_discord(subject, body, config)
+            sent = self._send_discord(subject, body, config)
         else:
             logger.warning("Notification", f"Méthode inconnue: {method}")
             return False
+        from app.services import config_status
+        config_status.record_send(method, sent)
+        return sent
 
     def _send_smtp(
         self,
@@ -121,7 +124,7 @@ class NotificationService:
             logger.warning("Notification", "URL Apprise non configurée")
             return False
 
-        logger.debug("Notification", f"Apprise POST → {apprise_url}")
+        logger.debug("Notification", "Apprise POST")  # l'URL peut contenir des jetons
 
         try:
             # Discord et d'autres services ont des limites de caractères (souvent 2000).
@@ -185,7 +188,7 @@ class NotificationService:
             logger.warning("Notification", "URL Webhook Discord non configurée")
             return False
 
-        logger.debug("Notification", f"Discord POST → {webhook_url}")
+        logger.debug("Notification", "Discord POST")  # l'URL du webhook est un secret
 
         try:
             # Discord limit is 2000 chars per embed description

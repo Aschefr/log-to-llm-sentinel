@@ -279,6 +279,7 @@ class GlobalConfig(Base):
     ollama_think = Column(Boolean, default=True)
     system_prompt = Column(Text, default="")
     notification_method = Column(String, default="smtp")
+    notification_state_json = Column(Text, default="{}")  # Derniers tests et envois, par méthode (voir config_status)
     apprise_url = Column(String, nullable=True)
     apprise_tags = Column(String, nullable=True)
     apprise_max_chars = Column(Integer, default=1900)

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 import io
 import zipfile
 
@@ -19,12 +20,31 @@ import httpx
 from app import logger
 from app.utils.notification_i18n import nt
 
+from app.services import config_status
+import functools
+
 router = APIRouter(prefix="/api/config", tags=["config"])
 _orchestrator = None
 
 def set_orchestrator(o):
     global _orchestrator
     _orchestrator = o
+
+def _records_test(method: str):
+    """Garde le résultat d'un test de notification, pour la ligne d'état de la page."""
+    def decorator(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            try:
+                result = fn(*args, **kwargs)
+            except Exception:
+                config_status.record_test(method, False)
+                raise
+            config_status.record_test(method, True)
+            return result
+        return wrapper
+    return decorator
+
 
 # Alias conservé pour les appelants existants (une seule définition, complète : voir app_config)
 from app.services.app_config import config_to_dict as _get_config_dict
@@ -87,6 +107,12 @@ class ConfigUpdate(BaseModel):
     log_rotation_limit_mb: Optional[int] = None
 
 
+@router.get("/status")
+def get_status():
+    """Ce qui est réellement branché : Ollama, notifications, récepteur syslog, diagnostic."""
+    return config_status.build(_orchestrator)
+
+
 @router.get("")
 def get_config():
     db = SessionLocal()
@@ -99,6 +125,7 @@ def get_config():
             db.refresh(config)
         return {
             "smtp_host": config.smtp_host,
+            "smtp_password_set": bool(config.smtp_password),
             "smtp_port": config.smtp_port,
             "smtp_user": config.smtp_user,
             "smtp_recipient": config.smtp_recipient,
@@ -142,7 +169,8 @@ async def update_config(config_data: ConfigUpdate):
             db.add(config)
 
         from app import logger
-        logger.debug("ConfigRouter", f"Données reçues: {config_data.dict(exclude={'smtp_password'})}")
+        syslog_before = (config.syslog_enabled, config.syslog_forward_addr)
+        logger.debug("ConfigRouter", f"Données reçues: {config_data.dict(exclude={'smtp_password', 'apprise_url', 'discord_webhook_url'})}")
 
         if config_data.smtp_host is not None:
             config.smtp_host = config_data.smtp_host
@@ -204,13 +232,15 @@ async def update_config(config_data: ConfigUpdate):
             config.log_rotation_limit_mb = config_data.log_rotation_limit_mb
 
         db.commit()
+        logger.refresh_debug_mode()
 
-        # Recharger le récepteur Syslog
-        try:
-            from app.services.syslog_receiver import syslog_receiver
-            await syslog_receiver.reload()
-        except Exception as ex:
-            logger.error("ConfigRouter", f"Erreur lors du rechargement de SyslogReceiver : {ex}")
+        # Recharger le récepteur Syslog seulement si ses réglages changent : un redémarrage peut perdre des paquets
+        if syslog_before != (config.syslog_enabled, config.syslog_forward_addr):
+            try:
+                from app.services.syslog_receiver import syslog_receiver
+                await syslog_receiver.reload()
+            except Exception as ex:
+                logger.error("ConfigRouter", f"Erreur lors du rechargement de SyslogReceiver : {ex}")
 
         return {"message": "Configuration mise à jour"}
     finally:
@@ -323,6 +353,7 @@ async def test_ollama(request: Request):
 
 
 @router.post("/test/smtp")
+@_records_test("smtp")
 def test_smtp():
     db = SessionLocal()
     try:
@@ -345,6 +376,7 @@ def test_smtp():
 
 
 @router.post("/test/apprise")
+@_records_test("apprise")
 def test_apprise():
     """
     Test “connexion” Apprise : vérifie que l'URL est joignable.
@@ -375,6 +407,7 @@ def test_apprise():
 
 
 @router.post("/test/discord")
+@_records_test("discord")
 def test_discord():
     """Test connexion Discord Webhook"""
     db = SessionLocal()
@@ -482,34 +515,20 @@ def list_ollama_models():
         db.close()
 
 
-@router.get("/logs")
-def get_debug_logs():
-    """Retourne les derniers logs en mémoire."""
-    from app.logger import get_logs
-    return {"logs": get_logs()}
-
-
-@router.delete("/logs")
-def clear_debug_logs():
-    """Efface les logs en mémoire."""
-    from app.logger import clear_logs
-    clear_logs()
-    return {"message": "Logs effacés"}
-
-
-@router.get("/ollama/logs")
-def get_ollama_debug_logs():
-    """Retourne les derniers appels Ollama en mémoire."""
-    from app.logger import get_ollama_logs
-    return {"logs": get_ollama_logs()}
-
-
-@router.delete("/ollama/logs")
-def clear_ollama_debug_logs():
-    """Efface les logs Ollama en mémoire."""
-    from app.logger import clear_ollama_logs
-    clear_ollama_logs()
-    return {"message": "Logs Ollama effacés"}
+@router.get("/log/download")
+def download_log():
+    """Le journal de l'application et ses anciens fichiers, dans une archive."""
+    files = logger.log_files()
+    if not files:
+        raise HTTPException(status_code=404, detail="log_empty")
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for path in files:
+            archive.write(path, path.name)
+    buffer.seek(0)
+    filename = f"sentinel_logs_{datetime.utcnow():%Y%m%d_%H%M%S}.zip"
+    return StreamingResponse(buffer, media_type="application/zip",
+                             headers={"Content-Disposition": f"attachment; filename={filename}"})
 
 
 @router.get("/maintenance/stats")
@@ -524,15 +543,7 @@ def get_maintenance_stats():
         retention_days = config.auto_delete_retention_days if config else 30
         threshold_date = datetime.utcnow() - timedelta(days=retention_days)
 
-        # Taille dossier data
-        data_dir = "./data/"
-        total_size_bytes = 0
-        if os.path.exists(data_dir):
-            for dirpath, _, filenames in os.walk(data_dir):
-                for f in filenames:
-                    fp = os.path.join(dirpath, f)
-                    if not os.path.islink(fp):
-                        total_size_bytes += os.path.getsize(fp)
+        total_size_bytes = config_status.data_size()
 
         # Stats BDD (old items)
         old_analyses_count = db.query(Analysis).filter(Analysis.analyzed_at < threshold_date).count()
@@ -759,6 +770,7 @@ async def import_config(file: UploadFile = File(...)):
                 db.add(from_dict(KeywordLearningSession, row))
         
         db.commit()
+        logger.refresh_debug_mode()
         
         # Reload syslog receiver if config changed
         try:

@@ -44,3 +44,6 @@ data/webhooks/
 
 # Impeccable design tool working files
 .impeccable/
+
+# Journal de l application : contient des lignes de logs reelles
+data/logs/

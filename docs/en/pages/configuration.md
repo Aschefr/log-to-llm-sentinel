@@ -2,11 +2,29 @@
 
 ![Global Configuration](../../../screenshots/log-to-llm-sentinel_config.png)
 
-The **Configuration** tab handles global integration credentials, LLM parameters, maintenance settings, and system backup/restoration.
+The **Configuration** page handles global integration credentials, LLM parameters, maintenance settings, and system backup/restoration.
+
+## Tabs and their state
+The six tabs at the top of the page each show the real state of what they configure, in text and with a colored dot.
+
+| Tab | What it can say |
+|---|---|
+| **Ollama** | Connected with its model, model missing, unreachable, or not set up |
+| **Notifications** | Incomplete, not tested, or the result and time of the latest test or real send. Changing the settings of the method brings it back to *not tested*: an older success no longer proves anything. |
+| **Sources** | Syslog off, not listening, on with nothing received in 7 days, or the number of sources and the latest line |
+| **Diagnostics** | Which of Docker and the server are set up. This is checked by **Test and save** in that tab, not every time the page opens. |
+| **Data** | Size of the data folder and how long data is kept |
+| **Advanced** | Whether debug mode is on |
+
+If the state cannot be read, the page says it is unknown.
+
+## Saving
+A setting is saved when you leave its field (or press Enter), and the result shows next to the field. A failure stays visible until the next attempt. **Test** buttons use what you just typed. A saved SMTP password is never sent back to the page: leave the field empty to keep it.
 
 ---
 
-## 1. Notification & Alerts Config
+## 1. Notifications tab
+* **Instance Name**: Prefixed in notification subjects, to tell several Sentinel instances apart.
 * **Primary Notification Method**: Dropdown selector to choose between `Email (SMTP)`, `Apprise`, or `Discord Webhook`.
 * **SMTP Settings**:
   * *SMTP Host / Port*: Address of your email provider (e.g., `smtp.gmail.com`).
@@ -25,7 +43,7 @@ The **Configuration** tab handles global integration credentials, LLM parameters
 
 ---
 
-## 2. Ollama Settings
+## 2. Ollama tab
 * **Ollama URL**: The access endpoint of your Ollama instance (default: `http://host.docker.internal:11434` for Docker hosts).
 * **Model Selection**: Dropdown list populated dynamically by queries to Ollama.
 * **Model (Manual Override)**: Text field to specify a model manually (e.g., `llama3:latest`).
@@ -38,7 +56,9 @@ The **Configuration** tab handles global integration credentials, LLM parameters
 
 ---
 
-## 3. Syslog Receiver & Relay Setup
+## 3. Sources tab
+**Detected sources** lists the hosts that sent lines in the last 7 days and the rule following each one.
+
 Sentinel listens on UDP port 514 inside the container (mapped to host port 10514 by default):
 * **Enable Syslog Receiver**: Master checkbox to activate the UDP listener.
 * **Forwarding Address (Relay)**: Enter an IP:Port to forward raw incoming Syslog packets to another destination (e.g., a secondary NAS or SIEM server).
@@ -61,7 +81,7 @@ The console uses **two host names**: `Dream Machine Special Edition` for UniFi O
 
 ---
 
-## 4. Maintenance, Backup & Restore
+## 4. Data tab
 **Maintenance** also holds two resets, each with a confirmation: **Reset the MTTR** removes already resolved incidents from the calculation and keeps the analyses; **Delete all analyses** permanently deletes every analysis of every rule.
 
 * **Auto-Delete Old Data**: Toggle switch to purge old logs.
@@ -76,6 +96,15 @@ The console uses **two host names**: `Dream Machine Special Edition` for UniFi O
 
 ---
 
-## 5. Docker Setup Configurator
+## 5. Advanced tab
+* **Live log lines**: Number of lines shown in a rule's *Live log* tab.
+* **Log file**: Sentinel's messages are kept across restarts in `data/logs/sentinel.log`, rotated at 5 MB with 3 older files. **Download the log** gives them all as a ZIP. They are also visible with `docker logs`, and they are not part of the configuration export.
+* **Debug mode**: Adds the detail of each step and the full prompts and answers of Ollama calls to the log file. Prompts copy lines of your logs, so turn it off once the problem is found.
+
+The **Diagnostics** tab is described in [Infrastructure Diagnostics](../features/diagnostics.md).
+
+---
+
+## 6. Docker Setup Configurator
 To customize or regenerate your initial docker deployment parameters, use the built-in interactive **[Docker Configurator](../../../docker-setup.html)**. It generates custom `docker-compose.yml` templates pre-configured with the host Systemd journal bridge, custom log folder mounts, and local NVIDIA CUDA GPU accelerated Ollama setup instructions.
 

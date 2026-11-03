@@ -139,6 +139,8 @@ def init_db():
         "ALTER TABLE keyword_learning_sessions ADD COLUMN summary_json TEXT DEFAULT '{}'",
         # AP-1: pilote automatique
         "ALTER TABLE rules ADD COLUMN autopilot_json TEXT DEFAULT '{}'",
+        # Page Configuration : derniers tests et envois de notification
+        "ALTER TABLE global_config ADD COLUMN notification_state_json TEXT DEFAULT '{}'",
         # Regroupement des analyses par événement
         "ALTER TABLE analyses ADD COLUMN event_key VARCHAR",
         "CREATE INDEX IF NOT EXISTS ix_analyses_rule_event ON analyses (rule_id, event_key)",

@@ -15,15 +15,21 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - **Analyses are grouped by event** on the dashboard and in a rule's Analyses tab: one row per event, with its number of occurrences and highest severity, and the other occurrences one click away. The unread count now counts events, and a simple repeat of an event you have read no longer makes it unread again. Nothing is deleted, and statistics still count every analysis.
 - **Not relevant** now applies to the whole event, stays on when the event repeats at the same severity, and is told to the AI in the next analyses of that event, which it could not see before.
-- *Reset the MTTR* and *Delete all analyses* moved from the dashboard to **Configuration > Maintenance**. The dashboard's MTTR is now the median over 30 days, the same as the Rules page.
+- **New Configuration page**: six tabs (Ollama, Notifications, Sources, Diagnostics, Data, Advanced), each showing the real state of what it configures. A success is only kept for the settings that produced it. A setting is saved when you leave its field, with the result next to it, and **Test** buttons use what you just typed. The Sources tab lists the hosts detected.
+- **Application log file** (`data/logs/sentinel.log`, rotated) replaces the live debug panel, which only kept the last 100 lines and 20 Ollama calls in memory. Configuration > Advanced downloads it, and debug mode adds the full Ollama prompts to it.
+- *Reset the MTTR* and *Delete all analyses* moved from the dashboard to **Configuration > Data**. The dashboard's MTTR is now the median over 30 days, the same as the Rules page.
 - Keywords and ignored lines are no longer edited in the Settings tab of an existing rule: the Keywords tab manages them (saving Settings never overwrites them anymore). They are still typed in the form when creating a manual rule.
 - A new rule on an existing log file starts watching at the end of the file: its history is read by the learning, no longer replayed as new lines (which could fire a burst of alerts on old events).
 
 ### Security
+- Debug logs no longer contain the Apprise URL or the Discord webhook URL, which can hold secrets.
 - **HTML in AI answers and log lines**: an answer quoting a crafted log line could run code in the page, since anyone on the network can send a syslog line. AI answers are now sanitized by DOMPurify, served by the application (without it they are shown as plain text), and may no longer load images, which could send data out just by opening the page. Error messages are escaped too.
 - **E-mail notifications** now escape the log line, the AI's answer, keywords and the rule's name.
 
 ### Fixed
+- **Syslog receiver**: every change in Configuration restarted it, even an unrelated one, which could lose packets. It now restarts only when its own settings change.
+- **Notification record**: an alert was marked as notified even when sending had failed.
+- **Quick profiles** in Configuration raised an error after applying the values.
 - **Event recognition**: a date written `2026/11/03` (e.g. in nginx errors) made the same event look new every day, for the recurrence count and for the autopilot's repeated events.
 - **Deleting a rule** now also deletes its analyses, resolution history and learning sessions. Its number can be reused: a rule created afterwards could inherit them, and a pending autopilot session prevented its setup, then applied the deleted rule's source to it.
 - **Changing a rule's source**: a learning session still running on the old source is stopped, and a rule on autopilot starts learning again from the new source. A rule on autopilot whose setup could not start now retries by itself.

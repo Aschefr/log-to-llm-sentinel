@@ -406,8 +406,8 @@ class Orchestrator:
 
 {nt('full_analysis_available', lang)}"""
 
-        await asyncio.to_thread(self.notifier.send, subject, notify_body, config)
-        analysis.notified = True
+        sent = await asyncio.to_thread(self.notifier.send, subject, notify_body, config)
+        analysis.notified = bool(sent)
         db.commit()
         return True
 

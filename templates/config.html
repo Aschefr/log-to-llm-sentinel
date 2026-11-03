@@ -2,438 +2,254 @@
 
 {% block title %}Configuration - Log to LLM Sentinel{% endblock %}
 
+{% macro field(for_id, key, label, hint_key=None, hint=None, row_id=None, row_class='') %}
+<div class="cfg-row {{ row_class }}"{% if row_id %} id="{{ row_id }}"{% endif %}>
+    <div class="cfg-row-label">
+        <label for="{{ for_id }}" data-i18n="{{ key }}">{{ label }}</label>
+        {% if hint_key %}<p class="form-hint" data-i18n="{{ hint_key }}">{{ hint }}</p>{% endif %}
+    </div>
+    <div class="cfg-row-control form-group">{{ caller() }}</div>
+</div>
+{% endmacro %}
+
+{% macro toggle(for_id, key, label, hint_key=None, hint=None) %}
+<div class="cfg-row cfg-row--toggle">
+    <div class="cfg-row-label">
+        <label for="{{ for_id }}" data-i18n="{{ key }}">{{ label }}</label>
+        {% if hint_key %}<p class="form-hint" data-i18n="{{ hint_key }}">{{ hint }}</p>{% endif %}
+    </div>
+    <div class="cfg-row-control">
+        <label class="toggle-switch"><input type="checkbox" id="{{ for_id }}"><span class="toggle-slider"></span></label>
+    </div>
+</div>
+{% endmacro %}
+
 {% block content %}
-<style>
-    .container {
-        max-width: 100% !important; /* Full width pour cette page */
-        padding-left: 3rem !important;
-        padding-right: 3rem !important;
-    }
-    .config-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(500px, 1fr)); /* Colonnes plus larges */
-        gap: 1.5rem;
-        align-items: start;
-    }
-    .config-section {
-        margin-bottom: 0 !important; /* Remplacé par le gap de la grille */
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-    .config-section-full {
-        grid-column: 1 / -1;
-    }
-    .panel-grid-2 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-        align-items: start;
-    }
-    .panel-grid-full {
-        grid-column: 1 / -1;
-    }
-    @media (max-width: 768px) {
-        .container {
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-        }
-    }
-</style>
-<div class="config-page">
-    <h1 data-i18n="config.title">Configuration Globale</h1>
+<div class="cfg-page">
+    <h1 data-i18n="config.title">Configuration</h1>
 
-    <form id="config-form" class="config-form config-grid">
-        <section class="config-section">
-            <h2><span aria-hidden="true">🔔 </span><span data-i18n="config.notifications_title">Notifications &amp; Alertes</span></h2>
-            <div class="form-group">
-                <label for="notification-method" data-i18n="config.notification_method_label">Méthode de notification principale</label>
-                <select id="notification-method">
-                    <option value="smtp" data-i18n="config.method_smtp">Email (SMTP)</option>
-                    <option value="apprise" data-i18n="config.method_apprise">Apprise (Telegram, Slack...)</option>
-                    <option value="discord" data-i18n="config.method_discord">Discord Webhook</option>
-                </select>
+    <nav class="cfg-status" id="cfg-tabs" aria-label="Sections" data-i18n-aria-label="config.sections">
+        <a class="cfg-status-item" href="#ollama" data-tab="ollama" data-status="ollama"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong>Ollama</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
+        <a class="cfg-status-item" href="#notifications" data-tab="notifications" data-status="notifications"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong data-i18n="config.tab_notifications">Notifications</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
+        <a class="cfg-status-item" href="#sources" data-tab="sources" data-status="syslog"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong data-i18n="config.tab_sources">Sources</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
+        <a class="cfg-status-item" href="#diagnostic" data-tab="diagnostic" data-status="diagnostics"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong data-i18n="config.tab_diagnostic">Diagnostic</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
+        <a class="cfg-status-item" href="#data" data-tab="data" data-status="data"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong data-i18n="config.tab_data">Données</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
+        <a class="cfg-status-item" href="#advanced" data-tab="advanced" data-status="advanced"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong data-i18n="config.tab_advanced">Avancé</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
+    </nav>
+
+    <div class="sr-only" id="cfg-save-live" role="status" aria-live="polite"></div>
+
+    <form id="config-form" class="cfg-form" novalidate>
+        <!-- ── Ollama ── -->
+        <section class="rp-panel hidden" id="tab-ollama">
+            <div class="rp-card">
+                <h2 data-i18n="config.ollama_connection">Connexion</h2>
+                {% call field('ollama-url', 'config.ollama_url', 'URL Ollama') %}
+                    <input type="text" id="ollama-url" class="mono" spellcheck="false" data-i18n-placeholder="config.ollama_url_placeholder" placeholder="http://host.docker.internal:11434">
+                {% endcall %}
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <label for="ollama-model" data-i18n="config.ollama_model">Modèle</label>
+                        <p class="form-hint" id="ollama-model-hint" data-i18n="config.ollama_model_hint">La liste est récupérée depuis Ollama.</p>
+                    </div>
+                    <div class="cfg-row-control form-group"><select id="ollama-model"></select></div>
+                </div>
+                {% call field('ollama-model-custom', 'config.ollama_model_manual', 'Modèle (manuel)', row_id='ollama-model-custom-group', row_class='hidden') %}
+                    <input type="text" id="ollama-model-custom" class="mono" spellcheck="false" data-i18n-placeholder="config.ollama_model_manual_placeholder" placeholder="ex: llama3:latest">
+                {% endcall %}
+                <div class="cfg-actions">
+                    <button type="button" id="test-ollama-btn" class="btn btn-secondary btn-sm" data-i18n="config.test_ollama">Tester Ollama</button>
+                    <span class="form-hint cfg-result" id="ollama-test-message"></span>
+                </div>
             </div>
 
-            <div id="smtp-section" class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
-                <h3><span aria-hidden="true">📧 </span><span data-i18n="config.smtp_title">Configuration SMTP</span></h3>
-                <div class="panel-grid-2">
-                    <div class="form-group panel-grid-full">
-                        <label for="smtp-host" data-i18n="config.smtp_host">Hôte SMTP</label>
-                        <input type="text" id="smtp-host" data-i18n-placeholder="config.smtp_host_placeholder" placeholder="smtp.gmail.com">
+            <div class="rp-card">
+                <h2 data-i18n="config.ollama_analyses">Analyses</h2>
+                {% call field('ollama-prompt-lang', 'config.ollama_prompt_lang_label', 'Langue des analyses Ollama', 'config.ollama_prompt_lang_hint', "Langue utilisée dans les prompts d'analyse de logs et de méta-analyse.") %}
+                    <select id="ollama-prompt-lang"><option value="fr">Français</option><option value="en">English</option></select>
+                {% endcall %}
+                {% call field('system-prompt', 'config.system_prompt', 'Prompt système', 'config.system_prompt_hint', "S'ajoute aux consignes de chaque analyse d'alerte.") %}
+                    <textarea id="system-prompt" rows="4" data-i18n-placeholder="config.system_prompt_placeholder" placeholder="Instructions système pour l'analyse..."></textarea>
+                {% endcall %}
+                {% call field('max-log-chars', 'config.max_log_chars', 'Limite de caractères par log', 'config.max_log_chars_hint', 'Évite de saturer le serveur avec des logs massifs.', row_class='cfg-row--short') %}
+                    <input type="number" id="max-log-chars" value="5000" min="500" max="50000">
+                {% endcall %}
+            </div>
+
+            <div class="rp-card">
+                <h2 data-i18n="config.performance_title">Réglages de performance</h2>
+                {% call field('ollama-temp', 'config.temperature', 'Température', 'config.temperature_hint', 'Bas = direct, Haut = créatif.', row_class='cfg-row--short') %}
+                    <input type="number" id="ollama-temp" step="0.1" min="0" max="1">
+                {% endcall %}
+                {% call field('ollama-ctx', 'config.context_tokens', 'Contexte (tokens)', 'config.context_hint', 'Taille de la mémoire contextuelle.', row_class='cfg-row--short') %}
+                    <input type="number" id="ollama-ctx" step="1024" min="1024" max="32768">
+                    <div class="preset-chips">
+                        <button type="button" class="chip" onclick="setOllamaCtx(2048)">2K</button>
+                        <button type="button" class="chip" onclick="setOllamaCtx(4096)">4K</button>
+                        <button type="button" class="chip" onclick="setOllamaCtx(8192)">8K</button>
+                        <button type="button" class="chip" onclick="setOllamaCtx(16384)">16K</button>
+                        <button type="button" class="chip" onclick="setOllamaCtx(32768)">32K</button>
                     </div>
-                    <div class="form-group">
-                        <label for="smtp-port" data-i18n="config.smtp_port">Port SMTP</label>
-                        <input type="number" id="smtp-port" value="587">
-                    </div>
-                    <div class="form-group">
-                        <label for="smtp-ssl-mode" data-i18n="config.smtp_ssl_mode">Mode de chiffrement</label>
-                        <select id="smtp-ssl-mode">
-                            <option value="starttls" selected data-i18n="config.ssl_starttls">TLS / STARTTLS (Port 587)</option>
-                            <option value="ssl" data-i18n="config.ssl_ssl">SSL / TLS (Port 465)</option>
-                            <option value="none" data-i18n="config.ssl_none">Aucun chiffrement (non recommandé)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="smtp-user" data-i18n="config.smtp_user">Utilisateur</label>
-                        <input type="text" id="smtp-user" data-i18n-placeholder="config.smtp_user_placeholder" placeholder="email@example.com">
-                    </div>
-                    <div class="form-group">
-                        <label for="smtp-password" data-i18n="config.smtp_password">Mot de passe</label>
-                        <input type="password" id="smtp-password" placeholder="••••••••">
-                    </div>
-                    <div class="form-group panel-grid-full">
-                        <label for="smtp-recipient" data-i18n="config.smtp_recipient">Destinataire</label>
-                        <input type="text" id="smtp-recipient" data-i18n-placeholder="config.smtp_recipient_placeholder" placeholder="destinataire@example.com">
+                {% endcall %}
+                <div class="cfg-row">
+                    <div class="cfg-row-label"><span class="cfg-label" data-i18n="config.quick_profiles">Profils rapides :</span></div>
+                    <div class="cfg-row-control cfg-buttons">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')" data-i18n="config.profile_eco">Profil Éco (Petit CPU)</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')" data-i18n="config.profile_balanced">Profil Équilibré</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')" data-i18n="config.profile_gpu">Profil GPU / Gamer</button>
                     </div>
                 </div>
-                <div class="form-actions" style="margin-top: 0.5rem;">
+            </div>
+
+            <div class="rp-card">
+                <h2 data-i18n="config.models_title">Gestion des modèles</h2>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <label for="pull-model-name" data-i18n="config.download_model">Télécharger un nouveau modèle</label>
+                        <p class="form-hint" data-i18n-html="config.download_hint">Plus le modèle est gros, plus il nécessite de VRAM (GPU) ou de RAM système disponible, mais plus ses réponses seront pertinentes et précises.</p>
+                    </div>
+                    <div class="cfg-row-control form-group">
+                        <div class="cfg-input-action">
+                            <input type="text" id="pull-model-name" class="mono" spellcheck="false" data-no-save data-i18n-placeholder="config.download_placeholder" placeholder="ex: llama3.2">
+                            <button type="button" id="pull-model-btn" class="btn btn-primary btn-sm" data-i18n="config.download_btn">Télécharger</button>
+                        </div>
+                        <div class="preset-chips">
+                            <button type="button" class="chip" onclick="setPullModel('qwen3.5:2b')">Qwen 3.5 - 2b (2.7GB)</button>
+                            <button type="button" class="chip" onclick="setPullModel('qwen3.5:4b')">Qwen 3.5 - 4b (3.4GB)</button>
+                            <button type="button" class="chip" onclick="setPullModel('gemma4:e2b')">Gemma 4 - e2b (7.2GB)</button>
+                            <button type="button" class="chip" onclick="setPullModel('gemma4:e4b')">Gemma 4 - e4b (9.6GB)</button>
+                        </div>
+                        <div id="pull-progress-container" class="hidden">
+                            <div class="cfg-progress"><div id="pull-progress-bar"></div></div>
+                            <div id="pull-status" class="config-status-text" role="status" data-i18n="config.pull_starting">Initialisation...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Notifications ── -->
+        <section class="rp-panel hidden" id="tab-notifications">
+            <div class="rp-card">
+                <h2 data-i18n="config.notifications_general">Envoi</h2>
+                {% call field('notification-method', 'config.notification_method_label', 'Méthode de notification principale') %}
+                    <select id="notification-method">
+                        <option value="smtp" data-i18n="config.method_smtp">Email (SMTP)</option>
+                        <option value="apprise" data-i18n="config.method_apprise">Apprise (Telegram, Slack...)</option>
+                        <option value="discord" data-i18n="config.method_discord">Discord Webhook</option>
+                    </select>
+                {% endcall %}
+                {% call field('instance-name', 'config.instance_name_label', 'Nom de l\'instance', 'config.instance_name_hint', 'Ajouté en préfixe dans les sujets de notifications.') %}
+                    <input type="text" id="instance-name" data-i18n-placeholder="config.instance_name_placeholder" placeholder="ex: Prod, Dev, Maison...">
+                {% endcall %}
+            </div>
+
+            <div class="rp-card" id="smtp-section">
+                <h2 data-i18n="config.smtp_title">Configuration SMTP</h2>
+                {% call field('smtp-host', 'config.smtp_host', 'Hôte SMTP') %}
+                    <input type="text" id="smtp-host" class="mono" spellcheck="false" data-i18n-placeholder="config.smtp_host_placeholder" placeholder="smtp.gmail.com">
+                {% endcall %}
+                {% call field('smtp-port', 'config.smtp_port', 'Port SMTP', row_class='cfg-row--short') %}
+                    <input type="number" id="smtp-port" value="587">
+                {% endcall %}
+                {% call field('smtp-ssl-mode', 'config.smtp_ssl_mode', 'Mode de chiffrement') %}
+                    <select id="smtp-ssl-mode">
+                        <option value="starttls" selected data-i18n="config.ssl_starttls">TLS / STARTTLS (Port 587)</option>
+                        <option value="ssl" data-i18n="config.ssl_ssl">SSL / TLS (Port 465)</option>
+                        <option value="none" data-i18n="config.ssl_none">Aucun chiffrement (non recommandé)</option>
+                    </select>
+                {% endcall %}
+                {% call field('smtp-user', 'config.smtp_user', 'Utilisateur') %}
+                    <input type="text" id="smtp-user" autocomplete="off" spellcheck="false" data-i18n-placeholder="config.smtp_user_placeholder" placeholder="email@example.com">
+                {% endcall %}
+                {% call field('smtp-password', 'config.smtp_password', 'Mot de passe') %}
+                    <input type="password" id="smtp-password" autocomplete="new-password" placeholder="">
+                {% endcall %}
+                {% call field('smtp-recipient', 'config.smtp_recipient', 'Destinataire') %}
+                    <input type="text" id="smtp-recipient" spellcheck="false" data-i18n-placeholder="config.smtp_recipient_placeholder" placeholder="destinataire@example.com">
+                {% endcall %}
+                <div class="cfg-actions">
                     <button type="button" id="test-smtp-btn" class="btn btn-secondary btn-sm" data-i18n="config.test_smtp">Tester SMTP</button>
+                    <span class="form-hint cfg-result" id="smtp-test-message"></span>
                 </div>
-                <div id="smtp-test-message" class="message hidden"></div>
             </div>
 
-            <div id="apprise-section" class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border);">
-                <h3><span aria-hidden="true">🚀 </span><span data-i18n="config.apprise_title">Configuration Apprise</span></h3>
-                <div class="form-group">
-                    <label for="apprise-url" data-i18n="config.apprise_url">URL Apprise (endpoint notify)</label>
-                    <input type="text" id="apprise-url" data-i18n-placeholder="config.apprise_url_placeholder" placeholder="http://192.168.1.100:8780/notify/apprise">
-                    <div class="form-hint" data-i18n="config.apprise_url_hint">L'URL de base vers votre API Apprise.</div>
-                </div>
-                <div class="panel-grid-2">
-                    <div class="form-group">
-                        <label for="apprise-tags-select" data-i18n="config.apprise_tags">Tags Apprise</label>
-                        <select id="apprise-tags-select"></select>
-                    </div>
-                    <div class="form-group hidden" id="apprise-tags-custom-group">
-                        <label for="apprise-tags" data-i18n="config.apprise_tags_custom">Tags personnalisés</label>
-                        <input type="text" id="apprise-tags" data-i18n-placeholder="config.apprise_tags_placeholder" placeholder="tag1, tag2">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="apprise-max-chars" data-i18n="config.apprise_max_chars">Limite de caractères (Résumé IA)</label>
+            <div class="rp-card" id="apprise-section">
+                <h2 data-i18n="config.apprise_title">Configuration Apprise</h2>
+                {% call field('apprise-url', 'config.apprise_url', 'URL Apprise (endpoint notify)', 'config.apprise_url_hint', "L'URL de base vers votre API Apprise.") %}
+                    <input type="text" id="apprise-url" class="mono" spellcheck="false" data-i18n-placeholder="config.apprise_url_placeholder" placeholder="http://192.168.1.100:8780/notify/apprise">
+                {% endcall %}
+                {% call field('apprise-tags-select', 'config.apprise_tags', 'Tags Apprise') %}
+                    <select id="apprise-tags-select"></select>
+                {% endcall %}
+                {% call field('apprise-tags', 'config.apprise_tags_custom', 'Tags personnalisés', row_id='apprise-tags-custom-group', row_class='hidden') %}
+                    <input type="text" id="apprise-tags" data-i18n-placeholder="config.apprise_tags_placeholder" placeholder="tag1, tag2">
+                {% endcall %}
+                {% call field('apprise-max-chars', 'config.apprise_max_chars', 'Limite de caractères (Résumé IA)', 'config.apprise_max_chars_hint', 'Tronque le message si trop long pour Discord/Telegram.', row_class='cfg-row--short') %}
                     <input type="number" id="apprise-max-chars" value="1900" min="100" max="10000">
-                    <div class="form-hint" style="margin-bottom: 0.5rem;" data-i18n="config.apprise_max_chars_hint">Tronque le message si trop long pour Discord/Telegram.</div>
                     <div class="preset-chips">
                         <button type="button" class="chip" onclick="setAppriseMax(2000)">Discord</button>
                         <button type="button" class="chip" onclick="setAppriseMax(4096)">Telegram</button>
                         <button type="button" class="chip" onclick="setAppriseMax(1000)">Sms</button>
                     </div>
-                </div>
-                <div class="form-actions" style="margin-top: 0.5rem;">
+                {% endcall %}
+                <div class="cfg-actions">
                     <button type="button" id="test-apprise-btn" class="btn btn-secondary btn-sm" data-i18n="config.test_apprise">Tester Apprise</button>
+                    <span class="form-hint cfg-result" id="apprise-test-message"></span>
                 </div>
-                <div id="apprise-test-message" class="message hidden"></div>
             </div>
 
-            <div id="discord-section" class="config-subsection" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--border); display: none;">
-                <h3><span aria-hidden="true">💬 </span><span data-i18n="config.discord_title">Configuration Discord</span></h3>
-                <div class="form-group">
-                    <label for="discord-webhook-url" data-i18n="config.discord_webhook">URL Webhook Discord</label>
-                    <input type="text" id="discord-webhook-url" data-i18n-placeholder="config.discord_webhook_placeholder" placeholder="https://discord.com/api/webhooks/...">
-                    <div class="form-hint" data-i18n="config.discord_help">Collez l'URL du Webhook depuis les paramètres d'intégration de votre salon Discord.</div>
-                </div>
-                <div class="form-group">
-                    <label for="discord-max-chars" data-i18n="config.apprise_max_chars">Limite de caractères (Résumé IA)</label>
+            <div class="rp-card" id="discord-section">
+                <h2 data-i18n="config.discord_title">Configuration Discord</h2>
+                {% call field('discord-webhook-url', 'config.discord_webhook', 'URL Webhook Discord', 'config.discord_help', "Collez l'URL du Webhook depuis les paramètres d'intégration de votre salon Discord.") %}
+                    <input type="text" id="discord-webhook-url" class="mono" spellcheck="false" data-i18n-placeholder="config.discord_webhook_placeholder" placeholder="https://discord.com/api/webhooks/...">
+                {% endcall %}
+                {% call field('discord-max-chars', 'config.apprise_max_chars', 'Limite de caractères (Résumé IA)', 'config.apprise_max_chars_hint', 'Tronque le message si trop long pour Discord/Telegram.', row_class='cfg-row--short') %}
                     <input type="number" id="discord-max-chars" value="1900" min="100" max="10000">
-                    <div class="form-hint" style="margin-bottom: 0.5rem;" data-i18n="config.apprise_max_chars_hint">Tronque le message si trop long pour Discord/Telegram.</div>
                     <div class="preset-chips">
                         <button type="button" class="chip" onclick="setDiscordMax(2000)">Discord</button>
                         <button type="button" class="chip" onclick="setDiscordMax(4096)">Telegram</button>
                         <button type="button" class="chip" onclick="setDiscordMax(1000)">Sms</button>
                     </div>
-                </div>
-                <div class="form-actions" style="margin-top: 0.5rem;">
+                {% endcall %}
+                <div class="cfg-actions">
                     <button type="button" id="test-discord-btn" class="btn btn-secondary btn-sm" data-i18n="config.test_discord">Tester Discord</button>
-                </div>
-                <div id="discord-test-message" class="message hidden"></div>
-            </div>
-        </section>
-
-        <section class="config-section">
-            <h2><span aria-hidden="true">🤖 </span><span data-i18n="config.ollama_title">Ollama</span></h2>
-            <div class="panel-grid-2">
-                <div class="form-group">
-                    <label for="ollama-url" data-i18n="config.ollama_url">URL Ollama</label>
-                    <input type="text" id="ollama-url" data-i18n-placeholder="config.ollama_url_placeholder" placeholder="http://host.docker.internal:11434">
-                </div>
-                <div>
-                    <div class="form-group">
-                        <label for="ollama-model" data-i18n="config.ollama_model">Modèle</label>
-                        <select id="ollama-model"></select>
-                        <div class="form-hint" data-i18n="config.ollama_model_hint">La liste est récupérée depuis Ollama.</div>
-                    </div>
-                    <div class="form-group hidden" id="ollama-model-custom-group">
-                        <label for="ollama-model-custom" data-i18n="config.ollama_model_manual">Modèle (manuel)</label>
-                        <input type="text" id="ollama-model-custom" data-i18n-placeholder="config.ollama_model_manual_placeholder" placeholder="ex: llama3:latest">
-                    </div>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="system-prompt" data-i18n="config.system_prompt">Prompt système</label>
-                <textarea id="system-prompt" rows="5" data-i18n-placeholder="config.system_prompt_placeholder" placeholder="Instructions système pour l'analyse..."></textarea>
-            </div>
-            <div class="form-group">
-                <label for="max-log-chars" data-i18n="config.max_log_chars">Limite de caractères par log</label>
-                <input type="number" id="max-log-chars" value="5000" min="500" max="50000">
-                <div class="form-hint" data-i18n="config.max_log_chars_hint">Évite de saturer le serveur avec des logs massifs.</div>
-            </div>
-            <div class="form-group">
-                <label for="ollama-prompt-lang">🌐 <span data-i18n="config.ollama_prompt_lang_label">Langue des analyses Ollama</span></label>
-                <select id="ollama-prompt-lang" style="display: none;">
-                    <option value="fr">Français</option>
-                    <option value="en">English</option>
-                </select>
-                <div class="lang-switcher-wrapper" style="width: 100%; position: relative;" id="config-lang-wrapper">
-                    <button type="button" class="lang-btn" id="config-lang-btn" style="width: 100%; justify-content: flex-start; padding: 0.5rem 0.8rem; background: var(--bg-card); border-color: var(--border); font-size: 0.85rem; height: 38px;">
-                        <span id="config-lang-flag"></span>
-                        <span id="config-lang-name" style="margin-left: 0.5rem; flex: 1; text-align: left;"></span>
-                        <svg width="10" height="10" viewBox="0 0 10 10" style="margin-left: auto; color: var(--text-secondary);"><path fill="currentColor" d="M5 7L1 3h8z"/></svg>
-                    </button>
-                    <div class="lang-dropdown" id="config-lang-dropdown" style="width: 100%; top: calc(100% + 4px);">
-                        <button type="button" class="lang-option" data-lang="fr" style="padding: 0.5rem 0.8rem;">
-                            <span class="cfg-flag" data-emoji="🇫🇷"></span>
-                            <span>Français</span>
-                        </button>
-                        <button type="button" class="lang-option" data-lang="en" style="padding: 0.5rem 0.8rem;">
-                            <span class="cfg-flag" data-emoji="🇬🇧"></span>
-                            <span>English</span>
-                        </button>
-                    </div>
-                </div>
-                <div class="form-hint" style="margin-top: 0.5rem;" data-i18n="config.ollama_prompt_lang_hint">Langue utilisée dans les prompts d'analyse de logs et de méta-analyse. Les prompts d'auto-apprentissage restent en anglais (meilleure fiabilité).</div>
-            </div>
-            <div class="form-actions" style="margin-top: 0.5rem;">
-                <button type="button" id="test-ollama-btn" class="btn btn-secondary" data-i18n="config.test_ollama">Tester Ollama</button>
-            </div>
-            <div id="ollama-test-message" class="message hidden"></div>
-
-
-            <div class="collapsible-section" style="margin-top: 1.5rem;">
-                <div class="section-header" onclick="toggleSection('performance-settings-container', 'performance-arrow')">
-                    <h3 style="margin: 0;"><span aria-hidden="true">⚡ </span><span data-i18n="config.performance_title">Réglages de performance</span></h3>
-                    <svg id="performance-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
-                </div>
-                <div id="performance-settings-container" class="config-subsection hidden">
-                    <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
-                        <div class="form-group" style="flex: 1; min-width: 120px;">
-                            <label for="ollama-temp" data-i18n="config.temperature">Température</label>
-                            <input type="number" id="ollama-temp" step="0.1" min="0" max="1">
-                            <div class="form-hint" data-i18n="config.temperature_hint">Bas = direct, Haut = créatif.</div>
-                        </div>
-                        <div class="form-group" style="flex: 1; min-width: 120px;">
-                            <label for="ollama-ctx" data-i18n="config.context_tokens">Contexte (tokens)</label>
-                            <input type="number" id="ollama-ctx" step="1024" min="1024" max="32768">
-                            <div class="form-hint" style="margin-bottom:0.5rem" data-i18n="config.context_hint">Taille de la mémoire contextuelle.</div>
-                            <div class="preset-chips">
-                                <button type="button" class="chip" onclick="setOllamaCtx(2048)">2K</button>
-                                <button type="button" class="chip" onclick="setOllamaCtx(4096)">4K</button>
-                                <button type="button" class="chip" onclick="setOllamaCtx(8192)">8K</button>
-                                <button type="button" class="chip" onclick="setOllamaCtx(16384)">16K</button>
-                                <button type="button" class="chip" onclick="setOllamaCtx(32768)">32K</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="profile-selectors" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                        <span class="config-hint-label" data-i18n="config.quick_profiles">Profils rapides :</span>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')"><span aria-hidden="true">💻 </span><span data-i18n="config.profile_eco">Profil Éco (Petit CPU)</span></button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')"><span aria-hidden="true">⚖️ </span><span data-i18n="config.profile_balanced">Profil Équilibré</span></button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')"><span aria-hidden="true">🚀 </span><span data-i18n="config.profile_gpu">Profil GPU / Gamer</span></button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="collapsible-section" style="margin-top: 1.5rem;">
-                <div class="section-header" onclick="toggleSection('model-management-container', 'model-management-arrow')">
-                    <h3 style="margin: 0;"><span aria-hidden="true">📦 </span><span data-i18n="config.models_title">Gestion des modèles</span></h3>
-                    <svg id="model-management-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
-                </div>
-                <div id="model-management-container" class="config-subsection hidden">
-                    <div class="form-group">
-                        <label data-i18n="config.download_model">Télécharger un nouveau modèle</label>
-                        <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            <input type="text" id="pull-model-name" data-i18n-placeholder="config.download_placeholder" placeholder="ex: llama3.2" style="flex: 1;">
-                            <button type="button" id="pull-model-btn" class="btn btn-primary" data-i18n="config.download_btn">Télécharger</button>
-                        </div>
-                        <div class="form-hint" style="margin-bottom: 0.75rem;" data-i18n-html="config.download_hint">
-                            Plus le modèle est gros, plus il nécessite de VRAM (GPU) ou de RAM système disponible, mais plus ses réponses seront pertinentes et précises. Les modèles <strong>Gemma 4</strong> sont recommandés pour leur excellent rapport performance/taille.
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('qwen3.5:2b')">Qwen 3.5 - 2b (2.7GB)</button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('qwen3.5:4b')">Qwen 3.5 - 4b (3.4GB)</button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('gemma4:e2b')">Gemma 4 - e2b (7.2GB)</button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="setPullModel('gemma4:e4b')">Gemma 4 - e4b (9.6GB)</button>
-                        </div>
-                    </div>
-                    <div id="pull-progress-container" class="hidden" style="margin-top: 1rem;">
-                        <div class="progress-bar-container" style="height: 10px; background: var(--bg-secondary); border-radius: 5px; overflow: hidden; margin-bottom: 0.5rem;">
-                            <div id="pull-progress-bar" style="width: 0%; height: 100%; background: var(--accent); transition: width 0.3s;"></div>
-                        </div>
-                        <div id="pull-status" class="config-status-text">Initialisation...</div>
-                    </div>
+                    <span class="form-hint cfg-result" id="discord-test-message"></span>
                 </div>
             </div>
         </section>
 
-        <section class="config-section">
-            <h2><span aria-hidden="true">🖥️ </span><span data-i18n="config.interface_title">Interface &amp; Monitor</span></h2>
-            <div class="form-group">
-                <label for="instance-name" data-i18n="config.instance_name_label">Instance Name</label>
-                <input type="text" id="instance-name" data-i18n-placeholder="config.instance_name_placeholder" placeholder="e.g. Prod, Dev, Home...">
-                <div class="form-hint" data-i18n="config.instance_name_hint">Prefixed in notification subjects to identify this instance when multiple are deployed.</div>
-            </div>
-            <div class="form-group">
-                <label for="monitor-log-lines" data-i18n="config.monitor_lines">Nombre de lignes (Monitor)</label>
-                <input type="number" id="monitor-log-lines" value="60" min="10" max="1000">
-                <div class="form-hint" data-i18n="config.monitor_lines_hint">Définit le nombre de lignes à afficher en temps réel dans la page Monitor.</div>
-            </div>
-
-            <div class="collapsible-section" style="margin-top: 1.5rem;">
-                <div class="section-header" onclick="toggleSection('syslog-settings-container', 'syslog-arrow')">
-                    <h3 style="margin: 0;"><span aria-hidden="true">📨 </span><span data-i18n="config.syslog_title">Récepteur Syslog &amp; Relais</span></h3>
-                    <svg id="syslog-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
+        <!-- ── Sources ── -->
+        <section class="rp-panel hidden" id="tab-sources">
+            <div class="rp-card">
+                <h2 data-i18n="config.syslog_title">Récepteur Syslog &amp; Relais</h2>
+                {{ toggle('syslog-enabled', 'config.syslog_enabled', 'Activer le récepteur Syslog (UDP 514)') }}
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span class="cfg-label" data-i18n="config.syslog_info_title">Configuration de la source de logs (ex: Unraid) :</span>
+                        <p class="form-hint" data-i18n="config.syslog_info_note">Note : Sentinel écoute sur le port 514 à l'intérieur de son conteneur Docker. Celui-ci est redirigé vers le port hôte 10514 dans votre fichier docker-compose.yml.</p>
+                    </div>
+                    <dl class="cfg-row-control cfg-facts">
+                        <div><dt data-i18n="config.syslog_info_ip">Adresse IP :</dt><dd><code id="syslog-current-ip">...</code></dd></div>
+                        <div><dt data-i18n="config.syslog_info_port">Port :</dt><dd><code>10514</code></dd></div>
+                        <div><dt data-i18n="config.syslog_info_proto">Protocole :</dt><dd><code>UDP</code></dd></div>
+                    </dl>
                 </div>
-                <div id="syslog-settings-container" class="config-subsection hidden">
-                    <div class="form-group checkbox-group" style="margin-bottom: 1rem;">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="syslog-enabled">
-                            <span class="toggle-slider"></span>
-                            <span class="toggle-label" data-i18n="config.syslog_enabled">Activer le récepteur Syslog (UDP 514)</span>
-                        </label>
-                    </div>
-
-                    <div class="syslog-info-box" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.25rem; font-size: 0.85rem; border-left: 3px solid var(--accent);">
-                        <strong data-i18n="config.syslog_info_title" style="display: block; margin-bottom: 0.5rem; color: var(--text-primary);">Configuration de la source de logs (ex: Unraid) :</strong>
-                        <ul style="margin: 0 0 0.5rem 1rem; padding: 0; list-style-type: disc; color: var(--text-secondary);">
-                            <li style="margin-bottom: 0.25rem;"><span data-i18n="config.syslog_info_ip">Adresse IP :</span> <code id="syslog-current-ip" style="background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: monospace;">...</code></li>
-                            <li style="margin-bottom: 0.25rem;"><span data-i18n="config.syslog_info_port">Port :</span> <code style="background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: monospace;">10514</code></li>
-                            <li><span data-i18n="config.syslog_info_proto">Protocole :</span> <code style="background: rgba(0,0,0,0.3); padding: 0.1rem 0.3rem; border-radius: 3px; font-family: monospace;">UDP</code></li>
-                        </ul>
-                        <div class="form-hint" style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);" data-i18n="config.syslog_info_note">
-                            Note : Sentinel écoute sur le port 514 à l'intérieur de son conteneur Docker. Celui-ci est redirigé vers le port hôte 10514 dans votre fichier docker-compose.yml.
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="syslog-forward-addr" data-i18n="config.syslog_forward_addr">Adresse de redirection (Relais Syslog)</label>
-                        <input type="text" id="syslog-forward-addr" placeholder="ex: 192.168.1.50:514" data-i18n-placeholder="config.syslog_forward_addr_placeholder">
-                        <div class="form-hint" data-i18n="config.syslog_forward_addr_hint">Adresse IP et Port (optionnel, défaut 514) vers lequel renvoyer les paquets Syslog bruts (ex: votre second serveur Unraid). Laisser vide pour désactiver la redirection.</div>
-                    </div>
-                </div>
+                {% call field('syslog-forward-addr', 'config.syslog_forward_addr', 'Adresse de redirection (Relais Syslog)', 'config.syslog_forward_addr_hint', 'Laisser vide pour désactiver la redirection.') %}
+                    <input type="text" id="syslog-forward-addr" class="mono" spellcheck="false" placeholder="ex: 192.168.1.50:514" data-i18n-placeholder="config.syslog_forward_addr_placeholder">
+                {% endcall %}
             </div>
 
-            <div class="collapsible-section" style="margin-top: 1.5rem;">
-                <div class="section-header" onclick="toggleSection('maintenance-container', 'maintenance-arrow')">
-                    <h3 style="margin: 0;"><span aria-hidden="true">🧹 </span><span data-i18n="config.maintenance_title">Maintenance &amp; Stockage</span></h3>
-                    <svg id="maintenance-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
-                </div>
-                <div id="maintenance-container" class="config-subsection hidden">
-                    <div class="form-group checkbox-group" style="margin-bottom: 1rem;">
-                        <label class="toggle-switch">
-                            <input type="checkbox" id="auto-delete-analyses">
-                            <span class="toggle-slider"></span>
-                            <span class="toggle-label" data-i18n="config.auto_delete_analyses">Suppression automatique des anciennes données</span>
-                        </label>
-                    </div>
-                    
-                    <div class="form-group" id="retention-period-group" style="margin-bottom: 1.5rem;">
-                        <label for="retention-period" data-i18n="config.retention_period">Période de conservation</label>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <select id="retention-period" style="flex: 1;">
-                                <option value="7" data-i18n="config.retention_1w">1 semaine</option>
-                                <option value="30" selected data-i18n="config.retention_1m">1 mois</option>
-                                <option value="180" data-i18n="config.retention_6m">6 mois</option>
-                                <option value="365" data-i18n="config.retention_1y">1 an</option>
-                                <option value="custom" data-i18n="config.retention_custom">Personnalisé...</option>
-                            </select>
-                            <input type="number" id="retention-days-custom" class="hidden" min="1" max="3650" placeholder="Jours" style="width: 100px;">
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom: 1.5rem;">
-                        <label for="log-rotation-limit-mb" data-i18n="config.log_rotation_limit">Taille maximale des fichiers de log (Rotation)</label>
-                        <div style="display: flex; gap: 0.5rem; align-items: center;">
-                            <input type="number" id="log-rotation-limit-mb" value="10" min="1" max="1000" style="flex: 1;">
-                            <span style="font-size: 0.9rem; color: var(--text-dim);">MB</span>
-                        </div>
-                        <div class="form-hint" data-i18n="config.log_rotation_limit_hint">Définit la taille maximale pour les fichiers de log Syslog et Webhook avant rotation.</div>
-                    </div>
-
-                    <div style="background: var(--bg-tertiary); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
-                        <h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 0.9rem;" data-i18n="config.disk_usage_title">Espace Disque (Dossier Data)</h4>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                            <span style="font-size: 1.25rem; font-weight: 600;" id="disk-usage-val">...</span>
-                        </div>
-                        
-                        <div id="cleanup-stats-container" class="hidden" style="margin-bottom: 1rem; font-size: 0.85rem; color: var(--text-dim);">
-                            <span data-i18n="config.found_old_items">Éléments anciens trouvés (> <span id="cleanup-days-val">30</span> jours) : </span>
-                            <strong id="cleanup-count-val" style="color: var(--text-main);">0</strong>
-                        </div>
-
-                        <button type="button" id="cleanup-btn" class="btn btn-secondary btn-sm" style="width: 100%;">
-                            <span aria-hidden="true">🗑️ </span><span data-i18n="config.cleanup_btn">Nettoyer maintenant</span>
-                        </button>
-                    </div>
-
-                    <div class="config-reset">
-                        <h4 data-i18n="config.reset_title">Réinitialiser</h4>
-                        <div class="config-reset-row">
-                            <div class="form-hint" data-i18n="config.reset_mttr_hint">Retire les incidents déjà résolus du calcul du MTTR. Les analyses sont conservées.</div>
-                            <button type="button" id="reset-mttr-btn" class="btn btn-secondary btn-sm" data-i18n="dashboard.reset_mttr_title">Réinitialiser le MTTR</button>
-                        </div>
-                        <div class="config-reset-row">
-                            <div class="form-hint" data-i18n="config.clear_all_hint">Supprime définitivement toutes les analyses de toutes les règles.</div>
-                            <button type="button" id="clear-all-analyses-btn" class="btn btn-danger btn-sm" data-i18n="config.clear_all_btn">Effacer toutes les analyses</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="collapsible-section" style="margin-top: 1.5rem;">
-                <div class="section-header" onclick="toggleSection('backup-container', 'backup-arrow')">
-                    <h3 style="margin: 0;"><span aria-hidden="true">💾 </span><span data-i18n="config.backup_title">Sauvegarde &amp; Restauration</span></h3>
-                    <svg id="backup-arrow" class="section-arrow" viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M8.59,16.58L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.58Z"/></svg>
-                </div>
-                <div id="backup-container" class="config-subsection hidden">
-                    <div style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px dashed var(--border);">
-                        <h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 0.9rem;" data-i18n="config.export_title">Exporter la configuration</h4>
-                        <div class="form-group checkbox-group" style="margin-bottom: 1rem;">
-                            <label class="toggle-switch">
-                                <input type="checkbox" id="export-history">
-                                <span class="toggle-slider"></span>
-                                <span class="toggle-label" data-i18n="config.export_history_label">Inclure l'historique d'analyses et de chat</span>
-                            </label>
-                        </div>
-                        <button type="button" id="export-btn" class="btn btn-secondary btn-sm" style="width: 100%;">
-                            <span aria-hidden="true">📤 </span><span data-i18n="config.export_btn">Générer et télécharger l'export (ZIP)</span>
-                        </button>
-                    </div>
-
-                    <div>
-                        <h4 style="margin-top: 0; margin-bottom: 0.5rem; font-size: 0.9rem;" data-i18n="config.import_title_sub">Importer une configuration</h4>
-                        <div class="form-group" style="margin-bottom: 1rem;">
-                            <input type="file" id="import-file" accept=".zip" style="width: 100%; display: none;">
-                            <button type="button" class="btn btn-secondary btn-sm" style="width: 100%; margin-bottom: 0.5rem;" onclick="document.getElementById('import-file').click();">
-                                <span aria-hidden="true">📁 </span><span id="import-file-label" data-i18n="config.select_backup_file">Sélectionner le fichier ZIP de sauvegarde</span>
-                            </button>
-                        </div>
-                        <div class="alert alert-warning" style="background: rgba(230, 92, 0, 0.1); border: 1px solid var(--danger); padding: 0.75rem; border-radius: var(--radius-md); font-size: 0.8rem; color: var(--danger); margin-bottom: 1rem; border-left: 3px solid var(--danger);" data-i18n="config.import_warning">
-                            ⚠️ Attention : L'importation d'une sauvegarde écrasera complètement la configuration actuelle (et l'historique si présent dans le fichier). Cette action est irréversible.
-                        </div>
-                        <button type="button" id="import-btn" class="btn btn-primary btn-sm" style="width: 100%;" disabled>
-                            <span aria-hidden="true">📥 </span><span data-i18n="config.import_btn">Restaurer la sauvegarde</span>
-                        </button>
-                    </div>
-                </div>
+            <div class="rp-card">
+                <h2 data-i18n="config.syslog_hosts_title">Sources détectées</h2>
+                <p class="form-hint" data-i18n="config.syslog_hosts_hint">Les hôtes qui ont envoyé des lignes ces 7 derniers jours.</p>
+                <ul class="cfg-hosts" id="cfg-hosts"></ul>
             </div>
         </section>
 
-        <section class="config-section config-section-full" id="diagnostics-section">
-            <h2><span aria-hidden="true">🩺 </span><span data-i18n="diag.title">Diagnostic (lecture seule)</span></h2>
-            <p class="form-hint diag-intro" data-i18n="diag.intro">Permet à l'IA du chat et de l'investigation de vérifier elle-même l'état réel de ton infrastructure (conteneurs, disque, mémoire, services) au lieu de te demander de lancer docker ps ou df. Tout est en lecture seule : rien ne peut être démarré, arrêté ou modifié.</p>
-
+        <!-- ── Diagnostic ── -->
+        <section class="rp-panel hidden" id="diagnostics-section">
+            <p class="form-hint diag-intro" data-i18n="diag.intro">Permet à l'IA du chat et de l'investigation de vérifier elle-même l'état réel de ton infrastructure. Tout est en lecture seule : rien ne peut être démarré, arrêté ou modifié.</p>
             <div class="diag-grid">
                 <!-- ── Docker ── -->
                 <div class="diag-card">
@@ -529,56 +345,119 @@
             </div>
         </section>
 
-        <section class="config-section config-section-full">
-            <h2><span aria-hidden="true">🛠️ </span><span data-i18n="config.debug_title">Debug</span></h2>
-            <div class="form-group checkbox-group">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="debug-mode">
-                        <span class="toggle-slider"></span>
-                        <span class="toggle-label" data-i18n="config.debug_mode">Activer le mode debug (logs verbeux dans la console serveur)</span>
-                    </label>
-                <div class="form-hint" data-i18n="config.debug_mode_hint">Affiche le détail de chaque étape : détection, appel Ollama, envoi de notification. À désactiver en production.</div>
-            </div>
-            
-            <div id="debug-logs-container" class="debug-logs-container hidden">
-                <div class="debug-logs-header">
-                    <span data-i18n="config.live_logs">Logs en direct</span>
-                    <div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">
-                        <span style="font-size:.72rem;color:var(--text-dim);" data-i18n="config.filter_label">Filtrer :</span>
-                        <button type="button" class="chip dbg-filter-btn dbg-filter-active" data-filter="" data-i18n="config.filter_all">Tous</button>
-                        <button type="button" class="chip dbg-filter-btn" data-filter="KeywordLearning">🤖 KeywordLearning</button>
-                        <button type="button" class="chip dbg-filter-btn" data-filter="Orchestrator">⚙️ Orchestrator</button>
-                        <button type="button" class="chip dbg-filter-btn" data-filter="LogWatcher">👁 LogWatcher</button>
-                        <button type="button" class="chip dbg-filter-btn" data-filter="OllamaService">🧠 OllamaService</button>
-                        <button type="button" class="chip dbg-filter-btn" data-filter="Notification">🔔 Notification</button>
-                        <button type="button" class="chip dbg-filter-btn" data-filter="Compression">🗜️ Compression</button>
-                    </div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" id="copy-logs-btn" class="btn btn-small"><span aria-hidden="true">📋 </span><span data-i18n="common.copy">Copier</span></button>
-                        <button type="button" id="clear-logs-btn" class="btn btn-small" data-i18n="config.clear_logs">Effacer</button>
+        <!-- ── Données ── -->
+        <section class="rp-panel hidden" id="tab-data">
+            <div class="rp-card">
+                <h2 data-i18n="config.retention_title">Conservation</h2>
+                {{ toggle('auto-delete-analyses', 'config.auto_delete_analyses', 'Suppression automatique des anciennes données') }}
+                <div class="cfg-row" id="retention-period-group">
+                    <div class="cfg-row-label"><label for="retention-period" data-i18n="config.retention_period">Période de conservation</label></div>
+                    <div class="cfg-row-control form-group cfg-input-action">
+                        <select id="retention-period">
+                            <option value="7" data-i18n="config.retention_1w">1 semaine</option>
+                            <option value="30" selected data-i18n="config.retention_1m">1 mois</option>
+                            <option value="180" data-i18n="config.retention_6m">6 mois</option>
+                            <option value="365" data-i18n="config.retention_1y">1 an</option>
+                            <option value="custom" data-i18n="config.retention_custom">Personnalisé...</option>
+                        </select>
+                        <input type="number" id="retention-days-custom" class="hidden" min="1" max="3650" data-i18n-placeholder="config.retention_days" placeholder="Jours" data-i18n-aria-label="config.retention_days" aria-label="Jours">
                     </div>
                 </div>
-                <div id="debug-logs" class="debug-logs"></div>
+                {% call field('log-rotation-limit-mb', 'config.log_rotation_limit', 'Taille maximale des fichiers de log (Rotation)', 'config.log_rotation_limit_hint', 'Définit la taille maximale pour les fichiers de log Syslog et Webhook avant rotation.', row_class='cfg-row--short') %}
+                    <div class="cfg-unit"><input type="number" id="log-rotation-limit-mb" value="10" min="1" max="1000"><span>MB</span></div>
+                {% endcall %}
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span class="cfg-label" data-i18n="config.disk_usage_title">Espace Disque (Dossier Data)</span>
+                        <p class="form-hint hidden" id="cleanup-stats-container"><span data-i18n="config.found_old_items_prefix">Éléments anciens trouvés :</span> <strong id="cleanup-count-val">0</strong> (&gt; <span id="cleanup-days-val">30</span> <span data-i18n="config.retention_days_lower">jours</span>)</p>
+                    </div>
+                    <div class="cfg-row-control cfg-disk">
+                        <span class="cfg-disk-value" id="disk-usage-val">...</span>
+                        <button type="button" id="cleanup-btn" class="btn btn-secondary btn-sm" data-i18n="config.cleanup_btn">Nettoyer maintenant</button>
+                        <span class="form-hint cfg-result" id="cleanup-result"></span>
+                    </div>
+                </div>
             </div>
 
-            <div id="ollama-logs-container" class="debug-logs-container hidden" style="margin-top: 1.5rem;">
-                <div class="debug-logs-header">
-                    <span data-i18n="config.ollama_call_detail">Détail des appels Ollama (Prompt/Réponse)</span>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" id="copy-ollama-logs-btn" class="btn btn-small"><span aria-hidden="true">📋 </span><span data-i18n="common.copy">Copier</span></button>
-                        <button type="button" id="clear-ollama-logs-btn" class="btn btn-small" data-i18n="config.clear_logs">Effacer</button>
+            <div class="rp-card">
+                <h2 data-i18n="config.backup_title">Sauvegarde &amp; Restauration</h2>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span class="cfg-label" data-i18n="config.export_title">Exporter la configuration</span>
+                        <p class="form-hint" data-i18n="config.export_hint">Les règles, les réglages et les notes pour l'IA.</p>
+                    </div>
+                    <div class="cfg-row-control cfg-stack">
+                        <label class="cfg-check"><input type="checkbox" id="export-history" data-no-save> <span data-i18n="config.export_history_label">Inclure l'historique d'analyses et de chat</span></label>
+                        <button type="button" id="export-btn" class="btn btn-secondary btn-sm" data-i18n="config.export_btn">Générer et télécharger l'export (ZIP)</button>
                     </div>
                 </div>
-                <div id="ollama-debug-logs" class="debug-logs ollama-debug-logs"></div>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span class="cfg-label" data-i18n="config.import_title_sub">Importer une configuration</span>
+                        <p class="form-hint" data-i18n="config.import_hint">Écrase la configuration actuelle, et l'historique s'il est dans le fichier. Action irréversible.</p>
+                    </div>
+                    <div class="cfg-row-control cfg-stack">
+                        <input type="file" id="import-file" accept=".zip" class="hidden" data-no-save>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('import-file').click();"><span id="import-file-label" data-i18n="config.select_backup_file">Sélectionner le fichier ZIP de sauvegarde</span></button>
+                        <button type="button" id="import-btn" class="btn btn-danger btn-sm" disabled data-i18n="config.import_btn">Restaurer la sauvegarde</button>
+                        <span class="form-hint cfg-result" id="import-result"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rp-card">
+                <h2 data-i18n="config.reset_title">Réinitialiser</h2>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span class="cfg-label" data-i18n="dashboard.reset_mttr_title">Réinitialiser le MTTR</span>
+                        <p class="form-hint" data-i18n="config.reset_mttr_hint">Retire les incidents déjà résolus du calcul du MTTR. Les analyses sont conservées.</p>
+                    </div>
+                    <div class="cfg-row-control cfg-stack">
+                        <button type="button" id="reset-mttr-btn" class="btn btn-secondary btn-sm" data-i18n="dashboard.reset_mttr_title">Réinitialiser le MTTR</button>
+                        <span class="form-hint cfg-result" id="reset-mttr-result"></span>
+                    </div>
+                </div>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span class="cfg-label" data-i18n="config.clear_all_btn">Effacer toutes les analyses</span>
+                        <p class="form-hint" data-i18n="config.clear_all_hint">Supprime définitivement toutes les analyses de toutes les règles.</p>
+                    </div>
+                    <div class="cfg-row-control cfg-stack">
+                        <button type="button" id="clear-all-analyses-btn" class="btn btn-danger btn-sm" data-i18n="config.clear_all_btn">Effacer toutes les analyses</button>
+                        <span class="form-hint cfg-result" id="clear-all-analyses-result"></span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Avancé ── -->
+        <section class="rp-panel hidden" id="tab-advanced">
+            <div class="rp-card">
+                <h2 data-i18n="config.display_title">Affichage</h2>
+                {% call field('monitor-log-lines', 'config.monitor_lines', 'Lignes du journal en direct', 'config.monitor_lines_hint', "Nombre de lignes affichées dans l'onglet Journal en direct d'une règle.", row_class='cfg-row--short') %}
+                    <input type="number" id="monitor-log-lines" value="60" min="10" max="1000">
+                {% endcall %}
+            </div>
+            <div class="rp-card">
+                <h2 data-i18n="config.journal_title">Journal de l'application</h2>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span class="cfg-label" data-i18n="config.journal_label">Fichier journal</span>
+                        <p class="form-hint" data-i18n-html="config.journal_hint">Les messages de Sentinel, conservés après un redémarrage dans <code>data/logs/sentinel.log</code> (20 Mo au plus). Aussi visibles avec <code>docker logs</code>.</p>
+                    </div>
+                    <div class="cfg-row-control cfg-disk">
+                        <span class="cfg-disk-value" id="cfg-log-size">...</span>
+                        <a class="btn btn-secondary btn-sm" id="cfg-log-download" href="/api/config/log/download" download data-i18n="config.journal_download">Télécharger le journal</a>
+                    </div>
+                </div>
+                {{ toggle('debug-mode', 'config.debug_mode', 'Mode debug', 'config.debug_mode_hint', "Ajoute au journal le détail de chaque étape et les prompts envoyés à Ollama, qui recopient des lignes de tes logs. À désactiver une fois le problème trouvé.") }}
             </div>
         </section>
     </form>
-
-    <div id="config-message" class="message hidden"></div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=7"></script>
+<script src="/static/js/config.js?v=11"></script>
 <script src="/static/js/diagnostics_config.js?v=4"></script>
 {% endblock %}

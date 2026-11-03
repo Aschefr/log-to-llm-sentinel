@@ -7,67 +7,176 @@ document.addEventListener('DOMContentLoaded', () => {
     setupModelPulling();
     setupNotificationMethodToggle();
     setupMaintenance();
-    setupLangSwitcher();
     setupBackupAndRestore();
+    setupTabs();
+    refreshStatus();
+    setInterval(() => { if (!document.hidden) refreshStatus(); }, 30000);
+    if (window.i18n && window.i18n.onLanguageChange) window.i18n.onLanguageChange(refreshStatus);
 });
 
-function setupLangSwitcher() {
-    const btn = document.getElementById('config-lang-btn');
-    const dropdown = document.getElementById('config-lang-dropdown');
-    const hiddenSelect = document.getElementById('ollama-prompt-lang');
-    if (!btn || !dropdown || !hiddenSelect) return;
+function cfgT(key, fallback, vars) {
+    let text = window.t ? window.t(key) : null;
+    if (!text || text === key) text = fallback;
+    Object.entries(vars || {}).forEach(([k, v]) => { text = text.replace(`{${k}}`, v); });
+    return text;
+}
 
-    function updateUI(lang) {
-        const opt = dropdown.querySelector(`[data-lang="${lang}"]`);
-        if (!opt) return;
-        
-        // Use i18n SVG fallback if available
-        const emoji = opt.querySelector('.cfg-flag').dataset.emoji;
-        const flagHtml = (window.i18n && window.i18n.getFlagHTML) ? window.i18n.getFlagHTML(emoji) : emoji;
-        
-        document.getElementById('config-lang-flag').innerHTML = flagHtml;
-        document.getElementById('config-lang-name').textContent = opt.querySelector('span:not(.cfg-flag)').textContent;
-        
-        dropdown.querySelectorAll('.lang-option').forEach(o => o.classList.toggle('active', o.dataset.lang === lang));
-        hiddenSelect.value = lang;
-    }
+/* ── Tabs ─────────────────────────────────────────────────────────────── */
 
-    // Initialize UI on load
-    const initialLang = hiddenSelect.value || 'fr';
-    updateUI(initialLang);
+const CFG_TABS = { ollama: 'tab-ollama', notifications: 'tab-notifications', sources: 'tab-sources',
+                   diagnostic: 'diagnostics-section', data: 'tab-data', advanced: 'tab-advanced' };
 
-    // Initialise flags in dropdown using i18n helper
-    dropdown.querySelectorAll('.cfg-flag').forEach(el => {
-        const emoji = el.dataset.emoji;
-        el.innerHTML = (window.i18n && window.i18n.getFlagHTML) ? window.i18n.getFlagHTML(emoji) : emoji;
-    });
-
-    btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdown.classList.toggle('open');
-    });
-
-    dropdown.querySelectorAll('.lang-option').forEach(opt => {
-        opt.addEventListener('click', (e) => {
-            e.stopPropagation();
-            updateUI(opt.dataset.lang);
-            hiddenSelect.dispatchEvent(new Event('change')); // Trigger auto-save only on user click
-            dropdown.classList.remove('open');
-        });
-    });
-
-    document.addEventListener('click', () => {
-        dropdown.classList.remove('open');
-    });
-
-    // Écouter si la valeur du select caché est modifiée par le chargement de la config
-    let originalLoad = hiddenSelect.value;
-    setInterval(() => {
-        if(hiddenSelect.value !== originalLoad) {
-            originalLoad = hiddenSelect.value;
-            updateUI(hiddenSelect.value);
+function selectConfigTab(tab) {
+    const current = CFG_TABS[tab] ? tab : 'ollama';
+    Object.entries(CFG_TABS).forEach(([name, id]) => document.getElementById(id).classList.toggle('hidden', name !== current));
+    document.querySelectorAll('#cfg-tabs a').forEach(a => {
+        const active = a.dataset.tab === current;
+        a.classList.toggle('active', active);
+        if (active) {
+            a.setAttribute('aria-current', 'page');
+        } else {
+            a.removeAttribute('aria-current');
         }
-    }, 500); // quick hack for when loadConfig dynamically updates it since value change via JS doesn't fire "change" event if done via .value =
+    });
+    if (current === 'sources') loadSyslogHosts();
+    if (current === 'data') fetchMaintenanceStats();
+}
+
+function setupTabs() {
+    const fromHash = () => selectConfigTab(location.hash.slice(1) === 'diagnostics-section' ? 'diagnostic' : location.hash.slice(1));
+    window.addEventListener('hashchange', fromHash);
+    fromHash();
+}
+
+/* ── Real state, at the top of the page ───────────────────────────────── */
+
+function cfgAgo(iso) {
+    if (!iso) return '';
+    const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    const lang = (window.i18n && (window.i18n.lang || window.i18n.currentLang)) || document.documentElement.lang || 'fr';
+    const format = new Intl.RelativeTimeFormat(lang, { numeric: 'auto', style: 'short' });
+    if (seconds < 60) return cfgT('config.ago_now', "à l'instant");
+    if (seconds < 3600) return format.format(-Math.round(seconds / 60), 'minute');
+    if (seconds < 86400) return format.format(-Math.round(seconds / 3600), 'hour');
+    return format.format(-Math.round(seconds / 86400), 'day');
+}
+
+function cfgMethodName(method) {
+    return { smtp: 'Email', apprise: 'Apprise', discord: 'Discord' }[method] || method;
+}
+
+function ollamaStatusView(o) {
+    if (o.state === 'ok') return ['ok', cfgT('config.status_ollama_ok', 'Connecté · {model}', { model: o.model })];
+    if (o.state === 'model_missing') return ['warn', cfgT('config.status_ollama_missing', 'Modèle {model} absent', { model: o.model })];
+    if (o.state === 'not_configured') return ['warn', cfgT('config.status_ollama_unset', 'À configurer')];
+    return ['alert', cfgT('config.status_ollama_down', 'Injoignable')];
+}
+
+function notificationStatusView(n) {
+    const name = cfgMethodName(n.method);
+    if (n.state === 'incomplete') return ['warn', cfgT('config.status_notif_incomplete', '{method} · à compléter', { method: name })];
+    if (n.state === 'failed') {
+        const key = n.kind === 'send' ? 'config.status_notif_send_failed' : 'config.status_notif_test_failed';
+        return ['alert', cfgT(key, '{method} · échec {ago}', { method: name, ago: cfgAgo(n.at) })];
+    }
+    if (n.state === 'ok') {
+        const key = n.kind === 'send' ? 'config.status_notif_sent' : 'config.status_notif_tested';
+        return ['ok', cfgT(key, '{method} · réussi {ago}', { method: name, ago: cfgAgo(n.at) })];
+    }
+    return ['idle', cfgT('config.status_notif_untested', '{method} · non testé', { method: name })];
+}
+
+function syslogStatusView(y) {
+    if (y.state === 'off') return ['idle', cfgT('config.status_syslog_off', 'Désactivé')];
+    if (y.state === 'not_listening') return ['alert', cfgT('config.status_syslog_down', "N'écoute pas")];
+    if (y.state === 'waiting') return ['idle', cfgT('config.status_syslog_waiting', 'Actif · rien reçu en 7 jours')];
+    return ['ok', cfgT('config.status_syslog_on', '{n} source(s) · {ago}', { n: y.hosts, ago: cfgAgo(y.last_seen) })];
+}
+
+function diagnosticsStatusView(d) {
+    if (d.docker && d.host) return ['ok', cfgT('config.status_diag_both', 'Docker et serveur')];
+    if (d.docker) return ['ok', cfgT('config.status_diag_docker', 'Docker')];
+    if (d.host) return ['ok', cfgT('config.status_diag_host', 'Serveur')];
+    return ['idle', cfgT('config.status_diag_off', 'Non configuré')];
+}
+
+function cfgSize(bytes) {
+    const megabytes = bytes / (1024 * 1024);
+    const lang = document.documentElement.lang || 'fr';
+    if (megabytes < 1) {
+        const kilobytes = Math.max(bytes ? 1 : 0, Math.round(bytes / 1024));
+        return `${kilobytes.toLocaleString(lang)} ${cfgT('config.unit_kb', 'Ko')}`;
+    }
+    const value = megabytes.toLocaleString(lang, { maximumFractionDigits: megabytes < 100 ? 1 : 0 });
+    return `${value} ${cfgT('config.unit_mb', 'Mo')}`;
+}
+
+function cfgRetentionName(days) {
+    const key = { 7: 'config.retention_1w', 30: 'config.retention_1m', 180: 'config.retention_6m', 365: 'config.retention_1y' }[days];
+    return key ? cfgT(key, `${days} j`).toLowerCase() : `${days} ${cfgT('config.retention_days_lower', 'jours')}`;
+}
+
+function dataStatusView(d) {
+    const size = cfgSize(d.size_bytes);
+    if (!d.auto_delete) return ['idle', cfgT('config.status_data_keep', '{size} · tout conservé', { size })];
+    return ['idle', cfgT('config.status_data_retention', '{size} · conservation {period}', { size, period: cfgRetentionName(d.retention_days) })];
+}
+
+function advancedStatusView(a) {
+    if (a.debug) return ['warn', cfgT('config.status_debug_on', 'Mode debug actif')];
+    return ['idle', cfgT('config.status_debug_off', 'Debug désactivé')];
+}
+
+function setStatusItem(name, tone, text) {
+    const item = document.querySelector(`.cfg-status-item[data-status="${name}"]`);
+    if (!item) return;
+    item.querySelector('.rp-dot').className = `rp-dot rp-dot--${tone}`;
+    const detail = item.querySelector('.cfg-status-detail');
+    detail.removeAttribute('data-i18n');
+    detail.textContent = text;
+}
+
+async function refreshStatus() {
+    try {
+        const s = await apiFetch('/api/config/status');
+        const views = { ollama: ollamaStatusView(s.ollama), notifications: notificationStatusView(s.notifications),
+                        syslog: syslogStatusView(s.syslog), diagnostics: diagnosticsStatusView(s.diagnostics),
+                        data: dataStatusView(s.data), advanced: advancedStatusView(s.advanced) };
+        Object.entries(views).forEach(([name, [tone, text]]) => setStatusItem(name, tone, text));
+        const logSize = document.getElementById('cfg-log-size');
+        if (logSize) logSize.textContent = cfgSize(s.advanced.log_bytes);
+        document.getElementById('cfg-log-download')?.classList.toggle('hidden', !s.advanced.log_bytes);
+    } catch (_) {
+        ['ollama', 'notifications', 'syslog', 'diagnostics', 'data', 'advanced'].forEach(name => setStatusItem(name, 'idle', cfgT('config.status_unknown', 'État inconnu')));
+    }
+}
+
+async function loadSyslogHosts() {
+    const list = document.getElementById('cfg-hosts');
+    if (!list) return;
+    try {
+        const { hosts } = await apiFetch('/api/monitor/syslog/hosts');
+        if (!hosts.length) {
+            list.innerHTML = `<li class="form-hint">${escapeHtml(cfgT('config.syslog_hosts_empty', "Rien reçu pour l'instant : indique l'adresse ci-dessus à la source qui envoie ses logs."))}</li>`;
+            return;
+        }
+        list.innerHTML = hosts.map(h => `<li>
+            <code>${escapeHtml(h.hostname)}</code>
+            <span class="form-hint">${escapeHtml(cfgAgo(h.last_seen))}</span>
+            ${h.rule ? `<a href="/rules/${h.rule.id}">${escapeHtml(h.rule.name)}</a>`
+                     : `<a href="/rules">${escapeHtml(cfgT('config.syslog_host_no_rule', 'Aucune règle'))}</a>`}
+        </li>`).join('');
+    } catch (e) {
+        list.innerHTML = `<li class="form-hint rf-ko">${escapeHtml(e.message)}</li>`;
+    }
+}
+
+function cfgResult(id, ok, text) {
+    const el = typeof id === 'string' ? document.getElementById(id) : id;
+    if (!el) return;
+    el.textContent = text;
+    el.classList.remove('rf-ok', 'rf-ko');
+    if (ok !== null) el.classList.add(ok ? 'rf-ok' : 'rf-ko');
 }
 
 function setupNotificationMethodToggle() {
@@ -90,7 +199,6 @@ function updateNotificationVisibility() {
     if (discordEl) discordEl.style.display = (method === 'discord') ? '' : 'none';
 }
 
-
 function setPullModel(name) {
     const input = document.getElementById('pull-model-name');
     if (input) input.value = name;
@@ -99,7 +207,6 @@ function setPullModel(name) {
 function applyProfile(type) {
     const temp = document.getElementById('ollama-temp');
     const ctx = document.getElementById('ollama-ctx');
-    const threads = document.getElementById('ollama-threads');
     
     if (type === 'eco') {
         temp.value = 0.1;
@@ -113,9 +220,8 @@ function applyProfile(type) {
     }
     
     // Déclencher l'auto-sauvegarde
-    temp.dispatchEvent(new Event('input'));
-    ctx.dispatchEvent(new Event('input'));
-    threads.dispatchEvent(new Event('input'));
+    temp.dispatchEvent(new Event('change'));
+    ctx.dispatchEvent(new Event('change'));
 }
 
 function setupModelPulling() {
@@ -201,7 +307,9 @@ async function loadConfig() {
         document.getElementById('smtp-host').value = config.smtp_host || '';
         document.getElementById('smtp-port').value = config.smtp_port || 587;
         document.getElementById('smtp-user').value = config.smtp_user || '';
-        document.getElementById('smtp-password').value = '';
+        const passwordEl = document.getElementById('smtp-password');
+        passwordEl.value = '';
+        passwordEl.placeholder = config.smtp_password_set ? cfgT('config.smtp_password_saved', 'Enregistré : laisser vide pour le garder') : '';
         document.getElementById('smtp-recipient').value = config.smtp_recipient || '';
         // ssl_mode: priorité au nouveau champ, fallback legacy
         const sslMode = config.smtp_ssl_mode || (config.smtp_tls ? 'starttls' : 'none');
@@ -210,7 +318,9 @@ async function loadConfig() {
         // Model select is populated async; keep desired value to apply later.
         window.__desiredOllamaModel = config.ollama_model || 'llama3';
         document.getElementById('system-prompt').value = config.system_prompt || '';
-        document.getElementById('notification-method').value = config.notification_method || 'smtp';
+        const methodEl = document.getElementById('notification-method');
+        methodEl.value = config.notification_method || 'smtp';
+        if (!methodEl.value) methodEl.value = 'smtp';  // valeur inconnue en base : ne jamais afficher un choix vide
         document.getElementById('apprise-url').value = config.apprise_url || '';
         document.getElementById('apprise-max-chars').value = config.apprise_max_chars || 1900;
         const discordMaxEl = document.getElementById('discord-max-chars');
@@ -226,10 +336,7 @@ async function loadConfig() {
         if (promptLangEl) promptLangEl.value = config.ollama_prompt_lang || 'fr';
         window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
-        if (debugEl) {
-            debugEl.checked = config.debug_mode === true;
-            toggleLogsContainer(debugEl.checked);
-        }
+        if (debugEl) debugEl.checked = config.debug_mode === true;
 
         const autoDeleteEl = document.getElementById('auto-delete-analyses');
         if (autoDeleteEl) autoDeleteEl.checked = config.auto_delete_analyses === true;
@@ -296,8 +403,13 @@ async function setupOllamaModelSelect() {
     }
 
     // Populate list
+    const hint = document.getElementById('ollama-model-hint');
     try {
         const res = await apiFetch('/api/config/ollama/models');
+        if (hint) {
+            hint.textContent = cfgT('config.ollama_model_hint', 'La liste est récupérée depuis Ollama.');
+            hint.classList.remove('rf-ko');
+        }
         const models = (res && res.models) ? res.models : [];
 
         const desired = window.__desiredOllamaModel || 'llama3';
@@ -321,9 +433,13 @@ async function setupOllamaModelSelect() {
             setCustomVisible(true);
         }
     } catch (e) {
-        // Fallback avec message d'erreur visible
-        const errMsg = e && e.message ? e.message : 'Ollama unreachable';
-        select.innerHTML = `<option value="__custom__">${window.t ? window.t('config.autre_option') : 'Other\u2026'} (${escapeHtml(errMsg)})</option>`;
+        // La liste n'a pas pu être lue : l'explication va dans l'aide du champ, le modèle reste modifiable à la main
+        select.innerHTML = `<option value="__custom__">${window.t ? window.t('config.autre_option') : 'Other\u2026'}</option>`;
+        if (hint) {
+            hint.removeAttribute('data-i18n');
+            hint.textContent = cfgT('config.ollama_models_error', "Liste indisponible. Vérifie l'URL ci-dessus, ou saisis le modèle à la main.");
+            hint.classList.add('rf-ko');
+        }
         select.value = '__custom__';
         customInput.value = window.__desiredOllamaModel || 'llama3';
         setCustomVisible(true);
@@ -332,121 +448,76 @@ async function setupOllamaModelSelect() {
 
 function setupForm() {
     const form = document.getElementById('config-form');
-    const messageEl = document.getElementById('config-message');
 
-    form.addEventListener('submit', async (e) => {
+    // Entrée dans un champ : le quitte et l'enregistre, sans recharger la page
+    form.addEventListener('submit', (e) => {
         e.preventDefault();
-        await saveConfig(messageEl);
+        if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     });
 
-    const debugEl = document.getElementById('debug-mode');
-    if (debugEl) {
-        debugEl.addEventListener('change', () => {
-            toggleLogsContainer(debugEl.checked);
-        });
+    // La section Diagnostic a son propre « Tester et enregistrer » (API dédiée) : hors enregistrement automatique.
+    // Un champ est enregistré quand on le quitte, pour ne jamais appliquer une URL ou un mot de passe à moitié saisis.
+    form.querySelectorAll('input, select, textarea').forEach(input => {
+        if (input.closest('#diagnostics-section') || input.hasAttribute('data-no-save')) return;
+        input.addEventListener('change', () => queueSave(input));
+    });
+    // Page fermée ou rechargée pendant la saisie : le champ en cours part quand même (requête keepalive)
+    window.addEventListener('pagehide', () => {
+        if (form.contains(document.activeElement)) document.activeElement.blur();
+    });
+}
+
+const CFG_SAVE = { inFlight: null, dirty: false, inputs: new Set() };
+
+function fieldSaveState(input, state, text) {
+    const row = input.closest('.cfg-row');
+    const holder = row && row.querySelector('.cfg-row-label');
+    if (!holder) return;
+    let el = holder.querySelector('.cfg-save-state');
+    if (!el) {
+        el = document.createElement('span');
+        el.className = 'cfg-save-state';
+        holder.querySelector('label, .cfg-label')?.after(el);
     }
+    clearTimeout(el._timer);
+    el.textContent = text;
+    el.dataset.state = state;
+    if (state === 'saved') el._timer = setTimeout(() => { el.textContent = ''; el.dataset.state = ''; }, 2500);
+}
 
-    const clearBtn = document.getElementById('clear-logs-btn');
-    if (clearBtn) {
-        clearBtn.addEventListener('click', async () => {
-            try {
-                await apiFetch('/api/config/logs', { method: 'DELETE' });
-                document.getElementById('debug-logs').innerHTML = '';
-            } catch (e) {
-                console.error('Erreur effacement logs:', e);
-            }
-        });
-    }
+function queueSave(input) {
+    CFG_SAVE.inputs.add(input);
+    if (CFG_SAVE.inFlight) { CFG_SAVE.dirty = true; return; }
+    CFG_SAVE.inFlight = runSaves().finally(() => { CFG_SAVE.inFlight = null; });
+}
 
-    const clearOllamaBtn = document.getElementById('clear-ollama-logs-btn');
-    if (clearOllamaBtn) {
-        clearOllamaBtn.addEventListener('click', async () => {
-            try {
-                await apiFetch('/api/config/ollama/logs', { method: 'DELETE' });
-                document.getElementById('ollama-debug-logs').innerHTML = '';
-            } catch (e) {
-                console.error('Erreur effacement logs Ollama:', e);
-            }
-        });
-    }
-
-    const copyBtn = document.getElementById('copy-logs-btn');
-    if (copyBtn) {
-        copyBtn.addEventListener('click', () => {
-            const logsEl = document.getElementById('debug-logs');
-            const text = logsEl.innerText;
-            
-            copyToClipboard(text).then(() => {
-                const oldText = copyBtn.innerHTML;
-                copyBtn.innerHTML = '✅ ' + (window.t ? window.t('common.copied') : 'Copied!');
-                setTimeout(() => {
-                    copyBtn.innerHTML = oldText;
-                }, 2000);
-            }).catch(err => {
-                console.error('Copy error:', err);
-                alert(window.t ? window.t('config.clipboard_error') : 'Cannot copy to clipboard. Check your browser permissions.');
-            });
-        });
-    }
-
-    const copyOllamaBtn = document.getElementById('copy-ollama-logs-btn');
-    if (copyOllamaBtn) {
-        copyOllamaBtn.addEventListener('click', () => {
-            const logsEl = document.getElementById('ollama-debug-logs');
-            const text = logsEl.innerText;
-            copyToClipboard(text).then(() => {
-                const oldText = copyOllamaBtn.innerHTML;
-            copyOllamaBtn.innerHTML = '\u2705 ' + (window.t ? window.t('common.copied') : 'Copied!');
-                setTimeout(() => { copyOllamaBtn.innerHTML = oldText; }, 2000);
-            }).catch(err => {
-                console.error('Ollama copy error:', err);
-                alert(window.t ? window.t('config.clipboard_error') : 'Cannot copy to clipboard. Check your browser permissions.');
-            });
-        });
-    }
-
-    // Auto-save logic
-    // La section Diagnostic a son propre « Tester et enregistrer » (API dédiée) : hors auto-save
-    const inputs = Array.from(form.querySelectorAll('input, select, textarea'))
-        .filter(input => !input.closest('#diagnostics-section'));
-    let modifiedInputs = new Set();
-    
-    const debouncedSave = debounce(async () => {
-        const inputsToGlow = Array.from(modifiedInputs);
-        modifiedInputs.clear();
-        
-        const success = await saveConfig(messageEl, true);
-        if (success) {
-            inputsToGlow.forEach(input => {
-                let targetToGlow = input;
-                if (input.id === 'ollama-prompt-lang') {
-                    const customBtn = document.getElementById('config-lang-btn');
-                    if (customBtn) targetToGlow = customBtn;
-                }
-
-                targetToGlow.classList.add('save-success-glow');
-                setTimeout(() => targetToGlow.classList.remove('save-success-glow'), 1500);
-                
-                // Si l'URL Ollama a changé, on rafraîchit automatiquement la liste des modèles
-                if (input.id === 'ollama-url') {
-                    setupOllamaModelSelect();
-                }
-                
-                // Si l'URL Apprise a changé, on rafraîchit la liste des tags disponibles
-                if (input.id === 'apprise-url') {
-                    setupAppriseTags();
-                }
-            });
+async function runSaves() {
+    const live = document.getElementById('cfg-save-live');
+    do {
+        CFG_SAVE.dirty = false;
+        const inputs = [...CFG_SAVE.inputs];
+        CFG_SAVE.inputs.clear();
+        inputs.forEach(input => fieldSaveState(input, 'saving', cfgT('config.field_saving', 'Enregistrement…')));
+        const error = await saveConfig();
+        if (error) {
+            const text = cfgT('config.field_not_saved', 'Non enregistré : {error}', { error });
+            inputs.forEach(input => fieldSaveState(input, 'error', text));
+            if (live) live.textContent = text;
+            continue;
         }
-    }, 1000);
-
-    inputs.forEach(input => {
-        const eventType = (input.type === 'checkbox' || input.tagName === 'SELECT') ? 'change' : 'input';
-        input.addEventListener(eventType, () => {
-            modifiedInputs.add(input);
-            debouncedSave();
+        const text = cfgT('config.field_saved', 'Enregistré');
+        inputs.forEach(input => fieldSaveState(input, 'saved', text));
+        if (live) live.textContent = text;
+        inputs.forEach(input => {
+            if (input.id === 'ollama-url') setupOllamaModelSelect();
+            if (input.id === 'apprise-url') setupAppriseTags();
+            if (input.id === 'smtp-password' && input.value) {
+                input.value = '';
+                input.placeholder = cfgT('config.smtp_password_saved', 'Enregistré : laisser vide pour le garder');
+            }
         });
-    });
+    } while (CFG_SAVE.dirty);
+    refreshStatus();
 }
 
 function debounce(func, wait) {
@@ -459,136 +530,6 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(later, wait);
     };
-}
-
-function toggleLogsContainer(visible) {
-    const container = document.getElementById('debug-logs-container');
-    const ollamaContainer = document.getElementById('ollama-logs-container');
-    if (container) container.classList.toggle('hidden', !visible);
-    if (ollamaContainer) ollamaContainer.classList.toggle('hidden', !visible);
-
-    if (visible) {
-        startLogPolling();
-        _initDebugLogFilters();
-    } else {
-        stopLogPolling();
-    }
-}
-
-let logInterval = null;
-
-function startLogPolling() {
-    if (logInterval) return;
-    logInterval = setInterval(() => {
-        fetchLogs();
-        fetchOllamaLogs();
-    }, 2000);
-    fetchLogs();
-    fetchOllamaLogs();
-}
-
-function stopLogPolling() {
-    if (logInterval) {
-        clearInterval(logInterval);
-        logInterval = null;
-    }
-}
-
-async function fetchLogs() {
-    const container = document.getElementById('debug-logs');
-    if (!container) return;
-
-    try {
-        const res = await apiFetch('/api/config/logs');
-        if (res && res.logs) {
-            renderLogs(res.logs);
-        }
-    } catch (e) {
-        console.error('Erreur logs:', e);
-    }
-}
-
-function renderLogs(logs) {
-    const container = document.getElementById('debug-logs');
-    if (!container) return;
-
-    const wasAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 20;
-
-    // Get active filter
-    const activeFilter = (document.querySelector('.dbg-filter-btn.dbg-filter-active') || {}).dataset?.filter ?? '';
-
-    container.innerHTML = logs
-        .filter(l => !activeFilter || l.tag === activeFilter)
-        .map(l => `
-        <div class="log-entry" data-tag="${escapeHtml(l.tag)}">
-            <span class="log-time">${escapeHtml(l.timestamp)}</span>
-            <span class="log-level ${escapeHtml(l.level)}">${escapeHtml(l.level)}</span>
-            <span class="log-tag">[${escapeHtml(l.tag)}]</span>
-            <span class="log-message">${escapeHtml(l.message)}</span>
-        </div>
-    `).join('');
-
-    if (wasAtBottom) {
-        container.scrollTop = container.scrollHeight;
-    }
-}
-
-function _initDebugLogFilters() {
-    document.querySelectorAll('.dbg-filter-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.dbg-filter-btn').forEach(b => b.classList.remove('dbg-filter-active'));
-            btn.classList.add('dbg-filter-active');
-            fetchLogs(); // re-render with new filter
-        });
-    });
-}
-
-async function fetchOllamaLogs() {
-    const container = document.getElementById('ollama-debug-logs');
-    if (!container) return;
-    try {
-        const res = await apiFetch('/api/config/ollama/logs');
-        if (res && res.logs) {
-            renderOllamaLogs(res.logs);
-        }
-    } catch (e) {}
-}
-
-function renderOllamaLogs(logs) {
-    const container = document.getElementById('ollama-debug-logs');
-    if (!container) return;
-
-    // Ne pas écraser le DOM si l'utilisateur a une sélection active dans ce conteneur
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && sel.toString().length > 0) {
-        const range = sel.getRangeAt(0);
-        if (container.contains(range.commonAncestorContainer)) {
-            return; // Protéger la sélection, on rafraîchirait au prochain cycle
-        }
-    }
-
-    const wasAtBottom = container.scrollHeight - container.clientHeight <= container.scrollTop + 20;
-
-    container.innerHTML = logs.map(l => `
-        <div class="log-entry ollama-log-entry">
-            <div class="log-time">
-                ${escapeHtml(l.timestamp)}
-                ${l.detection_id ? `<span class="detection-id-badge" style="margin-left: 10px;">#${escapeHtml(l.detection_id)}</span>` : ''}
-            </div>
-            <div class="ollama-debug-block">
-            <strong>${window.t ? window.t('config.prompt_label') : 'PROMPT:'}</strong>
-                <pre>${escapeHtml(l.prompt)}</pre>
-            </div>
-            <div class="ollama-debug-block">
-            <strong>${window.t ? window.t('config.response_label') : 'RESPONSE:'}</strong>
-                <pre>${escapeHtml(l.response)}</pre>
-            </div>
-        </div>
-    `).reverse().join('');
-
-    if (wasAtBottom) {
-        container.scrollTop = container.scrollHeight;
-    }
 }
 
 function setupTests() {
@@ -627,47 +568,41 @@ function setupTests() {
 async function runTest(url, messageEl, buttonEl) {
     const oldText = buttonEl.textContent;
     buttonEl.disabled = true;
-    buttonEl.textContent = window.t ? window.t('config.test_in_progress') : 'Testing...';
-    
+    buttonEl.textContent = cfgT('config.test_in_progress', 'Testing...');
+    cfgResult(messageEl, null, '');
+
     const abortController = new AbortController();
     const stopBtn = document.createElement('button');
-    stopBtn.className = 'btn btn-danger btn-sm';
-    stopBtn.style.marginLeft = '0.5rem';
-    stopBtn.innerHTML = window.t ? '🛑 ' + window.t('common.stop') : '🛑 Stop';
+    stopBtn.type = 'button';
+    stopBtn.className = 'btn btn-secondary btn-sm';
+    stopBtn.textContent = cfgT('common.stop', 'Stop');
     stopBtn.onclick = () => abortController.abort();
-    
-    buttonEl.parentNode.insertBefore(stopBtn, buttonEl.nextSibling);
-    
+    buttonEl.after(stopBtn);
+
     try {
-        const res = await apiFetch(url, { 
-            method: 'POST',
-            signal: abortController.signal
-        });
-        const detail = (res && res.detail) ? res.detail : 'OK';
-        showMessage(messageEl, detail, 'success');
+        // Le test doit porter sur ce qui vient d'être saisi : le champ quitté en cliquant ici est encore en cours d'envoi
+        if (CFG_SAVE.inFlight) await CFG_SAVE.inFlight;
+        const res = await apiFetch(url, { method: 'POST', signal: abortController.signal });
+        cfgResult(messageEl, true, (res && res.detail) ? res.detail : 'OK');
     } catch (error) {
         if (error.name === 'AbortError') {
-            showMessage(messageEl, window.t ? window.t('config.test_cancelled') : 'Test cancelled', 'error');
+            cfgResult(messageEl, false, cfgT('config.test_cancelled', 'Test cancelled'));
         } else {
             console.error('Test error:', error);
-            showMessage(messageEl, (window.t ? window.t('common.error') : 'Error') + ': ' + (error.message || 'unknown'), 'error');
+            cfgResult(messageEl, false, `${cfgT('common.error', 'Error')} : ${error.message || 'unknown'}`);
         }
     } finally {
         buttonEl.disabled = false;
         buttonEl.textContent = oldText;
-        if (stopBtn.parentNode) stopBtn.parentNode.removeChild(stopBtn);
+        stopBtn.remove();
+        refreshStatus();
     }
 }
 
-async function saveConfig(messageEl, isAutoSave = false) {
+/** Sends every field. Returns an error message, or null when it is saved. */
+async function saveConfig() {
     if (!window.__configLoaded) {
-        console.warn('Sauvegarde annulée: la config n\'a pas encore été chargée correctement.');
-        return false;
-    }
-    if (isAutoSave) {
-        messageEl.textContent = window.t ? window.t('config.auto_saving') : 'Auto-saving...';
-        messageEl.className = 'message info';
-        messageEl.classList.remove('hidden');
+        return cfgT('config.not_loaded', "la configuration n'a pas pu être chargée");
     }
     const modelSelect = document.getElementById('ollama-model');
     const modelCustom = document.getElementById('ollama-model-custom');
@@ -718,19 +653,12 @@ async function saveConfig(messageEl, isAutoSave = false) {
     const pwd = document.getElementById('smtp-password').value;
     if (pwd) data.smtp_password = pwd;
 
-
     try {
-        await apiFetch('/api/config', {
-            method: 'PUT',
-            body: data,
-        });
-        const successMsg = isAutoSave ? (window.t ? window.t('config.auto_saved') : 'Auto-saved') : (window.t ? window.t('config.save_success') : 'Configuration saved successfully');
-        showMessage(messageEl, successMsg, 'success');
-        return true;
+        await apiFetch('/api/config', { method: 'PUT', body: data, keepalive: true });
+        return null;
     } catch (error) {
         console.error('Erreur sauvegarde config:', error);
-        showMessage(messageEl, 'Erreur: ' + error.message, 'error');
-        return false;
+        return error.message;
     }
 }
 
@@ -780,7 +708,7 @@ window.setOllamaCtx = function(val) {
     if (el) {
         el.value = val;
         // Trigger auto-save
-        el.dispatchEvent(new Event('input'));
+        el.dispatchEvent(new Event('change'));
     }
 }
 
@@ -788,12 +716,12 @@ window.setAppriseMax = (val) => {
     const input = document.getElementById('apprise-max-chars');
     if (input) {
         input.value = val;
-        input.dispatchEvent(new Event('input'));
+        input.dispatchEvent(new Event('change'));
     }
     const inputD = document.getElementById('discord-max-chars');
     if (inputD) {
         inputD.value = val;
-        inputD.dispatchEvent(new Event('input'));
+        inputD.dispatchEvent(new Event('change'));
     }
 }
 
@@ -811,8 +739,6 @@ function setupMaintenance() {
             } else {
                 retentionCustom.classList.add('hidden');
             }
-            // Trigger auto-save on select change
-            retentionSelect.dispatchEvent(new Event('input'));
         });
     }
 
@@ -826,9 +752,9 @@ function setupMaintenance() {
             showInlineConfirm(btn, window.t(confirmKey), async () => {
                 try {
                     await apiFetch(url, { method });
-                    alert(window.t(doneKey));
+                    cfgResult(`${id.replace('-btn', '')}-result`, true, window.t(doneKey));
                 } catch (error) {
-                    alert(`${window.t('common.error')} : ${error.message}`);
+                    cfgResult(`${id.replace('-btn', '')}-result`, false, `${window.t('common.error')} : ${error.message}`);
                 }
             });
         });
@@ -836,17 +762,18 @@ function setupMaintenance() {
 
     const cleanupBtn = document.getElementById('cleanup-btn');
     if (cleanupBtn) {
-        cleanupBtn.addEventListener('click', async () => {
-            if (!confirm(window.t ? window.t('config.cleanup_confirm') : 'Êtes-vous sûr de vouloir supprimer définitivement ces données ?')) return;
-            cleanupBtn.disabled = true;
-            try {
-                const res = await apiFetch('/api/config/maintenance/cleanup', { method: 'DELETE' });
-                alert(res.detail || (window.t ? window.t('config.cleanup_done') : 'Nettoyage terminé.'));
-                fetchMaintenanceStats();
-            } catch (e) {
-                alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
-                cleanupBtn.disabled = false;
-            }
+        cleanupBtn.addEventListener('click', () => {
+            showInlineConfirm(cleanupBtn, cfgT('config.cleanup_confirm', 'Supprimer définitivement ces données ?'), async () => {
+                cleanupBtn.disabled = true;
+                try {
+                    const res = await apiFetch('/api/config/maintenance/cleanup', { method: 'DELETE' });
+                    cfgResult('cleanup-result', true, res.detail || cfgT('config.cleanup_done', 'Nettoyage terminé.'));
+                    fetchMaintenanceStats();
+                } catch (e) {
+                    cfgResult('cleanup-result', false, `${cfgT('common.error', 'Erreur')} : ${e.message}`);
+                    cleanupBtn.disabled = false;
+                }
+            });
         });
     }
 }
@@ -863,8 +790,7 @@ async function fetchMaintenanceStats() {
     try {
         const res = await apiFetch('/api/config/maintenance/stats');
         
-        const mb = (res.size_bytes / (1024 * 1024)).toFixed(2);
-        usageVal.textContent = `${mb} MB`;
+        usageVal.textContent = cfgSize(res.size_bytes);
         
         if (statsContainer && daysVal && countVal && cleanupBtn) {
             daysVal.textContent = res.retention_days;
@@ -932,10 +858,9 @@ function setupBackupAndRestore() {
                     throw new Error(result.detail || (window.t ? window.t('config.import_error') : 'Erreur lors de l\'importation'));
                 }
                 
-                alert(result.message || (window.t ? window.t('config.import_success') : 'Importation réussie.'));
                 window.location.reload();
             } catch (e) {
-                alert((window.t ? window.t('common.error') : 'Erreur') + ': ' + e.message);
+                cfgResult('import-result', false, `${cfgT('common.error', 'Erreur')} : ${e.message}`);
                 importBtn.disabled = false;
                 importBtn.textContent = oldText;
             }
