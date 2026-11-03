@@ -18,7 +18,9 @@ Every hour, for each enabled rule whose tuning is not *Off*, the arbiter receive
 * **Blind spots** seen at least 3 times → *add a keyword*, or *ignore* (expected, transient, maintenance, a container being stopped…). One keyword per event, even when it writes several lines.
 * **Noisy keywords** → *keep*, *add an exclusion* for the useless lines, or *remove the keyword*. A keyword is reviewed when ≥ 10 alerts over 30 days are ≥ 90 % `info` without any `critical`, or when you flag one of its alerts **Not relevant**.
 
-Flagging an alert **Not relevant** (button on every alert card) triggers this review right away for that rule: the arbiter targets the flagged lines with a precise exclusion rather than dropping a keyword that also catches useful alerts.
+Flagging an alert **Not relevant** (button on every alert card) flags every occurrence of that event and triggers this review right away for that rule: the arbiter targets the flagged lines with a precise exclusion rather than dropping a keyword that also catches useful alerts. The next analyses of that event are told about the flag too.
+
+The arbiter also receives the rule's [notes](notes.md). Its safeguards still apply.
 
 ## 3. Checks before anything changes
 

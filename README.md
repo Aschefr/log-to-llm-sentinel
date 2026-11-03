@@ -102,6 +102,7 @@ Setting up keywords can be tedious, so Sentinel keeps them up to date by itself:
 - A new rule analyzes the last 7 days of its log: the AI proposes the keywords that matter.
 - Every hour, error lines that no keyword catches ("blind spots") and keywords that only produce noise are reviewed by the local AI.
 - Flag an alert **Not relevant** and the AI adds the right exclusion.
+- Add a **note** to tell the AI what the logs cannot, such as "this server has no systemd": the next alerts on that event or source take it into account.
 - Every change is checked against your data first (it must appear in the real lines, must not hide important alerts…), logged in the rule's **Keywords** tab and can be undone in one click. Prefer to approve each change? Switch the rule to *Suggestions*.
 
 ### 📊 Meta-Analysis: The Big Picture

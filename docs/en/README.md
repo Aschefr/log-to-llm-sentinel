@@ -18,6 +18,7 @@ Sentinel detects critical log events, automatically collects surrounding applica
 ### ⚙️ Deep-Dive Features
 * [**Autopilot**](features/autopilot.md) — Give only the source: the local AI sets up the rule (name, context, keywords, rhythm) from the log history, or after watching it for 24 h.
 * [**Keyword tuning**](features/keyword-learning.md) — How the local AI keeps keywords and exclusions up to date (blind spots, noise, history analysis), with checks and undo.
+* [**Notes for the AI**](features/notes.md) — Tell the AI what the logs cannot, for the next alerts on that event or source.
 * [**Inactivity Monitoring**](features/inactivity-monitoring.md) — Tracking log ingestion gaps to alert on dead processes.
 * [**Incident Resolution**](features/resolution-tracking.md) — Adaptive calm, health probes, AI validation modes and suggested patterns.
 * [**Infrastructure Diagnostics**](features/diagnostics.md) — Let the chat AI check containers and the server itself (read-only Docker proxy, restricted SSH key), with step-by-step setup for Linux and Unraid.

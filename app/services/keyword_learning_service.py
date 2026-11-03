@@ -25,6 +25,7 @@ from app import logger as app_logger
 from app.database import SessionLocal
 from app.models import GlobalConfig, KeywordChange, KeywordLearningSession, Rule
 from app.services import autopilot as ap
+from app.services import event_notes
 from app.services import keyword_tuning as kt
 from app.services.app_config import config_to_dict
 from app.services.prompts import AUTOPILOT_PROFILE_SCHEMA
@@ -439,7 +440,8 @@ async def _run_session(session_id: int):
             signatures = ap.top_signatures(result["templates"])
             profile_messages = None
             if autopilot and (not summary.get("refresh") or ap.profile_changed(ap.load(rule).get("signatures", []), signatures)):
-                profile_messages = ap.build_profile_messages(lang, rule, result, period)
+                profile_messages = ap.build_profile_messages(lang, rule, result, period,
+                                                             notes=event_notes.for_rule(db, rule.id, source_only=True))
         finally:
             db.close()
 
@@ -465,7 +467,7 @@ async def _run_session(session_id: int):
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             # Ajustement désactivé sur la règle : le pilote règle le reste, pas les mots-clés
             blind, noise = scan_candidates(db, rule, result, days) if (rule.keyword_tuning_mode or "auto") != "off" else ([], [])
-            messages = kt.build_arbiter_messages(lang, rule, blind, noise, period)
+            messages = kt.build_arbiter_messages(lang, rule, blind, noise, period, notes=event_notes.for_rule(db, rule.id))
         finally:
             db.close()
         summary.update({"blind_spots": len(blind), "keywords_reviewed": len(noise)})

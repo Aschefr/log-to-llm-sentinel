@@ -86,6 +86,9 @@ def render_history(history: dict, lang: str, max_recent: int = 5) -> str:
         lines.append(label(lang, "history_first"))
         return "\n".join(lines)
     lines.append(label(lang, "history_total", total=history["total"], similar=len(similar)))
+    flagged = sum(1 for a in similar if a.feedback == "irrelevant")
+    if flagged:
+        lines.append(label(lang, "history_flagged", n=flagged))
     hours = Counter(a.analyzed_at.hour for a in similar)
     lines.append(label(lang, "history_hours", hours=", ".join(f"{h:02d}h ×{n}" for h, n in sorted(hours.items()))))
     lines.append(label(lang, "history_recent"))
@@ -96,6 +99,28 @@ def render_history(history: dict, lang: str, max_recent: int = 5) -> str:
             status = a.resolution_status or label(lang, "resolution_pending")
         lines.append(f"- {a.analyzed_at.strftime('%Y-%m-%d %H:%M')} UTC — {a.severity} — {status} — « {short_summary(a)} »")
     return "\n".join(lines)
+
+
+def render_notes(notes: Optional[List[dict]], lang: str, max_chars: Optional[int] = None, intro: str = "notes_intro",
+                 with_line: bool = False) -> str:
+    """Bloc des notes de l'administrateur, les plus proches de l'événement d'abord. Sur une ligne chacune : une note ne
+    peut pas imiter une autre section du prompt. Au-delà de max_chars, les dernières notes sont retirées."""
+    if not notes:
+        return ""
+    items = []
+    for n in notes:
+        where = label(lang, f"note_scope_{n['scope']}")
+        if with_line and n.get("line") and n["scope"] != "source":
+            where = label(lang, "note_on_line", line=n["line"][:120])
+        items.append(f"- {(n.get('updated_at') or '')[:10]} ({where}) : {' '.join(n['text'].split())}")
+    head = f"## {label(lang, 'notes_title')}\n{label(lang, intro)}"
+    if max_chars:
+        while len(items) > 1 and len(head) + sum(len(i) + 1 for i in items) > max_chars:
+            items.pop()
+        room = max(0, max_chars - len(head) - 1)
+        if len(items[0]) > room:
+            items[0] = items[0][:room].rstrip() + "…"
+    return "\n".join([head, *items])
 
 
 # ── Messages ───────────────────────────────────────────────────────────────────
@@ -139,7 +164,7 @@ def _shrink_context(context: dict) -> dict:
 
 def build_alert_messages(rule: Rule, events_text: str, matched_keywords: Optional[list],
                          context: Optional[dict], history: Optional[dict],
-                         config: dict, now: datetime) -> List[dict]:
+                         config: dict, now: datetime, notes: Optional[List[dict]] = None) -> List[dict]:
     lang = config.get("ollama_prompt_lang", "fr")
     system = ALERT_SYSTEM.get(lang, ALERT_SYSTEM["fr"])
     if (config.get("system_prompt") or "").strip():
@@ -155,6 +180,9 @@ def build_alert_messages(rule: Rule, events_text: str, matched_keywords: Optiona
     budget = max(3000, int((config.get("ollama_ctx", 4096) - reserve) * CHARS_PER_TOKEN))
     rule_block = _render_rule(rule, now, lang)
     remaining = budget - len(system) - len(rule_block)
+    # Les notes passent avant l'historique et le contexte, sans priver l'analyse de ses lignes
+    notes_block = render_notes(notes, lang, max_chars=max(800, remaining // 3))
+    remaining -= len(notes_block)
     if len(events) > remaining - 200:
         events = events[:max(500, remaining - 200)] + "…"
     remaining -= len(events)
@@ -178,6 +206,8 @@ def build_alert_messages(rule: Rule, events_text: str, matched_keywords: Optiona
             ctx = _shrink_context(ctx)
         if ctx:
             sections.insert(2, _render_context(ctx, n, lang))
+    if notes_block:
+        sections.insert(1, notes_block)
 
     return [{"role": "system", "content": system},
             {"role": "user", "content": "\n\n".join(sections)}]

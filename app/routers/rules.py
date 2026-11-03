@@ -8,7 +8,7 @@ import json
 import os
 
 from app.database import SessionLocal
-from app.models import (Rule, Analysis, GlobalConfig, ResolutionVerdict, KeywordChange, KeywordTemplate,
+from app.models import (Rule, Analysis, GlobalConfig, ResolutionVerdict, KeywordChange, KeywordTemplate, EventNote,
                         KeywordLearningSession)
 from app.services import autopilot as ap
 from app.services import keyword_tuning as kt
@@ -469,7 +469,7 @@ def delete_rule(rule_id: int):
             raise HTTPException(status_code=404, detail="rule_not_found")
         db.delete(rule)
         # L'identifiant peut resservir : rien de cette règle ne doit rester pour la suivante
-        for model in (Analysis, ResolutionVerdict, KeywordChange, KeywordTemplate):
+        for model in (Analysis, ResolutionVerdict, KeywordChange, KeywordTemplate, EventNote):
             db.query(model).filter(model.rule_id == rule_id).delete()
         kls.delete_rule_sessions(db, rule_id)
         db.commit()

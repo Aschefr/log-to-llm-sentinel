@@ -27,7 +27,7 @@ from typing import Dict, List, Optional
 from app import logger
 from app.database import SessionLocal
 from app.models import Analysis, GlobalConfig, KeywordChange, KeywordTemplate, Rule
-from app.services.alert_analysis import messages_to_text
+from app.services.alert_analysis import messages_to_text, render_notes
 from app.services.app_config import config_to_dict, llm_options
 from app.services.prompts import KEYWORD_ARBITER_SCHEMA, KEYWORD_ARBITER_SYSTEM, keyword_label
 from app.utils import keyword_match
@@ -294,7 +294,9 @@ class KeywordTuningService:
                 db.commit()  # statut « couvert » des modèles désormais attrapés
                 if not blind and not noise:
                     return []
-                messages = build_arbiter_messages(config.get("ollama_prompt_lang", "fr"), rule, blind, noise)
+                from app.services import event_notes
+                messages = build_arbiter_messages(config.get("ollama_prompt_lang", "fr"), rule, blind, noise,
+                                                  notes=event_notes.for_rule(db, rule.id))
             finally:
                 db.close()
 
@@ -552,7 +554,8 @@ def _fmt_sev(sev: dict) -> str:
     return ", ".join(f"{k} {v}" for k, v in sorted(sev.items(), key=lambda kv: -kv[1])) or "—"
 
 
-def build_arbiter_messages(lang: str, rule: Rule, blind: List[dict], noise: List[dict], period: str = "") -> list:
+def build_arbiter_messages(lang: str, rule: Rule, blind: List[dict], noise: List[dict], period: str = "",
+                           notes: Optional[List[dict]] = None) -> list:
     L = lambda key, **kw: keyword_label(lang, key, **kw)
     none = L("none")
     parts = [L("rule", name=rule.name)]
@@ -560,6 +563,8 @@ def build_arbiter_messages(lang: str, rule: Rule, blind: List[dict], noise: List
         parts.append(L("app_context", context=rule.application_context[:800]))
     parts.append(L("keywords", keywords=", ".join(f"« {k} »" for k in rule.get_keywords()) or none))
     parts.append(L("exclusions", exclusions=", ".join(f"« {e} »" for e in rule.get_excluded_patterns()) or none))
+    if notes:
+        parts.append(render_notes(notes, lang, intro="notes_intro_facts", with_line=True))
     if period:
         parts.append(L("period", period=period))
 

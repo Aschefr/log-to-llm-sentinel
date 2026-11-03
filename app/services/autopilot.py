@@ -23,6 +23,7 @@ from typing import List, Optional
 
 from app.models import Analysis, Rule
 from app.utils.log_utils import line_signature
+from app.services.alert_analysis import render_notes
 from app.services.prompts import AUTOPILOT_PROFILE_SCHEMA, AUTOPILOT_PROFILE_SYSTEM, autopilot_label
 from app.services.log_source import source_type
 from app.utils import keyword_match
@@ -75,10 +76,11 @@ def log_event(rule: Rule, text: str):
 
 
 def _harmless(a: Analysis) -> bool:
-    """Jugée sans gravité par l'IA ou signalée pas pertinente. Une analyse échouée (enregistrée en « info ») ne dit rien."""
+    """Jugée sans gravité par l'IA ou signalée pas pertinente. Une analyse échouée (enregistrée en « info ») ne dit rien.
+    Une analyse critique reste analysée même signalée : un signalement erroné ne doit pas cacher une vraie panne."""
     if (a.ollama_response or "").startswith("[Erreur"):
         return False
-    return a.feedback == "irrelevant" or a.severity == "info"
+    return a.severity == "info" or (a.feedback == "irrelevant" and a.severity != "critical")
 
 
 def quiet_lines(db, rule: Rule, lines: List[str], now: Optional[datetime] = None) -> tuple:
@@ -271,7 +273,7 @@ def source_label(log_file_path: str) -> str:
     return f"fichier {log_file_path}"
 
 
-def build_profile_messages(lang: str, rule: Rule, result: dict, period: str) -> list:
+def build_profile_messages(lang: str, rule: Rule, result: dict, period: str, notes: Optional[List[dict]] = None) -> list:
     L = lambda key, **kw: autopilot_label(lang, key, **kw)
     templates = result["templates"]
     frequent = sorted(templates.values(), key=lambda t: t["count"], reverse=True)[:25]
@@ -281,6 +283,8 @@ def build_profile_messages(lang: str, rule: Rule, result: dict, period: str) -> 
              L("volume", lines=result["lines"], templates=len(templates))]
     if (rule.application_context or "").strip() and "application_context" not in load(rule).get("managed", []):
         parts.append(L("user_context", context=rule.application_context[:CONTEXT_MAX]))
+    if notes:
+        parts.append(render_notes(notes, lang, intro="notes_intro_facts"))
     parts.append("\n" + L("frequent_title"))
     parts += [L("line", count=t["count"], example=clean_log_line(t["examples"][0])[:300]) for t in frequent]
     if errors:

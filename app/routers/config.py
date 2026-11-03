@@ -603,7 +603,7 @@ def cleanup_maintenance_data():
 def export_config(with_history: bool = False):
     db = SessionLocal()
     try:
-        from app.models import Rule, MetaAnalysisConfig, Analysis, ResolutionVerdict, ChatConversation, ChatMessage, ChatCompression, MetaAnalysisResult, KeywordLearningSession
+        from app.models import Rule, MetaAnalysisConfig, Analysis, ResolutionVerdict, ChatConversation, ChatMessage, ChatCompression, MetaAnalysisResult, KeywordLearningSession, EventNote
         from datetime import datetime
         
         def to_dict(obj):
@@ -626,7 +626,8 @@ def export_config(with_history: bool = False):
             "configuration": {
                 "global_config": [to_dict(c) for c in db.query(GlobalConfig).all()],
                 "rules": [to_dict(r) for r in db.query(Rule).all()],
-                "meta_analysis_configs": [to_dict(m) for m in db.query(MetaAnalysisConfig).all()]
+                "meta_analysis_configs": [to_dict(m) for m in db.query(MetaAnalysisConfig).all()],
+                "event_notes": [to_dict(n) for n in db.query(EventNote).all()]
             }
         }
         
@@ -687,7 +688,7 @@ async def import_config(file: UploadFile = File(...)):
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Le fichier backup.json n'est pas un JSON valide.")
         
-        from app.models import Rule, MetaAnalysisConfig, Analysis, ResolutionVerdict, ChatConversation, ChatMessage, ChatCompression, MetaAnalysisResult, KeywordLearningSession
+        from app.models import Rule, MetaAnalysisConfig, Analysis, ResolutionVerdict, ChatConversation, ChatMessage, ChatCompression, MetaAnalysisResult, KeywordLearningSession, EventNote
         from datetime import datetime
         
         def from_dict(model_cls, data_dict):
@@ -714,6 +715,7 @@ async def import_config(file: UploadFile = File(...)):
         db.query(GlobalConfig).delete()
         db.query(Rule).delete()
         db.query(MetaAnalysisConfig).delete()
+        db.query(EventNote).delete()  # liées aux règles remplacées, même si la sauvegarde n'en contient pas
         
         # Restore configs
         for row in config_data.get("global_config", []):
@@ -724,6 +726,9 @@ async def import_config(file: UploadFile = File(...)):
             
         for row in config_data.get("meta_analysis_configs", []):
             db.add(from_dict(MetaAnalysisConfig, row))
+
+        for row in config_data.get("event_notes", []):
+            db.add(from_dict(EventNote, row))
             
         # Restore history if present
         history_data = data.get("history", {})

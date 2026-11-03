@@ -10,6 +10,7 @@ from app.models import Rule, Analysis, GlobalConfig
 from app.services.ollama_service import OllamaService
 from app.services.notification_service import NotificationService
 from app.services.app_config import config_to_dict, llm_options
+from app.services import event_notes
 from app.services.alert_analysis import (build_history, build_alert_messages, messages_to_text,
                                          parse_alert_response, detect_severity)
 from app.services.log_source import find_context
@@ -225,7 +226,8 @@ class Orchestrator:
                                               rule.context_lines, rule.context_lines)
         signatures = {line_signature(l) for l in raw_lines["lines"]}
         history = build_history(db, rule.id, signatures, ref_time, exclude_id=exclude_id)
-        messages = build_alert_messages(rule, events_text, matched_keywords, context, history, config, ref_time)
+        notes = event_notes.for_lines(db, rule.id, raw_lines["lines"])
+        messages = build_alert_messages(rule, events_text, matched_keywords, context, history, config, ref_time, notes=notes)
 
         logger.debug("Orchestrator", f"Envoi à Ollama — modèle={config.get('ollama_model')} | {len(messages[1]['content'])} car.")
         async with self._ollama_semaphore:

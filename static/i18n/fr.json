@@ -636,14 +636,28 @@
     "view_rule": "Voir dans la règle",
     "irrelevant": "Pas pertinente",
     "irrelevant_done": "Signalée pas pertinente",
-    "irrelevant_title": "L'IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne",
+    "irrelevant_title": "S'applique à toutes les occurrences de cet événement. L'IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne.",
     "irrelevant_toast": "Merci : l'IA réexamine les mots-clés de la règle.",
     "toggle_details": "Afficher ou masquer le détail",
     "event_count_title": "{n} occurrences de cet événement",
     "event_range": "{n} occurrences, du {first} au {last}",
     "event_more": "Voir les autres occurrences",
     "event_hide": "Masquer les occurrences",
-    "confirm_delete_event": "Supprimer cet événement et ses {n} occurrences ?"
+    "confirm_delete_event": "Supprimer cet événement et ses {n} occurrences ?",
+    "notes_title": "Notes pour l'IA",
+    "note_add": "Ajouter une note",
+    "note_label": "Ce que l'IA devrait savoir",
+    "note_placeholder": "Ex. : ce serveur tourne sous Unraid, sans systemd.",
+    "note_hint": "Elle informe l'IA sans jamais faire taire une alerte. Prise en compte dès la prochaine analyse ; « Ré-essayer » l'applique à celle-ci.",
+    "note_scope_label": "S'applique à",
+    "note_scope_event": "Cet événement",
+    "note_scope_related": "Événement lié",
+    "note_scope_source": "Toute la source",
+    "note_confirm_delete": "Supprimer cette note ?",
+    "note_err_empty": "Écris d'abord ta note.",
+    "note_err_too_long": "Cette note dépasse 500 caractères.",
+    "note_err_limit": "Cette règle a atteint 30 notes : supprimes-en une d'abord.",
+    "note_scope_an_event": "Un événement"
   },
   "meta": {
     "title": "Méta-Analyse",
@@ -1131,7 +1145,10 @@
     "kw_status_dismissed": "écarté par le pilote",
     "kw_apply_anyway": "Appliquer quand même",
     "kw_apply_anyway_title": "Le pilote l'a écarté par prudence ({why}).",
-    "origin_autopilot": "Pilote auto"
+    "origin_autopilot": "Pilote auto",
+    "notes_intro": "L'IA reçoit ces notes avec les alertes de cette source. Une note ne fait jamais taire une alerte, et elle reste quand les analyses sont supprimées.",
+    "notes_empty": "Aucune note pour le moment.",
+    "notes_add": "Ajouter une note sur toute la source"
   },
   "diag": {
     "title": "Diagnostic (lecture seule)",

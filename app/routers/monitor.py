@@ -5,8 +5,8 @@ import asyncio
 from datetime import datetime
 
 from app.database import SessionLocal
-from app.models import Rule, Analysis, GlobalConfig
-from app.services import analysis_events
+from app.models import Rule, Analysis, GlobalConfig, EventNote
+from app.services import analysis_events, event_notes
 from app.services.orchestrator import Orchestrator
 from app.services.task_manager import task_manager
 from app.services.app_config import load_config_dict
@@ -160,8 +160,8 @@ def mark_analysis_viewed(analysis_id: int):
 
 @router.post("/analyses/{analysis_id}/feedback")
 async def set_analysis_feedback(analysis_id: int, value: str = "irrelevant"):
-    """Signale une alerte « pas pertinente » (value=irrelevant) ou retire le signalement (value=none).
-    L'arbitre des mots-clés réexamine aussitôt la règle : exclusion ou retrait du mot-clé fautif."""
+    """Signale un événement « pas pertinent » (value=irrelevant) ou retire le signalement (value=none), pour toutes ses
+    occurrences. L'arbitre des mots-clés réexamine aussitôt la règle : exclusion ou retrait du mot-clé fautif."""
     if value not in ("irrelevant", "none"):
         raise HTTPException(status_code=422, detail="invalid_feedback")
     db = SessionLocal()
@@ -169,7 +169,7 @@ async def set_analysis_feedback(analysis_id: int, value: str = "irrelevant"):
         analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
         if not analysis:
             raise HTTPException(status_code=404, detail="analysis_not_found")
-        analysis.feedback = None if value == "none" else value
+        analysis_events.set_feedback(db, analysis, None if value == "none" else value)
         rule_id = analysis.rule_id
         db.commit()
     finally:
@@ -177,6 +177,81 @@ async def set_analysis_feedback(analysis_id: int, value: str = "irrelevant"):
     if value == "irrelevant" and _keyword_tuning:
         asyncio.create_task(_keyword_tuning.review_rule(rule_id, focus_analysis_id=analysis_id))
     return {"status": "ok", "feedback": None if value == "none" else value}
+
+
+def _note_error(e: event_notes.NoteError) -> HTTPException:
+    return HTTPException(status_code=422, detail=str(e))
+
+
+@router.get("/rules/{rule_id}/notes")
+def list_rule_notes(rule_id: int):
+    """Toutes les notes d'une règle."""
+    db = SessionLocal()
+    try:
+        return {"notes": event_notes.for_rule(db, rule_id, limit=None), "max_chars": event_notes.MAX_CHARS,
+                "max_notes": event_notes.MAX_PER_RULE}
+    finally:
+        db.close()
+
+
+@router.post("/rules/{rule_id}/notes")
+def add_rule_note(rule_id: int, data: dict):
+    """Ajoute une note sur toute la source, ou sur un événement si analysis_id est donné."""
+    db = SessionLocal()
+    try:
+        if not db.query(Rule.id).filter(Rule.id == rule_id).first():
+            raise HTTPException(status_code=404, detail="rule_not_found")
+        analysis = None
+        if data.get("analysis_id"):
+            analysis = db.query(Analysis).filter(Analysis.id == data["analysis_id"], Analysis.rule_id == rule_id).first()
+            if not analysis:
+                raise HTTPException(status_code=404, detail="analysis_not_found")
+        try:
+            return event_notes.to_dict(event_notes.create(db, rule_id, data.get("text"), analysis))
+        except event_notes.NoteError as e:
+            raise _note_error(e)
+    finally:
+        db.close()
+
+
+@router.get("/analyses/{analysis_id}/notes")
+def list_analysis_notes(analysis_id: int):
+    """Les notes qui concernent cette analyse."""
+    db = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="analysis_not_found")
+        return {"notes": event_notes.for_analysis(db, analysis, limit=None)}
+    finally:
+        db.close()
+
+
+@router.put("/notes/{note_id}")
+def update_note(note_id: int, data: dict):
+    db = SessionLocal()
+    try:
+        note = db.query(EventNote).filter(EventNote.id == note_id).first()
+        if not note:
+            raise HTTPException(status_code=404, detail="note_not_found")
+        try:
+            return event_notes.to_dict(event_notes.update(db, note, data.get("text")))
+        except event_notes.NoteError as e:
+            raise _note_error(e)
+    finally:
+        db.close()
+
+
+@router.delete("/notes/{note_id}")
+def delete_note(note_id: int):
+    db = SessionLocal()
+    try:
+        if not db.query(EventNote).filter(EventNote.id == note_id).delete():
+            raise HTTPException(status_code=404, detail="note_not_found")
+        db.commit()
+        return {"status": "ok"}
+    finally:
+        db.close()
 
 
 @router.post("/rules/{rule_id}/view-all")

@@ -636,14 +636,28 @@
     "view_rule": "View in rule",
     "irrelevant": "Not relevant",
     "irrelevant_done": "Flagged not relevant",
-    "irrelevant_title": "The AI will adjust the rule's keywords or exclusions so this kind of line no longer triggers it",
+    "irrelevant_title": "Applies to every occurrence of this event. The AI will adjust the rule's keywords or exclusions so this kind of line no longer triggers.",
     "irrelevant_toast": "Thanks: the AI is reviewing the rule's keywords.",
     "toggle_details": "Show or hide the details",
     "event_count_title": "{n} occurrences of this event",
     "event_range": "{n} occurrences, from {first} to {last}",
     "event_more": "Show the other occurrences",
     "event_hide": "Hide the occurrences",
-    "confirm_delete_event": "Delete this event and its {n} occurrences?"
+    "confirm_delete_event": "Delete this event and its {n} occurrences?",
+    "notes_title": "Notes for the AI",
+    "note_add": "Add a note",
+    "note_label": "What the AI should know",
+    "note_placeholder": "E.g. this server runs Unraid, without systemd.",
+    "note_hint": "It informs the AI and never silences an alert. Used from the next analysis on; Retry applies it to this one.",
+    "note_scope_label": "Applies to",
+    "note_scope_event": "This event",
+    "note_scope_related": "Related event",
+    "note_scope_source": "The whole source",
+    "note_confirm_delete": "Delete this note?",
+    "note_err_empty": "Write your note first.",
+    "note_err_too_long": "This note is over 500 characters.",
+    "note_err_limit": "This rule has reached 30 notes: delete one first.",
+    "note_scope_an_event": "One event"
   },
   "meta": {
     "title": "Meta-Analysis",
@@ -1131,7 +1145,10 @@
     "kw_status_dismissed": "dismissed by the autopilot",
     "kw_apply_anyway": "Apply anyway",
     "kw_apply_anyway_title": "The autopilot dismissed it to be safe ({why}).",
-    "origin_autopilot": "Autopilot"
+    "origin_autopilot": "Autopilot",
+    "notes_intro": "The AI receives these notes with this source's alerts. A note never silences an alert, and it stays when analyses are deleted.",
+    "notes_empty": "No notes yet.",
+    "notes_add": "Add a note on the whole source"
   },
   "diag": {
     "title": "Diagnostics (read-only)",

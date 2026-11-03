@@ -3459,3 +3459,39 @@ button.collapse-toggle:hover { color: var(--text-primary); }
     .event-occurrence { flex-wrap: wrap; }
     .event-occurrence-text { flex-basis: 100%; white-space: normal; }
 }
+
+/* Notes for the AI */
+.event-note-count { margin-left: 0.4rem; color: var(--text-secondary); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.event-notes { margin-top: 0.9rem; padding: 0.75rem 0.9rem; border: 1px solid var(--border); border-radius: 8px; }
+.event-notes.is-empty { display: none; }
+.event-notes-title { margin: 0 0 0.5rem; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); }
+.event-notes-list { list-style: none; margin: 0; padding: 0; }
+.event-note { padding: 0.5rem 0; border-top: 1px solid var(--border); }
+.event-note:first-child { border-top: 0; padding-top: 0; }
+.event-note-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; color: var(--text-secondary); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.event-note-scope { font-weight: 600; }
+.event-note-actions { margin-left: auto; display: inline-flex; gap: 0.75rem; }
+.event-note-actions .btn-link { min-height: 1.75rem; padding: 0; background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer; }
+.event-note-actions .btn-link:hover { text-decoration: underline; }
+.event-note-actions .btn-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.event-note-text { margin: 0.25rem 0 0; font-size: 0.88rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.event-note-line { display: block; margin-top: 0.25rem; font-size: 0.76rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+.event-note-form { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; }
+.event-note-label { font-size: 0.82rem; font-weight: 600; }
+.event-note-form textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.event-note-form .form-hint { margin: 0; }
+.event-note-form-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 1rem; }
+.event-note-counter { color: var(--text-secondary); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.event-note-scopes { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.9rem; margin: 0; padding: 0; border: 0; font-size: 0.82rem; }
+.event-note-scopes legend { float: left; margin-right: 0.6rem; padding: 0; color: var(--text-secondary); }
+.event-note-scopes label { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 1.75rem; cursor: pointer; }
+.event-note-error { margin: 0; color: var(--danger); font-size: 0.82rem; }
+.event-note-form-actions { display: flex; gap: 0.5rem; }
+.rule-notes { margin-bottom: 0.9rem; border: 1px solid var(--border); border-radius: 8px; }
+.rule-notes > summary { display: flex; align-items: center; gap: 0.5rem; min-height: 2.5rem; padding: 0 0.9rem; font-size: 0.88rem; font-weight: 600; cursor: pointer; }
+.rule-notes > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rule-notes-count { color: var(--text-secondary); font-weight: 400; font-variant-numeric: tabular-nums; }
+.rule-notes-body { display: flex; flex-direction: column; align-items: stretch; gap: 0.6rem; padding: 0 0.9rem 0.9rem; }
+.rule-notes-body .form-hint, .rule-notes-empty { margin: 0; }
+.rule-notes-add { align-self: flex-start; }
+.event-notes .event-notes-list:empty { display: none; }

@@ -10,7 +10,8 @@ from typing import Optional
 from sqlalchemy import desc, func
 
 from app.models import Analysis, Rule, MetaAnalysisConfig, MetaAnalysisResult
-from app.services.alert_analysis import analysis_lines, short_summary, _load_json
+from app.services import event_notes
+from app.services.alert_analysis import analysis_lines, render_notes, short_summary, _load_json
 from app.services.prompts import meta_label
 from app.utils.log_utils import line_signature
 
@@ -60,6 +61,8 @@ def collect(db, config: MetaAnalysisConfig, period_start: datetime, period_end: 
     for pr in per_rule.values():
         pr["total"] = totals_by_rule.get(pr["rule_id"], len(pr["analyses"]))
         pr["max_rank"] = max(SEVERITY_RANK.get(a.severity, 0) for a in pr["analyses"])
+        period_lines = [line for a in pr["analyses"] for line in analysis_lines(a)]
+        pr["notes"] = event_notes.for_lines(db, pr["rule_id"], period_lines)
     ordered = sorted(per_rule.values(), key=lambda pr: (-pr["max_rank"], -len(pr["analyses"])))
 
     watched = [r for r in rules.values() if (r.id in rule_ids if rule_ids else r.enabled)]
@@ -116,7 +119,8 @@ def _render_rule_header(pr: dict, lang: str) -> str:
                        mttr=meta_label(lang, "mttr", mttr=round(sum(durations) / len(durations))) if durations else "",
                        state=(rule.alert_status or "normal") if rule else "?")
     ctx = f"\n{rule.application_context.strip()}" if rule and rule.application_context else ""
-    return f"## {title}\n{stats}{ctx}"
+    notes = render_notes(pr.get("notes"), lang, intro="notes_intro_facts", with_line=True)
+    return f"## {title}\n{stats}{ctx}" + (f"\n{notes}" if notes else "")
 
 
 def render_context(agg: dict, period_start: datetime, period_end: datetime, lang: str,

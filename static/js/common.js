@@ -499,6 +499,7 @@ function renderAnalysisCard(a, opts = {}) {
     const toggleArrow = collapsed ? '▶' : '▼';
 
     const ev = opts.event;  // événement regroupant cette analyse, s'il y en a un
+    const flagged = ev ? ev.flagged : a.feedback === 'irrelevant';
     const isUnread = ev ? ev.unread : a.viewed === false || a.viewed === 0;
     const unreadCls = isUnread ? ' unread' : '';
     const unreadIndicator = isUnread ? `<span class="unread-dot-indicator" title="${_t('monitor.unviewed_tooltip', 'Non consultée')}">●</span>` : '';
@@ -605,6 +606,7 @@ function renderAnalysisCard(a, opts = {}) {
                 <span class="severity-badge ${escapeHtml(ev ? ev.severity : a.severity)}">${escapeHtml(ev ? ev.severity : a.severity)}</span>
                 ${resolvedBadge}
                 ${recurBadge}
+                ${ev ? `<span class="event-note-count${(ev.notes || []).length ? '' : ' hidden'}" title="${escapeHtml(_t('common.notes_title', 'Notes pour l’IA'))}"><span aria-hidden="true">📝 </span><span>${(ev.notes || []).length}</span></span>` : ''}
                 ${unreadIndicator}
                 ${summaryLine}
             </div>
@@ -624,13 +626,15 @@ function renderAnalysisCard(a, opts = {}) {
             <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
             <div class="analysis-response markdown-body">${a.ollama_response ? renderMarkdown(a.ollama_response) : ''}</div>
             ${resolutionBlock}
+            ${ev ? eventNotesHtml(ev, a.id) : ''}
             <div class="analysis-footer">
-                <div style="display: flex; gap: 0.5rem;">
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); retryAnalysis(${a.id}, this)">🔄 ${_t('common.retry', 'Retry')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); notifyAnalysis(${a.id}, this)">🔔 ${_t('common.notify', 'Notify')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); togglePromptView(${a.id}, this)" title="${_t('common.view_prompt_title', 'Show the exact messages sent to the LLM')}">📜 ${_t('common.view_prompt', 'Prompt')}</button>
-                    ${a.rule_id ? `<button class="btn btn-secondary btn-sm${a.feedback === 'irrelevant' ? ' is-flagged' : ''}" onclick="event.stopPropagation(); toggleIrrelevant(${a.id}, this)" aria-pressed="${a.feedback === 'irrelevant'}"
-                        title="${_t('common.irrelevant_title', 'L’IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne')}">👎 ${a.feedback === 'irrelevant' ? _t('common.irrelevant_done', 'Signalée pas pertinente') : _t('common.irrelevant', 'Pas pertinente')}</button>` : ''}
+                    ${ev ? `<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openNoteForm(this)">📝 ${_t('common.note_add', 'Ajouter une note')}</button>` : ''}
+                    ${a.rule_id ? `<button class="btn btn-secondary btn-sm${flagged ? ' is-flagged' : ''}" onclick="event.stopPropagation(); toggleIrrelevant(${a.id}, this)" aria-pressed="${flagged}"
+                        title="${_t('common.irrelevant_title', 'L’IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne')}">👎 ${flagged ? _t('common.irrelevant_done', 'Signalée pas pertinente') : _t('common.irrelevant', 'Pas pertinente')}</button>` : ''}
                     ${a.rule_id && !opts.hideRuleLink ? `<a class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" href="/rules/${a.rule_id}?analysis=${a.id}#analyses">🔍 ${_t('common.view_rule', 'Voir dans la règle')}</a>` : ''}
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openChat(${a.id})">💬 ${_t('common.deepen', 'Deepen')}</button>
@@ -707,7 +711,8 @@ function deleteEvent(ruleId, key, count, btn) {
 
 function eventCardSignature(ev) {
     const a = ev.analysis;
-    return [a.id, ev.unread, ev.count, ev.last_at, ev.severity, a.resolution_status, a.resolved_at, a.summary, a.feedback, (a.ollama_response || '').length].join('|');
+    const notes = (ev.notes || []).map(n => `${n.id}:${n.updated_at}:${n.scope}`).join(',');
+    return [a.id, ev.unread, ev.count, ev.last_at, ev.severity, a.resolution_status, a.resolved_at, a.summary, ev.flagged, notes, (a.ollama_response || '').length].join('|');
 }
 
 /** Card of one event, as a DOM element. */
@@ -725,7 +730,7 @@ function reconcileEvents(list, events, opts = {}) {
     const isCard = el => el && el.classList.contains('analysis-card');
     const idOf = ev => `${ev.rule_id}-${ev.key}`;
     const incoming = new Set(events.map(idOf));
-    const reading = el => !el.classList.contains('collapsed') || el.contains(document.activeElement);
+    const reading = el => !el.classList.contains('collapsed') || el.contains(document.activeElement) || el.querySelector('.event-note-form');
     [...list.children].forEach(el => { if (isCard(el) && !incoming.has(el.dataset.event) && !reading(el)) el.remove(); });
     const tail = [...list.children].find(el => !isCard(el)) || null;
     let cursor = isCard(list.firstElementChild) ? list.firstElementChild : null;

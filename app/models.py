@@ -438,6 +438,19 @@ class KeywordChange(Base):
     decided_at = Column(DateTime, nullable=True)
 
 
+class EventNote(Base):
+    """Note de l'administrateur transmise à l'IA : sur un événement (event_key et signatures de ses lignes),
+    ou sur toute la source de la règle (event_key vide). Survit aux analyses, suit la règle."""
+    __tablename__ = "event_notes"
+    id = Column(Integer, primary_key=True, index=True)
+    rule_id = Column(Integer, index=True)
+    event_key = Column(String, nullable=True)
+    signatures_json = Column(Text, default="[]")
+    text = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
 class KeywordTemplate(Base):
     """Modèle de ligne d'erreur qu'aucun mot-clé n'attrape (angle mort), compté au fil de l'eau."""
     __tablename__ = "keyword_templates"

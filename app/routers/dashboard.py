@@ -11,9 +11,9 @@ except ImportError:
 
 from app.database import SessionLocal
 from app.models import GlobalConfig, Rule, Analysis
-from app.services import analysis_events, dashboard_watch, rule_stats
+from app.services import analysis_events, dashboard_watch, event_notes, rule_stats
 from app.services.app_config import config_to_dict
-from app.services.alert_analysis import short_summary
+from app.services.alert_analysis import analysis_lines, short_summary
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -155,8 +155,13 @@ def get_events(limit: int = 20, offset: int = 0, rule_id: int | None = None, sev
         selected = analysis_events.select(events, severity=severity, unread=unread)
         page = selected[offset:offset + limit]
         by_id = {a.id: a for a in db.query(Analysis).filter(Analysis.id.in_([e["analysis_id"] for e in page])).all()}
+        notes_of_rule = {}
         for e in page:
-            e["analysis"] = _analysis_dict(by_id[e["analysis_id"]], e["rule_name"], {})
+            a = by_id[e["analysis_id"]]
+            e["analysis"] = _analysis_dict(a, e["rule_name"], {})
+            if e["rule_id"] not in notes_of_rule:
+                notes_of_rule[e["rule_id"]] = event_notes.rule_rows(db, e["rule_id"])
+            e["notes"] = event_notes.applicable(notes_of_rule[e["rule_id"]], analysis_lines(a))
         return {"events": page, "has_more": offset + limit < len(selected), "total": len(selected),
                 "counts": analysis_events.counts(events)}
     finally:

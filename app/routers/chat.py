@@ -13,7 +13,8 @@ from app.services.app_config import config_to_dict
 from app.services.chat_agent import run_agent_turn, replay_tool_messages, AgentLimits
 from app.services.llm_tools import apply_action, action_to_dict
 from app.services.prompts import CHAT_ANALYSIS_CONTEXT, CHAT_TOOLS_INSTRUCTIONS, DIAG_TOOLS_INSTRUCTIONS, INVESTIGATION_PROMPT
-from app.services import diagnostics
+from app.services import diagnostics, event_notes
+from app.services.alert_analysis import render_notes
 from app.services.orchestrator import Orchestrator
 from app.services.task_manager import task_manager, ChatTaskEntry
 from app import logger
@@ -219,6 +220,13 @@ def build_chat_messages(conv_id: int, db: Session, with_tools: bool = False) -> 
         if analysis:
             rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first()
             block_lines.extend(_analysis_block(analysis, rule, lang))
+
+    # Hors du bloc ci-dessus : les notes restent connues une fois la conversation compressée
+    if conv.analysis_id:
+        analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
+        notes_text = render_notes(event_notes.for_analysis(db, analysis), lang) if analysis else ""
+        if notes_text:
+            block_lines.extend([notes_text, ""])
 
     if mode_text:
         block_lines.append(mode_text)

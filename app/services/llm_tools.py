@@ -19,7 +19,8 @@ from app.database import SessionLocal
 from app.models import Analysis, Rule, ResolutionVerdict, MetaAnalysisConfig, ChatAction
 from app.services import log_source
 from app.services import diagnostics as diag
-from app.services.alert_analysis import analysis_lines, short_summary
+from app.services import event_notes
+from app.services.alert_analysis import analysis_lines, render_notes, short_summary
 from app.utils.log_utils import clean_log_line, line_signature
 
 MAX_OUTPUT_CHARS = 4000
@@ -218,6 +219,9 @@ def get_analysis(db, analysis_id=None, detection_id=None, **_):
     if before or after:
         parts.append("\nContexte avant :\n" + "\n".join(before) + "\nContexte après :\n" + "\n".join(after))
     parts.append(f"\nAnalyse :\n{a.ollama_response or ''}")
+    notes = render_notes(event_notes.for_analysis(db, a), "fr")
+    if notes:
+        parts.append("\n" + notes)
     return "\n".join(parts)
 
 

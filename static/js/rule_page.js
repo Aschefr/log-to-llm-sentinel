@@ -164,7 +164,7 @@ function selectTab(tab) {
     if (location.hash.slice(1) !== tab) history.replaceState({}, '', `${location.pathname}${location.search}#${tab}`);
     if (tab === 'overview') { renderOverview(); RP.timers.push(setInterval(renderOverview, 15000)); }
     else if (tab === 'log') renderLogTab();
-    else if (tab === 'analyses') { loadAnalyses(true); RP.timers.push(setInterval(pollAnalyses, 20000)); }
+    else if (tab === 'analyses') { loadAnalyses(true); loadNotesPanel(); RP.timers.push(setInterval(pollAnalyses, 20000)); }
     else if (tab === 'resolution') { renderResolution(); RP.timers.push(setInterval(renderResolution, 20000)); }
     else if (tab === 'keywords') renderKeywords();
     // The AI arbiter may have changed the keywords since the form was filled
@@ -547,6 +547,16 @@ function renderAnalysisFilters() {
 }
 
 const RULE_CARD_OPTS = { showRuleName: false, hideRuleLink: true };
+
+function loadNotesPanel() {
+    const panel = document.getElementById('an-notes');
+    if (!panel || !RP.id) return;
+    panel.dataset.rule = RP.id;
+    loadRuleNotes(panel).catch(e => console.error('notes', e));
+}
+document.addEventListener('notes-changed', () => {
+    if (RP.id && RP.tab === 'analyses') { loadNotesPanel(); pollAnalyses(); }
+});
 
 async function loadAnalyses(reset) {
     const list = document.getElementById('an-list');
