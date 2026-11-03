@@ -1,4 +1,5 @@
 import asyncio
+import html
 import json
 import os
 import re
@@ -991,12 +992,12 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
 
                 subject = f"{instance_prefix}{nt('resolution_resolved_subject', lang).format(rule_name=rule.name)}"
                 body = f"""
-                <h2>🟢 {nt('resolution_resolved_subject', lang).format(rule_name=rule.name)}</h2>
-                <p>{nt('resolution_resolved_body', lang).format(rule_name=rule.name, duration=duration)}</p>
-                <p><strong>{nt('trigger', lang)}:</strong> {trigger}</p>
+                <h2>🟢 {nt('resolution_resolved_subject', lang).format(rule_name=html.escape(rule.name or ''))}</h2>
+                <p>{nt('resolution_resolved_body', lang).format(rule_name=html.escape(rule.name or ''), duration=duration)}</p>
+                <p><strong>{nt('trigger', lang)}:</strong> {html.escape(str(trigger))}</p>
                 """
                 if explanation:
-                    body += f"<p><strong>{nt('ollama_analysis', lang)}:</strong> {explanation} ({confidence}% confidence)</p>"
+                    body += f"<p><strong>{nt('ollama_analysis', lang)}:</strong> {html.escape(str(explanation))} ({confidence}% confidence)</p>"
                 
                 if config.notification_method in ("apprise", "discord"):
                     body = f"🟢 **{nt('resolution_resolved_subject', lang).format(rule_name=rule.name)}**\n\n{nt('resolution_resolved_body', lang).format(rule_name=rule.name, duration=duration)}\n\n**{nt('trigger', lang)}:** {trigger}"

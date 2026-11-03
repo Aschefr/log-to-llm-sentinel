@@ -1,3 +1,4 @@
+import html
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import List, Optional
@@ -799,10 +800,10 @@ _Ceci est un test manuel depuis l'interface Log to LLM Sentinel._
             else:
                 body = f"""
                 <h2>🧪 Test Log to LLM Sentinel</h2>
-                <p><strong>Règle:</strong> {rule.name}</p>
-                <p><strong>Ligne déclenchante:</strong> <code>{last_line}</code></p>
+                <p><strong>Règle:</strong> {html.escape(rule.name or '')}</p>
+                <p><strong>Ligne déclenchante:</strong> <code>{html.escape(last_line or '')}</code></p>
                 <p><strong>Analyse Ollama:</strong></p>
-                <blockquote>{response}</blockquote>
+                <blockquote>{html.escape(response or '')}</blockquote>
                 <p><strong>Sévérité:</strong> {severity}</p>
                 <hr><p><em>Ceci est un test manuel depuis l'interface Log to LLM Sentinel.</em></p>
                 """

@@ -1,4 +1,5 @@
 import asyncio
+import html
 import uuid
 import json
 from typing import List, Optional
@@ -326,14 +327,14 @@ class Orchestrator:
         
         body = f"""
         <h2>{severity_emoji} {nt('alert_title', lang)}</h2>
-        <p><strong>{nt('rule', lang)}:</strong> {rule.name}</p>
+        <p><strong>{nt('rule', lang)}:</strong> {html.escape(rule.name or '')}</p>
         <p><strong>{nt('detection_id', lang)}:</strong> <code>{detection_id or 'N/A'}</code></p>
-        <p><strong>{nt('keywords', lang)}:</strong> {', '.join(matched_keywords) if matched_keywords else 'N/A'}</p>
+        <p><strong>{nt('keywords', lang)}:</strong> {html.escape(', '.join(matched_keywords)) if matched_keywords else 'N/A'}</p>
         <hr/>
         <p><strong>{nt('triggered_line', lang)}:</strong></p>
-        <pre><code>{line}</code></pre>
+        <pre><code>{html.escape(line or '')}</code></pre>
         <p><strong>{nt('ollama_analysis', lang)}:</strong></p>
-        <blockquote>{response}</blockquote>
+        <blockquote>{html.escape(response or '')}</blockquote>
         <p><strong>{nt('severity', lang)}:</strong> {severity.upper()}</p>
         """
         

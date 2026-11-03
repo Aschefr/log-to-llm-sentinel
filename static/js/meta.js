@@ -245,7 +245,7 @@ async function loadConfigs() {
             }
         } catch (_) { /* silencieux */ }
     } catch (e) {
-        container.innerHTML = `<div style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'}: ${e.message}</div>`;
+        container.innerHTML = `<div style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'}: ${escapeHtml(e.message)}</div>`;
     }
 }
 
@@ -484,7 +484,7 @@ async function loadPreview(configId, customStart = null, customEnd = null) {
         _previewData[configId] = res;
         _renderPreview(configId);
     } catch (e) {
-        container.innerHTML = `<div style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'}: ${e.message}</div>`;
+        container.innerHTML = `<div style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'}: ${escapeHtml(e.message)}</div>`;
     }
 }
 
@@ -565,7 +565,7 @@ async function loadResultsForConfig(configId) {
             });
         }, 10);
     } catch(e) {
-        container.innerHTML = `<div style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'}: ${e.message}</div>`;
+        container.innerHTML = `<div style="color:var(--danger)">${window.t ? window.t('common.error') : 'Erreur'}: ${escapeHtml(e.message)}</div>`;
     }
 }
 

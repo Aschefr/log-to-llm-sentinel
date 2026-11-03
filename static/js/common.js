@@ -253,14 +253,14 @@ async function askQuestion(analysisId, inputEl, contextPrompt = null, contextRes
         if (res.status === 'ok') {
             contentSpan.innerHTML = renderMarkdown(res.response);
         } else {
-            contentSpan.innerHTML = `${window.t ? window.t('common.error') : 'Erreur'} : ${res.detail}`;
+            contentSpan.innerHTML = `${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(res.detail)}`;
         }
     } catch (e) {
         if (e.name === 'AbortError') {
             const cancelledMsg = window.t ? window.t('chat.generation_cancelled') : 'Génération annulée.';
             contentSpan.innerHTML = `❌ ${cancelledMsg}`;
         } else {
-            contentSpan.innerHTML = `${window.t ? window.t('common.error') : 'Erreur'} : ${e.message}`;
+            contentSpan.innerHTML = `${window.t ? window.t('common.error') : 'Erreur'} : ${escapeHtml(e.message)}`;
         }
     } finally {
         if (stopBtn && stopBtn.parentNode) {
@@ -473,9 +473,17 @@ function formatMinutesShort(m) {
     return `${Math.floor(m / 1440)} ${(window.t && window.t('rule.day_short') !== 'rule.day_short') ? window.t('rule.day_short') : 'j'}`;
 }
 
-/** Markdown to HTML; plain text when the parser is not available, so a card always renders. */
+// AI answers quote log lines, and anyone on the network can send a syslog line: their HTML is not trusted.
+// Images and styles are refused too: an external image would send data out just by opening the page.
+const MARKDOWN_SANITIZE = {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['img', 'picture', 'source', 'video', 'audio', 'style', 'form', 'input', 'button', 'select', 'textarea'],
+    FORBID_ATTR: ['style', 'id', 'name', 'srcset'],
+};
+
+/** Markdown to safe HTML; plain text when a library is not available, so a card always renders. */
 function renderMarkdown(text) {
-    if (window.marked) return marked.parse(text || '');
+    if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(text || ''), MARKDOWN_SANITIZE);
     return `<p style="white-space: pre-wrap;">${escapeHtml(text || '')}</p>`;
 }
 

@@ -1046,7 +1046,7 @@ async function loadConversations() {
         renderConversationList();
     } catch (e) {
         console.error(e);
-        if (list) list.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('chat.error_network') : 'Erreur'} : ${e.message}</div>`;
+        if (list) list.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('chat.error_network') : 'Erreur'} : ${escapeHtml(e.message)}</div>`;
     }
 }
 
@@ -1278,7 +1278,7 @@ async function loadHistory(id) {
         try { window._chatContextData = await apiFetch('/chat/api/context/' + id); updateContextBar(); } catch(_){}
 
     } catch (e) {
-        container.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('chat.error_network') : 'Erreur'}: ${e.message}</div>`;
+        container.innerHTML = `<div class="loading" style="color:var(--danger)">${window.t ? window.t('chat.error_network') : 'Erreur'}: ${escapeHtml(e.message)}</div>`;
     }
 }
 
@@ -1352,7 +1352,7 @@ function renderMath(el) {
 
 /**
  * Convertit du markdown en HTML, puis rend les formules KaTeX sur l'élément cible.
- * Utilisation : el.innerHTML = marked.parse(text); renderMath(el);
+ * Utilisation : el.innerHTML = parseMd(text); renderMath(el);
  */
 function parseMd(text) {
     return renderMarkdown(text);

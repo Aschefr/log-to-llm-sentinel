@@ -1,3 +1,4 @@
+import html
 import json
 from datetime import datetime, timedelta
 import asyncio
@@ -323,12 +324,12 @@ class MetaAnalysisService:
         subject = instance_prefix + nt('meta_subject', lang).format(config_name=config.name)
         
         body_html = f"""
-        <h2>📊 {nt('meta_title', lang)} : {config.name}</h2>
+        <h2>📊 {nt('meta_title', lang)} : {html.escape(config.name or '')}</h2>
         <p><strong>{nt('period', lang)}:</strong> du {result.period_start.strftime('%Y-%m-%d %H:%M')} au {result.period_end.strftime('%Y-%m-%d %H:%M')}</p>
         <p><strong>{nt('events_analyzed', lang)}:</strong> {result.analyses_count}</p>
         <hr/>
         <h3>{nt('ia_synthesis', lang)} :</h3>
-        <blockquote>{result.ollama_response}</blockquote>
+        <blockquote>{html.escape(result.ollama_response or '')}</blockquote>
         """
         
         notify_body = body_html

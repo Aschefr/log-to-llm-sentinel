@@ -521,9 +521,9 @@ function renderLogs(logs) {
         .filter(l => !activeFilter || l.tag === activeFilter)
         .map(l => `
         <div class="log-entry" data-tag="${escapeHtml(l.tag)}">
-            <span class="log-time">${l.timestamp}</span>
-            <span class="log-level ${l.level}">${l.level}</span>
-            <span class="log-tag">[${l.tag}]</span>
+            <span class="log-time">${escapeHtml(l.timestamp)}</span>
+            <span class="log-level ${escapeHtml(l.level)}">${escapeHtml(l.level)}</span>
+            <span class="log-tag">[${escapeHtml(l.tag)}]</span>
             <span class="log-message">${escapeHtml(l.message)}</span>
         </div>
     `).join('');
@@ -572,7 +572,7 @@ function renderOllamaLogs(logs) {
     container.innerHTML = logs.map(l => `
         <div class="log-entry ollama-log-entry">
             <div class="log-time">
-                ${l.timestamp}
+                ${escapeHtml(l.timestamp)}
                 ${l.detection_id ? `<span class="detection-id-badge" style="margin-left: 10px;">#${escapeHtml(l.detection_id)}</span>` : ''}
             </div>
             <div class="ollama-debug-block">

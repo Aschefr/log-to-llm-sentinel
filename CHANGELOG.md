@@ -16,6 +16,10 @@ All notable changes to this project will be documented in this file.
 - Keywords and ignored lines are no longer edited in the Settings tab of an existing rule: the Keywords tab manages them (saving Settings never overwrites them anymore). They are still typed in the form when creating a manual rule.
 - A new rule on an existing log file starts watching at the end of the file: its history is read by the learning, no longer replayed as new lines (which could fire a burst of alerts on old events).
 
+### Security
+- **HTML in AI answers and log lines**: an answer quoting a crafted log line could run code in the page, since anyone on the network can send a syslog line. AI answers are now sanitized by DOMPurify, served by the application (without it they are shown as plain text), and may no longer load images, which could send data out just by opening the page. Error messages are escaped too.
+- **E-mail notifications** now escape the log line, the AI's answer, keywords and the rule's name.
+
 ### Fixed
 - **Autopilot**: an event repeating all day (e.g. Docker Desktop's `event streamer: error: EOF`, every 10 seconds) no longer sends an analysis to the AI every 30 seconds nor keeps the rule in alert: once its last 3 analyses are rated `info`, it is only analyzed again every 6 hours.
 - **Dashboard**: the automatic refresh no longer closes the analysis being read, nor reloads the list from the start. The list is usable on a phone and with the keyboard (an analysis card opens with a real button, on every page).

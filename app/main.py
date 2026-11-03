@@ -1,4 +1,5 @@
 import asyncio
+import html
 from contextlib import asynccontextmanager
 import logging
 
@@ -202,7 +203,9 @@ async def lifespan(app: FastAPI):
                                     lang = config.site_lang or 'fr'
                                     instance_prefix = f"[{config.instance_name}] " if config.instance_name else ""
                                     subject = instance_prefix + nt('inactivity_subject', lang).format(rule_name=rule.name)
-                                    body = nt('inactivity_body', lang).format(rule_name=rule.name, hours=rule.inactivity_period_hours, last_received=rule.last_line_received_at.strftime('%Y-%m-%d %H:%M:%S'))
+                                    # Gabarit HTML pour l'e-mail ; converti plus bas pour Apprise et Discord
+                                    plain_channel = config.notification_method in ("apprise", "discord")
+                                    body = nt('inactivity_body', lang).format(rule_name=rule.name if plain_channel else html.escape(rule.name or ''), hours=rule.inactivity_period_hours, last_received=rule.last_line_received_at.strftime('%Y-%m-%d %H:%M:%S'))
                                     if config.notification_method in ("apprise", "discord"):
                                         body = body.replace("<p>", "").replace("</p>", "\n").replace("<b>", "**").replace("</b>", "**").strip()
                                     config_dict = {

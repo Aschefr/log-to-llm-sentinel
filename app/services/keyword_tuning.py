@@ -15,6 +15,7 @@ sont appliquées et journalisées (KeywordChange, annulables) ; les autres sont 
 Un changement refusé ou annulé n'est jamais reproposé.
 """
 import asyncio
+import html
 import json
 import os
 import re
@@ -871,8 +872,11 @@ async def notify_changes(rule_name: str, notify: bool, changes: List[dict], conf
     if instance:
         subject = f"[{instance}] {subject}"
     from app.services.notification_service import NotificationService
+    body = "\n".join(lines)
+    if config.get("notification_method") not in ("apprise", "discord"):  # e-mail : HTML, avec des valeurs venues des logs
+        body = f'<pre style="white-space: pre-wrap;">{html.escape(body)}</pre>'
     try:
-        await asyncio.to_thread(NotificationService().send, subject, "\n".join(lines), config)
+        await asyncio.to_thread(NotificationService().send, subject, body, config)
     except Exception as e:
         logger.warning("KeywordTuning", f"Notification impossible : {e}")
 
