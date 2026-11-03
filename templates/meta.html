@@ -1,198 +1,143 @@
 {% extends "base.html" %}
+{% from "_form_macros.html" import field, toggle %}
 
 {% block title %}Méta-Analyse — Log to LLM Sentinel{% endblock %}
 
-{% block scripts %}
-<script src="/static/js/meta.js?v=7"></script>
-<style>
-/* Spécifique à Méta Analyse */
-.rule-checkbox-list {
-    max-height: 150px;
-    overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 0.5rem;
-    background: rgba(0,0,0,0.1);
-    display: flex;
-    flex-direction: column;
-    gap: 0.1rem;
-}
-.rule-checkbox-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.3rem 0.4rem;
-    border-radius: 3px;
-    width: 100%;
-    transition: background 0.15s;
-}
-.rule-checkbox-item:hover {
-    background: rgba(255,255,255,0.05);
-}
-.rule-checkbox-item input[type='checkbox'] {
-    flex-shrink: 0;
-    width: 14px;
-    height: 14px;
-    cursor: pointer;
-    accent-color: var(--accent);
-}
-.rule-checkbox-item label {
-    flex: 1;
-    margin: 0;
-    cursor: pointer;
-    font-size: 0.88rem;
-    color: var(--text-primary);
-}
-.schedule-group {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-.context-preview-box {
-    width: 100%;
-    height: 300px;
-    font-family: 'Consolas', monospace;
-    font-size: 0.8rem;
-    background: #1e1e1e;
-    color: #d4d4d4;
-    border: 1px solid #333;
-    padding: 0.5rem;
-    border-radius: 4px;
-    margin-bottom: 0.5rem;
-    resize: vertical;
-    box-sizing: border-box;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
-    outline: none;
-}
-.accordion-header {
-    background: rgba(255,255,255,0.03);
-    padding: 0.75rem 1rem;
-    border-top: 1px solid var(--border);
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 500;
-    transition: background 0.2s;
-    user-select: none;
-}
-.accordion-header:hover {
-    background: rgba(255,255,255,0.06);
-}
-.accordion-content {
-    padding: 1rem;
-    border-top: 1px solid var(--border);
-    display: none;
-}
-.accordion-content.open {
-    display: block;
-}
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="header-actions" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-    <h1 data-i18n="meta.title">Méta-Analyse</h1>
-    <button class="btn btn-primary" onclick="openConfigModal()" data-i18n="meta.new_config">+ Nouvelle Configuration</button>
-</div>
+<div class="cfg-page meta-page">
+    <header class="meta-head">
+        <h1 data-i18n="meta.title">Méta-analyse</h1>
+        <p class="meta-lead" data-i18n="meta.lead">Une alerte raconte un instant. La méta-analyse relit des semaines d'alertes, sur plusieurs règles, pour dire ce qu'une alerte seule ne peut pas voir : ce qui revient, ce qui s'aggrave, ce qui a disparu.</p>
+    </header>
 
-<!-- Liste Globale -->
-<div>
-    <h2 data-i18n="meta.configs" style="margin-bottom: 1rem;">Configurations Actives</h2>
-    <div id="configs-container" style="display: flex; flex-direction: column; gap: 1.5rem;">
-        <div class="loading" data-i18n="common.loading">Chargement...</div>
+    <nav class="cfg-status meta-tiles" id="meta-tiles" aria-label="Méta-analyses" data-i18n-aria-label="meta.configs"></nav>
+
+    <div class="rp-card meta-empty hidden" id="meta-empty">
+        <h2 data-i18n="meta.empty_title">Aucune méta-analyse pour l'instant</h2>
+        <p class="form-hint" data-i18n="meta.empty_text">Crée-en une par machine ou par service pour suivre chacun dans le temps, ou une sur tout le parc pour voir les liens entre machines.</p>
+        <a class="btn btn-primary btn-sm" href="#new" data-i18n="meta.new_config">Nouvelle méta-analyse</a>
     </div>
-</div>
 
-<!-- Modal Configuration -->
-<div id="config-modal" class="modal hidden">
-    <div class="modal-content">
-        <h2 id="modal-title" data-i18n="meta.modal_title_new">Nouvelle Méta-Analyse</h2>
-        <form id="config-form">
-            <input type="hidden" id="config-id">
-            
-            <div class="form-group">
-                <label data-i18n="meta.name">Nom de la configuration</label>
-                <input type="text" id="config-name" class="form-control" required data-i18n-placeholder="meta.placeholder_name" placeholder="Ex : Synthèse Journalière Production">
-            </div>
+    <div id="meta-new-banner" class="meta-new-banner hidden" role="status">
+        <span data-i18n="meta.new_result_available">Un nouveau rapport est arrivé.</span>
+        <button type="button" class="btn btn-secondary btn-sm" id="meta-new-show" data-i18n="meta.new_result_show">Afficher</button>
+    </div>
 
-            <div class="form-group">
-                <label data-i18n="meta.rules">Règles cibles (Laissez vide pour inclure toutes les règles)</label>
-                <div class="rule-checkbox-list" id="config-rules-list">
-                    <!-- Rempli par le JS -->
+    <div class="hidden" id="meta-view-dash">
+        <div class="meta-dash">
+            <article class="rp-card meta-report" id="meta-report"></article>
+            <aside class="meta-aside">
+                <section class="rp-card" id="meta-plan"></section>
+                <section class="rp-card" id="meta-reports"></section>
+            </aside>
+        </div>
+        <section class="rp-card meta-about" id="meta-about"></section>
+
+        <section class="meta-long" aria-labelledby="meta-long-title">
+            <div class="meta-long-head">
+                <div class="meta-long-title">
+                    <h2 id="meta-long-title" data-i18n="meta.long_title">Ce que disent les alertes</h2>
+                    <p class="form-hint" id="meta-long-sentence" role="status"></p>
                 </div>
+                <div class="meta-range" id="meta-range" role="group" aria-label="Période" data-i18n-aria-label="meta.range_label"></div>
             </div>
+            <div class="cfg-status meta-changes" id="meta-changes" role="group" aria-label="Changements" data-i18n-aria-label="meta.changes_label"></div>
+            <p class="form-hint meta-note hidden" id="meta-long-note"></p>
+            <section class="rp-card" id="meta-heat" aria-labelledby="meta-heat-title"></section>
+            <section class="rp-card" id="meta-events" aria-labelledby="meta-events-title"></section>
+        </section>
+        <div class="meta-tip hidden" id="meta-tip" role="tooltip"></div>
+    </div>
 
-            <div class="schedule-group">
-                <h4 style="margin-top:0; margin-bottom: 0.75rem; color: var(--text-primary);" data-i18n="meta.schedule_planning">Planification</h4>
-                <div class="row">
-                    <div class="col">
-                        <label data-i18n="meta.schedule_type">Fréquence</label>
-                        <select id="config-schedule-type" class="form-control" onchange="updateScheduleUI()">
+    <section class="rp-panel hidden" id="meta-view-next">
+        <a class="meta-back" id="meta-next-back" href="#" data-i18n="meta.back">Retour au tableau de bord</a>
+        <div class="rp-card">
+            <h2 data-i18n="meta.next_title">Lancer un rapport</h2>
+            <div id="meta-next-info"></div>
+            <div class="cfg-actions">
+                <button type="button" class="btn btn-primary btn-sm" id="meta-run" data-i18n="meta.run_custom">Lancer maintenant</button>
+                <button type="button" class="btn btn-secondary btn-sm hidden" id="meta-stop" data-i18n="common.stop">Arrêter</button>
+                <span class="form-hint cfg-result" id="meta-run-status" role="status"></span>
+            </div>
+        </div>
+        <details class="rule-notes" id="meta-period-box">
+            <summary data-i18n="meta.choose_period">Choisir la période</summary>
+            <div class="rule-notes-body meta-period">
+                <label class="rf-stack"><span data-i18n="meta.period_from">Du</span><input type="datetime-local" id="meta-period-start"></label>
+                <label class="rf-stack"><span data-i18n="meta.period_to">Au</span><input type="datetime-local" id="meta-period-end"></label>
+            </div>
+        </details>
+        <details class="rule-notes" id="meta-review-box">
+            <summary><span data-i18n="meta.review_title">Relire et exclure des événements</span> <span class="rule-notes-count" id="meta-review-count"></span></summary>
+            <div class="rule-notes-body">
+                <p class="form-hint" data-i18n="meta.preview_help">Retire un événement de cette analyse ou ajoute-lui une remarque. Pour une information durable, utilise plutôt une note de la règle.</p>
+                <div id="meta-review"></div>
+            </div>
+        </details>
+    </section>
+
+    <section class="rp-panel hidden" id="meta-view-settings">
+        <a class="meta-back" id="meta-settings-back" href="#" data-i18n="meta.back">Retour au tableau de bord</a>
+        <form id="config-form" class="cfg-form rp-panel" novalidate>
+            <input type="hidden" id="config-id">
+            <div class="rp-card">
+                <h2 id="meta-form-title" data-i18n="meta.modal_title_new">Nouvelle méta-analyse</h2>
+                <div class="meta-suggest hidden" id="meta-suggest">
+                    <span class="form-hint" data-i18n="meta.suggest_label">Partir d'une source :</span>
+                    <div class="preset-chips" id="meta-suggest-chips"></div>
+                </div>
+                {% call field('config-name', 'meta.name', 'Nom') %}
+                    <input type="text" id="config-name" maxlength="120" data-i18n-placeholder="meta.placeholder_name" placeholder="Ex : Serveur Tower, Réseau UniFi">
+                {% endcall %}
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span class="cfg-label" id="meta-rules-label" data-i18n="meta.rules_title">Règles suivies</span>
+                        <p class="form-hint" data-i18n="meta.rules_hint">Regroupe ce qui a du sens ensemble : une machine, un service, ou tout le parc pour voir les liens entre machines. Aucune cochée : toutes les règles.</p>
+                    </div>
+                    <div class="cfg-row-control meta-rules" id="config-rules-list" role="group" aria-labelledby="meta-rules-label"></div>
+                </div>
+                <div class="cfg-row">
+                    <div class="cfg-row-label"><label for="config-schedule-type" data-i18n="meta.schedule_type">Fréquence</label></div>
+                    <div class="cfg-row-control form-group meta-schedule">
+                        <select id="config-schedule-type">
                             <option value="daily" data-i18n="meta.schedule_daily">Tous les jours</option>
                             <option value="weekly" data-i18n="meta.schedule_weekly">Toutes les semaines</option>
                             <option value="monthly" data-i18n="meta.schedule_monthly">Tous les mois</option>
                         </select>
-                    </div>
-                    <div class="col" id="schedule-day-container" style="display: none;">
-                        <label id="schedule-day-label" data-i18n="meta.schedule_day">Jour</label>
-                        <select id="config-schedule-day" class="form-control">
-                            <!-- Rempli dynamiquement par JS -->
-                        </select>
-                    </div>
-                    <div class="col">
-                        <label data-i18n="meta.schedule_hour">Heure</label>
-                        <input type="time" id="config-schedule-time" class="form-control" value="00:00" required>
+                        <select id="config-schedule-day" class="hidden" data-i18n-aria-label="meta.schedule_day" aria-label="Jour"></select>
+                        <input type="time" id="config-schedule-time" value="00:00" data-i18n-aria-label="meta.schedule_hour" aria-label="Heure">
                     </div>
                 </div>
-            </div>
-
-            <div class="row">
-                <div class="col">
-                    <div class="form-group">
-                        <label data-i18n="meta.context_size_label">Taille du contexte (tokens)</label>
-                        <select id="config-context" class="form-control">
-                            <option value="2048" data-i18n="meta.ctx_quick">2048 (Résumé rapide)</option>
-                            <option value="4096" data-i18n="meta.ctx_standard">4096 (Standard)</option>
-                            <option value="8192" data-i18n="meta.ctx_large">8192 (Contexte large)</option>
-                            <option value="16384" selected data-i18n="meta.ctx_xlarge">16384 (Très large)</option>
-                            <option value="32768" data-i18n="meta.ctx_massive">32768 (Massif - Attention RAM)</option>
-                        </select>
-                    </div>
+                {{ toggle('config-enabled', 'meta.enabled', 'Activée', 'meta.enabled_hint', "Désactivée, elle ne tourne que si tu la lances.") }}
+                {{ toggle('config-notify', 'meta.notify', 'Notifier à la fin') }}
+                <p class="form-hint rf-ko cfg-result" id="meta-form-error" role="alert"></p>
+                <div class="cfg-actions">
+                    <button type="submit" class="btn btn-primary btn-sm" data-i18n="common.save">Enregistrer</button>
+                    <span class="form-hint rf-ok cfg-result" id="meta-form-saved" role="status"></span>
                 </div>
-                <div class="col">
-                    <div class="form-group">
-                        <label data-i18n="meta.max_analyses_label">Limite d'analyses incluses</label>
-                        <input type="number" id="config-max" class="form-control" value="50" min="5" required>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label data-i18n="meta.system_prompt">Prompt Système IA</label>
-                <textarea id="config-prompt" class="form-control" rows="3" required></textarea>
-            </div>
-
-            <div class="form-group" style="display: flex; gap: 1rem; align-items: center;">
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" id="config-enabled" checked>
-                    <span data-i18n="meta.enabled">Activé</span>
-                </label>
-                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                    <input type="checkbox" id="config-notify" checked>
-                    <span data-i18n="meta.notify">Notifier à la fin</span>
-                </label>
-            </div>
-
-            <div class="form-actions" style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
-                <button type="button" class="btn btn-secondary" onclick="closeConfigModal()" data-i18n="common.cancel">Annuler</button>
-                <button type="submit" class="btn btn-primary" data-i18n="common.save">Enregistrer</button>
             </div>
         </form>
-    </div>
+        <div class="rp-card hidden" id="meta-danger">
+            <h2 data-i18n="config.reset_title">Réinitialiser</h2>
+            <div class="cfg-row hidden" id="meta-reset-row">
+                <div class="cfg-row-label">
+                    <span class="cfg-label" data-i18n="meta.reset_last_run">Oublier la dernière exécution</span>
+                    <p class="form-hint" data-i18n="meta.reset_last_run_hint">Le prochain rapport repart de la période par défaut. Les rapports déjà écrits restent.</p>
+                </div>
+                <div class="cfg-row-control"><button type="button" class="btn btn-secondary btn-sm" id="meta-reset" data-i18n="meta.reset_last_run">Oublier la dernière exécution</button></div>
+            </div>
+            <div class="cfg-row">
+                <div class="cfg-row-label">
+                    <span class="cfg-label" data-i18n="meta.delete_title">Supprimer cette méta-analyse</span>
+                    <p class="form-hint" data-i18n="meta.delete_hint">Supprime aussi ses rapports. Les alertes des règles ne sont pas touchées.</p>
+                </div>
+                <div class="cfg-row-control"><button type="button" class="btn btn-danger btn-sm" id="meta-delete" data-i18n="common.delete">Supprimer</button></div>
+            </div>
+        </div>
+    </section>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/meta.js?v=13"></script>
 {% endblock %}

@@ -8,7 +8,7 @@ import json
 import os
 
 from app.database import SessionLocal
-from app.models import (Rule, Analysis, GlobalConfig, ResolutionVerdict, KeywordChange, KeywordTemplate, EventNote,
+from app.models import (Rule, Analysis, GlobalConfig, ResolutionVerdict, KeywordChange, KeywordTemplate, EventNote, MetaAnalysisConfig,
                         KeywordLearningSession)
 from app.services import autopilot as ap
 from app.services import keyword_tuning as kt
@@ -472,6 +472,13 @@ def delete_rule(rule_id: int):
         for model in (Analysis, ResolutionVerdict, KeywordChange, KeywordTemplate, EventNote):
             db.query(model).filter(model.rule_id == rule_id).delete()
         kls.delete_rule_sessions(db, rule_id)
+        for meta in db.query(MetaAnalysisConfig).all():
+            ids = json.loads(meta.rule_ids_json or "[]")
+            if rule_id in ids:
+                ids.remove(rule_id)
+                meta.rule_ids_json = json.dumps(ids)
+                if not ids:  # une liste vide veut dire « toutes les règles » : ne pas élargir sans le demander
+                    meta.enabled = False
         db.commit()
         if resolution_service:
             resolution_service._alert_states.pop(rule_id, None)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Optional
@@ -6,7 +6,8 @@ from datetime import datetime
 import json
 
 from app.database import SessionLocal
-from app.models import MetaAnalysisConfig, MetaAnalysisResult, GlobalConfig
+from app.models import MetaAnalysisConfig, MetaAnalysisResult, GlobalConfig, Rule
+from app.services import meta_overview
 from app.services.meta_service import MetaAnalysisService
 
 router = APIRouter(prefix="/api/meta-analysis", tags=["meta-analysis"])
@@ -24,10 +25,30 @@ def get_db():
 
 # ---- CONFIGS ----
 
+def _status_of(result) -> Optional[str]:
+    """Les anciennes analyses échouées n'ont pas d'état : elles se reconnaissent à leur texte."""
+    if not result.status and (result.ollama_response or "").startswith("[Erreur"):
+        return "failed"
+    return result.status
+
+
+def _latest_result(db, config_id: int) -> Optional[dict]:
+    r = db.query(MetaAnalysisResult).filter(MetaAnalysisResult.config_id == config_id) \
+        .order_by(desc(MetaAnalysisResult.created_at), desc(MetaAnalysisResult.id)).first()
+    if not r:
+        return None
+    return {"id": r.id, "status": _status_of(r), "tldr": r.tldr, "analyses_count": r.analyses_count,
+            "created_at": r.created_at.isoformat() + 'Z'}
+
+
 @router.get("/configs")
 async def list_configs(db: Session = Depends(get_db)):
     configs = db.query(MetaAnalysisConfig).order_by(MetaAnalysisConfig.id.desc()).all()
+    rule_names = {r.id: r.name for r in db.query(Rule.id, Rule.name).all()}
     return [{
+        "latest": _latest_result(db, c.id),
+        # Règles supprimées depuis : la synthèse ne doit pas laisser croire qu'elle les suit encore
+        "missing_rules": sum(1 for i in (json.loads(c.rule_ids_json) if c.rule_ids_json else []) if i not in rule_names),
         "id": c.id,
         "name": c.name,
         "rule_ids_json": json.loads(c.rule_ids_json) if c.rule_ids_json else [],
@@ -36,9 +57,6 @@ async def list_configs(db: Session = Depends(get_db)):
         "schedule_day": c.schedule_day,
         "enabled": c.enabled,
         "notify_enabled": c.notify_enabled,
-        "context_size": c.context_size,
-        "system_prompt": c.system_prompt,
-        "max_analyses": c.max_analyses,
         "last_run_at": c.last_run_at.isoformat() + 'Z' if c.last_run_at else None
     } for c in configs]
 
@@ -55,9 +73,6 @@ async def create_config(data: dict, db: Session = Depends(get_db)):
             schedule_day=int(data.get("schedule_day", 1)),
             enabled=data.get("enabled", True),
             notify_enabled=data.get("notify_enabled", True),
-            context_size=int(data.get("context_size", 16384)),
-            system_prompt=data.get("system_prompt", "Tu es un expert DevOps. Analyse ces événements et fais une synthèse globale de la situation du service."),
-            max_analyses=int(data.get("max_analyses", 50)),
             last_run_at=None  # Pas de fenêtre vide - sera calculée selon schedule_type
         )
         db.add(config)
@@ -81,9 +96,6 @@ async def update_config(config_id: int, data: dict, db: Session = Depends(get_db
         if "schedule_day" in data: config.schedule_day = int(data["schedule_day"])
         if "enabled" in data: config.enabled = bool(data["enabled"])
         if "notify_enabled" in data: config.notify_enabled = bool(data["notify_enabled"])
-        if "context_size" in data: config.context_size = int(data["context_size"])
-        if "system_prompt" in data: config.system_prompt = data["system_prompt"]
-        if "max_analyses" in data: config.max_analyses = int(data["max_analyses"])
         if "last_run_at" in data and data["last_run_at"]:
             from datetime import datetime as dt
             config.last_run_at = dt.fromisoformat(data["last_run_at"].replace('Z', '+00:00')).replace(tzinfo=None)
@@ -113,6 +125,15 @@ async def reset_last_run(config_id: int, db: Session = Depends(get_db)):
     config.last_run_at = None
     db.commit()
     return {"status": "ok"}
+
+
+@router.get("/configs/{config_id}/overview")
+async def config_overview(config_id: int, days: int = Query(30, ge=1, le=365), tz: int = Query(0, ge=-840, le=840), db: Session = Depends(get_db)):
+    """Activité des règles dans le temps et ce qui change d'une période à l'autre. Aucun appel à l'IA."""
+    config = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == config_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="config_not_found")
+    return meta_overview.build(db, config, days, tz)
 
 
 # ---- TRIGGER ----
@@ -211,31 +232,64 @@ async def cancel_meta_analysis(config_id: int):
 
 # ---- RESULTS ----
 
+def _structured(result) -> dict:
+    try:
+        data = json.loads(result.result_json) if result.result_json else {}
+    except ValueError:
+        data = {}
+    data = data if isinstance(data, dict) else {}
+    out = {key: [str(x) for x in (data.get(key) or []) if str(x).strip()] for key in ("highlights", "recommendations")}
+    out["synthesis"] = str(data.get("synthesis") or "").strip() or None
+    return out
+
+
+def _result_brief(r, config_name) -> dict:
+    return {
+        "id": r.id,
+        "config_id": r.config_id,
+        "config_name": config_name,
+        "period_start": r.period_start.isoformat() + 'Z',
+        "period_end": r.period_end.isoformat() + 'Z',
+        "analyses_count": r.analyses_count,
+        "tldr": r.tldr,
+        "status": _status_of(r),
+        "created_at": r.created_at.isoformat() + 'Z',
+    }
+
+
+def _result_full(r, config_name) -> dict:
+    return {
+        **_structured(r),
+        **_result_brief(r, config_name),
+        "detection_ids": json.loads(r.detection_ids_json) if getattr(r, 'detection_ids_json', None) else [],
+        "matched_keywords": json.loads(r.matched_keywords_json) if getattr(r, 'matched_keywords_json', None) else [],
+        "context_sent": getattr(r, 'context_sent', None),
+        "ollama_response": r.ollama_response,
+    }
+
+
 @router.get("/results")
-async def list_results(config_id: Optional[int] = None, limit: int = 20, db: Session = Depends(get_db)):
+async def list_results(config_id: Optional[int] = None, limit: int = 20, compact: bool = False, db: Session = Depends(get_db)):
+    """compact : sans le contexte envoyé ni le texte, pour lister les rapports sans charger des mégaoctets."""
     query = db.query(MetaAnalysisResult, MetaAnalysisConfig.name).join(
         MetaAnalysisConfig, MetaAnalysisResult.config_id == MetaAnalysisConfig.id
     )
     if config_id:
         query = query.filter(MetaAnalysisResult.config_id == config_id)
-        
-    results = query.order_by(desc(MetaAnalysisResult.created_at)).limit(limit).all()
-    
-    return [{
-        "id": r.MetaAnalysisResult.id,
-        "config_id": r.MetaAnalysisResult.config_id,
-        "config_name": r.name,
-        "period_start": r.MetaAnalysisResult.period_start.isoformat() + 'Z',
-        "period_end": r.MetaAnalysisResult.period_end.isoformat() + 'Z',
-        "analyses_count": r.MetaAnalysisResult.analyses_count,
-        "detection_ids": json.loads(r.MetaAnalysisResult.detection_ids_json) if getattr(r.MetaAnalysisResult, 'detection_ids_json', None) else [],
-        "matched_keywords": json.loads(r.MetaAnalysisResult.matched_keywords_json) if getattr(r.MetaAnalysisResult, 'matched_keywords_json', None) else [],
-        "context_sent": getattr(r.MetaAnalysisResult, 'context_sent', None),
-        "ollama_response": r.MetaAnalysisResult.ollama_response,
-        "tldr": r.MetaAnalysisResult.tldr,
-        "status": r.MetaAnalysisResult.status,
-        "created_at": r.MetaAnalysisResult.created_at.isoformat() + 'Z'
-    } for r in results]
+    results = query.order_by(desc(MetaAnalysisResult.created_at), desc(MetaAnalysisResult.id)).limit(limit).all()
+    view = _result_brief if compact else _result_full
+    return [view(r.MetaAnalysisResult, r.name) for r in results]
+
+
+@router.get("/results/{result_id}")
+async def get_result(result_id: int, db: Session = Depends(get_db)):
+    row = db.query(MetaAnalysisResult, MetaAnalysisConfig.name).join(
+        MetaAnalysisConfig, MetaAnalysisResult.config_id == MetaAnalysisConfig.id
+    ).filter(MetaAnalysisResult.id == result_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="result_not_found")
+    return _result_full(row.MetaAnalysisResult, row.name)
+
 
 @router.delete("/results/{result_id}")
 async def delete_result(result_id: int, db: Session = Depends(get_db)):

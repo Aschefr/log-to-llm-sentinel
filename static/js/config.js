@@ -50,16 +50,7 @@ function setupTabs() {
 
 /* ── Real state, at the top of the page ───────────────────────────────── */
 
-function cfgAgo(iso) {
-    if (!iso) return '';
-    const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-    const lang = (window.i18n && (window.i18n.lang || window.i18n.currentLang)) || document.documentElement.lang || 'fr';
-    const format = new Intl.RelativeTimeFormat(lang, { numeric: 'auto', style: 'short' });
-    if (seconds < 60) return cfgT('config.ago_now', "à l'instant");
-    if (seconds < 3600) return format.format(-Math.round(seconds / 60), 'minute');
-    if (seconds < 86400) return format.format(-Math.round(seconds / 3600), 'hour');
-    return format.format(-Math.round(seconds / 86400), 'day');
-}
+const cfgAgo = relativeTime;
 
 function cfgMethodName(method) {
     return { smtp: 'Email', apprise: 'Apprise', discord: 'Discord' }[method] || method;

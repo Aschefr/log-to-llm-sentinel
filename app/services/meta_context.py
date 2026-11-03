@@ -16,6 +16,8 @@ from app.services.prompts import meta_label
 from app.utils.log_utils import line_signature
 
 SEVERITY_RANK = {"info": 0, "warning": 1, "critical": 2}
+# Garde-fou mémoire, pas un réglage : le regroupement par événement et le budget de contexte font le vrai tri
+MAX_ANALYSES = 5000
 CHARS_PER_TOKEN = 3.0
 
 
@@ -28,13 +30,13 @@ def _rule_ids(config: MetaAnalysisConfig) -> list:
 
 def collect(db, config: MetaAnalysisConfig, period_start: datetime, period_end: datetime,
             excluded_ids=(), annotations: Optional[dict] = None) -> dict:
-    """Agrège les analyses de la période (au plus config.max_analyses, les plus récentes) par règle puis par événement."""
+    """Agrège les analyses de la période (les plus récentes si elles dépassent MAX_ANALYSES) par règle puis par événement."""
     rule_ids = _rule_ids(config)
     base = db.query(Analysis).filter(Analysis.analyzed_at >= period_start, Analysis.analyzed_at <= period_end)
     if rule_ids:
         base = base.filter(Analysis.rule_id.in_(rule_ids))
     totals_by_rule = dict(base.with_entities(Analysis.rule_id, func.count(Analysis.id)).group_by(Analysis.rule_id).all())
-    rows = base.order_by(desc(Analysis.analyzed_at)).limit(config.max_analyses).all()
+    rows = base.order_by(desc(Analysis.analyzed_at)).limit(MAX_ANALYSES).all()
     excluded = {int(i) for i in excluded_ids or []}
     rows = [a for a in reversed(rows) if a.id not in excluded]  # ordre chronologique
     notes = {int(k): str(v).strip() for k, v in (annotations or {}).items() if str(v).strip()}
@@ -73,15 +75,17 @@ def collect(db, config: MetaAnalysisConfig, period_start: datetime, period_end: 
         "silent_rules": silent,
         "total_period": sum(totals_by_rule.values()),
         "included": len(rows),
-        "limit": config.max_analyses,
+        "limit": MAX_ANALYSES,
         "detection_ids": [a.detection_id for a in rows if a.detection_id],
         "keywords": sorted(keywords),
     }
 
 
 def previous_result(db, config_id: int, before: datetime) -> Optional[MetaAnalysisResult]:
+    # Une analyse échouée n'a rien à transmettre à la suivante
     return (db.query(MetaAnalysisResult)
-            .filter(MetaAnalysisResult.config_id == config_id, MetaAnalysisResult.period_end <= before)
+            .filter(MetaAnalysisResult.config_id == config_id,
+        (MetaAnalysisResult.status == None) | (MetaAnalysisResult.status != "failed"), MetaAnalysisResult.period_end <= before)
             .order_by(desc(MetaAnalysisResult.period_end)).first())
 
 
@@ -164,9 +168,9 @@ class SimpleText:
         self.ollama_response = text or ""
 
 
-def budget_for(config: MetaAnalysisConfig, think: bool) -> int:
+def budget_for(context_size: int, think: bool) -> int:
     reserve = 4096 + (4096 if think else 0)
-    return max(4000, int(((config.context_size or 16000) - reserve) * CHARS_PER_TOKEN))
+    return max(4000, int(((context_size or 8192) - reserve) * CHARS_PER_TOKEN))
 
 
 def parse_meta_response(content: str, lang: str) -> dict:

@@ -2,27 +2,7 @@
 
 {% block title %}Configuration - Log to LLM Sentinel{% endblock %}
 
-{% macro field(for_id, key, label, hint_key=None, hint=None, row_id=None, row_class='') %}
-<div class="cfg-row {{ row_class }}"{% if row_id %} id="{{ row_id }}"{% endif %}>
-    <div class="cfg-row-label">
-        <label for="{{ for_id }}" data-i18n="{{ key }}">{{ label }}</label>
-        {% if hint_key %}<p class="form-hint" data-i18n="{{ hint_key }}">{{ hint }}</p>{% endif %}
-    </div>
-    <div class="cfg-row-control form-group">{{ caller() }}</div>
-</div>
-{% endmacro %}
-
-{% macro toggle(for_id, key, label, hint_key=None, hint=None) %}
-<div class="cfg-row cfg-row--toggle">
-    <div class="cfg-row-label">
-        <label for="{{ for_id }}" data-i18n="{{ key }}">{{ label }}</label>
-        {% if hint_key %}<p class="form-hint" data-i18n="{{ hint_key }}">{{ hint }}</p>{% endif %}
-    </div>
-    <div class="cfg-row-control">
-        <label class="toggle-switch"><input type="checkbox" id="{{ for_id }}"><span class="toggle-slider"></span></label>
-    </div>
-</div>
-{% endmacro %}
+{% from "_form_macros.html" import field, toggle %}
 
 {% block content %}
 <div class="cfg-page">
@@ -458,6 +438,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=11"></script>
+<script src="/static/js/config.js?v=12"></script>
 <script src="/static/js/diagnostics_config.js?v=4"></script>
 {% endblock %}

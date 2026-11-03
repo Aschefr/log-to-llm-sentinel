@@ -15,7 +15,13 @@ from app.utils.notification_i18n import nt
 from app.services.alert_analysis import short_summary
 from app.services.alert_analysis import messages_to_text
 from app.services.meta_context import collect, previous_result, render_context, budget_for, parse_meta_response
+from app.services.app_config import config_to_dict, llm_options
 from app.services.prompts import META_SCHEMA, META_SYSTEM, meta_label
+
+
+FAILED_STATUS = "failed"
+FAILED_RETRY_SECONDS = 3600
+PREVIEW_MAX = 200
 
 
 class MetaAnalysisService:
@@ -51,6 +57,13 @@ class MetaAnalysisService:
 
         return False
 
+    def _failed_recently(self, db, config, now) -> bool:
+        """Après un échec, la période reste due : on réessaie au plus une fois par heure, pas à chaque tour."""
+        last = db.query(MetaAnalysisResult).filter(MetaAnalysisResult.config_id == config.id) \
+            .order_by(MetaAnalysisResult.created_at.desc(), MetaAnalysisResult.id.desc()).first()
+        return bool(last and last.status == FAILED_STATUS and last.created_at
+                    and (now - last.created_at).total_seconds() < FAILED_RETRY_SECONDS)
+
     async def run_scheduled_analyses(self):
         db = SessionLocal()
         try:
@@ -58,7 +71,7 @@ class MetaAnalysisService:
             now = datetime.utcnow()
 
             for config in configs:
-                if self._should_run_schedule(config, now):
+                if self._should_run_schedule(config, now) and not self._failed_recently(db, config, now):
                     # Vérifier qu'une exécution manuelle n'est pas déjà en cours (éviter double résultat)
                     from app.routers.meta_analysis import _running_configs
                     if config.id in _running_configs:
@@ -121,7 +134,9 @@ class MetaAnalysisService:
             if rule_ids:
                 query = query.filter(Analysis.rule_id.in_(rule_ids))
 
-            results = query.order_by(desc(Analysis.analyzed_at)).limit(config.max_analyses).all()
+            # La relecture reste lisible : les plus récentes, le total vient à part
+            total = query.count()
+            results = query.order_by(desc(Analysis.analyzed_at)).limit(PREVIEW_MAX).all()
             if not results:
                 return {
                     'status': 'ok',
@@ -158,7 +173,7 @@ class MetaAnalysisService:
             return {
                 'status': 'ok',
                 'rules_context': list(by_rule.values()),
-                'analyses_count': len(results),
+                'analyses_count': total,
                 'matched_keywords': list(all_kws),
                 'period_start': period_start.isoformat() + 'Z',
                 'period_end': period_end.isoformat() + 'Z'
@@ -232,8 +247,10 @@ class MetaAnalysisService:
             detection_ids = []
             all_matched_keywords = set()
             system = META_SYSTEM.get(lang, META_SYSTEM["fr"])
-            if (config.system_prompt or "").strip():
-                system = f"{config.system_prompt.strip()}\n\n{system}"
+            # Un seul endroit pour les réglages de l'IA : la page Configuration
+            settings = config_to_dict(global_cfg)
+            think = bool(settings.get("ollama_think", False))
+            context_size = settings.get("ollama_ctx")
 
             if custom_context:
                 # Ancien format : texte libre édité côté interface
@@ -258,11 +275,11 @@ class MetaAnalysisService:
                 all_matched_keywords = set(agg["keywords"])
                 previous = previous_result(db, config.id, period_start)
                 user_content = render_context(agg, period_start, period_end, lang, previous,
-                                              budget_for(config, think=True) - len(system))
+                                              budget_for(context_size, think=think) - len(system))
 
             messages = [{"role": "system", "content": system}, {"role": "user", "content": user_content}]
             prompt = messages_to_text(messages)
-            logger.debug("MetaAnalysisService", f"Envoi prompt méta-analyse (Taille: {len(prompt)} car., Contexte: {config.context_size})")
+            logger.debug("MetaAnalysisService", f"Envoi prompt méta-analyse (Taille: {len(prompt)} car., Contexte: {context_size})")
 
             lock = self.orchestrator._ollama_semaphore if self.orchestrator else contextlib.nullcontext()
             async with lock:
@@ -270,12 +287,12 @@ class MetaAnalysisService:
                     messages,
                     url=ollama_url,
                     model=ollama_model,
-                    options={"temperature": 0.2, "num_ctx": config.context_size},
-                    think=True,
+                    options=llm_options(settings),
+                    think=think,
                     format=META_SCHEMA,
                 )
             if res.get("error") or not res.get("content"):
-                parsed = {"markdown": f"[Erreur Ollama] {res.get('error') or 'Aucune réponse'}", "tldr": None, "status": None, "data": None}
+                parsed = {"markdown": f"[Erreur Ollama] {res.get('error') or 'Aucune réponse'}", "tldr": None, "status": FAILED_STATUS, "data": None}
             else:
                 parsed = parse_meta_response(res["content"], lang)
 
@@ -298,8 +315,15 @@ class MetaAnalysisService:
             # On enregistre period_end (et non trigger_time) comme dernière exécution :
             # la prochaine fenêtre démarrera exactement là où celle-ci s'est terminée (borne du schedule),
             # pas à l'heure réelle d'exécution — garantit des fenêtres contiguës et alignées sur le schedule.
-            config.last_run_at = period_end
+            # Une analyse échouée ne compte pas : sa période reste à faire, le résultat dit seulement ce qui s'est passé
+            failed = parsed["status"] == FAILED_STATUS
+            if not failed:
+                config.last_run_at = period_end
             db.commit()
+
+            if failed:
+                logger.error('MetaAnalysisService', f'Méta-analyse {config.name} échouée : {parsed["markdown"][:200]}')
+                return {"status": "error", "message": parsed["markdown"]}
 
             # Notification
             if config.notify_enabled:
@@ -379,7 +403,7 @@ class MetaAnalysisService:
                                     "temperature": 0.1,
                                     # Même num_ctx que la synthèse : évite le rechargement du modèle
                                     # et la troncature de la synthèse en entrée (2048 était trop petit)
-                                    "num_ctx": config.context_size,
+                                    "num_ctx": global_cfg.ollama_ctx or 8192,
                                 }
                             ),
                             timeout=60.0

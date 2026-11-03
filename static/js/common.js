@@ -35,6 +35,21 @@ function showMessage(element, message, type = 'success') {
     setTimeout(() => element.classList.add('hidden'), 3000);
 }
 
+/** "il y a 2 h", dans la langue de l'interface. */
+function relativeTime(iso) {
+    if (!iso) return '';
+    const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    const lang = document.documentElement.lang || 'fr';
+    const format = new Intl.RelativeTimeFormat(lang, { numeric: 'auto', style: 'short' });
+    if (seconds < 60) {
+        const now = window.t ? window.t('common.ago_now') : null;
+        return now && now !== 'common.ago_now' ? now : "à l'instant";
+    }
+    if (seconds < 3600) return format.format(-Math.round(seconds / 60), 'minute');
+    if (seconds < 86400) return format.format(-Math.round(seconds / 3600), 'hour');
+    return format.format(-Math.round(seconds / 86400), 'day');
+}
+
 function formatDate(dateString) {
     if (!dateString) return '';
     // Si la chaîne ne finit pas par Z et n'a pas de fuseau horaire, 

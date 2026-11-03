@@ -18,16 +18,22 @@ All notable changes to this project will be documented in this file.
 - **Not relevant** now applies to the whole event, stays on when the event repeats at the same severity, and is told to the AI in the next analyses of that event, which it could not see before.
 - **New Configuration page**: six tabs (Ollama, Notifications, Sources, Diagnostics, Data, Advanced), each showing the real state of what it configures. A success is only kept for the settings that produced it. A setting is saved when you leave its field, with the result next to it, and **Test** buttons use what you just typed. The Sources tab lists the hosts detected.
 - **Application log file** (`data/logs/sentinel.log`, rotated) replaces the live debug panel, which only kept the last 100 lines and 20 Ollama calls in memory. Configuration > Advanced downloads it, and debug mode adds the full Ollama prompts to it.
+- **Meta-Analysis is now a long-term dashboard**: it says what a meta-analysis is for and what it does, then opens on the AI's latest report, with its state, summary, highlights and recommendations, which were saved but never shown. Below, computed without AI and available before the first report: what changed since the period before (new, getting worse, coming back, not seen anymore), the activity of each rule over 7 to 180 days, and the events of the period. Nothing is compared without older alerts to compare with. One button per meta-analysis shows its real state, and rules are grouped by source to create one per machine in a click. A report arriving while you read no longer replaces the page.
+- **One place for AI settings**: a meta-analysis no longer has its own context size, system prompt or limit of analyses. It uses the Configuration page, and a matching context size also avoids reloading the model. Any custom prompt stored on a meta-analysis is no longer used.
+- **Meta-analysis covers the whole period**: it was limited to the 50 latest analyses, so a long period lost most of its alerts. Grouping by event makes them fit: on real data, 929 analyses over 200 days take about 20,000 tokens.
 - *Reset the MTTR* and *Delete all analyses* moved from the dashboard to **Configuration > Data**. The dashboard's MTTR is now the median over 30 days, the same as the Rules page.
 - Keywords and ignored lines are no longer edited in the Settings tab of an existing rule: the Keywords tab manages them (saving Settings never overwrites them anymore). They are still typed in the form when creating a manual rule.
 - A new rule on an existing log file starts watching at the end of the file: its history is read by the learning, no longer replayed as new lines (which could fire a burst of alerts on old events).
 
 ### Security
+- Meta-analysis page: log lines containing HTML could run in the page when keywords were highlighted. They are now always shown as text.
 - Debug logs no longer contain the Apprise URL or the Discord webhook URL, which can hold secrets.
 - **HTML in AI answers and log lines**: an answer quoting a crafted log line could run code in the page, since anyone on the network can send a syslog line. AI answers are now sanitized by DOMPurify, served by the application (without it they are shown as plain text), and may no longer load images, which could send data out just by opening the page. Error messages are escaped too.
 - **E-mail notifications** now escape the log line, the AI's answer, keywords and the rule's name.
 
 ### Fixed
+- **Meta-analysis failure**: when the AI failed, the error was saved as a report and its period was skipped for good. The failure is now shown, the period stays due, and a scheduled meta-analysis tries again at most once an hour.
+- **Deleting a rule** now removes it from the meta-analyses that followed it, as its number can be reused. One left with no rule is disabled, not widened to all rules.
 - **Autopilot description of a log**: it no longer judges events as normal or usual noise. The keyword arbiter then quoted that unproven judgment to ignore the same lines.
 - **Syslog receiver**: every change in Configuration restarted it, even an unrelated one, which could lose packets. It now restarts only when its own settings change.
 - **Notification record**: an alert was marked as notified even when sending had failed.
