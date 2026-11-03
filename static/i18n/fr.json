@@ -16,16 +16,36 @@
     "uptime": "En ligne",
     "tooltip_cpu": "Utilisation CPU (App / Système)",
     "tooltip_ram": "Utilisation RAM (App)",
-    "meta": "Méta-analyse"
+    "meta": "Méta-analyse",
+    "tooltip_time": "Heure du serveur"
   },
   "header": {
-    "update_available": "Mise à jour disponible",
     "up_to_date": "À jour",
     "update_instructions": "Pour mettre à jour : git pull && docker compose up -d --build",
-    "checking": "Vérification...",
-    "check_failed": "Échec (Hors-ligne ?)",
+    "checking": "Vérification…",
+    "check_failed": "Vérification impossible : GitHub est-il joignable ?",
     "theme_light": "Passer au thème clair",
-    "theme_dark": "Passer au thème sombre"
+    "theme_dark": "Passer au thème sombre",
+    "monitoring": "Surveillance",
+    "monitoring_paused": "En pause",
+    "monitoring_unknown": "État inconnu",
+    "monitoring_unknown_title": "Sentinel ne répond pas : état de la surveillance inconnu.",
+    "monitoring_on_title": "Surveillance active. Clique pour la mettre en pause.",
+    "monitoring_paused_title": "Surveillance en pause depuis le {since}. Clique pour la reprendre.",
+    "monitoring_confirm": "Mettre la surveillance en pause ? Plus aucune analyse ni notification automatique. Les lignes reçues pendant la pause ne seront pas analysées à la reprise.",
+    "version_title": "Voir les nouveautés",
+    "update_to": "{v} disponible",
+    "check_latest": "Tu as la dernière version.",
+    "changelog_title": "Nouveautés",
+    "changelog_current": "Version installée :",
+    "changelog_check": "Vérifier les mises à jour",
+    "changelog_note": "Le journal des versions est rédigé en anglais.",
+    "changelog_update_title": "Version {v} disponible",
+    "changelog_update_notes": "Ce qu'elle apporte",
+    "changelog_github": "Voir sur GitHub",
+    "changelog_next": "Prochaine version",
+    "changelog_installed": "Installée",
+    "changelog_empty": "Journal des versions indisponible."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -123,7 +143,9 @@
     "history_none": "Les analyses apparaîtront ici dès qu'une règle se déclenchera.",
     "history_none_filter": "Aucune analyse pour ce filtre.",
     "attention_unknown": "Impossible de savoir ce qui est à traiter pour le moment.",
-    "pilot_no_trigger": "Ne surveille que le silence"
+    "pilot_no_trigger": "Ne surveille que le silence",
+    "verdict_paused": "Surveillance en pause",
+    "verdict_paused_sub": "Depuis {t}. Les lignes reçues ne sont ni analysées ni notifiées : ce qui suit peut être dépassé."
   },
   "rules": {
     "title": "Gestion des Règles",

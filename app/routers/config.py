@@ -642,6 +642,12 @@ def export_config(with_history: bool = False):
             }
         }
         
+        # Une sauvegarde ne doit jamais remettre une surveillance en pause sans que ça se voie
+        from app.services.monitoring import EXCLUDED_FROM_BACKUP
+        for row in data["configuration"]["global_config"]:
+            for key in EXCLUDED_FROM_BACKUP:
+                row.pop(key, None)
+
         if with_history:
             data["history"] = {
                 "analyses": [to_dict(a) for a in db.query(Analysis).all()],

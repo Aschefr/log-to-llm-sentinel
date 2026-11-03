@@ -265,6 +265,9 @@ class KeywordTuningService:
     async def review_all(self):
         db = SessionLocal()
         try:
+            from app.services import monitoring
+            if monitoring.is_paused(db):
+                return
             rules = db.query(Rule).filter(Rule.enabled == True).all()
             ids = [r.id for r in rules if (r.keyword_tuning_mode or "auto") != "off"]
             autopilot_due = [(r.id, refresh) for r in rules for refresh in [autopilot_due_refresh(r)] if refresh is not None]

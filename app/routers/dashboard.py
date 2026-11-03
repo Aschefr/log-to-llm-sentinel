@@ -11,7 +11,7 @@ except ImportError:
 
 from app.database import SessionLocal
 from app.models import GlobalConfig, Rule, Analysis
-from app.services import analysis_events, dashboard_watch, event_notes, rule_stats
+from app.services import analysis_events, dashboard_watch, event_notes, monitoring, rule_stats
 from app.services.app_config import config_to_dict
 from app.services.alert_analysis import analysis_lines, short_summary
 
@@ -26,6 +26,17 @@ def set_orchestrator(orchestrator):
     _orchestrator = orchestrator
 
 
+@router.put("/monitoring")
+def set_monitoring(data: dict):
+    if not isinstance(data.get("paused"), bool):
+        raise HTTPException(status_code=400, detail="paused_required")
+    db = SessionLocal()
+    try:
+        return monitoring.set_paused(db, data["paused"], _orchestrator.resolution_service if _orchestrator else None)
+    finally:
+        db.close()
+
+
 @router.get("/system-stats")
 def get_system_stats():
     """Retourne les statistiques d'utilisation des ressources."""
@@ -34,9 +45,16 @@ def get_system_stats():
         "app_ram": 0,
         "sys_cpu": 0,
         "sys_ram": 0,
-        "uptime": int(time.time() - START_TIME)
+        "uptime": int(time.time() - START_TIME),
+        # Avec son fuseau : c'est l'heure des lignes de log, pas celle du navigateur
+        "server_time": datetime.now().astimezone().isoformat(timespec="seconds"),
     }
-    
+    db = SessionLocal()
+    try:
+        stats["monitoring"] = monitoring.state(db)
+    finally:
+        db.close()
+
     if psutil:
         try:
             process = psutil.Process(os.getpid())

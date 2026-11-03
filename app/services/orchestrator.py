@@ -7,6 +7,7 @@ from datetime import datetime
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig
+from app.services import monitoring
 from app.services.ollama_service import OllamaService
 from app.services.notification_service import NotificationService
 from app.services.app_config import config_to_dict, llm_options
@@ -54,7 +55,7 @@ class Orchestrator:
         db = SessionLocal()
         try:
             db_rule = db.query(Rule).filter(Rule.id == rule.id).first()
-            if not db_rule or not db_rule.enabled:
+            if not db_rule or not db_rule.enabled or monitoring.is_paused(db):
                 return
 
             logger.debug("Orchestrator", f"Régle '{db_rule.name}' — {len(lines)} nouvelle(s) ligne(s) reçue(s)")
@@ -146,7 +147,7 @@ class Orchestrator:
         try:
             # Re-fetch rule to ensure it's still enabled after sleep
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
-            if not rule or not rule.enabled:
+            if not rule or not rule.enabled or monitoring.is_paused(db):
                 return
 
             config_dict = config_to_dict(db.query(GlobalConfig).first())

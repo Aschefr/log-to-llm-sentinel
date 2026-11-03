@@ -138,39 +138,6 @@ function copyToClipboard(text) {
 }
 
 
-document.addEventListener('DOMContentLoaded', () => {
-    pollSystemStats();
-    restoreUpdateBadge();
-});
-
-async function pollSystemStats() {
-    updateSystemStatsUI();
-    setInterval(updateSystemStatsUI, 10000);
-}
-
-async function updateSystemStatsUI() {
-    try {
-        const stats = await apiFetch('/api/dashboard/system-stats');
-        const cpuAppEl = document.getElementById('stat-cpu-app');
-        const cpuSysEl = document.getElementById('stat-cpu-sys');
-        const ramEl = document.getElementById('stat-ram');
-        const uptimeEl = document.getElementById('stat-uptime');
-        
-        if (cpuAppEl) cpuAppEl.textContent = `${Math.round(stats.app_cpu)}%`;
-        if (cpuSysEl) cpuSysEl.textContent = `${Math.round(stats.sys_cpu)}%`;
-        if (ramEl) ramEl.textContent = `${stats.app_ram} MB`;
-        if (uptimeEl) uptimeEl.textContent = formatUptime(stats.uptime);
-    } catch (e) {}
-}
-
-function formatUptime(seconds) {
-    if (seconds < 60) return `${seconds}s`;
-    if (seconds < 3600) return `${Math.floor(seconds/60)}m`;
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    return `${h}h${m}m`;
-}
-
 async function openChat(analysisId, rawPrompt = null, rawResponse = null) {
     try {
         const res = await apiFetch('/chat/api/create', {
@@ -371,87 +338,6 @@ function showInlineConfirm(btnElement, message, onConfirmCallback) {
         };
         document.addEventListener('click', outsideClickListener);
     }, 10);
-}
-
-/**
- * Apply a check result object to the update badge UI.
- */
-function applyUpdateBadge(status) {
-    const badge = document.getElementById('version-update-badge');
-    if (!badge) return;
-    badge.classList.remove('checking', 'update-available', 'system-up-to-date', 'check-failed');
-
-    if (!status || !status.checked) {
-        // Never checked yet — show neutral
-        badge.innerHTML = `<span class="check-icon">—</span>`;
-        return;
-    }
-
-    if (status.error) {
-        badge.classList.add('check-failed');
-        const errKey = 'header.check_failed';
-        const errText = window.t ? window.t(errKey) : 'Check failed';
-        badge.innerHTML = `<span class="stat-icon">⚠️</span> <span data-i18n="${errKey}">${errText}</span>`;
-        badge.setAttribute('data-i18n-title', errKey);
-        badge.setAttribute('title', errText);
-    } else if (status.is_available) {
-        badge.classList.add('update-available');
-        const avKey = 'header.update_available';
-        const avText = window.t ? window.t(avKey) : 'Update available';
-        const instKey = 'header.update_instructions';
-        const instText = window.t ? window.t(instKey) : 'git pull && docker compose up -d';
-        badge.innerHTML = `<span class="pulse-dot"></span> <span data-i18n="${avKey}">${avText}</span>`;
-        badge.setAttribute('data-i18n-title', instKey);
-        badge.setAttribute('title', instText);
-    } else {
-        badge.classList.add('system-up-to-date');
-        const upKey = 'header.up_to_date';
-        const upText = window.t ? window.t(upKey) : 'Up to date';
-        badge.innerHTML = `<span class="check-icon">✓</span> <span data-i18n="${upKey}">${upText}</span>`;
-        badge.setAttribute('data-i18n-title', upKey);
-        badge.setAttribute('title', upText);
-    }
-}
-
-/**
- * On page load: restore badge state from server cache (persisted across navigations).
- */
-async function restoreUpdateBadge() {
-    try {
-        const status = await apiFetch('/api/system/update-status');
-        applyUpdateBadge(status);
-    } catch (e) { /* silently ignore — badge stays neutral */ }
-}
-
-/**
- * Triggers a manual check for app updates from GitHub.
- */
-async function checkAppUpdate() {
-    const badge = document.getElementById('version-update-badge');
-    if (!badge || badge.classList.contains('checking')) return;
-
-    // State: Checking
-    badge.classList.add('checking');
-    const labelKey = 'header.checking';
-    const labelText = window.t ? window.t(labelKey) : 'Checking...';
-    
-    badge.innerHTML = `<span class="pulse-dot" style="animation-duration: 0.8s;"></span> <span data-i18n="${labelKey}">${labelText}</span>`;
-    badge.setAttribute('title', labelText);
-
-    try {
-        const status = await apiFetch('/api/system/update-check');
-        applyUpdateBadge(status);
-    } catch (e) {
-        const badge = document.getElementById('version-update-badge');
-        if (badge) {
-            badge.classList.remove('checking');
-            badge.classList.add('check-failed');
-            const errKey = 'header.check_failed';
-            const errText = window.t ? window.t(errKey) : 'Check failed';
-            badge.innerHTML = `<span class="stat-icon">⚠️</span> <span data-i18n="${errKey}">${errText}</span>`;
-            badge.setAttribute('title', errText);
-        }
-    }
 }
 
 // ─── Shared Analysis Card Template ──────────────────────────────────────────
@@ -821,52 +707,6 @@ function toggleAnalysisCardGeneric(event, card) {
         }
     }
 }
-
-/* ── Server Time Display ── */
-function updateServerTime() {
-    const el = document.getElementById('server-time-display');
-    if (!el) return;
-    const now = new Date();
-    el.textContent = now.toLocaleString(window._currentLang || 'fr-FR', {
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        day: '2-digit', month: '2-digit', year: 'numeric'
-    });
-}
-setInterval(updateServerTime, 1000);
-updateServerTime();
-
-/* ── Theme Management ── */
-function applyThemeIcon(theme) {
-    const btn = document.getElementById('theme-toggle-btn');
-    if (!btn) return;
-    if (theme === 'light') {
-        btn.innerHTML = '🌙';
-        btn.setAttribute('data-i18n-title', 'header.theme_dark');
-        if (window.t) {
-            btn.setAttribute('title', window.t('header.theme_dark'));
-        }
-    } else {
-        btn.innerHTML = '☀️';
-        btn.setAttribute('data-i18n-title', 'header.theme_light');
-        if (window.t) {
-            btn.setAttribute('title', window.t('header.theme_light'));
-        }
-    }
-}
-
-function toggleTheme() {
-    let currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-    let newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    
-    document.documentElement.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    applyThemeIcon(newTheme);
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    let currentTheme = localStorage.getItem('theme') || 'dark';
-    applyThemeIcon(currentTheme);
-});
 
 function translateBackendError(msg) {
     if (!msg) return msg;

@@ -15,6 +15,7 @@ from app.utils.notification_i18n import nt
 from app.services.alert_analysis import short_summary
 from app.services.alert_analysis import messages_to_text
 from app.services.meta_context import collect, previous_result, render_context, budget_for, parse_meta_response
+from app.services import monitoring
 from app.services.app_config import config_to_dict, llm_options
 from app.services.prompts import META_SCHEMA, META_SYSTEM, meta_label
 
@@ -67,6 +68,8 @@ class MetaAnalysisService:
     async def run_scheduled_analyses(self):
         db = SessionLocal()
         try:
+            if monitoring.is_paused(db):  # la période reste due : le prochain rapport la couvrira
+                return
             configs = db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.enabled == True).all()
             now = datetime.utcnow()
 

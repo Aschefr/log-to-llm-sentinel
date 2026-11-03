@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Log to LLM Sentinel{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
-    <link rel="stylesheet" href="/static/css/style.css?v=31">
+    <link rel="stylesheet" href="/static/css/style.css?v=32">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -15,91 +15,6 @@
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
-    <style>
-        /* ── Language Switcher ── */
-        .lang-switcher-wrapper { position: relative; }
-        .lang-btn {
-            display: flex; align-items: center; gap: 0.35rem;
-            background: transparent; border: 1px solid var(--border);
-            color: var(--text-secondary); border-radius: 0.4rem;
-            padding: 0.3rem 0.6rem; cursor: pointer; font-size: 0.8rem;
-            transition: border-color 0.2s, color 0.2s;
-        }
-        .lang-btn:hover { border-color: var(--accent); color: var(--text-primary); }
-        .lang-code { font-weight: 600; letter-spacing: 0.05em; }
-        .lang-dropdown {
-            display: none; position: absolute; top: calc(100% + 6px); right: 0;
-            background: var(--bg-primary); border: 1px solid var(--border);
-            border-radius: 0.5rem; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-            min-width: 140px; z-index: 1000; overflow: hidden;
-        }
-        .lang-dropdown.open { display: block; }
-        .lang-option {
-            display: flex; align-items: center; gap: 0.5rem;
-            width: 100%; padding: 0.6rem 1rem; background: transparent;
-            border: none; color: var(--text-secondary); cursor: pointer;
-            font-size: 0.85rem; transition: background 0.15s, color 0.15s;
-            text-align: left;
-        }
-        .lang-option:hover { background: rgba(255,255,255,0.05); color: var(--text-primary); }
-        .lang-option.active { color: var(--accent); font-weight: 600; }
-
-        /* ── Theme Switcher ── */
-        .theme-btn {
-            display: flex; align-items: center; justify-content: center;
-            background: transparent; border: 1px solid var(--border);
-            color: var(--text-secondary); border-radius: 0.4rem;
-            padding: 0.3rem 0.5rem; cursor: pointer; font-size: 1rem;
-            transition: border-color 0.2s, color 0.2s;
-        }
-        .theme-btn:hover { border-color: var(--accent); color: var(--text-primary); }
-
-        /* ── Update Notification ── */
-        .update-badge {
-            display: inline-flex; align-items: center; gap: 0.35rem;
-            margin-left: 0.8rem; padding: 0.15rem 0.5rem; border-radius: 2rem;
-            font-size: 0.65rem; font-weight: 600; cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            user-select: none;
-            vertical-align: middle;
-        }
-        .update-available { 
-            background: rgba(255, 107, 107, 0.1); color: #ff8787; 
-            border: 1px solid rgba(255, 107, 107, 0.3);
-            box-shadow: 0 0 10px rgba(255, 107, 107, 0.1);
-        }
-        .system-up-to-date { 
-            background: rgba(81, 207, 102, 0.05); color: #69db7c; 
-            border: 1px solid rgba(81, 207, 102, 0.15);
-            opacity: 0.8;
-        }
-        .update-badge:hover {
-            background: rgba(255, 255, 255, 0.08);
-            transform: translateY(-1px);
-        }
-        .update-available:hover {
-            background: rgba(255, 107, 107, 0.2);
-            border-color: rgba(255, 107, 107, 0.5);
-        }
-        .check-failed { 
-            background: rgba(255, 146, 0, 0.1); color: #ff9200; 
-            border: 1px solid rgba(255, 146, 0, 0.3);
-        }
-        .update-badge:active { transform: scale(0.95); }
-        
-        .pulse-dot {
-            width: 7px; height: 7px; background: #ff8787; border-radius: 50%;
-            box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
-            animation: pulse 2.5s infinite;
-        }
-        .check-icon { font-size: 0.75rem; margin-top: -1px; }
-
-        @keyframes pulse {
-            0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7); }
-            70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(255, 107, 107, 0); }
-            100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
-        }
-    </style>
 </head>
 <body>
     <nav class="navbar">
@@ -109,14 +24,11 @@
             </svg>
         </button>
         <div class="nav-brand">
-            <span class="nav-brand-title" style="display: flex; align-items: center;"><img src="/static/logo.png" alt="Logo" style="height: 1.2em; vertical-align: middle; margin-right: 8px; border-radius: 4px;">Log to LLM Sentinel</span>
-            <div class="nav-brand-meta">
-                <span class="nav-version">v{{ APP_VERSION }}</span>
-                <div id="version-update-badge" class="update-badge" onclick="checkAppUpdate()" title="">
-                    <span class="check-icon">—</span>
-                    <span data-i18n="header.checking"></span>
-                </div>
-            </div>
+            <span class="nav-brand-title"><img src="/static/logo.png" alt="" class="nav-logo">Log to LLM Sentinel</span>
+            <button type="button" class="nav-version" id="version-btn" data-version="{{ APP_VERSION }}" aria-haspopup="dialog">
+                <span class="nav-version-number">v{{ APP_VERSION }}</span>
+                <span class="nav-version-status" id="version-status"></span>
+            </button>
         </div>
         <!-- Overlay INSIDE navbar so it shares stacking context with nav-links -->
         <div class="nav-overlay" id="nav-overlay" onclick="toggleMobileNav()"></div>
@@ -128,35 +40,53 @@
             <a href="/config" data-i18n="nav.config" class="{% if request.url.path == '/config' %}active{% endif %}">Configuration</a>
         </div>
         <div class="nav-right">
-            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem;">
-                <div id="server-time-display" style="font-family: monospace; font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.2rem;" title="Server Time">--:--:--</div>
-                <div class="nav-stats" id="nav-system-stats">
-                    <div class="stat-item" data-i18n-title="nav.tooltip_cpu" title="Utilisation CPU (App / Système)">
-                        <span class="stat-icon">📊</span>
-                        <span class="stat-label" data-i18n="nav.cpu_app">App</span>
-                        <span id="stat-cpu-app" class="stat-value">--%</span>
-                        <span class="stat-sep" style="opacity: 0.3; font-size: 0.75rem;">/</span>
-                        <span class="stat-label" data-i18n="nav.cpu_sys">Sys</span>
-                        <span id="stat-cpu-sys" class="stat-value">--%</span>
-                    </div>
-                    <div class="stat-item" data-i18n-title="nav.tooltip_ram" title="Utilisation RAM (App)">
-                        <span class="stat-icon">💾</span>
-                        <span class="stat-label" data-i18n="nav.ram">RAM</span>
-                        <span id="stat-ram" class="stat-value">-- MB</span>
-                    </div>
-                    <div class="stat-item" data-i18n-title="nav.tooltip_uptime" title="Uptime">
-                        <span class="stat-icon">⏱️</span>
-                        <span class="stat-label" data-i18n="nav.uptime">Uptime</span>
-                        <span id="stat-uptime" class="stat-value">--</span>
-                    </div>
+            <button type="button" class="nav-switch is-unknown" id="monitoring-switch" role="switch" aria-checked="mixed" disabled>
+                <span class="nav-switch-track" aria-hidden="true"><span class="nav-switch-thumb"></span></span>
+                <span class="nav-switch-label" data-i18n="header.monitoring_unknown">État inconnu</span>
+            </button>
+            <div class="nav-stats" id="nav-system-stats">
+                <div class="stat-item" data-i18n-title="nav.tooltip_cpu" title="Utilisation CPU (App / Système)">
+                    <span class="stat-label" data-i18n="nav.cpu_app">App</span>
+                    <span id="stat-cpu-app" class="stat-value">--</span>
+                    <span class="stat-label" data-i18n="nav.cpu_sys">Sys</span>
+                    <span id="stat-cpu-sys" class="stat-value">--</span>
+                </div>
+                <div class="stat-item" data-i18n-title="nav.tooltip_ram" title="Utilisation RAM (App)">
+                    <span class="stat-label" data-i18n="nav.ram">RAM</span>
+                    <span id="stat-ram" class="stat-value">--</span>
+                </div>
+                <div class="stat-item stat-item--uptime" data-i18n-title="nav.tooltip_uptime" title="Uptime">
+                    <span class="stat-label" data-i18n="nav.uptime">Uptime</span>
+                    <span id="stat-uptime" class="stat-value">--</span>
+                </div>
+                <div class="stat-item stat-item--time" data-i18n-title="nav.tooltip_time" title="Heure du serveur">
+                    <span id="server-time-display" class="stat-value">--:--:--</span>
                 </div>
             </div>
-            <button id="theme-toggle-btn" class="theme-btn" onclick="toggleTheme()" data-i18n-title="header.theme_light" title="Passer au thème clair">
-                ☀️
-            </button>
+            <button type="button" id="theme-toggle-btn" class="theme-btn" onclick="toggleTheme()" data-i18n-title="header.theme_light" title="Passer au thème clair"></button>
             <div id="lang-switcher"></div>
         </div>
     </nav>
+    <dialog class="changelog" id="changelog-dialog" aria-labelledby="changelog-title">
+        <div class="changelog-inner">
+            <header class="changelog-head">
+                <div>
+                    <h2 id="changelog-title" data-i18n="header.changelog_title">Nouveautés</h2>
+                    <p class="form-hint"><span data-i18n="header.changelog_current">Version installée :</span> {{ APP_VERSION }}</p>
+                </div>
+                <button type="button" class="theme-btn" id="changelog-close" data-i18n-title="common.close" data-i18n-aria-label="common.close" title="Fermer" aria-label="Fermer">
+                    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9"/></svg>
+                </button>
+            </header>
+            <div class="changelog-actions">
+                <button type="button" class="btn btn-secondary btn-sm" id="changelog-check" data-i18n="header.changelog_check">Vérifier les mises à jour</button>
+                <span class="form-hint cfg-result" id="changelog-check-result" role="status"></span>
+            </div>
+            <div id="changelog-update"></div>
+            <p class="form-hint changelog-note" data-i18n="header.changelog_note">Le journal des versions est rédigé en anglais.</p>
+            <div class="changelog-list" id="changelog-list"></div>
+        </div>
+    </dialog>
     <main class="{% block container_class %}container{% endblock %}">
         {% block content %}{% endblock %}
     </main>
@@ -167,7 +97,8 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
     <script src="/static/js/i18n.js?v=2"></script>
-    <script src="/static/js/common.js?v=17"></script>
+    <script src="/static/js/common.js?v=18"></script>
+    <script src="/static/js/header.js?v=1"></script>
     <script src="/static/js/event_notes.js?v=1"></script>
     <script>
     /* ── Mobile hamburger nav toggle ── */

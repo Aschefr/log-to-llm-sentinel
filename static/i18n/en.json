@@ -16,16 +16,36 @@
     "uptime": "Uptime",
     "tooltip_cpu": "CPU Usage (App / System)",
     "tooltip_ram": "RAM Usage (App)",
-    "meta": "Meta-Analysis"
+    "meta": "Meta-Analysis",
+    "tooltip_time": "Server time"
   },
   "header": {
-    "update_available": "Update available",
     "up_to_date": "Up to date",
     "update_instructions": "To update: git pull && docker compose up -d --build",
-    "checking": "Checking...",
-    "check_failed": "Check failed (Offline?)",
+    "checking": "Checking…",
+    "check_failed": "Could not check: is GitHub reachable?",
     "theme_light": "Switch to light theme",
-    "theme_dark": "Switch to dark theme"
+    "theme_dark": "Switch to dark theme",
+    "monitoring": "Monitoring",
+    "monitoring_paused": "Paused",
+    "monitoring_unknown": "Unknown state",
+    "monitoring_unknown_title": "Sentinel is not responding: monitoring state unknown.",
+    "monitoring_on_title": "Monitoring is on. Click to pause it.",
+    "monitoring_paused_title": "Monitoring paused since {since}. Click to resume it.",
+    "monitoring_confirm": "Pause monitoring? No more automatic analyses or notifications. Lines received during the pause will not be analyzed when it resumes.",
+    "version_title": "See what's new",
+    "update_to": "{v} available",
+    "check_latest": "You have the latest version.",
+    "changelog_title": "What's new",
+    "changelog_current": "Installed version:",
+    "changelog_check": "Check for updates",
+    "changelog_note": "The release notes are written in English.",
+    "changelog_update_title": "Version {v} available",
+    "changelog_update_notes": "What it brings",
+    "changelog_github": "See on GitHub",
+    "changelog_next": "Next version",
+    "changelog_installed": "Installed",
+    "changelog_empty": "Release notes unavailable."
   },
   "dashboard": {
     "title": "Dashboard",
@@ -123,7 +143,9 @@
     "history_none": "Analyses will appear here as soon as a rule triggers.",
     "history_none_filter": "No analysis for this filter.",
     "attention_unknown": "Cannot tell what needs attention right now.",
-    "pilot_no_trigger": "Only watches for silence"
+    "pilot_no_trigger": "Only watches for silence",
+    "verdict_paused": "Monitoring paused",
+    "verdict_paused_sub": "Since {t}. Lines received are neither analyzed nor notified: what follows may be out of date."
   },
   "rules": {
     "title": "Rule Management",

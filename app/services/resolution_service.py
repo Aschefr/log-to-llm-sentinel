@@ -10,6 +10,7 @@ from typing import List, Dict, Any, Optional
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig, ResolutionVerdict
+from app.services import monitoring
 from app.utils.notification_i18n import nt
 from app.services.alert_analysis import analysis_lines, short_summary, messages_to_text, _format_duration
 from app.services.app_config import config_to_dict, llm_options
@@ -351,6 +352,8 @@ class ResolutionService:
         """Boucle périodique — vérifie si le timeout d'absence d'erreur est atteint."""
         db = SessionLocal()
         try:
+            if monitoring.is_paused(db):
+                return
             for rule_id, state in list(self._alert_states.items()):
                 # Ignorer 'resolving' et les tentatives en cours : une validation IA est déjà lancée
                 if state["status"] != "alert" or state.get("attempting"):
@@ -391,6 +394,13 @@ class ResolutionService:
             logger.error("ResolutionService", f"Erreur dans check_timeout_resolutions : {e}")
         finally:
             db.close()
+
+    def shift_timers(self, paused_for: timedelta):
+        """Fin d'une pause de la surveillance : les délais de calme reprennent là où ils en étaient."""
+        for state in self._alert_states.values():
+            for key in ("last_error_at", "next_attempt_at"):
+                if state.get(key):
+                    state[key] += paused_for
 
     def required_calm_minutes(self, rule: Rule, state: dict) -> int:
         """Durée sans erreur exigée avant de clore l'incident.
@@ -1020,6 +1030,8 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
         Appele periodiquement par le scheduler (toutes les PATTERN_DECAY_INTERVAL_HOURS heures)."""
         db = SessionLocal()
         try:
+            if monitoring.is_paused(db):  # rien n'a été observé : un motif n'est pas périmé pour autant
+                return
             rules = db.query(Rule).filter(Rule.resolution_mode != "disabled").all()
             total_decayed = 0
             total_removed = 0

@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderAll();
     refresh();
     setInterval(() => { if (!document.hidden) refresh(); }, DASH_REFRESH_MS);
+    document.addEventListener('monitoring-changed', refresh);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
     document.addEventListener('analysis-viewed', refresh);
     document.addEventListener('events-changed', refresh);
@@ -127,6 +128,10 @@ function computeVerdict() {
                 : dT('dashboard.verdict_unknown_sub', 'Sentinel ne répond pas.') };
     }
     if (!w) return { state: 'checking', title: dT('dashboard.verdict_checking', 'Vérification…'), sub: '' };
+    if (w.monitoring && w.monitoring.paused) {
+        return { state: 'off', title: dT('dashboard.verdict_paused', 'Surveillance en pause'),
+            sub: dT('dashboard.verdict_paused_sub', 'Depuis {t}. Les lignes reçues ne sont ni analysées ni notifiées : ce qui suit peut être dépassé.', { t: dWhen(w.monitoring.since) }) };
+    }
     if (!w.rules.total) {
         return { state: 'off', title: dT('dashboard.verdict_empty', 'Aucune source surveillée'), sub: dT('dashboard.verdict_empty_sub', 'Ajoute une source : le pilote automatique s’occupe du reste.'), create: true };
     }

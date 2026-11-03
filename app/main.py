@@ -29,6 +29,7 @@ import re
 
 # ── Update cache (persists across requests / page navigations) ──
 _update_cache: dict = {"is_available": False, "is_latest": False, "error": True, "checked": False}
+RELEASE_NOTES_MAX = 20000
 
 
 def _parse_semver(version: str):
@@ -52,13 +53,17 @@ def check_for_updates(current_version):
         with httpx.Client(headers=headers, timeout=5.0) as client:
             response = client.get(url)
             if response.status_code == 200:
-                remote = _parse_semver(response.json().get("tag_name", ""))
+                release = response.json()
+                remote = _parse_semver(release.get("tag_name", ""))
                 if remote:
                     result = {
                         "is_available": remote > local,
                         "is_latest": remote <= local,
                         "error": False,
-                        "checked": True
+                        "checked": True,
+                        "latest_version": ".".join(str(x) for x in remote),
+                        "release_url": release.get("html_url"),
+                        "release_notes": (release.get("body") or "")[:RELEASE_NOTES_MAX],
                     }
                     _update_cache = result
                     return result
@@ -187,6 +192,9 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(300)  # Check every 5 minutes
             db = SessionLocal()
             try:
+                from app.services import monitoring
+                if monitoring.is_paused(db):
+                    continue  # rien à notifier ; une source encore muette à la reprise sera signalée à ce moment-là
                 now = datetime.utcnow()
                 rules = db.query(Rule).filter(Rule.enabled == True, Rule.inactivity_warning_enabled == True, Rule.inactivity_notified == False).all()
                 from app.services import autopilot
@@ -290,6 +298,33 @@ async def api_update_check():
 async def api_update_status():
     """Returns the last cached update check result without hitting GitHub."""
     return _update_cache
+
+
+def parse_changelog(text: str) -> list:
+    """Sections « ## [version] - date » du CHANGELOG, de la plus récente à la plus ancienne ; une section vide est ignorée."""
+    sections = []
+    current = None
+    for line in text.splitlines():
+        m = re.match(r"^## \[([^\]]+)\](?:\s*-\s*(\S+))?", line)
+        if m:
+            current = {"version": m.group(1), "date": m.group(2), "body": []}
+            sections.append(current)
+        elif current is not None:
+            current["body"].append(line)
+    for section in sections:
+        section["body"] = "\n".join(section["body"]).strip()
+    return [s for s in sections if s["body"]]
+
+
+@app.get("/api/system/changelog")
+async def api_changelog():
+    """Le journal livré avec l'application : il reste lisible sans accès à Internet."""
+    try:
+        with open(os.path.join(BASE_DIR, "CHANGELOG.md"), encoding="utf-8") as f:
+            sections = parse_changelog(f.read())
+    except OSError:
+        sections = []
+    return {"current": APP_VERSION, "sections": sections}
 
 # ── Templates & Static ──
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

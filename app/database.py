@@ -141,6 +141,9 @@ def init_db():
         "ALTER TABLE rules ADD COLUMN autopilot_json TEXT DEFAULT '{}'",
         # Page Configuration : derniers tests et envois de notification
         "ALTER TABLE global_config ADD COLUMN notification_state_json TEXT DEFAULT '{}'",
+        # Interrupteur général de la surveillance
+        "ALTER TABLE global_config ADD COLUMN monitoring_paused BOOLEAN DEFAULT 0",
+        "ALTER TABLE global_config ADD COLUMN monitoring_paused_at DATETIME",
         # Regroupement des analyses par événement
         "ALTER TABLE analyses ADD COLUMN event_key VARCHAR",
         "CREATE INDEX IF NOT EXISTS ix_analyses_rule_event ON analyses (rule_id, event_key)",

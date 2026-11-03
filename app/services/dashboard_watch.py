@@ -12,6 +12,7 @@ from typing import Optional
 from sqlalchemy import func
 
 from app.models import Analysis, KeywordChange, Rule
+from app.services import monitoring
 from app.services import analysis_events
 from app.services import autopilot as ap
 from app.services import rule_stats
@@ -102,6 +103,7 @@ def build(db) -> dict:
             "observing": sum(1 for r in enabled if ap.enabled(r) and ap.load(r).get("status") in ("learning", "observing")),
         },
         "last_analysis_at": rule_stats.iso(last_analysis),
+        "monitoring": monitoring.state(db),
         "attention": {
             "alerts": _alerts(db, enabled),
             "muted": [{"rule_id": r.id, "rule_name": r.name, "last_line_at": rule_stats.iso(r.last_line_received_at),
