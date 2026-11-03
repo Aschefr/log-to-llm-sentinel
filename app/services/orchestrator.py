@@ -268,12 +268,31 @@ class Orchestrator:
         ctx = result.get("context") or {}
         analysis.context_before_json = json.dumps(ctx.get("before") or [], ensure_ascii=False)
         analysis.context_after_json = json.dumps(ctx.get("after") or [], ensure_ascii=False)
+        analysis.reused_from = None  # un vrai résultat de l'IA, y compris quand on relance une analyse reprise
+
+    def reused_result(self, raw_lines: dict, prior: Analysis, config: dict) -> dict:
+        """Le verdict d'une analyse précédente, pour une répétition du même événement."""
+        return {
+            "events_text": self.bundle_lines(raw_lines["lines"], raw_lines["total"], raw_lines.get("window_s", 0),
+                                             config.get("max_log_chars", 5000), config.get("ollama_prompt_lang", "fr")),
+            "markdown": prior.ollama_response,
+            "severity": prior.severity,
+            "summary": prior.summary,
+            "data": json.loads(prior.analysis_json) if prior.analysis_json else None,
+            "messages": None,
+            "context": None,
+        }
 
     async def _process_match(self, rule: Rule, raw_lines: dict, config: dict, db,
                               detection_id: str = None, matched_keywords: list = None):
         """Analyse un groupe de lignes correspondantes, sauvegarde et notifie."""
-        result = await self.analyze_alert(rule, raw_lines, config, db,
-                                          matched_keywords=matched_keywords, detection_id=detection_id)
+        prior = analysis_events.reusable_analysis(db, rule.id, raw_lines["lines"])
+        if prior:
+            logger.debug("Orchestrator", f"'{rule.name}' : répétition, verdict repris de l'analyse #{prior.id} sans appel à l'IA.")
+            result = self.reused_result(raw_lines, prior, config)
+        else:
+            result = await self.analyze_alert(rule, raw_lines, config, db,
+                                              matched_keywords=matched_keywords, detection_id=detection_id)
         severity = result["severity"]
 
         analysis = Analysis(
@@ -285,6 +304,7 @@ class Orchestrator:
             analyzed_at=datetime.utcnow(),
         )
         self.apply_result(analysis, result)
+        analysis.reused_from = prior.id if prior else None
         db.add(analysis)
         db.commit()
         db.refresh(analysis)

@@ -727,7 +727,8 @@
     "note_err_too_long": "Cette note dépasse 500 caractères.",
     "note_err_limit": "Cette règle a atteint 30 notes : supprimes-en une d'abord.",
     "note_scope_an_event": "Un événement",
-    "ago_now": "à l'instant"
+    "ago_now": "à l'instant",
+    "analysis_reused": "Même événement : analyse reprise, sans nouvel appel à l'IA."
   },
   "meta": {
     "title": "Méta-analyse",

@@ -142,6 +142,7 @@ def init_db():
         # Page Configuration : derniers tests et envois de notification
         "ALTER TABLE global_config ADD COLUMN notification_state_json TEXT DEFAULT '{}'",
         "ALTER TABLE global_config ADD COLUMN event_keys_version INTEGER DEFAULT 0",
+        "ALTER TABLE analyses ADD COLUMN reused_from INTEGER",
         # Interrupteur général de la surveillance
         "ALTER TABLE global_config ADD COLUMN monitoring_paused BOOLEAN DEFAULT 0",
         "ALTER TABLE global_config ADD COLUMN monitoring_paused_at DATETIME",

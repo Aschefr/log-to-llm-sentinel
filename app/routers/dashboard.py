@@ -144,6 +144,7 @@ def _analysis_dict(a: Analysis, rule_name: str, recurrence: dict) -> dict:
         "rule_name": rule_name or f"Règle #{a.rule_id}",
         "triggered_line": a.triggered_line,
         "ollama_response": a.ollama_response,
+        "reused_from": a.reused_from,
         "severity": a.severity,
         "detection_id": a.detection_id,
         "viewed": a.viewed,

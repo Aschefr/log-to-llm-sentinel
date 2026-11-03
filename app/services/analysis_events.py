@@ -21,6 +21,12 @@ REKEY_BATCH = 1000
 # Un événement qui continue ne notifie plus, mais ne se fait pas oublier non plus
 NOTIFY_REMINDER_HOURS = 6
 _CLOSED = ("resolved", "false_positive")
+# Une répétition reprend le verdict précédent. L'IA relit l'événement après 5 min, puis 10, 20, 40 et 60 tant que son
+# verdict ne change pas : un événement qui évolue reste suivi de près, un événement stable ne l'occupe plus.
+REANALYZE_MIN_MINUTES = 5
+REANALYZE_MAX_MINUTES = 60
+REANALYZE_MEMORY_HOURS = 24
+REANALYZE_LOOKBACK = 500
 
 
 def event_signatures(lines: List[str]) -> set:
@@ -83,6 +89,37 @@ def rekey(db):
             note.signatures_json = json.dumps(sorted(found[1]), ensure_ascii=False)
     config.event_keys_version = EVENT_KEY_VERSION
     db.commit()
+
+
+def reanalyze_delay(real_analyses: List[Analysis]) -> timedelta:
+    """Délai avant de solliciter à nouveau l'IA, selon le nombre de verdicts identiques d'affilée (le plus récent d'abord)."""
+    stable = 0
+    for a in real_analyses:
+        if a.severity != real_analyses[0].severity:
+            break
+        stable += 1
+    return timedelta(minutes=min(REANALYZE_MAX_MINUTES, REANALYZE_MIN_MINUTES * 2 ** max(stable - 1, 0)))
+
+
+def reusable_analysis(db, rule_id: int, lines: List[str], now: Optional[datetime] = None) -> Optional[Analysis]:
+    """L'analyse dont le verdict vaut encore pour ces lignes, ou rien s'il faut demander à l'IA : événement nouveau,
+    incident clos depuis, analyse précédente échouée, note ajoutée depuis (l'IA doit en tenir compte), délai écoulé."""
+    now = now or datetime.utcnow()
+    key = key_of(event_signatures(lines))
+    rows = db.query(Analysis).filter(Analysis.rule_id == rule_id, Analysis.event_key == key,
+                                     Analysis.analyzed_at >= now - timedelta(hours=REANALYZE_MEMORY_HOURS)) \
+        .order_by(Analysis.analyzed_at.desc(), Analysis.id.desc()).limit(REANALYZE_LOOKBACK).all()
+    if not rows or rows[0].resolution_status in _CLOSED:
+        return None
+    real = [a for a in rows if a.reused_from is None]
+    if not real or (real[0].ollama_response or "").startswith("[Erreur"):
+        return None
+    last = real[0]
+    if now - last.analyzed_at >= reanalyze_delay(real):
+        return None
+    if db.query(EventNote).filter(EventNote.rule_id == rule_id, EventNote.updated_at > last.analyzed_at).first():
+        return None
+    return last
 
 
 def notification_decision(db, analysis: Analysis, now: Optional[datetime] = None) -> Tuple[bool, int]:

@@ -727,7 +727,8 @@
     "note_err_too_long": "This note is over 500 characters.",
     "note_err_limit": "This rule has reached 30 notes: delete one first.",
     "note_scope_an_event": "One event",
-    "ago_now": "just now"
+    "ago_now": "just now",
+    "analysis_reused": "Same event: analysis reused, with no new AI call."
   },
   "meta": {
     "title": "Meta-analysis",

@@ -237,6 +237,7 @@ class Analysis(Base):
     exclude_from_mttr = Column(Boolean, default=False)
     event_key = Column(String, nullable=True)  # Empreinte des signatures de ses lignes : même clé, même événement
     feedback = Column(String, nullable=True)  # 'irrelevant' : signalée « pas pertinente » par l'utilisateur
+    reused_from = Column(Integer, nullable=True)  # Répétition : verdict repris de cette analyse, sans appel à l'IA
 
 
 class ResolutionVerdict(Base):

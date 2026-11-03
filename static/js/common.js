@@ -510,6 +510,7 @@ function renderAnalysisCard(a, opts = {}) {
                 ${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')}
             </div>` : ''}
             <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
+            ${a.reused_from ? `<p class="form-hint analysis-reused">${_t('common.analysis_reused', 'Même événement : analyse reprise, sans nouvel appel à l’IA.')}</p>` : ''}
             <div class="analysis-response markdown-body">${a.ollama_response ? renderMarkdown(a.ollama_response) : ''}</div>
             ${resolutionBlock}
             ${ev ? eventNotesHtml(ev, a.id) : ''}
