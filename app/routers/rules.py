@@ -354,10 +354,7 @@ async def create_rule(rule_data: RuleCreate):
         # (pilote automatique : toujours, et la session définit aussi le reste de la règle)
         session_id = None
         if rule_data.autopilot or (rule_data.learn_history and rule.keyword_tuning_mode != "off"):
-            try:
-                session_id = kls.start_session(rule.id, "history", 168)
-            except Exception:
-                session_id = None
+            session_id = kls.start_setup_session(rule.id)
         return {"id": rule.id, "message": "Règle créée", "learning_session_id": session_id}
     finally:
         db.close()
@@ -373,6 +370,7 @@ async def update_rule(rule_id: int, rule_data: RuleUpdate):
 
         if rule_data.name is not None:
             rule.name = rule_data.name
+        source_changed = rule_data.log_file_path is not None and rule_data.log_file_path != rule.log_file_path
         if rule_data.log_file_path is not None:
             rule.log_file_path = rule_data.log_file_path
         old_keywords, old_excluded = rule.get_keywords(), rule.get_excluded_patterns()
@@ -441,13 +439,14 @@ async def update_rule(rule_id: int, rule_data: RuleUpdate):
                 start_autopilot = True
             else:
                 ap.disable(rule)
+        # Nouvelle source sous pilote automatique : tout ce qu'il a appris portait sur l'ancienne
+        if source_changed and ap.enabled(rule):
+            ap.set_state(rule, status="learning", session_id=None, observe_until=None, error=None)
+            start_autopilot = True
 
         db.commit()
         if start_autopilot:
-            try:
-                kls.start_session(rule.id, "history", 168)
-            except Exception:
-                pass
+            kls.start_setup_session(rule.id)
 
         # Recharger les règles Syslog
         try:
@@ -469,9 +468,18 @@ def delete_rule(rule_id: int):
         if not rule:
             raise HTTPException(status_code=404, detail="rule_not_found")
         db.delete(rule)
-        db.query(KeywordChange).filter(KeywordChange.rule_id == rule_id).delete()
-        db.query(KeywordTemplate).filter(KeywordTemplate.rule_id == rule_id).delete()
+        # L'identifiant peut resservir : rien de cette règle ne doit rester pour la suivante
+        for model in (Analysis, ResolutionVerdict, KeywordChange, KeywordTemplate):
+            db.query(model).filter(model.rule_id == rule_id).delete()
+        kls.delete_rule_sessions(db, rule_id)
         db.commit()
+        if resolution_service:
+            resolution_service._alert_states.pop(rule_id, None)
+        if keyword_tuning:
+            keyword_tuning._stats.pop(rule_id, None)
+            keyword_tuning._templates.pop(rule_id, None)
+        if orchestrator:
+            orchestrator._buffers.pop(rule_id, None)
 
         # Recharger les règles Syslog
         try:

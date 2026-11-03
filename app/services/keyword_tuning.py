@@ -424,6 +424,8 @@ def autopilot_due_refresh(rule: Rule) -> Optional[bool]:
         return True
     if data.get("status") == "error" and data.get("error") != "cancelled" and since("attempt_at") >= AUTOPILOT_RETRY_H:
         return False
+    if data.get("status") == "learning" and not data.get("session_id"):  # la session n'a jamais pu démarrer
+        return False
     return None
 
 

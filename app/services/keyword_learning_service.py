@@ -272,10 +272,12 @@ def start_session(rule_id: int, mode: str = "history", hours: int = 168, refresh
         rule = db.query(Rule).filter(Rule.id == rule_id).first()
         if not rule:
             raise ValueError("rule_not_found")
-        running = db.query(KeywordLearningSession).filter(KeywordLearningSession.rule_id == rule_id,
-                                                          KeywordLearningSession.status.in_(ACTIVE)).first()
-        if running:
-            return running.id
+        for running in db.query(KeywordLearningSession).filter(KeywordLearningSession.rule_id == rule_id,
+                                                               KeywordLearningSession.status.in_(ACTIVE)).all():
+            if running.log_file_path == rule.log_file_path:
+                return running.id
+            # La source de la règle a changé : cette session lirait l'ancienne et appliquerait le résultat à la règle
+            running.status, running.error_message = "error", "Source de la règle modifiée"
         now = datetime.utcnow()
         start, end = (now - timedelta(hours=hours), now) if mode == "history" else (now, now + timedelta(hours=hours))
         summary = {}
@@ -307,6 +309,22 @@ def start_session(rule_id: int, mode: str = "history", hours: int = 168, refresh
     _launch(session_id)
     app_logger.info("KeywordLearning", f"Session {session_id} ({mode}, {hours} h) lancée pour la règle {rule_id}")
     return session_id
+
+
+def start_setup_session(rule_id: int) -> Optional[int]:
+    """Session demandée à la création ou à l'activation du pilote : un échec n'empêche pas d'enregistrer la règle,
+    mais il doit se voir dans les logs."""
+    try:
+        return start_session(rule_id, "history", 168)
+    except Exception as e:
+        app_logger.error("KeywordLearning", f"Session impossible à lancer pour la règle {rule_id} : {e}")
+        return None
+
+
+def delete_rule_sessions(db, rule_id: int):
+    """Une règle supprimée emporte ses sessions : son identifiant peut resservir, et une session en attente se
+    réveillerait alors sur la nouvelle règle. Sans sa ligne, la tâche en cours s'arrête à sa prochaine vérification."""
+    db.query(KeywordLearningSession).filter(KeywordLearningSession.rule_id == rule_id).delete()
 
 
 def _launch(session_id: int):

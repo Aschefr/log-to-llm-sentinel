@@ -21,6 +21,8 @@ All notable changes to this project will be documented in this file.
 - **E-mail notifications** now escape the log line, the AI's answer, keywords and the rule's name.
 
 ### Fixed
+- **Deleting a rule** now also deletes its analyses, resolution history and learning sessions. Its number can be reused: a rule created afterwards could inherit them, and a pending autopilot session prevented its setup, then applied the deleted rule's source to it.
+- **Changing a rule's source**: a learning session still running on the old source is stopped, and a rule on autopilot starts learning again from the new source. A rule on autopilot whose setup could not start now retries by itself.
 - **Autopilot**: an event repeating all day (e.g. Docker Desktop's `event streamer: error: EOF`, every 10 seconds) no longer sends an analysis to the AI every 30 seconds nor keeps the rule in alert: once its last 3 analyses are rated `info`, it is only analyzed again every 6 hours.
 - **Dashboard**: the automatic refresh no longer closes the analysis being read, nor reloads the list from the start. The list is usable on a phone and with the keyboard (an analysis card opens with a real button, on every page).
 - Markdown rendering no longer depends on a CDN: without internet access the analyses list stopped displaying altogether. The library is now served by the application, with its version pinned.
