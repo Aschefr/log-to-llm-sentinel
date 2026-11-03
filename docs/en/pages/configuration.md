@@ -47,12 +47,11 @@ A setting is saved when you leave its field (or press Enter), and the result sho
 * **Ollama URL**: The access endpoint of your Ollama instance (default: `http://host.docker.internal:11434` for Docker hosts).
 * **Model Selection**: Dropdown list populated dynamically by queries to Ollama.
 * **Model (Manual Override)**: Text field to specify a model manually (e.g., `llama3:latest`).
-* **System Prompt**: Default diagnostic prompt sent to Ollama for all rule triggers.
-* **Performance Settings**:
-  * *Temperature*: Creativity slider (0.0 = deterministic, 1.0 = creative).
-  * *Context size*: Context window limits (e.g., `4096` tokens).
-  * *Quick Profiles*: Setup templates (Eco, Balanced, GPU/Gamer) to quickly adjust temperature/tokens.
-* **Model Management (Download)**: Enter a model tag (e.g., `gemma2:2b`) and click **Download** to pull a new model onto the host.
+* **Which model to choose**: three [recommended models](../features/recommended-models.md), with their memory and speed as measured. One click selects a model if it is installed, otherwise prepares its download.
+* **Download a model**: enter any model tag and click **Download** to pull it onto the host.
+* **Context**: 8K to 128K, 32K recommended. Meta-analyses and the chat use the same value, which also avoids reloading the model.
+
+The temperature is set to 0.2 and analyses are written in the site's language: the study behind these recommendations settled both, so there is nothing to adjust.
 
 ---
 

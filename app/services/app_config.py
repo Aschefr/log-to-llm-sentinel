@@ -3,6 +3,16 @@ from typing import Optional
 from app.database import SessionLocal
 from app.models import GlobalConfig
 
+# Mesurés sur de vraies alertes : voir docs/en/features/recommended-models.md
+ANALYSIS_TEMPERATURE = 0.2
+DEFAULT_CTX = 32768
+MIN_CTX = 8192   # le plus gros échange mesuré : 5 900 tokens de prompt et 990 de réponse
+MAX_CTX = 131072
+
+
+def clamp_ctx(value: int) -> int:
+    return max(MIN_CTX, min(MAX_CTX, int(value)))
+
 
 def config_to_dict(config: Optional[GlobalConfig]) -> dict:
     """Source unique de la configuration (LLM + notifications) sous forme de dict, avec valeurs par défaut."""
@@ -16,10 +26,9 @@ def config_to_dict(config: Optional[GlobalConfig]) -> dict:
         "smtp_ssl_mode": config.smtp_ssl_mode if config else "starttls",
         "ollama_url": config.ollama_url if config and config.ollama_url else "http://ollama:11434",
         "ollama_model": config.ollama_model if config and config.ollama_model else "gemma4:e4b",
-        "ollama_temp": config.ollama_temp if config and config.ollama_temp is not None else 0.1,
-        "ollama_ctx": config.ollama_ctx if config and config.ollama_ctx else 4096,
+        "ollama_temp": ANALYSIS_TEMPERATURE,
+        "ollama_ctx": config.ollama_ctx if config and config.ollama_ctx else DEFAULT_CTX,
         "ollama_think": config.ollama_think if config and config.ollama_think is not None else True,
-        "system_prompt": config.system_prompt if config else "",
         "notification_method": config.notification_method if config else "smtp",
         "apprise_url": config.apprise_url if config else "",
         "apprise_tags": config.apprise_tags if config else "",
@@ -48,6 +57,6 @@ def load_config_dict() -> dict:
 
 def llm_options(config: dict, **overrides) -> dict:
     """Options Ollama standard. Garder le même num_ctx partout évite qu'Ollama recharge le modèle."""
-    opts = {"temperature": config.get("ollama_temp", 0.1), "num_ctx": config.get("ollama_ctx", 4096)}
+    opts = {"temperature": ANALYSIS_TEMPERATURE, "num_ctx": config.get("ollama_ctx", DEFAULT_CTX)}
     opts.update(overrides)
     return opts

@@ -47,7 +47,7 @@ def _records_test(method: str):
 
 
 # Alias conservé pour les appelants existants (une seule définition, complète : voir app_config)
-from app.services.app_config import config_to_dict as _get_config_dict
+from app.services.app_config import config_to_dict as _get_config_dict, clamp_ctx
 
 @router.post("/pull-model")
 async def pull_model(data: dict):
@@ -85,10 +85,8 @@ class ConfigUpdate(BaseModel):
     smtp_ssl_mode: Optional[str] = None
     ollama_url: Optional[str] = None
     ollama_model: Optional[str] = None
-    ollama_temp: Optional[float] = None
     ollama_ctx: Optional[int] = None
     ollama_think: Optional[bool] = None
-    system_prompt: Optional[str] = None
     notification_method: Optional[str] = None
     apprise_url: Optional[str] = None
     apprise_tags: Optional[str] = None
@@ -96,7 +94,6 @@ class ConfigUpdate(BaseModel):
     max_log_chars: Optional[int] = None
     monitor_log_lines: Optional[int] = None
     debug_mode: Optional[bool] = None
-    ollama_prompt_lang: Optional[str] = None  # 'fr' | 'en'
     site_lang: Optional[str] = None  # langue du site (header) pour notifications
     instance_name: Optional[str] = None  # nom de l'instance (multi-déploiement)
     discord_webhook_url: Optional[str] = None
@@ -133,10 +130,8 @@ def get_config():
             "smtp_ssl_mode": config.smtp_ssl_mode,
             "ollama_url": config.ollama_url,
             "ollama_model": config.ollama_model,
-            "ollama_temp": config.ollama_temp,
             "ollama_ctx": config.ollama_ctx,
             "ollama_think": config.ollama_think,
-            "system_prompt": config.system_prompt,
             "notification_method": config.notification_method,
             "apprise_url": config.apprise_url,
             "apprise_tags": config.apprise_tags,
@@ -190,14 +185,10 @@ async def update_config(config_data: ConfigUpdate):
             config.ollama_url = config_data.ollama_url
         if config_data.ollama_model is not None:
             config.ollama_model = config_data.ollama_model
-        if config_data.ollama_temp is not None:
-            config.ollama_temp = config_data.ollama_temp
         if config_data.ollama_ctx is not None:
-            config.ollama_ctx = config_data.ollama_ctx
+            config.ollama_ctx = clamp_ctx(config_data.ollama_ctx)
         if config_data.ollama_think is not None:
             config.ollama_think = config_data.ollama_think
-        if config_data.system_prompt is not None:
-            config.system_prompt = config_data.system_prompt
         if config_data.notification_method is not None:
             config.notification_method = config_data.notification_method
         if config_data.apprise_url is not None:
@@ -212,8 +203,6 @@ async def update_config(config_data: ConfigUpdate):
             config.monitor_log_lines = config_data.monitor_log_lines
         if config_data.debug_mode is not None:
             config.debug_mode = config_data.debug_mode
-        if config_data.ollama_prompt_lang is not None:
-            config.ollama_prompt_lang = config_data.ollama_prompt_lang
         if config_data.site_lang is not None:
             config.site_lang = config_data.site_lang
         if config_data.instance_name is not None:
@@ -258,6 +247,7 @@ def update_site_lang(data: dict):
             config = GlobalConfig()
             db.add(config)
         config.site_lang = lang
+        config.ollama_prompt_lang = lang  # les analyses suivent la langue du site
         db.commit()
         return {"ok": True, "site_lang": lang}
     finally:

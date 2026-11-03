@@ -57,7 +57,6 @@ Answer in English, using the requested JSON format:
 
 LABELS = {
     "fr": {
-        "admin_instructions": "Consignes de l'administrateur",
         "rule": "Règle surveillée",
         "name": "Nom",
         "source": "Source",
@@ -99,7 +98,6 @@ LABELS = {
         "turn_timeout": "*(Réponse interrompue : durée maximale du tour atteinte.)*",
     },
     "en": {
-        "admin_instructions": "Administrator instructions",
         "rule": "Monitored rule",
         "name": "Name",
         "source": "Source",

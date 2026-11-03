@@ -3,6 +3,14 @@ document.addEventListener('DOMContentLoaded', () => {
     setupForm();
     setupTests();
     setupOllamaModelSelect();
+    setupRecommendedModels();
+    const ctxInput = document.getElementById('ollama-ctx');
+    ctxInput?.addEventListener('input', syncCtxChips);
+    // Ce qui s'affiche est ce qui est enregistré : hors limites, le champ montre la valeur retenue
+    ctxInput?.addEventListener('change', () => {
+        if (ctxInput.value !== '') ctxInput.value = Math.min(131072, Math.max(8192, parseInt(ctxInput.value) || 32768));
+        syncCtxChips();
+    });
     setupAppriseTags();
     setupModelPulling();
     setupNotificationMethodToggle();
@@ -195,24 +203,67 @@ function setPullModel(name) {
     if (input) input.value = name;
 }
 
-function applyProfile(type) {
-    const temp = document.getElementById('ollama-temp');
-    const ctx = document.getElementById('ollama-ctx');
-    
-    if (type === 'eco') {
-        temp.value = 0.1;
-        ctx.value = 2048;
-    } else if (type === 'balanced') {
-        temp.value = 0.4;
-        ctx.value = 4096;
-    } else if (type === 'gpu') {
-        temp.value = 0.7;
-        ctx.value = 8192;
-    }
-    
-    // Déclencher l'auto-sauvegarde
-    temp.dispatchEvent(new Event('change'));
-    ctx.dispatchEvent(new Event('change'));
+/* Résultats de l'étude sur de vraies alertes, sur une RTX 3090 : voir docs/en/features/recommended-models.md */
+const RECOMMENDED_MODELS = [
+    { model: 'gemma4:e4b', tier: ['config.tier_minimum', 'Minimum'], memory: '3,2', seconds: 4 },
+    { model: 'gemma4:12b', tier: ['config.tier_recommended', 'Conseillé'], memory: '7,6', seconds: 6 },
+    { model: 'qwen3.8:27b', tier: ['config.tier_top', 'Top qualité'], memory: '16,3', seconds: 7 },
+];
+
+function installedModels() {
+    const select = document.getElementById('ollama-model');
+    return select ? [...select.options].map(o => o.value).filter(v => v && v !== '__custom__') : [];
+}
+
+function renderRecommendedModels() {
+    const box = document.getElementById('cfg-models');
+    if (!box) return;
+    const select = document.getElementById('ollama-model');
+    const installed = installedModels();
+    box.innerHTML = RECOMMENDED_MODELS.map(m => {
+        const isInstalled = installed.includes(m.model);
+        const current = select && select.value === m.model;
+        const state = !installed.length ? '' : isInstalled ? cfgT('config.model_installed', 'Installé') : cfgT('config.model_to_download', 'À télécharger');
+        const detail = cfgT('config.model_detail', '{gb} Go · {s} s par analyse').replace('{gb}', m.memory).replace('{s}', m.seconds);
+        return `<button type="button" class="cfg-status-item${current ? ' active' : ''}" data-model="${m.model}" aria-pressed="${Boolean(current)}">
+            <span class="cfg-status-text">
+                <span class="cfg-status-detail">${escapeHtml(cfgT(m.tier[0], m.tier[1]))}</span>
+                <strong class="mono">${escapeHtml(m.model)}</strong>
+                <span class="cfg-status-detail">${escapeHtml(detail)}${state ? ` · ${escapeHtml(state)}` : ''}</span>
+            </span>
+        </button>`;
+    }).join('');
+}
+
+function setupRecommendedModels() {
+    const box = document.getElementById('cfg-models');
+    const select = document.getElementById('ollama-model');
+    if (!box || !select) return;
+    box.addEventListener('click', e => {
+        const item = e.target.closest('[data-model]');
+        if (!item) return;
+        if (installedModels().includes(item.dataset.model)) {
+            select.value = item.dataset.model;
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        } else {
+            setPullModel(item.dataset.model);
+            document.getElementById('pull-model-btn').focus();
+        }
+        renderRecommendedModels();
+    });
+    select.addEventListener('change', renderRecommendedModels);
+    // La liste arrive d'Ollama après l'ouverture de la page, et change après un téléchargement
+    new MutationObserver(renderRecommendedModels).observe(select, { childList: true });
+    renderRecommendedModels();
+}
+
+function syncCtxChips() {
+    const value = Number(document.getElementById('ollama-ctx')?.value);
+    document.querySelectorAll('#ctx-chips .chip').forEach(chip => {
+        const active = Number(chip.dataset.ctx) === value;
+        chip.classList.toggle('active', active);
+        chip.setAttribute('aria-pressed', String(active));
+    });
 }
 
 function setupModelPulling() {
@@ -308,7 +359,6 @@ async function loadConfig() {
         document.getElementById('ollama-url').value = config.ollama_url || 'http://host.docker.internal:11434';
         // Model select is populated async; keep desired value to apply later.
         window.__desiredOllamaModel = config.ollama_model || 'llama3';
-        document.getElementById('system-prompt').value = config.system_prompt || '';
         const methodEl = document.getElementById('notification-method');
         methodEl.value = config.notification_method || 'smtp';
         if (!methodEl.value) methodEl.value = 'smtp';  // valeur inconnue en base : ne jamais afficher un choix vide
@@ -321,10 +371,8 @@ async function loadConfig() {
         document.getElementById('max-log-chars').value = config.max_log_chars || 5000;
         document.getElementById('monitor-log-lines').value = config.monitor_log_lines || 60;
         document.getElementById('instance-name').value = config.instance_name || '';
-        document.getElementById('ollama-temp').value = config.ollama_temp || 0.1;
-        document.getElementById('ollama-ctx').value = config.ollama_ctx || 4096;
-        const promptLangEl = document.getElementById('ollama-prompt-lang');
-        if (promptLangEl) promptLangEl.value = config.ollama_prompt_lang || 'fr';
+        document.getElementById('ollama-ctx').value = config.ollama_ctx || 32768;
+        syncCtxChips();
         window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) debugEl.checked = config.debug_mode === true;
@@ -610,7 +658,6 @@ async function saveConfig() {
         smtp_tls: document.getElementById('smtp-ssl-mode').value === 'starttls',
         ollama_url: document.getElementById('ollama-url').value,
         ollama_model: chosenModel,
-        system_prompt: document.getElementById('system-prompt').value,
         notification_method: document.getElementById('notification-method').value,
         apprise_url: document.getElementById('apprise-url').value,
         apprise_tags: (document.getElementById('apprise-tags-select').value === '__custom__') 
@@ -622,10 +669,8 @@ async function saveConfig() {
         discord_webhook_url: document.getElementById('discord-webhook-url') ? document.getElementById('discord-webhook-url').value : '',
         max_log_chars: parseInt(document.getElementById('max-log-chars').value) || 5000,
         monitor_log_lines: parseInt(document.getElementById('monitor-log-lines').value) || 60,
-        ollama_temp: parseFloat(document.getElementById('ollama-temp').value) || 0.1,
-        ollama_ctx: parseInt(document.getElementById('ollama-ctx').value) || 4096,
+        ollama_ctx: Math.min(131072, Math.max(8192, parseInt(document.getElementById('ollama-ctx').value) || 32768)),
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
-        ollama_prompt_lang: (document.getElementById('ollama-prompt-lang') || {}).value || 'fr',
         instance_name: document.getElementById('instance-name') ? document.getElementById('instance-name').value : '',
         auto_delete_analyses: document.getElementById('auto-delete-analyses') ? document.getElementById('auto-delete-analyses').checked : false,
         syslog_enabled: document.getElementById('syslog-enabled') ? document.getElementById('syslog-enabled').checked : false,
@@ -698,6 +743,7 @@ window.setOllamaCtx = function(val) {
     const el = document.getElementById('ollama-ctx');
     if (el) {
         el.value = val;
+        syncCtxChips();
         // Trigger auto-save
         el.dispatchEvent(new Event('change'));
     }

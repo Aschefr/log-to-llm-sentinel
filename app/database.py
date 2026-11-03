@@ -150,6 +150,13 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS ix_analyses_rule_event ON analyses (rule_id, event_key)",
     ]
 
+    migrations += [
+        # Sous ce minimum, les plus grosses alertes seraient coupées
+        "UPDATE global_config SET ollama_ctx = 8192 WHERE ollama_ctx < 8192",
+        # La langue des analyses suit désormais celle du site
+        "UPDATE global_config SET ollama_prompt_lang = site_lang WHERE site_lang IS NOT NULL AND site_lang != ''",
+    ]
+
     with engine.connect() as conn:
         for sql in migrations:
             try:

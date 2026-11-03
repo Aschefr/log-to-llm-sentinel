@@ -668,8 +668,6 @@ class ResolutionService:
         parts.append("\n".join(l[:500] for l in context_lines[-30:]) if context_lines else resolution_label(lang, "no_recent"))
 
         system = RESOLUTION_SYSTEM.get(lang, RESOLUTION_SYSTEM["fr"])
-        if (config.get("system_prompt") or "").strip():
-            system = f"{config['system_prompt'].strip()}\n\n{system}"
         return [{"role": "system", "content": system}, {"role": "user", "content": "\n".join(parts)}]
 
     async def _validate_with_ai(self, db, rule: Rule, trigger: str, context_lines: List[str],

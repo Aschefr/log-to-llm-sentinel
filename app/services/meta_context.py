@@ -18,7 +18,10 @@ from app.utils.log_utils import line_signature
 SEVERITY_RANK = {"info": 0, "warning": 1, "critical": 2}
 # Garde-fou mémoire, pas un réglage : le regroupement par événement et le budget de contexte font le vrai tri
 MAX_ANALYSES = 5000
-CHARS_PER_TOKEN = 3.0
+# Mesuré sur de vraies méta-analyses (66 498 caractères pour 27 330 tokens) : au-dessus, Ollama couperait le début sans le dire
+CHARS_PER_TOKEN = 2.4
+REPLY_RESERVE_TOKENS = 2048  # réponse la plus longue mesurée : 1 571 tokens
+THINK_RESERVE_TOKENS = 4096
 
 
 def _rule_ids(config: MetaAnalysisConfig) -> list:
@@ -138,24 +141,32 @@ def render_context(agg: dict, period_start: datetime, period_end: datetime, lang
     if agg["silent_rules"]:
         parts.append(meta_label(lang, "silent", names=", ".join(agg["silent_rules"])))
 
+    # Si tout ne tient pas : les plus graves d'abord, et le plus grave de chaque règle avant le suivant d'une autre.
+    # Une règle bavarde ne peut plus prendre toute la place et cacher une panne signalée par une autre.
     used = sum(len(p) for p in parts)
     omitted_groups = omitted_alerts = 0
-    for pr in agg["per_rule"]:
-        header = _render_rule_header(pr, lang)
+    rules = agg["per_rule"]
+    headers = [_render_rule_header(pr, lang) for pr in rules]
+    queue = []
+    for ri, pr in enumerate(rules):
         groups = sorted(pr["groups"].values(),
                         key=lambda g: (-max(SEVERITY_RANK.get(a.severity, 0) for a in g["analyses"]), -len(g["analyses"])))
-        block = [header]
-        for g in groups:
-            text = _render_group(g, lang)
-            if used + sum(len(b) + 1 for b in block) + len(text) > budget_chars:
-                omitted_groups += 1
-                omitted_alerts += len(g["analyses"])
-                continue
-            block.append(text)
-        if len(block) > 1:
-            text = "\n".join(block)
-            parts.append(text)
-            used += len(text)
+        for gi, g in enumerate(groups):
+            queue.append((-max(SEVERITY_RANK.get(a.severity, 0) for a in g["analyses"]), gi, ri, g))
+    queue.sort(key=lambda item: item[:3])
+    kept = {ri: [] for ri in range(len(rules))}
+    for _, gi, ri, g in queue:
+        text = _render_group(g, lang)
+        cost = len(text) + 1 + (0 if kept[ri] else len(headers[ri]) + 2)
+        if used + cost > budget_chars:
+            omitted_groups += 1
+            omitted_alerts += len(g["analyses"])
+            continue
+        kept[ri].append((gi, text))
+        used += cost
+    for ri in range(len(rules)):
+        if kept[ri]:
+            parts.append("\n".join([headers[ri]] + [text for _, text in sorted(kept[ri], key=lambda item: item[0])]))
     if omitted_groups:
         parts.append(meta_label(lang, "omitted", groups=omitted_groups, alerts=omitted_alerts))
     return "\n\n".join(parts)
@@ -169,7 +180,7 @@ class SimpleText:
 
 
 def budget_for(context_size: int, think: bool) -> int:
-    reserve = 4096 + (4096 if think else 0)
+    reserve = REPLY_RESERVE_TOKENS + (THINK_RESERVE_TOKENS if think else 0)
     return max(4000, int(((context_size or 8192) - reserve) * CHARS_PER_TOKEN))
 
 

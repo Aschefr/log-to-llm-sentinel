@@ -44,60 +44,17 @@
             </div>
 
             <div class="rp-card">
-                <h2 data-i18n="config.ollama_analyses">Analyses</h2>
-                {% call field('ollama-prompt-lang', 'config.ollama_prompt_lang_label', 'Langue des analyses Ollama', 'config.ollama_prompt_lang_hint', "Langue utilisée dans les prompts d'analyse de logs et de méta-analyse.") %}
-                    <select id="ollama-prompt-lang"><option value="fr">Français</option><option value="en">English</option></select>
-                {% endcall %}
-                {% call field('system-prompt', 'config.system_prompt', 'Prompt système', 'config.system_prompt_hint', "S'ajoute aux consignes de chaque analyse d'alerte.") %}
-                    <textarea id="system-prompt" rows="4" data-i18n-placeholder="config.system_prompt_placeholder" placeholder="Instructions système pour l'analyse..."></textarea>
-                {% endcall %}
-                {% call field('max-log-chars', 'config.max_log_chars', 'Limite de caractères par log', 'config.max_log_chars_hint', 'Évite de saturer le serveur avec des logs massifs.', row_class='cfg-row--short') %}
-                    <input type="number" id="max-log-chars" value="5000" min="500" max="50000">
-                {% endcall %}
-            </div>
-
-            <div class="rp-card">
-                <h2 data-i18n="config.performance_title">Réglages de performance</h2>
-                {% call field('ollama-temp', 'config.temperature', 'Température', 'config.temperature_hint', 'Bas = direct, Haut = créatif.', row_class='cfg-row--short') %}
-                    <input type="number" id="ollama-temp" step="0.1" min="0" max="1">
-                {% endcall %}
-                {% call field('ollama-ctx', 'config.context_tokens', 'Contexte (tokens)', 'config.context_hint', 'Taille de la mémoire contextuelle.', row_class='cfg-row--short') %}
-                    <input type="number" id="ollama-ctx" step="1024" min="1024" max="32768">
-                    <div class="preset-chips">
-                        <button type="button" class="chip" onclick="setOllamaCtx(2048)">2K</button>
-                        <button type="button" class="chip" onclick="setOllamaCtx(4096)">4K</button>
-                        <button type="button" class="chip" onclick="setOllamaCtx(8192)">8K</button>
-                        <button type="button" class="chip" onclick="setOllamaCtx(16384)">16K</button>
-                        <button type="button" class="chip" onclick="setOllamaCtx(32768)">32K</button>
-                    </div>
-                {% endcall %}
-                <div class="cfg-row">
-                    <div class="cfg-row-label"><span class="cfg-label" data-i18n="config.quick_profiles">Profils rapides :</span></div>
-                    <div class="cfg-row-control cfg-buttons">
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('eco')" data-i18n="config.profile_eco">Profil Éco (Petit CPU)</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('balanced')" data-i18n="config.profile_balanced">Profil Équilibré</button>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="applyProfile('gpu')" data-i18n="config.profile_gpu">Profil GPU / Gamer</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="rp-card">
-                <h2 data-i18n="config.models_title">Gestion des modèles</h2>
+                <h2 data-i18n="config.models_title">Quel modèle choisir</h2>
+                <p class="form-hint cfg-models-intro" data-i18n="config.models_intro">Mesurés sur de vraies alertes, avec une carte RTX 3090. Un clic choisit le modèle s'il est installé, sinon prépare son téléchargement.</p>
+                <div class="cfg-status cfg-models" id="cfg-models" role="group" aria-label="Modèles conseillés" data-i18n-aria-label="config.models_title"></div>
                 <div class="cfg-row">
                     <div class="cfg-row-label">
-                        <label for="pull-model-name" data-i18n="config.download_model">Télécharger un nouveau modèle</label>
-                        <p class="form-hint" data-i18n-html="config.download_hint">Plus le modèle est gros, plus il nécessite de VRAM (GPU) ou de RAM système disponible, mais plus ses réponses seront pertinentes et précises.</p>
+                        <label for="pull-model-name" data-i18n="config.download_model">Télécharger un modèle</label>
                     </div>
                     <div class="cfg-row-control form-group">
                         <div class="cfg-input-action">
-                            <input type="text" id="pull-model-name" class="mono" spellcheck="false" data-no-save data-i18n-placeholder="config.download_placeholder" placeholder="ex: llama3.2">
+                            <input type="text" id="pull-model-name" class="mono" spellcheck="false" data-no-save data-i18n-placeholder="config.download_placeholder" placeholder="ex: gemma4:12b">
                             <button type="button" id="pull-model-btn" class="btn btn-primary btn-sm" data-i18n="config.download_btn">Télécharger</button>
-                        </div>
-                        <div class="preset-chips">
-                            <button type="button" class="chip" onclick="setPullModel('qwen3.5:2b')">Qwen 3.5 - 2b (2.7GB)</button>
-                            <button type="button" class="chip" onclick="setPullModel('qwen3.5:4b')">Qwen 3.5 - 4b (3.4GB)</button>
-                            <button type="button" class="chip" onclick="setPullModel('gemma4:e2b')">Gemma 4 - e2b (7.2GB)</button>
-                            <button type="button" class="chip" onclick="setPullModel('gemma4:e4b')">Gemma 4 - e4b (9.6GB)</button>
                         </div>
                         <div id="pull-progress-container" class="hidden">
                             <div class="cfg-progress"><div id="pull-progress-bar"></div></div>
@@ -105,6 +62,23 @@
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div class="rp-card">
+                <h2 data-i18n="config.ollama_analyses">Analyses</h2>
+                {% call field('ollama-ctx', 'config.context_tokens', 'Contexte (tokens)', 'config.context_hint', "8K suffit aux alertes. 32K coûte à peine plus de mémoire et laisse tenir de longues méta-analyses entières.", row_class='cfg-row--short') %}
+                    <input type="number" id="ollama-ctx" step="1024" min="8192" max="131072">
+                    <div class="preset-chips" id="ctx-chips">
+                        <button type="button" class="chip" data-ctx="8192" onclick="setOllamaCtx(8192)">8K</button>
+                        <button type="button" class="chip" data-ctx="16384" onclick="setOllamaCtx(16384)">16K</button>
+                        <button type="button" class="chip" data-ctx="32768" onclick="setOllamaCtx(32768)" data-i18n="config.ctx_recommended">32K (conseillé)</button>
+                        <button type="button" class="chip" data-ctx="65536" onclick="setOllamaCtx(65536)">64K</button>
+                        <button type="button" class="chip" data-ctx="131072" onclick="setOllamaCtx(131072)">128K</button>
+                    </div>
+                {% endcall %}
+                {% call field('max-log-chars', 'config.max_log_chars', 'Limite de caractères par log', 'config.max_log_chars_hint', 'Évite de saturer le serveur avec des logs massifs.', row_class='cfg-row--short') %}
+                    <input type="number" id="max-log-chars" value="5000" min="500" max="50000">
+                {% endcall %}
             </div>
         </section>
 
@@ -438,6 +412,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=12"></script>
+<script src="/static/js/config.js?v=13"></script>
 <script src="/static/js/diagnostics_config.js?v=4"></script>
 {% endblock %}

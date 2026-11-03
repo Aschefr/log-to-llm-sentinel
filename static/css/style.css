@@ -3233,11 +3233,15 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 .cfg-disk-value { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .cfg-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 .cfg-check { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.86rem; cursor: pointer; min-height: 1.75rem; }
+.cfg-models-intro { margin: 0; max-width: 75ch; }
+.cfg-status.cfg-models { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cfg-models .mono { overflow-wrap: anywhere; }
+.chip.active { color: var(--text-primary); border-color: var(--accent); background: rgba(59, 130, 246, 0.14); }
 .diag-card { background: var(--bg-card); }
 .diag-intro { margin: 0; max-width: 75ch; }
 #diagnostics-section .diag-grid { width: 100%; align-items: start; }
 @media (max-width: 1080px) { .cfg-status { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 560px) { .cfg-status { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .cfg-status { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cfg-status.cfg-models { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) {
     .cfg-row { grid-template-columns: minmax(0, 1fr); }
     .cfg-row--toggle { grid-template-columns: minmax(0, 1fr) auto; }

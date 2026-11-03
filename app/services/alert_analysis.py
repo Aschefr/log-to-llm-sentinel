@@ -167,8 +167,6 @@ def build_alert_messages(rule: Rule, events_text: str, matched_keywords: Optiona
                          config: dict, now: datetime, notes: Optional[List[dict]] = None) -> List[dict]:
     lang = config.get("ollama_prompt_lang", "fr")
     system = ALERT_SYSTEM.get(lang, ALERT_SYSTEM["fr"])
-    if (config.get("system_prompt") or "").strip():
-        system = f"## {label(lang, 'admin_instructions')}\n{config['system_prompt'].strip()}\n\n{system}"
 
     events = f"## {label(lang, 'events')}\n"
     if matched_keywords:
