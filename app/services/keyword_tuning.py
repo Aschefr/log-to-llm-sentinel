@@ -65,6 +65,9 @@ _JSON_LEVEL = re.compile(r'"(?:level|severity|lvl|level_name)"\s*:\s*"?([A-Za-z]
 _LEVEL_TOKEN = re.compile(r"(?:^|[\s\[(<|\"'=:])(error|err|fatal|crit|critical|emerg|emergency|severe|panic)(?=$|[\s\])>|\"':,])",
                           re.IGNORECASE)
 _ERROR_LEVEL_NAMES = {"error", "err", "fatal", "critical", "crit", "emerg", "emergency", "alert", "severe", "panic"}
+# CEF (UniFi, pare-feu, SIEM) : CEF:version|éditeur|produit|version|id|nom|sévérité|… Le standard classe 7-8 High, 9-10 Very-High
+_CEF = re.compile(r"CEF:\d+\|(?:[^|]*\|){3}[^|]*\|([^|]*)\|([^|]*)\|")
+CEF_HIGH_SEVERITY = 7
 # Mots d'échec (sans « warning » : trop fréquent pour signaler à lui seul un angle mort)
 _FAILURE_WORDS = re.compile(
     r"\b(fail(ed|ure|s|ing)?|errors?|denied|refused|time[ds]?[ -]?out|unable|cannot|can't|could not|exception|fatal|"
@@ -72,8 +75,22 @@ _FAILURE_WORDS = re.compile(
     r"out of memory|unhealthy|degraded|corrupt(ed)?|échec|erreur|refusé|impossible)\b", re.IGNORECASE)
 
 
+def cef_event(line: str) -> Optional[tuple]:
+    """(nom de l'événement, sévérité) d'une ligne CEF. Sévérité None si elle n'est pas lisible."""
+    m = _CEF.search(line)
+    if not m:
+        return None
+    value = m.group(2).strip().lower()
+    if value.isdigit():
+        return m.group(1).strip(), int(value)
+    return m.group(1).strip(), {"low": 2, "medium": 5, "high": 8, "very-high": 10}.get(value)
+
+
 def error_level(line: str) -> bool:
-    """La ligne porte un niveau d'erreur explicite (syslog ≤ 3, JSON level, jeton ERROR/FATAL…)."""
+    """La ligne porte un niveau d'erreur explicite (syslog ≤ 3, CEF ≥ 7, JSON level, jeton ERROR/FATAL…)."""
+    cef = cef_event(line)
+    if cef:  # la sévérité de l'événement fait foi, pas les mots de son texte
+        return cef[1] is not None and cef[1] >= CEF_HIGH_SEVERITY
     m = _SYSLOG_PRI.match(line)
     if m and int(m.group(1)) % 8 <= 3:
         return True
@@ -573,7 +590,8 @@ def build_arbiter_messages(lang: str, rule: Rule, blind: List[dict], noise: List
         for i, c in enumerate(blind, 1):
             parts.append(L("blind_item", n=i, count=c["count"], per_day=c["per_day"],
                            first=f"{c['first']:%Y-%m-%d}" if c.get("first") else "?",
-                           last=f"{c['last']:%Y-%m-%d}" if c.get("last") else "?"))
+                           last=f"{c['last']:%Y-%m-%d}" if c.get("last") else "?")
+                         + (" " + L("event_mark") if c.get("kind") == "event" else ""))
             for ex in c["examples"][:2]:
                 parts.append(L("example", example=clean_log_line(ex)[:400]))
     else:

@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - **Autopilot setup journey** on the rule overview: the steps (source connected, history read or observation with its remaining time, the AI describes the log, the AI picks the keywords, rhythm of the source, rule ready) are ticked as the background work progresses, with what was found or set at each step. Shown until the rule is ready, then for 24 hours.
 - **Detected syslog sources**: with the Syslog source, the rule form lists the hosts that sent lines in the last 7 days (line count, last message), refreshed every 5 seconds; one click fills the hostname. Hosts already followed by a rule are shown as such.
 - **Notes for the AI**: add a note on an event or on a whole source to tell the AI what the logs cannot (the operating system, a part just replaced, a known cause). Notes go with the next alert analyses, the chat, investigations, the keyword arbiter, the autopilot description of the log and the meta-analysis. A note never silences an alert: the AI must say so if the lines contradict it. Notes stay when analyses are deleted and are part of backups. A rule's Analyses tab lists them.
+- **Autopilot on event sources**: sources that only tell what happens (UniFi Network, audit logs) have no error lines, so the autopilot found nothing to watch. It now reads the CEF severity and reviews their events itself, the user does not need to know what deserves an analysis. A rule left with no keyword says so instead of claiming to be ready.
 - **Watchdog**: if the application's main loop stops responding for more than 5 seconds, the logs show where it is stuck (once per stall), to diagnose an unresponsive interface.
 
 ### Changed
@@ -27,6 +28,7 @@ All notable changes to this project will be documented in this file.
 - **E-mail notifications** now escape the log line, the AI's answer, keywords and the rule's name.
 
 ### Fixed
+- **Autopilot description of a log**: it no longer judges events as normal or usual noise. The keyword arbiter then quoted that unproven judgment to ignore the same lines.
 - **Syslog receiver**: every change in Configuration restarted it, even an unrelated one, which could lose packets. It now restarts only when its own settings change.
 - **Notification record**: an alert was marked as notified even when sending had failed.
 - **Quick profiles** in Configuration raised an error after applying the values.

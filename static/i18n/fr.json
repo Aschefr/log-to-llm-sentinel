@@ -122,7 +122,8 @@
     "filter_unread": "Non lues",
     "history_none": "Les analyses apparaîtront ici dès qu'une règle se déclenchera.",
     "history_none_filter": "Aucune analyse pour ce filtre.",
-    "attention_unknown": "Impossible de savoir ce qui est à traiter pour le moment."
+    "attention_unknown": "Impossible de savoir ce qui est à traiter pour le moment.",
+    "pilot_no_trigger": "Ne surveille que le silence"
   },
   "rules": {
     "title": "Gestion des Règles",
@@ -1200,7 +1201,8 @@
     "origin_autopilot": "Pilote auto",
     "notes_intro": "L'IA reçoit ces notes avec les alertes de cette source. Une note ne fait jamais taire une alerte, et elle reste quand les analyses sont supprimées.",
     "notes_empty": "Aucune note pour le moment.",
-    "notes_add": "Ajouter une note sur toute la source"
+    "notes_add": "Ajouter une note sur toute la source",
+    "ap_step_keywords_none": "Rien à analyser pour l'instant : la règle ne surveille que le silence de la source. Nouvelle lecture du journal chaque semaine."
   },
   "diag": {
     "title": "Diagnostic (lecture seule)",

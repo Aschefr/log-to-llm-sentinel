@@ -122,7 +122,8 @@
     "filter_unread": "Unread",
     "history_none": "Analyses will appear here as soon as a rule triggers.",
     "history_none_filter": "No analysis for this filter.",
-    "attention_unknown": "Cannot tell what needs attention right now."
+    "attention_unknown": "Cannot tell what needs attention right now.",
+    "pilot_no_trigger": "Only watches for silence"
   },
   "rules": {
     "title": "Rule Management",
@@ -1200,7 +1201,8 @@
     "origin_autopilot": "Autopilot",
     "notes_intro": "The AI receives these notes with this source's alerts. A note never silences an alert, and it stays when analyses are deleted.",
     "notes_empty": "No notes yet.",
-    "notes_add": "Add a note on the whole source"
+    "notes_add": "Add a note on the whole source",
+    "ap_step_keywords_none": "Nothing to analyze for now: the rule only watches for the source going silent. The log is read again every week."
   },
   "diag": {
     "title": "Diagnostics (read-only)",

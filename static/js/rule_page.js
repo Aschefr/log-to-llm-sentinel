@@ -216,8 +216,10 @@ function autopilotJourneyHtml(j) {
     step('profile', profiled ? 'done' : refining ? 'active' : 'todo', T('rule.ap_step_profile', 'L’IA décrit le journal'),
         profiled ? T('rule.ap_step_profile_done', 'Règle nommée « {name} », contexte rédigé.', { name: j.rule.name })
             : T('rule.ap_step_profile_todo', 'Elle lit un extrait du journal pour nommer la règle et décrire ce qui y est normal.'));
-    step('keywords', ready ? 'done' : refining && profiled ? 'active' : 'todo', T('rule.ap_step_keywords', 'L’IA choisit les mots-clés'),
-        ready ? T('rule.ap_step_keywords_done', '{k} mot(s)-clé(s), {x} exclusion(s).', { k: j.rule.keywords, x: j.rule.exclusions })
+    const noTrigger = ready && !j.rule.keywords;
+    step('keywords', noTrigger ? 'warn' : ready ? 'done' : refining && profiled ? 'active' : 'todo', T('rule.ap_step_keywords', 'L’IA choisit les mots-clés'),
+        noTrigger ? T('rule.ap_step_keywords_none', 'Rien à analyser pour l’instant : la règle ne surveille que le silence de la source. Nouvelle lecture du journal chaque semaine.')
+        : ready ? T('rule.ap_step_keywords_done', '{k} mot(s)-clé(s), {x} exclusion(s).', { k: j.rule.keywords, x: j.rule.exclusions })
             : T('rule.ap_step_keywords_todo', 'Les lignes qui méritent une alerte, vérifiées sur les vraies lignes du journal.'));
     step('rhythm', ready ? 'done' : 'todo', T('rule.ap_step_rhythm', 'Rythme de la source'),
         ready ? T('rule.ap_step_rhythm_done', 'Regroupement des lignes sur {s} s · alerte si la source se tait plus de {h} h · notifications à partir de {sev}.', { s: j.rule.anti_spam_delay, h: j.rule.inactivity_period_hours, sev: j.rule.notify_severity_threshold })

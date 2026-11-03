@@ -330,6 +330,7 @@ function activityText(a) {
 
 function pilotStatus(r) {
     const line = r.last_line_at ? dT('dashboard.pilot_last_line', 'dernière ligne il y a {d}', { d: dSince(r.last_line_at) }) : dT('dashboard.pilot_no_line', 'aucune ligne reçue');
+    if (r.no_trigger && r.status === 'active') return { dot: 'rp-dot--warn', text: dT('dashboard.pilot_no_trigger', 'Ne surveille que le silence') };
     if (r.status === 'observing') return { dot: 'rp-dot--warn', text: `${dT('dashboard.pilot_observing', 'En observation jusqu’à {t}', { t: dWhen(r.observe_until) })} · ${line}` };
     if (r.status === 'learning') return { dot: 'rp-dot--warn', text: dT('dashboard.pilot_learning', 'Lecture de l’historique') };
     if (r.status === 'error') return { dot: 'rp-dot--alert', text: dT('dashboard.pilot_error', 'En échec') };

@@ -419,6 +419,12 @@ Angles morts — lignes d'erreur qu'aucun mot-clé n'attrape. Pour chaque modèl
 - Un même événement produit souvent plusieurs lignes (cause, code de sortie, conséquence) : un seul mot-clé suffit, sur la ligne la plus explicite ;
   ignore les autres modèles de cet événement, et ceux déjà couverts par un mot-clé que tu ajoutes.
 
+Événements — les modèles marqués [événement] n'ont pas de niveau d'erreur : la source raconte ce qui se passe (audit, sécurité, réseau).
+L'utilisateur ne sait pas forcément ce qui mérite une analyse, c'est à toi de le décider :
+- add_keyword pour ce qu'un responsable voudrait faire vérifier : menace de sécurité (même bloquée), changement de configuration,
+  appareil ou lien perdu, compte ou droit modifié.
+- ignore pour la routine : connexions et déconnexions de clients, accès habituels, activité répétée sans conséquence.
+
 Bruit — mots-clés qui déclenchent surtout des alertes de faible importance. Pour chaque mot-clé :
 - keep si des alertes restent utiles et qu'aucune exclusion ne sépare proprement les lignes inutiles.
 - add_exclusion si un groupe de lignes inutiles se distingue : l'exclusion est une partie exacte et constante de ces lignes, absente des lignes utiles.
@@ -441,6 +447,12 @@ Blind spots — error lines that no keyword catches. For each template T:
 - One event often produces several lines (cause, exit code, consequence): one keyword is enough, on the most explicit line;
   ignore the other templates of that event, and those already covered by a keyword you add.
 
+Events — templates marked [event] have no error level: the source tells what happens (audit, security, network).
+The user does not necessarily know what deserves an analysis, so it is up to you to decide:
+- add_keyword for what a person in charge would want checked: security threat (even blocked), configuration change,
+  lost device or link, changed account or permission.
+- ignore routine: clients connecting and disconnecting, usual access, repeated activity without consequence.
+
 Noise — keywords that mostly trigger low-importance alerts. For each keyword:
 - keep if some alerts are still useful and no exclusion cleanly separates the useless lines.
 - add_exclusion if a group of useless lines stands out: the exclusion is an exact, constant part of those lines, absent from the useful ones.
@@ -462,6 +474,7 @@ KEYWORD_LABELS = {
         "period": "Période observée : {period}",
         "blind_title": "=== Angles morts : lignes d'erreur qu'aucun mot-clé n'attrape ===",
         "blind_item": "T{n} ×{count} (≈ {per_day} par jour, du {first} au {last})",
+        "event_mark": "[événement]",
         "noise_title": "=== Bruit : mots-clés à examiner ===",
         "noise_item": "Mot-clé « {keyword} » : {alerts} alerte(s) sur 30 jours ({severities}), {irrelevant} signalée(s) « pas pertinente » par l'utilisateur ; ≈ {per_day} ligne(s) par jour.",
         "noise_lines": "  Lignes déclenchées :",
@@ -478,6 +491,7 @@ KEYWORD_LABELS = {
         "period": "Observed period: {period}",
         "blind_title": "=== Blind spots: error lines that no keyword catches ===",
         "blind_item": "T{n} ×{count} (≈ {per_day} per day, from {first} to {last})",
+        "event_mark": "[event]",
         "noise_title": "=== Noise: keywords to review ===",
         "noise_item": "Keyword \"{keyword}\": {alerts} alert(s) over 30 days ({severities}), {irrelevant} flagged \"not relevant\" by the user; ≈ {per_day} line(s) per day.",
         "noise_lines": "  Triggered lines:",
@@ -506,15 +520,17 @@ AUTOPILOT_PROFILE_SYSTEM = {
     "fr": """Tu prépares une règle de surveillance de logs à partir d'un extrait du journal.
 Réponds avec :
 - name : un nom court et parlant pour la règle (2 à 5 mots, ex. « Nextcloud — serveur web », « Système Debian »).
-- application_context : 2 à 4 phrases qui décrivent ce que contient ce journal (système, application, services présents)
-  et ce qui y est normal (messages récurrents attendus, tâches planifiées, bruit habituel). Ce texte aidera ensuite l'IA
-  à juger chaque alerte : sois factuel et appuie-toi uniquement sur les lignes fournies, sans inventer de services absents.""",
+- application_context : 2 à 4 phrases qui décrivent ce que contient ce journal (système, application, services présents,
+  types d'événements et tâches récurrentes). Ce texte aidera ensuite l'IA à juger chaque alerte, mais ce jugement ne t'appartient
+  pas : ne dis jamais qu'un événement est normal, bénin, sans gravité ou du bruit, et n'avance aucune cause. Sois factuel et
+  appuie-toi uniquement sur les lignes fournies, sans inventer de services absents.""",
     "en": """You set up a log monitoring rule from an excerpt of the log.
 Answer with:
 - name: a short, meaningful name for the rule (2 to 5 words, e.g. "Nextcloud — web server", "Debian system").
-- application_context: 2 to 4 sentences describing what this log contains (system, application, services present)
-  and what is normal in it (expected recurring messages, scheduled jobs, usual noise). This text will then help the AI
-  judge each alert: be factual and rely only on the lines provided, without inventing services that are not there.""",
+- application_context: 2 to 4 sentences describing what this log contains (system, application, services present,
+  types of events and recurring jobs). This text will then help the AI judge each alert, but that judgment is not yours to make:
+  never say an event is normal, benign, harmless or noise, and do not suggest causes. Be factual and rely only on the lines
+  provided, without inventing services that are not there.""",
 }
 
 AUTOPILOT_LABELS = {
@@ -523,6 +539,7 @@ AUTOPILOT_LABELS = {
         "period": "Période lue : {period}",
         "volume": "{lines} ligne(s), {templates} modèle(s) de ligne distincts",
         "user_context": "Contexte écrit par l'utilisateur (à garder en tête) : {context}",
+        "no_trigger": "Aucun événement de ce journal ne semble mériter une analyse pour l'instant : la règle ne surveille que le silence de la source. Le pilote réexaminera le journal chaque semaine.",
         "frequent_title": "=== Lignes les plus fréquentes (nombre, exemple) ===",
         "errors_title": "=== Lignes d'erreur ===",
         "line": "- ×{count} {example}",
@@ -532,6 +549,7 @@ AUTOPILOT_LABELS = {
         "period": "Period read: {period}",
         "volume": "{lines} line(s), {templates} distinct line template(s)",
         "user_context": "Context written by the user (keep it in mind): {context}",
+        "no_trigger": "No event in this log seems to deserve an analysis for now: the rule only watches for the source going silent. The autopilot will read the log again every week.",
         "frequent_title": "=== Most frequent lines (count, example) ===",
         "errors_title": "=== Error lines ===",
         "line": "- ×{count} {example}",

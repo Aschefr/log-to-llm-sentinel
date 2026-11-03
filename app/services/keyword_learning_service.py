@@ -39,6 +39,7 @@ MAX_SIGNATURES = 20000
 MAX_TIMES_PER_TEMPLATE = 300    # instants gardés par modèle d'erreur (rythme des alertes, pilote automatique)
 BLIND_MIN_COUNT = 2
 BLIND_MAX = 12
+EVENT_MAX_TEMPLATES = 40        # au-delà, un journal sans événements nommés ne se résume plus en quelques lignes
 NOISE_MAX = 8
 ACTIVE = ("pending", "scanning", "refining")
 
@@ -209,6 +210,28 @@ def scan(files: list, start: datetime, end: datetime, keywords: list, excluded: 
             "local_offset_h": local_offset.total_seconds() / 3600, "gaps": gaps}
 
 
+def event_candidates(result: dict, days: float, room: int) -> list:
+    """Lignes sans niveau d'erreur d'une source qui journalise surtout des événements (audit, sécurité, réseau). Elle
+    n'a peut-être aucune ligne d'erreur : l'arbitre doit quand même voir ce qu'elle raconte pour choisir ce qui mérite
+    une analyse. Les événements nommés (CEF) sont regroupés par nom ; sans nom, seulement si le journal reste lisible."""
+    others = [t for t in result["templates"].values() if t["status"] is None and not t["error_like"]]
+    groups = {}
+    for t in others:
+        cef = kt.cef_event(t["examples"][0]) if t["examples"] else None
+        if cef:
+            g = groups.setdefault(cef[0], {"count": 0, "examples": [], "signature": cef[0]})
+            g["count"] += t["count"]
+            g["examples"] = (g["examples"] + t["examples"])[:3]
+    if not groups and len(result["templates"]) <= EVENT_MAX_TEMPLATES:
+        for sig, t in result["templates"].items():
+            if t["status"] is None and not t["error_like"]:
+                groups[sig] = {"count": t["count"], "examples": t["examples"], "signature": sig}
+    ordered = sorted(groups.values(), key=lambda g: g["count"])  # les plus rares d'abord : la routine est la plus fréquente
+    return [{"template_id": None, "kind": "event", "signature": g["signature"], "count": g["count"], "examples": g["examples"],
+             "first": result["first"], "last": result["last"], "per_day": round(g["count"] / days, 1)}
+            for g in ordered[:room]]
+
+
 def scan_candidates(db, rule: Rule, result: dict, days: float):
     """Angles morts et mots-clés à examiner, au format de keyword_tuning.build_arbiter_messages."""
     templates = result["templates"]
@@ -217,6 +240,10 @@ def scan_candidates(db, rule: Rule, result: dict, days: float):
              for sig, t in templates.items()
              if t["status"] is None and t["error_like"] and t["count"] >= BLIND_MIN_COUNT]
     blind.sort(key=lambda c: c["count"], reverse=True)
+    blind = blind[:BLIND_MAX]
+    # Une règle du pilote sans mot-clé ne peut rien détecter : c'est à lui de trouver ce qui mérite une analyse
+    if ap.enabled(rule) and not rule.get_keywords() and len(blind) < BLIND_MAX:
+        blind += event_candidates(result, days, BLIND_MAX - len(blind))
 
     alerts = kt.alert_stats(db, rule)
     noise = []
@@ -235,7 +262,7 @@ def scan_candidates(db, rule: Rule, result: dict, days: float):
                       "per_day": round(hits / days, 1), "lines": lines, "important_lines": important[:300],
                       "focus": False, "hits": hits})
     noise.sort(key=lambda c: c["hits"], reverse=True)
-    return blind[:BLIND_MAX], noise[:NOISE_MAX]
+    return blind, noise[:NOISE_MAX]
 
 
 # ── Sessions ───────────────────────────────────────────────────────────────────────
@@ -504,9 +531,16 @@ async def _run_session(session_id: int):
                 ap.upgrade_state(rule)
                 if ap.apply_notification_threshold(db, rule):
                     ap_changes.append("notify_severity_threshold")
+                # Source d'événements : chaque ligne retenue est analysée, seules les conclusions sérieuses notifient
+                if rule.get_keywords() and any(c.get("kind") == "event" for c in blind) \
+                        and ap.set_value(rule, "notify_severity_threshold", "warning"):
+                    ap_changes.append("notify_severity_threshold")
+                no_trigger = not rule.get_keywords()
+                if no_trigger:
+                    ap.log_event(rule, ap.L_no_trigger(lang))
                 kt.dismiss_pending(db, rule)
                 now_iso = datetime.utcnow().isoformat()
-                ap.set_state(rule, status="active", observe_until=None, error=None, signatures=signatures,
+                ap.set_state(rule, status="active", observe_until=None, error=None, signatures=signatures, no_trigger=no_trigger,
                              profiled_at=now_iso if profile_messages else ap.load(rule).get("profiled_at"),
                              refreshed_at=now_iso)
                 if ap_changes:
@@ -525,11 +559,15 @@ async def _run_session(session_id: int):
             s.refine_rationale_json = json.dumps({c["value"]: c["reason"] for c in result_changes})
             db.commit()
             name, notify = rule.name, rule.notify_on_match
+            final_keywords = rule.get_keywords()
             ap_lines = _autopilot_lines(rule, ap_changes, lang)
         finally:
             db.close()
         fr = lang == "fr"
-        if autopilot and not summary.get("refresh"):
+        if autopilot and not final_keywords:
+            title = f"[Sentinel] 🧭 Pilote automatique — aucun événement à analyser : {name}" if fr else f"[Sentinel] 🧭 Autopilot — nothing to analyze: {name}"
+            ap_lines = ap_lines + [ap.L_no_trigger(lang)]
+        elif autopilot and not summary.get("refresh"):
             title = f"[Sentinel] 🧭 Pilote automatique — règle prête : {name}" if fr else f"[Sentinel] 🧭 Autopilot — rule ready: {name}"
         else:
             title = f"[Sentinel] 🎓 Apprentissage terminé — {name}" if fr else f"[Sentinel] 🎓 Learning done — {name}"

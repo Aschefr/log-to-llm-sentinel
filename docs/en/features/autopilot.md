@@ -20,7 +20,13 @@ The rule page shows *Autopilot · reading history* in its header, and the setup 
 
 A syslog host or a webhook that has not sent anything yet, or a log with less than 50 lines of history (or less than 500 lines over less than 6 hours), is **watched for 24 hours** first (the lines already there count too). The AI then sets up the rule as above. If nothing arrives, the observation starts over, up to 7 days.
 
-While the rule is not set up yet, it alerts on lines that carry an **explicit error level** (syslog priority error or worse, JSON `level`, `ERROR`/`FATAL`/`CRIT`…). These alerts show the keyword `[error level]`.
+While the rule is not set up yet, it alerts on lines that carry an **explicit error level** (syslog priority error or worse, CEF severity 7 or more, JSON `level`, `ERROR`/`FATAL`/`CRIT`…). These alerts show the keyword `[error level]`.
+
+### Sources that only report events
+
+Some sources have no error lines: they tell what happens (UniFi Network, audit logs). You do not need to know which events matter. When a rule has no keyword yet, the arbiter also reviews these events, and keeps what a person in charge would want checked, such as a security threat or a configuration change, not the routine such as clients connecting. Each kept line gets an analysis, and notifications start at `warning`.
+
+If nothing deserves an analysis, the rule says so instead of claiming to be ready: it then only watches for the source going silent, and the autopilot reads the log again every week.
 
 ## 3. Afterwards — nothing to approve
 

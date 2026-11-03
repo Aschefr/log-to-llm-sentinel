@@ -139,6 +139,10 @@ def changes_text(rule: Rule, fields: List[str], lang: str) -> str:
     return ("Réglages définis : " if fr else "Settings set: ") + ", ".join(parts)
 
 
+def L_no_trigger(lang: str) -> str:
+    return autopilot_label(lang, "no_trigger")
+
+
 def enabled(rule: Rule) -> bool:
     return bool(load(rule).get("enabled"))
 
@@ -154,7 +158,7 @@ def public(rule: Rule) -> dict:
     data = load(rule)
     return {"enabled": bool(data.get("enabled")), "status": data.get("status"), "managed": data.get("managed", []),
             "observe_until": data.get("observe_until"), "session_id": data.get("session_id"),
-            "profiled_at": data.get("profiled_at"), "error": data.get("error")}
+            "profiled_at": data.get("profiled_at"), "error": data.get("error"), "no_trigger": bool(data.get("no_trigger"))}
 
 
 def default_name(log_file_path: str) -> str:

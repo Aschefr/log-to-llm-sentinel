@@ -72,6 +72,7 @@ def _pilot(db, rules) -> dict:
             "rule_id": r.id,
             "rule_name": r.name,
             "status": state.get("status"),
+            "no_trigger": bool(state.get("no_trigger")),
             "observe_until": _utc(state.get("observe_until")),
             "last_line_at": rule_stats.iso(r.last_line_received_at),
         })
