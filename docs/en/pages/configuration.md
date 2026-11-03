@@ -44,6 +44,21 @@ Sentinel listens on UDP port 514 inside the container (mapped to host port 10514
 * **Forwarding Address (Relay)**: Enter an IP:Port to forward raw incoming Syslog packets to another destination (e.g., a secondary NAS or SIEM server).
 * **Copy Helpers**: Displays the host's LAN IP address and ports to quickly configure remote syslog clients (e.g., Unraid, routers, switches).
 
+### Sending UniFi logs to Sentinel
+UniFi has **two separate syslog settings**, and the first one alone does not send network events (seen on a UDM SE with UniFi Network 10.6):
+
+| Setting | Where | What it sends |
+|---|---|---|
+| **Activity Logging (Syslog)** | Settings > CyberSecure > Traffic Logging | UniFi Network events (WiFi clients, threats, internet failover) and device logs |
+| **System Logging / SIEM** | Integrations (Control Plane) | UniFi OS events only (admin logins, configuration changes). Its *Send Test Event* works even when no network event is sent. |
+
+To receive network events, in **Activity Logging (Syslog)** choose **SIEM Server**, enter Sentinel's address and syslog port (10514 by default), then select the contents:
+* **Keep**: Clients, Security Detections, Critical, Triggers, and the others you need. Access Points and Switches send few lines.
+* **Leave out at first**: **Firewall Default Policy** and **Gateway**. With them, one network sent about 800 lines per minute, mostly firewall lines and DNS queries, which also reveal what your devices visit.
+* **Leave unchecked**: Debug Logs and Netconsole. UniFi warns that debug logs greatly increase the volume and may contain sensitive information.
+
+The console uses **two host names**: `Dream Machine Special Edition` for UniFi OS events and `Dream-Machine-Special-Edition` for network events (from the console's name). Create the rule on the name with hyphens: the rule form lists the detected hosts.
+
 ---
 
 ## 4. Maintenance, Backup & Restore

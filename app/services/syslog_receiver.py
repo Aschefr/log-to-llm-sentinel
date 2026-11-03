@@ -20,6 +20,8 @@ SYSLOG_3164 = re.compile(r"^(?:<(\d+)>)?([A-Za-z]{3}\s+\d+\s+\d{2}:\d{2}:\d{2})\
 SYSLOG_5424 = re.compile(r"^<(\d+)>\d{1,2}\s+(\S+)\s+(\S+)\s+(.*)$")
 # Seconde date ISO après l'en-tête (UniFi : « Nov 02 17:48:08 2026-11-02T17:48:08.617Z Dream Machine … CEF:0|… »)
 _ISO_TS = re.compile(r"^\d{4}-\d{2}-\d{2}T\S+\s+")
+# Appareil UniFi sans date (ex. switch Flex) : « <30>USWFlex25G5 847848686ea3,USW-Flex-2.5G-5-IP: message »
+_UNIFI_NO_DATE = re.compile(r"^<\d+>(\S+)\s+([0-9a-fA-F]{12},\S+:\s.*)$")
 
 
 def parse_host(line: str) -> tuple:
@@ -31,7 +33,8 @@ def parse_host(line: str) -> tuple:
         return (host if host != "-" else "unknown"), m.group(4)
     m = SYSLOG_3164.match(line)
     if not m:
-        return "unknown", line
+        unifi = _UNIFI_NO_DATE.match(line)
+        return (unifi.group(1), unifi.group(2)) if unifi else ("unknown", line)
     rest = _ISO_TS.sub("", m.group(3), count=1)
     cef = rest.find("CEF:")
     if cef > 0:
