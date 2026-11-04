@@ -1164,6 +1164,7 @@
     "calm_fixed_short": "fixed, {d}",
     "edit_conditions": "Edit conditions",
     "timeline": "Incident timeline",
+    "timeline_more": "Show the {n} steps in between",
     "tl_opened": "Incident opened",
     "tl_analysis": "Analysis",
     "tl_next": "Next scheduled check",

@@ -769,7 +769,7 @@ async function renderResolution() {
     const timeline = inc ? `
     <section class="rp-card rp-timeline-card">
         <div class="rp-card-head"><h2>${esc(T('rule.timeline', 'Chronologie de l’incident'))}</h2></div>
-        <ol class="rp-timeline">${r.timeline.map(timelineItem).join('')}</ol>
+        <ol class="rp-timeline">${timelineItems(r.timeline)}</ol>
     </section>` : '';
 
     const suggestions = r.suggestions.length ? `
@@ -835,6 +835,17 @@ async function renderResolution() {
     </section>`;
 
     panel.innerHTML = `<div class="rp-row">${conditions}${timeline}</div>${patterns}${verdicts}`;
+}
+
+// A long incident keeps its start and its latest steps in view, the rest stays folded.
+const TIMELINE_EDGE = 5;
+function timelineItems(items) {
+    if (items.length <= TIMELINE_EDGE * 2 + 2) return items.map(timelineItem).join('');
+    const hidden = items.slice(TIMELINE_EDGE, -TIMELINE_EDGE);
+    return `${items.slice(0, TIMELINE_EDGE).map(timelineItem).join('')}
+        <li class="rp-tl-more"><details><summary>${esc(T('rule.timeline_more', 'Voir les {n} étapes intermédiaires', { n: hidden.length }))}</summary>
+            <ol class="rp-timeline">${hidden.map(timelineItem).join('')}</ol></details></li>
+        ${items.slice(-TIMELINE_EDGE).map(timelineItem).join('')}`;
 }
 
 function timelineItem(e) {

@@ -41,6 +41,8 @@ All notable changes to this project will be documented in this file.
 - **E-mail notifications** now escape the log line, the AI's answer, keywords and the rule's name.
 
 ### Fixed
+- **Phone display**: the Analyses tab of a rule ran off the screen and made the whole page scroll sideways. Fields no longer zoom the page on iPhone, buttons are easier to tap, the Rules page header is aligned, and the chat stays usable in landscape.
+- **Long incident timelines** took tens of screens: the steps between the first and the latest ones are now folded.
 - **Stop in the chat** only closed the page's connection while the model kept generating. It now really stops the model, and keeps what was already written, looked up or proposed.
 - **Regenerate in the chat** added a copy of your question to the conversation at each use.
 - **Chat language**: "same as the site" actually used French. Times in the chat were shown in UTC instead of local time. The Log Chat menu entry was not highlighted on its own page.

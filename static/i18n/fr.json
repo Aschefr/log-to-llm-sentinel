@@ -1164,6 +1164,7 @@
     "calm_fixed_short": "fixe, {d}",
     "edit_conditions": "Modifier les conditions",
     "timeline": "Chronologie de l'incident",
+    "timeline_more": "Voir les {n} étapes intermédiaires",
     "tl_opened": "Incident ouvert",
     "tl_analysis": "Analyse",
     "tl_next": "Prochaine vérification prévue",
