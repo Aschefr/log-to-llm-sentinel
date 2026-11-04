@@ -353,7 +353,7 @@ class MetaAnalysisService:
         body_html = f"""
         <h2>📊 {nt('meta_title', lang)} : {html.escape(config.name or '')}</h2>
         <p><strong>{nt('period', lang)}:</strong> du {result.period_start.strftime('%Y-%m-%d %H:%M')} au {result.period_end.strftime('%Y-%m-%d %H:%M')}</p>
-        <p><strong>{nt('events_analyzed', lang)}:</strong> {result.analyses_count}</p>
+        <p><strong>{nt('alerts_analyzed', lang)}:</strong> {result.analyses_count}</p>
         <hr/>
         <h3>{nt('ia_synthesis', lang)} :</h3>
         <blockquote>{html.escape(result.ollama_response or '')}</blockquote>
@@ -364,7 +364,7 @@ class MetaAnalysisService:
         if global_cfg.notification_method in ("apprise", "discord"):
             notify_body = f"""### 📊 {nt('meta_title', lang)} : {config.name}
 **{nt('period', lang)}:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
-**{nt('events_analyzed', lang)}:** {result.analyses_count}
+**{nt('alerts_analyzed', lang)}:** {result.analyses_count}
 
 **{nt('ia_synthesis', lang)}:**
 {result.ollama_response}
@@ -375,7 +375,7 @@ class MetaAnalysisService:
                 status = f" — {meta_label(lang, 'status_label')[result.status]}" if result.status else ""
                 notify_body = f"""### 📊 {nt('meta_title', lang)}{status} : {config.name}
 **{nt('period', lang)}:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
-**{nt('events_analyzed', lang)}:** {result.analyses_count}
+**{nt('alerts_analyzed', lang)}:** {result.analyses_count}
 
 **TL;DR :** {result.tldr}
 """
@@ -419,7 +419,7 @@ class MetaAnalysisService:
                 if not (isinstance(summary, str) and summary.startswith("[Erreur Ollama]")):
                     notify_body = f"""### 📊 {nt('meta_title', lang)} ({nt('summary_of_synthesis', lang)}) : {config.name}
 **{nt('period', lang)}:** {result.period_start.strftime('%Y-%m-%d %H:%M')} - {result.period_end.strftime('%Y-%m-%d %H:%M')}
-**{nt('events_analyzed', lang)}:** {result.analyses_count}
+**{nt('alerts_analyzed', lang)}:** {result.analyses_count}
 
 **{nt('summary_of_synthesis', lang)}:**
 {summary}

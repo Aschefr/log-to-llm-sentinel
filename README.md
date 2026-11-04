@@ -12,7 +12,7 @@ Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. 
   <img src="screenshots/log-to-llm-sentinel_dashboard.png" width="100%" alt="Dashboard Overview">
 </p>
 <p align="center">
-  <img src="screenshots/log-to-llm-sentinel_monitor.png" width="19%" alt="Real-time Monitor">
+  <img src="screenshots/log-to-llm-sentinel_rule.png" width="19%" alt="Rule Page">
   <img src="screenshots/log-to-llm-sentinel_chat.png" width="19%" alt="AI Chat Analysis">
   <img src="screenshots/log-to-llm-sentinel_meta_analysis.png" width="19%" alt="Meta Analysis">
   <img src="screenshots/log-to-llm-sentinel_rules.png" width="19%" alt="Rules Configuration">

@@ -942,7 +942,7 @@
     "meta_subject": "[Sentinel] Méta-Analyse : {config_name}",
     "meta_title": "Méta-Analyse Sentinel",
     "period": "Période",
-    "events_analyzed": "Événements analysés",
+    "alerts_analyzed": "Alertes analysées",
     "ia_synthesis": "Synthèse IA",
     "summary_of_synthesis": "Résumé de la synthèse",
     "full_synthesis_available": "*(Synthèse complète dans l'interface)*",
