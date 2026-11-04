@@ -25,6 +25,7 @@ from app.models import Analysis, Rule
 from app.utils.log_utils import line_signature
 from app.services.alert_analysis import render_notes
 from app.services.prompts import AUTOPILOT_PROFILE_SCHEMA, AUTOPILOT_PROFILE_SYSTEM, autopilot_label
+from app.services.log_guard import fence
 from app.services.log_source import source_type
 from app.utils import keyword_match
 from app.utils.log_utils import clean_log_line
@@ -294,10 +295,10 @@ def build_profile_messages(lang: str, rule: Rule, result: dict, period: str, not
     if notes:
         parts.append(render_notes(notes, lang, intro="notes_intro_facts"))
     parts.append("\n" + L("frequent_title"))
-    parts += [L("line", count=t["count"], example=clean_log_line(t["examples"][0])[:300]) for t in frequent]
+    parts.append(fence("\n".join(L("line", count=t["count"], example=clean_log_line(t["examples"][0])[:300]) for t in frequent)))
     if errors:
         parts.append("\n" + L("errors_title"))
-        parts += [L("line", count=t["count"], example=clean_log_line(t["examples"][0])[:300]) for t in errors]
+        parts.append(fence("\n".join(L("line", count=t["count"], example=clean_log_line(t["examples"][0])[:300]) for t in errors)))
     return [{"role": "system", "content": AUTOPILOT_PROFILE_SYSTEM.get(lang, AUTOPILOT_PROFILE_SYSTEM["fr"])},
             {"role": "user", "content": "\n".join(parts)}]
 

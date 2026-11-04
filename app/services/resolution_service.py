@@ -14,6 +14,7 @@ from app.services import monitoring
 from app.utils.notification_i18n import nt
 from app.services.alert_analysis import analysis_lines, short_summary, messages_to_text, _format_duration
 from app.services.app_config import config_to_dict, llm_options
+from app.services.log_guard import addresses_the_ai, fence
 from app.services.log_source import resolve_path, read_tail_lines
 from app.utils import keyword_match
 from app.services.prompts import RESOLUTION_SCHEMA, RESOLUTION_SYSTEM, resolution_label
@@ -659,7 +660,7 @@ class ResolutionService:
                 parts.append(f"- [{when} UTC] {(a.severity or 'info').upper()} : {short_summary(a)}")
 
         if resolution_patterns:
-            parts.append("\n" + resolution_label(lang, "check_pattern", pattern=resolution_patterns[0], line=(resolution_line or "")[:500]))
+            parts.append("\n" + resolution_label(lang, "check_pattern", pattern=resolution_patterns[0], line=fence((resolution_line or "")[:500])))
         else:
             parts.append("\n" + resolution_label(lang, "check_timeout", minutes=self.required_calm_minutes(rule, state)))
         count = state.get("lines_since_error")
@@ -669,7 +670,7 @@ class ResolutionService:
                                           result=resolution_label(lang, "probe_ok" if state["probe"]["ok"] else "probe_ko")))
 
         parts.append("\n" + resolution_label(lang, "recent"))
-        parts.append("\n".join(l[:500] for l in context_lines[-30:]) if context_lines else resolution_label(lang, "no_recent"))
+        parts.append(fence("\n".join(l[:500] for l in context_lines[-30:])) if context_lines else resolution_label(lang, "no_recent"))
 
         system = RESOLUTION_SYSTEM.get(lang, RESOLUTION_SYSTEM["fr"])
         return [{"role": "system", "content": system}, {"role": "user", "content": "\n".join(parts)}]
@@ -677,6 +678,9 @@ class ResolutionService:
     async def _validate_with_ai(self, db, rule: Rule, trigger: str, context_lines: List[str],
                                 resolution_patterns: List[str] = None, resolution_line: str = None) -> dict:
         """Demande a Ollama un verdict structure de retour a la normale."""
+        if addresses_the_ai([resolution_line or ""] + list(context_lines or [])):
+            logger.warning("ResolutionService", f"Ligne de log adressee a l'IA pour '{rule.name}' : pas de resolution automatique par l'IA.")
+            return {"resolved": False, "confidence": 0, "explanation": "Une ligne de log s'adresse à l'IA : verdict automatique refusé."}
         try:
             config = config_to_dict(db.query(GlobalConfig).first())
             if not self.orchestrator:

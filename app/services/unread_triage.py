@@ -13,6 +13,7 @@ from app.services.alert_analysis import analysis_lines, short_summary
 from app.services.app_config import load_config_dict
 from app.services.prompts import TRIAGE_SCHEMA, TRIAGE_SYSTEM, triage_label
 from app.services.rule_stats import iso
+from app.services.log_guard import fence
 from app.utils.log_utils import clean_log_line
 
 BATCH_EVENTS = 15
@@ -66,7 +67,7 @@ def build_messages(db, lang: str, events: List[dict]) -> list:
         if e["flagged"]:
             facts.append(L("flagged"))
         block = [" — ".join(facts), L("summary", text=short_summary(a, 300))]
-        block += [L("line", text=clean_log_line(line)[:300]) for line in analysis_lines(a)[:3]]
+        block += [L("line", text=fence(clean_log_line(line)[:300])) for line in analysis_lines(a)[:3]]
         block += [L("note", text=" ".join(note["text"].split())[:300]) for note in event_notes.for_analysis(db, a, limit=3)]
         parts.append("\n".join(block))
     head = [L("rule_context", text=text) for text in contexts.values()]

@@ -12,6 +12,7 @@ from sqlalchemy import desc
 
 from app.models import Analysis, Rule
 from app.services import log_source
+from app.services.log_guard import addresses_the_ai, fence
 from app.services.prompts import ALERT_SYSTEM, label
 from app.utils.log_utils import line_signature
 
@@ -146,7 +147,7 @@ def _render_context(context: dict, n: int, lang: str) -> str:
     body = list(context.get("before") or [])
     body += context.get("between") or [label(lang, "context_gap")]
     body += context.get("after") or []
-    return f"## {label(lang, 'context', n=n)}\n" + "\n".join(body)
+    return f"## {label(lang, 'context', n=n)}\n" + fence("\n".join(body))
 
 
 def _shrink_context(context: dict) -> dict:
@@ -168,10 +169,9 @@ def build_alert_messages(rule: Rule, events_text: str, matched_keywords: Optiona
     lang = config.get("ollama_prompt_lang", "fr")
     system = ALERT_SYSTEM.get(lang, ALERT_SYSTEM["fr"])
 
-    events = f"## {label(lang, 'events')}\n"
+    events_head = f"## {label(lang, 'events')}\n"
     if matched_keywords:
-        events += f"{label(lang, 'keywords')} : {', '.join(matched_keywords)}\n"
-    events += events_text
+        events_head += f"{label(lang, 'keywords')} : {', '.join(matched_keywords)}\n"
 
     # Budget : contexte total moins une réserve pour la réponse (et le raisonnement s'il est actif)
     reserve = 2048 + (2048 if config.get("ollama_think", True) else 0)
@@ -181,8 +181,10 @@ def build_alert_messages(rule: Rule, events_text: str, matched_keywords: Optiona
     # Les notes passent avant l'historique et le contexte, sans priver l'analyse de ses lignes
     notes_block = render_notes(notes, lang, max_chars=max(800, remaining // 3))
     remaining -= len(notes_block)
-    if len(events) > remaining - 200:
-        events = events[:max(500, remaining - 200)] + "…"
+    events_room = max(500, remaining - 200 - len(events_head))
+    if len(events_text) > events_room:
+        events_text = events_text[:events_room] + "…"
+    events = events_head + fence(events_text)
     remaining -= len(events)
 
     sections = [rule_block, events]
@@ -269,6 +271,22 @@ def render_alert_markdown(data: dict, lang: str) -> str:
     if isinstance(data.get("confidence"), int):
         parts.append(f"*{label(lang, 'confidence')} : {data['confidence']} %*")
     return "\n\n".join(parts)
+
+
+def guard_log_instruction(parsed: dict, lines: List[str], lang: str) -> dict:
+    """Une ligne qui cherche à influencer l'IA ne fait pas baisser la gravité, et la personne qui lit l'alerte en est prévenue.
+    log_instruction ne vaut True que pour le détecteur : le signal du modèle se trompe parfois, il ne doit pas forcer de notification."""
+    detected = addresses_the_ai(lines)
+    if not (detected or (parsed.get("data") or {}).get("log_manipulation") is True):
+        return {**parsed, "log_instruction": False}
+    severity = "warning" if parsed["severity"] == "info" else parsed["severity"]
+    data = {**parsed["data"], "severity": severity} if parsed.get("data") else parsed.get("data")
+    notice = label(lang, "log_instruction")
+    markdown, summary = parsed["markdown"], parsed.get("summary")
+    if not (summary or markdown).startswith(notice):
+        markdown = f"**{notice}**\n\n{markdown}"
+        summary = f"{notice} {summary}"[:500] if summary else summary
+    return {**parsed, "severity": severity, "data": data, "markdown": markdown, "summary": summary, "log_instruction": detected}
 
 
 def parse_alert_response(content: str, lang: str) -> dict:
