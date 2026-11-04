@@ -29,6 +29,7 @@ from app.database import SessionLocal
 from app.models import Analysis, GlobalConfig, KeywordChange, KeywordTemplate, Rule
 from app.services.alert_analysis import messages_to_text, render_notes
 from app.services.app_config import config_to_dict, llm_options
+from app.services.log_guard import addresses_the_ai, fence
 from app.services.prompts import KEYWORD_ARBITER_SCHEMA, KEYWORD_ARBITER_SYSTEM, keyword_label
 from app.utils import keyword_match
 from app.utils.log_utils import clean_log_line, line_signature
@@ -596,7 +597,7 @@ def build_arbiter_messages(lang: str, rule: Rule, blind: List[dict], noise: List
                            last=f"{c['last']:%Y-%m-%d}" if c.get("last") else "?")
                          + (" " + L("event_mark") if c.get("kind") == "event" else ""))
             for ex in c["examples"][:2]:
-                parts.append(L("example", example=clean_log_line(ex)[:400]))
+                parts.append(L("example", example=fence(clean_log_line(ex)[:400])))
     else:
         parts.append(L("nothing"))
 
@@ -609,7 +610,7 @@ def build_arbiter_messages(lang: str, rule: Rule, blind: List[dict], noise: List
                 parts.append(L("noise_lines"))
                 for g in c["lines"]:
                     parts.append(L("noise_line", count=g["count"], severity=_fmt_sev(dict(g["severities"])),
-                                   example=clean_log_line(g["example"])[:300]))
+                                   example=fence(clean_log_line(g["example"])[:300])))
     else:
         parts.append(L("nothing"))
     return [{"role": "system", "content": KEYWORD_ARBITER_SYSTEM.get(lang, KEYWORD_ARBITER_SYSTEM["fr"])},
@@ -780,6 +781,9 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
         evidence = {"alerts": cand["alerts"], "severities": sev, "irrelevant": cand["irrelevant"],
                     "per_day": cand["per_day"], "examples": [g["example"] for g in cand["lines"][:3]]}
         decided = item.get("decision")
+        if decided in ("remove_keyword", "add_exclusion") and addresses_the_ai(g["example"] for g in cand["lines"]):
+            logger.warning("KeywordTuning", f"'{rule.name}' : ligne adressée à l'IA, « {kw} » reste surveillé.")
+            continue
         if decided == "remove_keyword":
             hold = None
             if conf < AUTO_CONFIDENCE:

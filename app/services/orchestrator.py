@@ -13,7 +13,7 @@ from app.services.notification_service import NotificationService
 from app.services.app_config import config_to_dict, llm_options
 from app.services import event_notes
 from app.services.alert_analysis import (build_history, build_alert_messages, messages_to_text,
-                                         parse_alert_response, detect_severity)
+                                         parse_alert_response, detect_severity, guard_log_instruction)
 from app.services.log_source import find_context
 from app.services.prompts import ALERT_SCHEMA, label
 from app.utils.log_utils import clean_log_line, aggregate_lines, line_signature
@@ -254,6 +254,8 @@ class Orchestrator:
             parsed = {"markdown": markdown, "severity": "info", "summary": None, "data": None}
         else:
             parsed = parse_alert_response(res["content"], lang)
+        context_lines = [l for key in ("before", "between", "after") for l in (context or {}).get(key) or []]
+        parsed = guard_log_instruction(parsed, raw_lines["lines"] + context_lines, lang)
         logger.debug("Orchestrator", f"Réponse Ollama reçue : {parsed['markdown'][:200]}")
         logger.add_ollama_log(messages_to_text(messages), parsed["markdown"], detection_id)
         return {"events_text": events_text, "context": context, "messages": messages, **parsed}
@@ -274,13 +276,16 @@ class Orchestrator:
 
     def reused_result(self, raw_lines: dict, prior: Analysis, config: dict) -> dict:
         """Le verdict d'une analyse précédente, pour une répétition du même événement."""
+        lang = config.get("ollama_prompt_lang", "fr")
         return {
             "events_text": self.bundle_lines(raw_lines["lines"], raw_lines["total"], raw_lines.get("window_s", 0),
-                                             config.get("max_log_chars", 5000), config.get("ollama_prompt_lang", "fr")),
-            "markdown": prior.ollama_response,
-            "severity": prior.severity,
-            "summary": prior.summary,
-            "data": json.loads(prior.analysis_json) if prior.analysis_json else None,
+                                             config.get("max_log_chars", 5000), lang),
+            **guard_log_instruction({
+                "markdown": prior.ollama_response,
+                "severity": prior.severity,
+                "summary": prior.summary,
+                "data": json.loads(prior.analysis_json) if prior.analysis_json else None,
+            }, raw_lines["lines"], lang),
             "messages": None,
             "context": None,
         }
@@ -313,7 +318,8 @@ class Orchestrator:
 
         # 6. Notifier
         should_notify = rule.notify_on_match
-        if should_notify and getattr(rule, "notify_severity_threshold", "info"):
+        # Une ligne qui s'adresse à l'IA est signalée quel que soit le seuil : c'est peut-être une alerte qu'on essaie de taire
+        if should_notify and getattr(rule, "notify_severity_threshold", "info") and not result.get("log_instruction"):
             severity_levels = {"info": 0, "warning": 1, "critical": 2}
             sev_val = severity_levels.get(severity, 0)
             threshold_val = severity_levels.get(rule.notify_severity_threshold, 0)
