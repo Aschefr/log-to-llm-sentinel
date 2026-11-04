@@ -18,7 +18,8 @@ from app.services.orchestrator import Orchestrator
 from app.services.app_config import config_to_dict
 from app.services import rule_stats
 from app.services.probe_service import run_probe, PROBE_TYPES
-from app.services.log_source import count_lines, resolve_path
+from app.services import connected_sources
+from app.services.log_source import count_lines, parse_connected, resolve_path
 from app.utils.log_utils import clean_log_line
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
@@ -221,6 +222,7 @@ def rules_overview():
                 "inactivity_period_hours": r.inactivity_period_hours,
                 "muted": rule_stats.is_muted(r, now),
                 "autopilot": ap.public(r),
+                "source_status": connected_sources.manager.status(r.id),
             })
         # En alerte d'abord, puis règles actives par dernière alerte, désactivées à la fin
         items.sort(key=lambda i: (not i["enabled"], i["alert_status"] == "normal",
@@ -921,6 +923,8 @@ def download_rule_log(rule_id: int):
             hostname = path_str.split(":", 1)[1]
             data_dir = os.environ.get("SENTINEL_DATA_DIR", "/app/data")
             target_path = Path(data_dir) / "syslog" / f"{hostname}.log"
+        elif parse_connected(path_str):
+            target_path = resolve_path(path_str)
         else:
             target_path = _resolve_under_roots(path_str)
             

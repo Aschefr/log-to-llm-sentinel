@@ -60,6 +60,7 @@
             <summary><span data-i18n="common.notes_title">Notes pour l'IA</span> <span class="rule-notes-count">0</span></summary>
             <div class="rule-notes-body">
                 <p class="form-hint" data-i18n="rule.notes_intro">L'IA reçoit chaque note avec les alertes qu'elle concerne. Une note ne fait jamais taire une alerte, et elle reste quand les analyses sont supprimées.</p>
+            <p class="form-hint" id="rp-source-status" role="status"></p>
                 <p class="rp-muted rule-notes-empty" data-i18n="rule.notes_empty">Aucune note pour le moment.</p>
                 <ul class="event-notes-list"></ul>
                 <button type="button" class="btn btn-secondary btn-sm rule-notes-add" onclick="openRuleNoteForm(this)" data-i18n="rule.notes_add">Ajouter une note sur toutes les alertes de cette règle</button>
@@ -76,7 +77,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/rule_form.js?v=8"></script>
-<script src="/static/js/rule_page.js?v=14"></script>
+<script src="/static/js/source_connections.js?v=2"></script>
+<script src="/static/js/rule_form.js?v=9"></script>
+<script src="/static/js/rule_page.js?v=15"></script>
 <script src="/static/js/rule_keywords.js?v=5"></script>
 {% endblock %}

@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Docker logs as a source**: follow a container's logs through the read-only Docker proxy, with no file to mount. Reading resumes where it stopped after a restart of Sentinel or of the container.
+- **Home Assistant as a source**: Sentinel reads its log directly with a long-lived access token, with no automation to install, and stack traces arrive whole.
+- **MQTT as a source**: follow the topics of an MQTT server (Zigbee2MQTT, Tasmota, ESPHome). The connection test shows the active topics.
+- **Log shippers**: a webhook rule also accepts the Loki and OpenTelemetry formats, so Fluent Bit, Grafana Alloy, Promtail, Vector or the OpenTelemetry Collector can send to Sentinel, including Windows event logs through Fluent Bit.
+- **Connection guides**: each source shows a short step-by-step guide in the rule form, and says clearly when it cannot be read, in the rule list, on the rule page and on the dashboard.
 - **Several diagnostic connections, chosen per rule**: add as many read-only Docker and SSH connections as you need in Configuration > Diagnostics, then tick in each rule which ones the AI may use. A conversation about an alert only reaches the machines of its rule, so the AI no longer checks the wrong server. An existing configuration carries over and stays available to all rules.
 
 - **Autopilot or manual, at a glance**: each rule in the Rules list now shows whether the autopilot keeps its settings up to date or you do.

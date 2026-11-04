@@ -55,6 +55,9 @@
                     <button type="button" class="source-card kw-tab kw-tab--active" data-source="local" role="tab" aria-selected="true"><span data-i18n="rules.source_local">Fichier Local</span></button>
                     <button type="button" class="source-card kw-tab" data-source="webhook" role="tab" aria-selected="false"><span data-i18n="rules.source_webhook">Webhook API</span></button>
                     <button type="button" class="source-card kw-tab" data-source="syslog" role="tab" aria-selected="false"><span data-i18n="rules.source_syslog">Syslog Server</span></button>
+                    <button type="button" class="source-card kw-tab" data-source="docker" role="tab" aria-selected="false"><span data-i18n="sources.tab_docker">Docker</span></button>
+                    <button type="button" class="source-card kw-tab" data-source="homeassistant" role="tab" aria-selected="false"><span data-i18n="sources.tab_hass">Home Assistant</span></button>
+                    <button type="button" class="source-card kw-tab" data-source="mqtt" role="tab" aria-selected="false"><span data-i18n="sources.tab_mqtt">MQTT</span></button>
                 </div>
             </div>
             <div class="form-group" id="path-group">
@@ -93,6 +96,84 @@
                     <code id="webhook-curl-cmd"></code>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="copyModalWebhookUrl(this)" data-i18n-title="rules.webhook_copy_url_title" title="Copier l'URL"><span data-i18n="rules.webhook_copied_short">Copier</span></button>
                 </div>
+                <details class="diag-howto" id="rs-shipper-details">
+                    <summary data-i18n="sources.shipper_title">Envoyer depuis un expéditeur de logs (Fluent Bit, Alloy, OpenTelemetry, journaux Windows)</summary>
+                    <div class="diag-howto-body">
+                        <p class="form-hint" data-i18n="sources.shipper_intro">Déjà des machines équipées d'un expéditeur de logs ? Ajoute cette règle comme destination, à la place ou en plus de ce que tu utilises. Chaque ligne envoyée arrive ici.</p>
+                        <div class="rp-seg" id="rs-shippers" role="group">
+                            <button type="button" class="active" data-shipper="fluentbit" aria-pressed="true">Fluent Bit</button>
+                            <button type="button" data-shipper="windows" aria-pressed="false" data-i18n="sources.shipper_windows">Journaux Windows</button>
+                            <button type="button" data-shipper="alloy" aria-pressed="false">Grafana Alloy</button>
+                            <button type="button" data-shipper="otel" aria-pressed="false">OpenTelemetry</button>
+                        </div>
+                        <p class="form-hint" id="rs-shipper-hint"></p>
+                        <pre class="diag-code" id="rs-shipper-code"></pre>
+                        <div class="diag-actions"><button type="button" class="btn btn-secondary btn-sm" onclick="rsCopyShipper(this)" data-i18n="sources.copy">Copier</button></div>
+                    </div>
+                </details>
+            </div>
+            <div class="form-group hidden rs-group" data-source="docker">
+                <details class="diag-howto" open>
+                    <summary data-i18n="sources.guide_title">Guide de connexion</summary>
+                    <div class="diag-howto-body"><ol class="rs-steps">
+                        <li data-i18n-html="sources.docker_step1">Sentinel lit les logs d'un conteneur par un <b>proxy Docker en lecture seule</b>. Il n'a accès à rien d'autre et ne peut rien modifier. Tu peux réutiliser le proxy du diagnostic.</li>
+                        <li data-i18n-html="sources.docker_step2">Choisis la connexion, puis le conteneur à surveiller. Une règle par conteneur.</li>
+                        <li data-i18n-html="sources.docker_step3">La lecture commence à l'enregistrement de la règle. Après un redémarrage, de Sentinel ou du conteneur, elle reprend où elle s'était arrêtée.</li>
+                    </ol></div>
+                </details>
+                <p class="form-hint hidden" id="rs-docker-none"><span data-i18n="sources.docker_none">Aucun proxy Docker n'est configuré pour l'instant.</span> <a href="/config#diagnostic" target="_blank" rel="noopener" data-i18n="sources.docker_setup">Le configurer dans un nouvel onglet</a></p>
+                <div id="rs-docker-pick" class="rs-pick">
+                    <label for="rs-docker-conn" data-i18n="sources.conn_label">Connexion</label>
+                    <select id="rs-docker-conn"></select>
+                    <label for="rs-docker-container" data-i18n="sources.docker_container">Conteneur</label>
+                    <input type="text" id="rs-docker-container" class="mono" list="rs-docker-list" autocomplete="off" spellcheck="false" data-i18n-placeholder="sources.docker_container_ph" placeholder="Nom du conteneur">
+                    <datalist id="rs-docker-list"></datalist>
+                    <p class="form-hint" id="rs-docker-hint"></p>
+                </div>
+                <p class="form-hint rf-ko" id="rs-docker-error" role="alert"></p>
+                <p class="form-hint rs-status"></p>
+            </div>
+            <div class="form-group hidden rs-group" data-source="homeassistant">
+                <details class="diag-howto" open>
+                    <summary data-i18n="sources.guide_title">Guide de connexion</summary>
+                    <div class="diag-howto-body"><ol class="rs-steps">
+                        <li data-i18n-html="sources.hass_step1">Dans Home Assistant, ouvre ton <b>profil</b> (ton nom, en bas à gauche), onglet <b>Sécurité</b>, puis <b>Jetons d'accès longue durée</b> &gt; <b>Créer un jeton</b>. Le compte doit être administrateur.</li>
+                        <li data-i18n-html="sources.hass_step2">Colle le jeton ci-dessous avec l'adresse de Home Assistant, puis clique sur <b>Tester</b>.</li>
+                        <li data-i18n-html="sources.hass_step3">C'est tout : aucune automatisation à installer. Sentinel reçoit les <b>avertissements et les erreurs</b>, traces d'exception comprises ; Home Assistant ne publie pas les autres niveaux par ce canal.</li>
+                    </ol></div>
+                </details>
+                <div id="rs-homeassistant-pick" class="rs-pick">
+                    <label for="rs-homeassistant-conn" data-i18n="sources.conn_label">Connexion</label>
+                    <select id="rs-homeassistant-conn"></select>
+                </div>
+                <details class="rs-add" id="rs-homeassistant-add">
+                    <summary data-i18n="sources.conn_new">Nouvelle connexion</summary>
+                    <div id="rs-homeassistant-form"></div>
+                </details>
+                <p class="form-hint rf-ko" id="rs-homeassistant-error" role="alert"></p>
+                <p class="form-hint rs-status"></p>
+            </div>
+            <div class="form-group hidden rs-group" data-source="mqtt">
+                <details class="diag-howto" open>
+                    <summary data-i18n="sources.guide_title">Guide de connexion</summary>
+                    <div class="diag-howto-body"><ol class="rs-steps">
+                        <li data-i18n-html="sources.mqtt_step1">Indique l'adresse de ton serveur MQTT (Mosquitto, le module de Home Assistant…) et ses identifiants s'il en demande, puis clique sur <b>Tester</b> : Sentinel écoute 3 secondes et affiche les sujets actifs.</li>
+                        <li data-i18n-html="sources.mqtt_step2">Choisis ce qu'il faut suivre. <code>+</code> remplace un niveau, <code>#</code> remplace tout ce qui suit : <code>zigbee2mqtt/#</code>, <code>tele/+/LWT</code>.</li>
+                        <li data-i18n-html="sources.mqtt_step3">Chaque ligne reçue commence par son sujet. Les messages retenus sont ignorés : ce sont d'anciens états, pas des événements. Évite <code>#</code> seul, souvent très bavard.</li>
+                    </ol></div>
+                </details>
+                <div id="rs-mqtt-pick" class="rs-pick">
+                    <label for="rs-mqtt-conn" data-i18n="sources.conn_label">Connexion</label>
+                    <select id="rs-mqtt-conn"></select>
+                </div>
+                <details class="rs-add" id="rs-mqtt-add">
+                    <summary data-i18n="sources.conn_new">Nouvelle connexion</summary>
+                    <div id="rs-mqtt-form"></div>
+                </details>
+                <label for="rs-mqtt-topic" data-i18n="sources.mqtt_topic">Sujet à suivre</label>
+                <input type="text" id="rs-mqtt-topic" class="mono" autocomplete="off" spellcheck="false" placeholder="zigbee2mqtt/#">
+                <p class="form-hint rf-ko" id="rs-mqtt-error" role="alert"></p>
+                <p class="form-hint rs-status"></p>
             </div>
             <div class="form-group hidden" id="syslog-group">
                 <label for="syslog-hostname" data-i18n="rules.syslog_hostname_label">Hostname du serveur Syslog</label>

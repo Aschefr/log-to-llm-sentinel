@@ -463,6 +463,20 @@ class DiagnosticLink(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class SourceConnection(Base):
+    """Connexion à une source que Sentinel lit lui-même : Home Assistant (URL, jeton) ou serveur MQTT."""
+    __tablename__ = "source_connections"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    kind = Column(String, nullable=False)  # 'homeassistant' | 'mqtt'
+    address = Column(String, nullable=False)
+    port = Column(Integer, nullable=True)
+    username = Column(String, default="")
+    secret = Column(String, default="")  # jeton ou mot de passe, jamais renvoyé par l'API
+    use_tls = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class EventNote(Base):
     """Note de l'administrateur transmise à l'IA : sur un événement (event_key et signatures de ses lignes),
     ou sur toute la source de la règle (event_key vide). Survit aux analyses, suit la règle."""

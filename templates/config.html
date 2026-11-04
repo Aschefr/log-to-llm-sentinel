@@ -211,6 +211,17 @@
                 <p class="form-hint" data-i18n="config.syslog_hosts_hint">Les hôtes qui ont envoyé des lignes ces 7 derniers jours.</p>
                 <ul class="cfg-hosts" id="cfg-hosts"></ul>
             </div>
+
+            <div class="rp-card">
+                <h2 data-i18n="sources.cfg_title">Connexions Home Assistant et MQTT</h2>
+                <p class="form-hint" data-i18n="sources.cfg_hint">Une connexion sert à toutes les règles qui en ont besoin. Les logs Docker passent par les connexions de l'onglet Diagnostic.</p>
+                <ul class="diag-links" id="cfg-source-conns"></ul>
+                <div class="diag-actions">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="scConfigAdd('homeassistant')" data-i18n="sources.cfg_add_hass">Ajouter Home Assistant</button>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="scConfigAdd('mqtt')" data-i18n="sources.cfg_add_mqtt">Ajouter un serveur MQTT</button>
+                </div>
+                <div id="cfg-source-form"></div>
+            </div>
         </section>
 
         <!-- ── Diagnostic ── -->
@@ -438,4 +449,5 @@
 {% block scripts %}
 <script src="/static/js/config.js?v=14"></script>
 <script src="/static/js/diagnostics_config.js?v=9"></script>
+<script src="/static/js/source_connections.js?v=2"></script>
 {% endblock %}

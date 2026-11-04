@@ -8,6 +8,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+from app.services.log_source import parse_connected
 from app.models import Analysis, ResolutionVerdict, Rule
 from app.services.alert_analysis import analysis_lines, short_summary
 from app.utils.log_utils import line_signature
@@ -27,6 +28,9 @@ def source_info(log_file_path: str) -> dict:
         return {"type": "webhook", "label": ""}
     if path.startswith("[SYSLOG]"):
         return {"type": "syslog", "label": path.split(":", 1)[1] if ":" in path else "*"}
+    parsed = parse_connected(path)
+    if parsed:
+        return {"type": parsed["kind"], "label": parsed.get("container") or parsed.get("topic") or ""}
     return {"type": "file", "label": path}
 
 

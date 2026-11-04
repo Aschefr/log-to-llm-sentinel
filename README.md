@@ -118,7 +118,9 @@ For long-term monitoring, use **Meta-Analysis**:
 
 ### 🏠 Home Assistant Integration
 
-Sentinel can monitor your Home Assistant logs in real-time. Follow these steps to set up the integration:
+The simplest way is the **Home Assistant** source of a rule: enter the address and a long-lived access token, with nothing to install in Home Assistant. See [Log sources](docs/en/features/sources.md), which also covers Docker logs, MQTT and log shippers.
+
+If you prefer Home Assistant to push its logs, use a webhook:
 
 ### 1. Create a Webhook Rule in Sentinel
 1. Go to the **Rules** page in Sentinel.

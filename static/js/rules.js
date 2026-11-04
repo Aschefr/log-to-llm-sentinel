@@ -62,6 +62,8 @@ function ruleState(r) {
 function sourceText(src) {
     if (src.type === 'webhook') return roT('rule.source_webhook', 'Webhook');
     if (src.type === 'syslog') return `${roT('rule.source_syslog', 'Syslog')} · ${src.label}`;
+    const connected = { docker: 'Docker', homeassistant: 'Home Assistant', mqtt: 'MQTT' }[src.type];
+    if (connected) return src.label ? `${connected} · ${src.label}` : connected;
     return `${roT('rule.source_file', 'Fichier')} · ${src.label}`;
 }
 
@@ -129,6 +131,8 @@ function rowHtml(r, s) {
         ? roT('rules.last_line_ago', 'dernière ligne {t}', { t: roT('rule.ago', 'il y a {d}', { d: roMinutes((Date.now() - new Date(r.last_line_received_at).getTime()) / 60000) }) })
         : roT('rules.never_received', 'aucune ligne reçue');
     const live = !r.enabled ? ['—', roT('rules.not_monitored', 'non surveillée'), '']
+        : r.source_status?.state === 'error' ? [roT('sources.state_error', 'Connexion en échec'), scErrorText(r.source_status.code, r.source_status.detail), 'rp-ko']
+        : r.source_status?.state === 'waiting' ? [roT('sources.state_waiting', 'En attente'), scErrorText(r.source_status.code, r.source_status.detail), '']
         : r.muted ? [roT('rules.muted', 'Muette'), ago, 'rp-ko'] : [roT('rules.live', 'Active'), ago, 'rp-ok'];
     return `
     <div class="ro-row ${r.enabled ? '' : 'ro-row--off'}" role="row">

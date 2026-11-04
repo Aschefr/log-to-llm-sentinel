@@ -3750,3 +3750,32 @@ select option, select optgroup { background-color: var(--bg-primary); color: var
 [data-theme="light"] .ro-mode--auto { color: #1d4ed8; }
 .ro-mode--error { border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.1); color: #ef4444; }
 [data-theme="light"] .ro-mode--error { color: #b91c1c; }
+
+/* ── SOURCES CONNECTÉES ────────────────────────────── */
+.source-card.kw-tab { flex: 1 1 auto; }
+.kw-tabs:has(.source-card) { flex-wrap: wrap; }
+.rs-steps { display: flex; flex-direction: column; gap: 0.45rem; margin: 0; padding-left: 1.25rem; font-size: 0.88rem; }
+.rs-steps code, .sc-topic { font-size: 0.82rem; }
+.rs-pick { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 0.6rem; }
+.rs-add { margin-top: 0.6rem; }
+.rs-add summary { cursor: pointer; font-size: 0.88rem; color: var(--accent); }
+.rs-group > label { display: block; margin-top: 0.6rem; }
+.rs-group .rf-ko:empty, .rs-group .rs-status:empty, .rs-group .form-hint:empty { display: none; }
+.sc-form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.6rem; padding: 0.85rem; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--bg-secondary); }
+.sc-form .form-group { margin: 0; }
+.sc-row { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; }
+.sc-row .form-group { flex: 1 1 11rem; min-width: 0; }
+.sc-row .sc-port { flex: 0 0 6.5rem; }
+.sc-tls { display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer; }
+.sc-tls input[type="checkbox"] { flex: none; width: 1.05rem; height: 1.05rem; margin: 0; accent-color: var(--accent); }
+.sc-result:empty { display: none; }
+.sc-topics { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.sc-topics:empty { display: none; }
+.sc-topic { padding: 0.15rem 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; color: var(--text-primary); cursor: pointer; overflow-wrap: anywhere; text-align: left; }
+.sc-topic:hover { border-color: var(--accent); }
+#rs-shipper-details pre { white-space: pre; overflow-x: auto; margin: 0; }
+#rs-shipper-details .rp-seg { align-self: flex-start; max-width: 100%; }
+@media (max-width: 640px) {
+    .sc-row .sc-port { flex: 1 1 100%; }
+    .sc-topic, .sc-form .btn { min-height: 2.75rem; }
+}

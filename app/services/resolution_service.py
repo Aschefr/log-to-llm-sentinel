@@ -785,15 +785,7 @@ class ResolutionService:
         try:
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             if rule and rule.log_file_path:
-                resolved_path = rule.log_file_path
-                if rule.log_file_path.startswith("[WEBHOOK]:"):
-                    token = rule.log_file_path.split(':', 1)[1]
-                    safe = "".join(c for c in token if c.isalnum() or c in "-_")
-                    resolved_path = os.path.join(os.environ.get("SENTINEL_DATA_DIR", "/app/data"), "webhooks", f"{safe}.log")
-                elif rule.log_file_path.startswith("[SYSLOG]:"):
-                    hostname = rule.log_file_path.split(':', 1)[1]
-                    safe = "".join(c for c in hostname if c.isalnum() or c in "-_")
-                    resolved_path = os.path.join(os.environ.get("SENTINEL_DATA_DIR", "/app/data"), "syslog", f"{safe}.log")
+                resolved_path = str(resolve_path(rule.log_file_path))
                 context_lines = _read_tail_lines(resolved_path, n=30)
         finally:
             db.close()
@@ -1120,15 +1112,7 @@ Retourne UNIQUEMENT le tableau JSON brut, sans formatage markdown ni bloc de cod
             # Les chemins virtuels [SYSLOG]:hostname et [WEBHOOK]:token sont resolus vers le fichier reel
             recent_logs = ""
             if rule.log_file_path:
-                log_path = rule.log_file_path
-                if rule.log_file_path.startswith("[SYSLOG]:"):
-                    hostname = rule.log_file_path.split(":", 1)[1].strip()
-                    safe = "".join(c for c in hostname if c.isalnum() or c in "-_")
-                    log_path = os.path.join(os.environ.get("SENTINEL_DATA_DIR", "/app/data"), "syslog", f"{safe}.log")
-                elif rule.log_file_path.startswith("[WEBHOOK]:"):
-                    token = rule.log_file_path.split(":", 1)[1].strip()
-                    safe = "".join(c for c in token if c.isalnum() or c in "-_")
-                    log_path = os.path.join(os.environ.get("SENTINEL_DATA_DIR", "/app/data"), "webhooks", f"{safe}.log")
+                log_path = str(resolve_path(rule.log_file_path))
                 lines = _read_tail_lines(log_path, n=30)
                 if lines:
                     recent_logs = f"\nLogs recents (dernieres 30 lignes):\n" + "\n".join(lines[-30:])

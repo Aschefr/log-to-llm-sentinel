@@ -205,6 +205,8 @@ function renderAttention() {
             not_configured: dT('dashboard.ollama_attention_none', 'Aucun serveur n’est configuré.') }[problem];
         rows.push(attentionRow(`ollama-${problem}`, `<span class="dash-tag">Ollama</span>`, DASH.ollama.model || 'Ollama', text, '', '/config'));
     }
+    (a.source_errors || []).forEach(x => rows.push(attentionRow(`source-${x.rule_id}`, `<span class="dash-tag">${escapeHtml(dT('dashboard.tag_source', 'Source'))}</span>`, x.rule_name,
+        scErrorText(x.code, x.detail), '', `/rules/${x.rule_id}#settings`)));
     a.muted.forEach(x => rows.push(attentionRow(`muted-${x.rule_id}`, `<span class="dash-tag">${escapeHtml(dT('dashboard.tag_silence', 'Silence'))}</span>`, x.rule_name,
         x.last_line_at ? dT('dashboard.silence_text', 'Aucune ligne depuis {d}.', { d: dSince(x.last_line_at) }) : dT('dashboard.silence_never', 'Aucune ligne reçue.'),
         dT('dashboard.silence_limit', 'limite : {h} h', { h: x.limit_hours }), `/rules/${x.rule_id}`)));

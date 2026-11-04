@@ -95,6 +95,8 @@ function sourceOf(rule) {
         return { key: `syslog:${host}`, label: host || mT('meta.source_syslog', 'Syslog') };
     }
     if (path.startsWith('[WEBHOOK]')) return { key: 'webhook', label: mT('meta.source_webhook', 'Webhooks') };
+    const connected = path.match(/^\[(DOCKER|HOMEASSISTANT|MQTT)\]/);
+    if (connected) return { key: connected[1], label: { DOCKER: 'Docker', HOMEASSISTANT: 'Home Assistant', MQTT: 'MQTT' }[connected[1]] };
     return { key: 'file', label: mT('meta.source_file', 'Fichiers de ce serveur') };
 }
 

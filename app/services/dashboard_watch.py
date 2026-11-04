@@ -12,6 +12,7 @@ from typing import Optional
 from sqlalchemy import func
 
 from app.models import Analysis, KeywordChange, Rule
+from app.services import connected_sources
 from app.services import monitoring
 from app.services import analysis_events
 from app.services import autopilot as ap
@@ -108,6 +109,8 @@ def build(db) -> dict:
             "alerts": _alerts(db, enabled),
             "muted": [{"rule_id": r.id, "rule_name": r.name, "last_line_at": rule_stats.iso(r.last_line_received_at),
                        "limit_hours": r.inactivity_period_hours} for r in enabled if rule_stats.is_muted(r, now)],
+            "source_errors": [{"rule_id": r.id, "rule_name": r.name, **status} for r in enabled
+                              for status in [connected_sources.manager.status(r.id)] if status and status["state"] == "error"],
             "pilot_errors": [{"rule_id": r.id, "rule_name": r.name} for r in enabled
                              if ap.enabled(r) and ap.load(r).get("status") == "error" and ap.load(r).get("error") != "cancelled"],
         },

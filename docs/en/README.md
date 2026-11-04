@@ -18,6 +18,7 @@ Sentinel detects critical log events, automatically collects surrounding applica
 ### ⚙️ Deep-Dive Features
 * [**Autopilot**](features/autopilot.md) — Give only the source: the local AI sets up the rule (name, context, keywords, rhythm) from the log history, or after watching it for 24 h.
 * [**Keyword tuning**](features/keyword-learning.md) — How the local AI keeps keywords and exclusions up to date (blind spots, noise, history analysis), with checks and undo.
+* [**Log sources**](features/sources.md) — Files, webhook, syslog, Docker logs, Home Assistant, MQTT and log shippers, and how to connect each one.
 * [**Notes for the AI**](features/notes.md) — Tell the AI what the logs cannot, for the next alerts on that event or source.
 * [**Recommended Models**](features/recommended-models.md) — Which model to run, measured on real alerts, and the settings that follow.
 * [**Pausing Monitoring**](features/monitoring-pause.md) — The header switch: what stops, what happens on resume.

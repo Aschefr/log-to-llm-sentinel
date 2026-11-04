@@ -145,6 +145,11 @@ async def lifespan(app: FastAPI):
     watcher_task = asyncio.create_task(log_watcher.start())
     print("[Main] LogWatcher démarré en background")
 
+    # Sources que Sentinel lit lui-même : logs Docker, Home Assistant, MQTT
+    from app.services.connected_sources import manager as source_manager
+    source_manager.on_new_lines = orchestrator.handle_new_lines
+    asyncio.create_task(source_manager.start())
+
     # Reprendre les sessions d'auto-apprentissage interrompues par un redémarrage
     from app.services.keyword_learning_service import resume_stuck_sessions, set_tuning_service
     set_tuning_service(keyword_tuning)
@@ -296,6 +301,7 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     log_watcher.stop()
+    source_manager.stop()
     try:
         await keyword_tuning.flush()
     except Exception:
@@ -369,6 +375,7 @@ from app.routers import keyword_learning as kw_learning_router
 from app.routers import webhook as webhook_router
 from app.routers import diagnostics as diagnostics_router
 from app.routers import triage as triage_router
+from app.routers import sources as sources_router
 
 app.include_router(rules.router)
 app.include_router(config.router)
@@ -382,6 +389,7 @@ app.include_router(kw_learning_router.router)
 app.include_router(webhook_router.router)
 app.include_router(diagnostics_router.router)
 app.include_router(triage_router.router)
+app.include_router(sources_router.router)
 
 
 # ── Pages ──

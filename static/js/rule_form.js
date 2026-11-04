@@ -151,8 +151,19 @@ function setupRuleForm(opts = {}) {
             sourceCards.forEach(c => { c.classList.remove('kw-tab--active'); c.setAttribute('aria-selected', 'false'); });
             card.classList.add('kw-tab--active');
             card.setAttribute('aria-selected', 'true');
+            const isConnected = ['docker', 'homeassistant', 'mqtt'].includes(card.dataset.source);
+            document.querySelectorAll('.rs-group').forEach(g => g.classList.toggle('hidden', g.dataset.source !== card.dataset.source));
+            rsCloseAll();
 
-            if (card.dataset.source === 'webhook') {
+            if (isConnected) {
+                pathGroup.classList.add('hidden');
+                webhookGroup.classList.add('hidden');
+                if (syslogGroup) syslogGroup.classList.add('hidden');
+                pathInputEl.removeAttribute('required');
+                if (syslogHostnameEl) syslogHostnameEl.removeAttribute('required');
+                pathInputEl.value = '';
+                rsOpen(card.dataset.source, window._rsEditingPath);
+            } else if (card.dataset.source === 'webhook') {
                 pathGroup.classList.add('hidden');
                 webhookGroup.classList.remove('hidden');
                 if (syslogGroup) syslogGroup.classList.add('hidden');
@@ -484,6 +495,9 @@ function _ruleFormData() {
         logFilePath = '[WEBHOOK]:' + (window._currentWebhookToken || _generateUUID());
     } else if (isSyslog) {
         logFilePath = '[SYSLOG]:' + (document.getElementById('syslog-hostname').value.trim() || '*');
+    } else if (activeCard && ['docker', 'homeassistant', 'mqtt'].includes(activeCard.dataset.source)) {
+        logFilePath = rsPath(activeCard.dataset.source);
+        if (!logFilePath) return null;  // la raison est affichée dans l'onglet
     }
 
     const resolutionOn = document.getElementById('rule-resolution-enable').checked;
@@ -562,6 +576,7 @@ function updateTuningUI() {
 async function saveRule() {
     const id = document.getElementById('rule-id').value;
     const data = _ruleFormData();
+    if (!data) return;
     if (!id) data.learn_history = document.getElementById('rule-learn-history').checked;
 
     try {
@@ -593,6 +608,11 @@ async function editRule(id) {
         } else if (rule.log_file_path && rule.log_file_path.startsWith('[SYSLOG]')) {
             document.querySelector('.source-card[data-source="syslog"]')?.click();
             document.getElementById('syslog-hostname').value = rule.log_file_path.split(':')[1] || '*';
+        } else if (rule.log_file_path && /^\[(DOCKER|HOMEASSISTANT|MQTT)\]/.test(rule.log_file_path)) {
+            window._rsEditingPath = rule.log_file_path;
+            const kind = rule.log_file_path.slice(1, rule.log_file_path.indexOf(']')).toLowerCase();
+            document.querySelector(`.source-card[data-source="${kind}"]`)?.click();
+            window._rsEditingPath = null;
         } else {
             document.querySelector('.source-card[data-source="local"]')?.click();
             document.getElementById('rule-path').value = rule.log_file_path;
@@ -625,7 +645,7 @@ async function editRule(id) {
         // Quick templates are for new rules only
         document.getElementById('modal-quick-templates')?.classList.add('hidden');
         closeFileBrowser();
-        if (!rule.log_file_path.startsWith('[WEBHOOK]') && !rule.log_file_path.startsWith('[SYSLOG]')) {
+        if (!rule.log_file_path.startsWith('[')) {
             fetchFilePreview(rule.log_file_path);
         } else {
             document.getElementById('file-preview-container')?.classList.add('hidden');

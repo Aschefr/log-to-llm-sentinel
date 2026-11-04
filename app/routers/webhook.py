@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, Request, Query
+from fastapi import APIRouter, HTTPException, Request, Query, Response
 from app.database import SessionLocal
-from app.models import GlobalConfig, Rule
+from app.models import Rule
 from app import logger
+from app.services import log_formats
+from app.services.log_source import append_lines
 from collections import deque
 from pathlib import Path
 from typing import Optional
@@ -54,24 +56,7 @@ def _append_to_disk(token: str, lines: list[str]):
     """Append lines to persistent log file."""
     fp = _log_path(token)
     try:
-        fp.parent.mkdir(parents=True, exist_ok=True)
-        with open(fp, "a", encoding="utf-8") as f:
-            for line in lines:
-                f.write(line + "\n")
-        
-        limit_mb = 10
-        db = SessionLocal()
-        try:
-            config = db.query(GlobalConfig).first()
-            if config and config.log_rotation_limit_mb:
-                limit_mb = config.log_rotation_limit_mb
-        except Exception:
-            pass
-        finally:
-            db.close()
-            
-        from app.utils.log_utils import rotate_log_file
-        rotate_log_file(fp, limit_mb * 1024 * 1024)
+        append_lines(fp, lines)
     except Exception as e:
         logger.warning("Webhook", f"Écriture du journal {fp.name} : {e}")
 
@@ -93,9 +78,13 @@ def parse_lines(body: bytes, content_type: str) -> list[str]:
         except ValueError:
             salvaged = _UNESCAPED_LINES.match(text)
             items = [salvaged.group(1) if salvaged else text]
+    return _split_lines(_as_text(item) for item in items)
+
+
+def _split_lines(items) -> list[str]:
     lines = []
     for item in items:
-        for line in _as_text(item).splitlines():
+        for line in item.splitlines():
             line = line.strip()
             if len(line) > MAX_LINE_CHARS:
                 line = line[:MAX_LINE_CHARS] + f" …[TRONQUÉ : {len(line)} chars]"
@@ -135,14 +124,18 @@ async def receive_logs(rule_id_or_token: str, request: Request):
         raise HTTPException(status_code=500, detail="orchestrator_not_configured")
         
     rule = _find_rule(rule_id_or_token)
+    _check_rule(rule)
+    return await _receive(rule, parse_lines(await request.body(), request.headers.get("content-type", "")))
+
+
+def _check_rule(rule: Optional[Rule]):
     if not rule:
         raise HTTPException(status_code=404, detail="rule_not_found")
-        
     if not rule.enabled:
         raise HTTPException(status_code=400, detail="rule_disabled")
 
-    lines = parse_lines(await request.body(), request.headers.get("content-type", ""))
 
+async def _receive(rule: Rule, lines: list[str]) -> dict:
     if not lines:
         return {"status": "ok", "message": "Aucune ligne à traiter"}
 
@@ -169,6 +162,37 @@ async def receive_logs(rule_id_or_token: str, request: Request):
         logger.error("Webhook", f"Traitement de {len(lines)} ligne(s) de la règle {rule.id} : {e}")
 
     return {"status": "ok", "lines_received": len(lines)}
+
+
+async def _shipper(token: str, request: Request, decode) -> list[str]:
+    """Un expéditeur de logs (Fluent Bit, Alloy, collecteur OpenTelemetry…) : mêmes règles, autre format."""
+    if not _orchestrator:
+        raise HTTPException(status_code=500, detail="orchestrator_not_configured")
+    rule = _find_rule(token)
+    _check_rule(rule)
+    try:
+        lines = decode(await request.body(), request.headers.get("content-type", ""), request.headers.get("content-encoding", ""))
+    except log_formats.BadPayload as e:
+        logger.warning("Webhook", f"Envoi illisible pour la règle {rule.id} : {e}")
+        raise HTTPException(status_code=400, detail="invalid_payload")
+    await _receive(rule, _split_lines(lines))
+    return lines
+
+
+@router.post("/logs/{token}/loki/api/v1/push")
+async def receive_loki(token: str, request: Request):
+    await _shipper(token, request, log_formats.loki_lines)
+    return Response(status_code=204)
+
+
+@router.post("/logs/{token}/v1/logs")
+async def receive_otlp(token: str, request: Request):
+    content_type = request.headers.get("content-type", "")
+    await _shipper(token, request, log_formats.otlp_lines)
+    # Réponse vide d'ExportLogsServiceResponse : tout a été accepté
+    if "json" in content_type.lower():
+        return Response(content="{}", media_type="application/json")
+    return Response(content=b"", media_type="application/x-protobuf")
 
 
 @router.get("/tail/{token}")

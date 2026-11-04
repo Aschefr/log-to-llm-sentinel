@@ -54,9 +54,26 @@ function sevBadge(sev) {
     return `<span class="severity-badge ${s}">${s}</span>`;
 }
 
+/** A connected source that cannot be read says so next to the rule's name, not hours later as a silence. */
+async function showSourceStatus(rule) {
+    const el = document.getElementById('rp-source-status');
+    if (!el) return;
+    el.textContent = '';
+    if (!/^\[(DOCKER|HOMEASSISTANT|MQTT)\]:/.test(rule.log_file_path || '') || !rule.enabled) return;
+    try {
+        const { status } = await apiFetch(`/api/sources/status/${rule.id}`);
+        if (status && ['error', 'waiting'].includes(status.state)) {
+            el.textContent = scErrorText(status.code, status.detail);
+            el.className = `form-hint ${status.state === 'error' ? 'rf-ko' : ''}`;
+        }
+    } catch (_) { /* facultatif */ }
+}
+
 function sourceLabel(path) {
     if (!path) return '';
     if (path.startsWith('[WEBHOOK]')) return T('rule.source_webhook', 'Webhook');
+    const connected = path.match(/^\[(DOCKER|HOMEASSISTANT|MQTT)\]:\d*:?(.*)$/);
+    if (connected) return `${{ DOCKER: 'Docker', HOMEASSISTANT: 'Home Assistant', MQTT: 'MQTT' }[connected[1]]}${connected[2] ? ` · ${connected[2]}` : ''}`;
     if (path.startsWith('[SYSLOG]')) return `${T('rule.source_syslog', 'Syslog')} · ${path.split(':')[1] || '*'}`;
     return `${T('rule.source_file', 'Fichier')} · ${path}`;
 }
@@ -264,6 +281,7 @@ async function loadHeader() {
         document.getElementById('rp-subtitle').textContent =
             `${sourceLabel(rule.log_file_path)} · ${T('rule.keywords', 'mots-clés')} : ${rule.keywords.join(', ') || '—'}`;
         document.getElementById('rp-enabled').checked = !!rule.enabled;
+        showSourceStatus(rule);
 
         const pill = document.getElementById('rp-status');
         pill.classList.remove('hidden', 'rp-pill--alert', 'rp-pill--ok', 'rp-pill--off', 'rp-pill--warn');
@@ -1005,6 +1023,8 @@ async function fetchLogs(rule) {
         if (rule.log_file_path && rule.log_file_path.startsWith('[WEBHOOK]:')) {
             const token = rule.log_file_path.split(':')[1];
             res = await apiFetch(`/api/webhook/tail/${encodeURIComponent(token)}?lines=${monitorLogLines}&keywords=${encodeURIComponent(kwParam)}`);
+        } else if (rule.log_file_path && /^\[(DOCKER|HOMEASSISTANT|MQTT)\]:/.test(rule.log_file_path)) {
+            res = await apiFetch(`/api/sources/tail/${rule.id}?lines=${monitorLogLines}&keywords=${encodeURIComponent(kwParam)}`);
         } else if (rule.log_file_path && rule.log_file_path.startsWith('[SYSLOG]:')) {
             const hostname = rule.log_file_path.split(':')[1];
             res = await apiFetch(`/api/monitor/syslog/tail/${encodeURIComponent(hostname)}?lines=${monitorLogLines}&keywords=${encodeURIComponent(kwParam)}`);

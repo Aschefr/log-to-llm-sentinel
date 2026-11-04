@@ -131,6 +131,12 @@ def _render_rule(rule: Rule, now: datetime, lang: str) -> str:
         source = f"{label(lang, 'source_file')} {rule.log_file_path}"
     elif kind == "syslog":
         source = label(lang, "source_syslog", host=rule.log_file_path.split(":", 1)[1])
+    elif kind == "docker":
+        source = label(lang, "source_docker", name=log_source.parse_connected(rule.log_file_path)["container"])
+    elif kind == "homeassistant":
+        source = label(lang, "source_homeassistant")
+    elif kind == "mqtt":
+        source = label(lang, "source_mqtt", topic=log_source.parse_connected(rule.log_file_path)["topic"])
     else:
         source = label(lang, "source_webhook")
     lines = [f"## {label(lang, 'rule')}",

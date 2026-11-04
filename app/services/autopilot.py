@@ -168,6 +168,12 @@ def default_name(log_file_path: str) -> str:
         return f"Syslog {log_file_path.split(':', 1)[1].strip() or '*'}"
     if kind == "webhook":
         return "Webhook"
+    if kind == "docker":
+        return log_file_path.split(":", 2)[2] or "Docker"
+    if kind == "homeassistant":
+        return "Home Assistant"
+    if kind == "mqtt":
+        return f"MQTT {log_file_path.split(':', 2)[2]}"
     return log_file_path.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or log_file_path
 
 
@@ -278,6 +284,12 @@ def source_label(log_file_path: str) -> str:
         return f"syslog, hôte {log_file_path.split(':', 1)[1].strip() or '*'}"
     if kind == "webhook":
         return "webhook (lignes envoyées par un script)"
+    if kind == "docker":
+        return f"logs du conteneur Docker {log_file_path.split(':', 2)[2]}"
+    if kind == "homeassistant":
+        return "journal de Home Assistant (avertissements et erreurs seulement)"
+    if kind == "mqtt":
+        return f"messages MQTT du sujet {log_file_path.split(':', 2)[2]}, chaque ligne commence par son sujet"
     return f"fichier {log_file_path}"
 
 

@@ -2,6 +2,7 @@
 Accès en lecture aux sources de logs d'une règle, quel que soit leur type :
 fichier local, [WEBHOOK]:<token> (data/webhooks/<token>.log) ou [SYSLOG]:<host> (data/syslog/<host>.log).
 """
+import hashlib
 import os
 from pathlib import Path
 from typing import List, Optional
@@ -24,7 +25,31 @@ def source_type(log_file_path: str) -> str:
         return "webhook"
     if log_file_path.startswith("[SYSLOG]:"):
         return "syslog"
+    if log_file_path.startswith("[DOCKER]:"):
+        return "docker"
+    if log_file_path.startswith("[HOMEASSISTANT]:"):
+        return "homeassistant"
+    if log_file_path.startswith("[MQTT]:"):
+        return "mqtt"
     return "file"
+
+
+def parse_connected(log_file_path: str) -> Optional[dict]:
+    """[DOCKER]:<connexion>:<conteneur>, [HOMEASSISTANT]:<connexion> ou [MQTT]:<connexion>:<sujet>. None sinon."""
+    kind = source_type(log_file_path or "")
+    if kind not in ("docker", "homeassistant", "mqtt"):
+        return None
+    parts = log_file_path.split(":", 2)
+    try:
+        connection_id = int(parts[1])
+    except (IndexError, ValueError):
+        connection_id = 0
+    value = parts[2] if len(parts) > 2 else ""
+    if kind == "docker":
+        return {"kind": kind, "connection_id": connection_id, "container": value}
+    if kind == "mqtt":
+        return {"kind": kind, "connection_id": connection_id, "topic": value}
+    return {"kind": kind, "connection_id": connection_id}
 
 
 def resolve_path(log_file_path: str) -> Path:
@@ -34,7 +59,28 @@ def resolve_path(log_file_path: str) -> Path:
         return _data_dir() / "webhooks" / f"{_safe(log_file_path.split(':', 1)[1])}.log"
     if kind == "syslog":
         return _data_dir() / "syslog" / f"{_safe(log_file_path.split(':', 1)[1].strip())}.log"
+    if parse_connected(log_file_path):
+        # Un sujet MQTT n'est pas un nom de fichier, et deux sujets ne doivent pas partager le même
+        return _data_dir() / "sources" / f"{kind}-{hashlib.sha1(log_file_path.encode('utf-8')).hexdigest()[:16]}.log"
     return Path(log_file_path)
+
+
+def append_lines(path: Path, lines: List[str]):
+    """Ajoute des lignes au fichier d'une source reçue, et le fait tourner à la limite configurée."""
+    from app.database import SessionLocal
+    from app.models import GlobalConfig
+    from app.utils.log_utils import rotate_log_file
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        for line in lines:
+            f.write(line + "\n")
+    db = SessionLocal()
+    try:
+        config = db.query(GlobalConfig).first()
+        limit_mb = (config.log_rotation_limit_mb if config else None) or 10
+    finally:
+        db.close()
+    rotate_log_file(path, limit_mb * 1024 * 1024)
 
 
 def count_lines(path: Path, max_bytes: int = 64 * 1024 * 1024) -> int:
