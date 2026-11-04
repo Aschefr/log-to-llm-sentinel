@@ -3695,3 +3695,58 @@ details[open] > summary > .chat-chevron { transform: rotate(90deg); }
     .chat-head, .cfg-status.chat-status, .chat-disclaimer { display: none; }
     .chat-ctx-btn:not(.hidden) { display: inline-flex; }
 }
+
+/* ── TRI DES NON LUES ─────────────────────────────── */
+.dash-unread { display: flex; align-items: center; border-top: 1px solid var(--border); }
+.dash-unread:first-child { border-top: 0; }
+.dash-unread .dash-row { flex: 1; min-width: 0; border-top: 0; }
+.dash-triage { flex: none; margin-right: 1rem; }
+.triage { width: min(46rem, calc(100vw - 2rem)); max-height: min(85vh, 60rem); margin: auto; padding: 0; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 0.75rem; color: var(--text-primary); box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35); }
+.triage::backdrop { background: rgba(0, 0, 0, 0.55); }
+.triage[open] { display: flex; }
+.triage-inner { display: flex; flex-direction: column; width: 100%; min-width: 0; min-height: 0; }
+.triage-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem 0.5rem; }
+.triage-head h2 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+.triage-body { display: flex; flex-direction: column; gap: 0.75rem; min-height: 0; padding: 0.25rem 1.25rem 1rem; overflow-y: auto; }
+.triage-lead { margin: 0; font-size: 0.95rem; }
+.triage-progress { width: 100%; height: 0.5rem; accent-color: var(--accent); }
+.triage-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; border: 1px solid var(--border); border-radius: 0.5rem; background: var(--bg-card); }
+.triage-item { display: flex; align-items: flex-start; gap: 0.65rem; padding: 0.6rem 0.75rem; border-top: 1px solid var(--border); }
+.triage-item:first-child { border-top: 0; }
+.triage-item input[type="checkbox"] { flex: none; width: 1.05rem; height: 1.05rem; margin: 0.15rem 0 0; accent-color: var(--accent); }
+.triage-text { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.triage-event { display: flex; align-items: baseline; gap: 0.5rem; min-width: 0; }
+.triage-event .severity-badge { flex: none; }
+.triage-summary { min-width: 0; color: var(--text-primary); font-size: 0.9rem; font-weight: 500; overflow-wrap: anywhere; }
+.triage-meta { color: var(--text-secondary); font-size: 0.78rem; }
+.triage-reason { font-size: 0.85rem; }
+.triage-item--kept .triage-reason { color: var(--text-secondary); }
+.triage-kept summary { cursor: pointer; font-size: 0.88rem; margin-bottom: 0.5rem; }
+.triage-note { margin: 0; }
+.triage-error { margin: 0; color: var(--danger, #ef4444); font-size: 0.88rem; }
+.triage-foot { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; padding: 0.75rem 1.25rem 1rem; border-top: 1px solid var(--border); }
+.triage-foot:empty { display: none; }
+.triage-last { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.6rem; margin: 0.5rem 0 0; color: var(--text-secondary); font-size: 0.82rem; }
+.triage-undo { padding: 0; background: none; border: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; }
+@media (max-width: 640px) {
+    .dash-unread { flex-direction: column; align-items: stretch; }
+    .dash-triage { margin: 0 1rem 0.65rem; min-height: 2.75rem; }
+    .triage-event { flex-wrap: wrap; }
+    .triage-foot .btn { flex: 1 1 100%; min-height: 2.75rem; }
+    .triage-item input[type="checkbox"] { width: 1.3rem; height: 1.3rem; }
+}
+
+/* ── OPTIONS DE LISTES DÉROULANTES ─────────────────── */
+/* Toutes les listes, pas seulement celles d'un .form-group : sans ça, Windows ouvre un menu blanc au texte clair */
+select option, select optgroup { background-color: var(--bg-primary); color: var(--text-primary); }
+
+/* ── MODE DES RÈGLES : PILOTE AUTOMATIQUE OU MANUEL ── */
+.ro-mode-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.15rem 0.4rem; margin-top: 0.15rem; }
+.ro-mode-state { font-size: 0.72rem; }
+.ro-mode-row .ro-mode { margin-top: 0; }
+.ro-mode { display: inline-flex; align-items: center; align-self: flex-start; gap: 0.3rem; margin-top: 0.15rem; padding: 0.05rem 0.5rem; border: 1px solid var(--border); border-radius: 999px; color: var(--text-secondary); font-size: 0.72rem; font-weight: 500; white-space: nowrap; }
+.ro-mode svg { flex: none; }
+.ro-mode--auto { border-color: rgba(59, 130, 246, 0.45); background: rgba(59, 130, 246, 0.12); color: var(--accent); }
+[data-theme="light"] .ro-mode--auto { color: #1d4ed8; }
+.ro-mode--error { border-color: rgba(239, 68, 68, 0.45); background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+[data-theme="light"] .ro-mode--error { color: #b91c1c; }

@@ -242,6 +242,7 @@ class Analysis(Base):
     exclude_from_mttr = Column(Boolean, default=False)
     event_key = Column(String, nullable=True)  # Empreinte des signatures de ses lignes : même clé, même événement
     feedback = Column(String, nullable=True)  # 'irrelevant' : signalée « pas pertinente » par l'utilisateur
+    triaged_at = Column(DateTime, nullable=True)  # Marquée comme lue par un tri de l'IA validé : permet d'annuler ce tri
     reused_from = Column(Integer, nullable=True)  # Répétition : verdict repris de cette analyse, sans appel à l'IA
 
 

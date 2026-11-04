@@ -7,7 +7,7 @@ import json
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
-from sqlalchemy import event
+from sqlalchemy import case, event, func, or_
 
 from app.models import Analysis, EventNote, GlobalConfig, Rule
 from app.services.alert_analysis import analysis_lines
@@ -27,6 +27,10 @@ REANALYZE_MIN_MINUTES = 5
 REANALYZE_MAX_MINUTES = 60
 REANALYZE_MEMORY_HOURS = 24
 REANALYZE_LOOKBACK = 500
+# Une vieille répétition n'apporte plus que sa date et sa gravité : ce sont elles qui font le MTTR et les statistiques.
+# Sa ligne reste, son texte part : prompt, contexte, analyse complète. Un mois couvre les statistiques courtes.
+SLIM_AFTER_DAYS = 30
+SLIM_TEXT_CHARS = 300
 
 
 def event_signatures(lines: List[str]) -> set:
@@ -89,6 +93,30 @@ def rekey(db):
             note.signatures_json = json.dumps(sorted(found[1]), ensure_ascii=False)
     config.event_keys_version = EVENT_KEY_VERSION
     db.commit()
+
+
+def slim_old_repeats(db, now: Optional[datetime] = None) -> int:
+    """Allège les vieilles occurrences qui répètent un événement. Garde entières la dernière de chaque événement pour
+    chaque gravité, les critiques et les signalées : ce sont celles qu'on relit. Les lignes restent, donc l'événement,
+    les notes et l'apprentissage aussi. Retourne le nombre d'occurrences allégées."""
+    cutoff = (now or datetime.utcnow()) - timedelta(days=SLIM_AFTER_DAYS)
+    keep = db.query(func.max(Analysis.id)).group_by(Analysis.rule_id, Analysis.event_key, Analysis.severity)
+    done = db.query(Analysis).filter(
+        Analysis.analyzed_at < cutoff, Analysis.severity != "critical", Analysis.feedback == None,
+        Analysis.triggered_lines_json != None, Analysis.id.notin_(keep),
+        or_(Analysis.prompt_json != None, Analysis.analysis_json != None,
+            func.length(Analysis.context_before_json) > 2, func.length(Analysis.context_after_json) > 2,
+            func.length(Analysis.ollama_response) > SLIM_TEXT_CHARS, func.length(Analysis.triggered_line) > SLIM_TEXT_CHARS),
+    ).update({
+        Analysis.prompt_json: None,
+        Analysis.analysis_json: None,
+        Analysis.context_before_json: "[]",
+        Analysis.context_after_json: "[]",
+        Analysis.ollama_response: case((func.length(Analysis.summary) > 0, Analysis.summary), else_=func.substr(Analysis.ollama_response, 1, SLIM_TEXT_CHARS)),
+        Analysis.triggered_line: func.substr(Analysis.triggered_line, 1, SLIM_TEXT_CHARS),
+    }, synchronize_session=False)
+    db.commit()
+    return done
 
 
 def reanalyze_delay(real_analyses: List[Analysis]) -> timedelta:

@@ -150,6 +150,8 @@ def init_db():
         # Regroupement des analyses par événement
         "ALTER TABLE analyses ADD COLUMN event_key VARCHAR",
         "CREATE INDEX IF NOT EXISTS ix_analyses_rule_event ON analyses (rule_id, event_key)",
+        # Tri des non lues par l'IA
+        "ALTER TABLE analyses ADD COLUMN triaged_at DATETIME",
     ]
 
     migrations += [

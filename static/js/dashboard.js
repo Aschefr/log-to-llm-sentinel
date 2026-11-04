@@ -210,11 +210,11 @@ function renderAttention() {
         dT('dashboard.silence_limit', 'limite : {h} h', { h: x.limit_hours }), `/rules/${x.rule_id}`)));
 
     const unread = DASH.watch.counts.unread;
-    const unreadRow = unread ? `<button type="button" class="dash-row dash-row--unread" onclick="showUnread()">
+    const unreadRow = unread ? `<div class="dash-unread"><button type="button" class="dash-row dash-row--unread" onclick="showUnread()">
         <span class="dash-tag">${escapeHtml(dT('dashboard.tag_read', 'À lire'))}</span>
         <span class="dash-row-main"><strong>${escapeHtml(dCount(unread, 'dashboard.unread_one', '{n} événement non lu', 'dashboard.unread_many', '{n} événements non lus'))}</strong></span>
         <span class="dash-row-when">${escapeHtml(dT('dashboard.unread_action', 'Voir'))}</span>
-    </button>` : '';
+    </button><button type="button" class="btn btn-secondary btn-sm dash-triage" onclick="openTriage()">${escapeHtml(dT('triage.title', 'Trier mes non lues'))}</button></div>` : '';
     DASH.attentionReady = true;
     const empty = !rows.length && !unread;
     dSetHtml(document.getElementById('dash-attention'), empty

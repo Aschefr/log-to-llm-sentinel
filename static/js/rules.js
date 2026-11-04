@@ -65,6 +65,15 @@ function sourceText(src) {
     return `${roT('rule.source_file', 'Fichier')} · ${src.label}`;
 }
 
+// Who keeps the rule's settings up to date: the autopilot, or the user.
+function modeHtml(r) {
+    const ap = r.autopilot;
+    if (!ap?.enabled) return `<span class="ro-mode">${escapeHtml(roT('rules.mode_manual', 'Manuel'))}</span>`;
+    const state = ap.status === 'error' ? roT('rules.mode_auto_error', 'en échec')
+        : ['learning', 'observing'].includes(ap.status) ? roT('rules.mode_auto_setup', 'en préparation') : '';
+    return `<span class="ro-mode-row"><span class="ro-mode ro-mode--auto ${ap.status === 'error' ? 'ro-mode--error' : ''}"><svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 10.5 13.5 3l-3 11-2.5-4.5z"/></svg>${escapeHtml(roT('rules.mode_auto', 'Pilote automatique'))}</span>${state ? `<span class="rp-muted ro-mode-state">${escapeHtml(state)}</span>` : ''}</span>`;
+}
+
 function render() {
     if (!RO.data) return;
     const { rules, kpis } = RO.data;
@@ -125,7 +134,7 @@ function rowHtml(r, s) {
     <div class="ro-row ${r.enabled ? '' : 'ro-row--off'}" role="row">
         <a class="ro-link" href="/rules/${r.id}" aria-label="${escapeHtml(r.name)}"></a>
         <span class="ro-state"><span class="ro-state-label"><span class="rp-dot ${s.dot}" aria-hidden="true"></span>${escapeHtml(s.label)}</span><span class="rp-muted">${escapeHtml(s.sub)}</span></span>
-        <span class="ro-name"><strong>${escapeHtml(r.name)}</strong><span class="mono rp-muted">${escapeHtml(sourceText(r.source))}</span></span>
+        <span class="ro-name"><strong>${escapeHtml(r.name)}</strong><span class="mono rp-muted">${escapeHtml(sourceText(r.source))}</span>${modeHtml(r)}</span>
         <span class="ro-alerts"><span class="ro-bars" aria-hidden="true">${bars}</span><strong>${r.total7}</strong></span>
         <span class="ro-incident"><span>${escapeHtml(last ? last.summary : roT('rules.no_alert', 'Aucune alerte.'))}</span><span class="rp-muted">${escapeHtml(lastWhen)}</span></span>
         <span>${escapeHtml(roMinutes(r.mttr30_minutes))}</span>

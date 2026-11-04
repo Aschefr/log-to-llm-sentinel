@@ -148,6 +148,7 @@ class ResolutionService:
         #     "lines_since_error": int | None (lignes normales recues depuis la derniere erreur ; None = inconnu),
         # }
         self._alert_states = {}
+        self._background = set()  # Validations de résolution en cours, gardées vivantes jusqu'à leur fin
         self._state_lock = asyncio.Lock()
 
     def set_orchestrator(self, orchestrator):
@@ -344,8 +345,11 @@ class ResolutionService:
 
         if matched_line:
             logger.info("ResolutionService", f"Pattern de resolution '{matched_pattern}' (poids={matched_weight}) detecte dans : {matched_line[:120]}")
-            await self._try_resolve(rule.id, trigger=f"Pattern match: '{matched_pattern}'", context_lines=lines, resolution_line=matched_line,
-                                    resolution_patterns=[matched_pattern], use_ai=(rule.resolution_ai_mode or "ambiguous") != "never")
+            # En arrière-plan : la validation IA peut durer des minutes, la réception des lignes ne doit pas l'attendre
+            task = asyncio.create_task(self._try_resolve(rule.id, trigger=f"Pattern match: '{matched_pattern}'", context_lines=lines, resolution_line=matched_line,
+                                    resolution_patterns=[matched_pattern], use_ai=(rule.resolution_ai_mode or "ambiguous") != "never"))
+            self._background.add(task)
+            task.add_done_callback(self._background.discard)
 
 
     async def check_timeout_resolutions(self):

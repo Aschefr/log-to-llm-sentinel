@@ -220,6 +220,7 @@ def rules_overview():
                 "last_line_received_at": rule_stats.iso(r.last_line_received_at),
                 "inactivity_period_hours": r.inactivity_period_hours,
                 "muted": rule_stats.is_muted(r, now),
+                "autopilot": ap.public(r),
             })
         # En alerte d'abord, puis règles actives par dernière alerte, désactivées à la fin
         items.sort(key=lambda i: (not i["enabled"], i["alert_status"] == "normal",
@@ -356,8 +357,10 @@ async def create_rule(rule_data: RuleCreate):
 
         # Apprentissage initial : l'arbitre propose ou complète les mots-clés d'après l'historique
         # (pilote automatique : toujours, et la session définit aussi le reste de la règle)
+        # (une source qui n'a encore rien reçu n'a pas d'historique à lire ; le pilote automatique, lui, sait attendre)
         session_id = None
-        if rule_data.autopilot or (rule_data.learn_history and rule.keyword_tuning_mode != "off"):
+        has_history = resolve_path(rule.log_file_path).exists()
+        if rule_data.autopilot or (rule_data.learn_history and has_history and rule.keyword_tuning_mode != "off"):
             session_id = kls.start_setup_session(rule.id)
         return {"id": rule.id, "message": "Règle créée", "learning_session_id": session_id}
     finally:
@@ -377,6 +380,12 @@ async def update_rule(rule_id: int, rule_data: RuleUpdate):
         source_changed = rule_data.log_file_path is not None and rule_data.log_file_path != rule.log_file_path
         if rule_data.log_file_path is not None:
             rule.log_file_path = rule_data.log_file_path
+        if source_changed:
+            # Comme à la création : l'ancienne position ne veut rien dire dans le nouveau fichier
+            try:
+                rule.last_position = float(os.path.getsize(rule.log_file_path)) if os.path.isfile(rule.log_file_path) else 0.0
+            except OSError:
+                rule.last_position = 0.0
         old_keywords, old_excluded = rule.get_keywords(), rule.get_excluded_patterns()
         if rule_data.keywords is not None:
             rule.set_keywords(rule_data.keywords)

@@ -543,6 +543,7 @@ document.addEventListener('events-changed', refreshAnalysisCounts);
 function setupAnalysesToolbar() {
     document.getElementById('an-period').addEventListener('change', e => { RP.an.period = e.target.value; loadAnalyses(true); });
     document.getElementById('an-open-only').addEventListener('change', e => { RP.an.openOnly = e.target.checked; loadAnalyses(true); });
+    document.getElementById('an-triage').addEventListener('click', () => openTriage(RP.id));
     document.getElementById('an-mark-read').addEventListener('click', async () => {
         await apiFetch(`/api/monitor/rules/${RP.id}/view-all`, { method: 'POST' });
         loadAnalyses(true);

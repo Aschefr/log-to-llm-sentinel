@@ -154,7 +154,7 @@ rest_command:
     headers:
       Content-Type: "application/json"
     payload: >-
-      {"lines": ["{{ level }} [{{ name }}] {{ message[0] if message is list else message | string | truncate(800, True, '...') }}{% if exception %} | EXCEPTION: {{ exception | string | truncate(500, True, '...') }}{% endif %}"]}
+      {{ {"lines": [level ~ " [" ~ name ~ "] " ~ (message | string | truncate(800, True, "...")) ~ (" | EXCEPTION: " ~ (exception | string)[-800:] if exception else "")]} | tojson }}
     timeout: 10
 
 system_log:
@@ -167,7 +167,7 @@ automation:
       Envoie chaque entree du journal HA vers Log Sentinel
       en temps reel via system_log_event.
     mode: queued
-    max: 20
+    max: 100
     trigger:
       - platform: event
         event_type: system_log_event

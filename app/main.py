@@ -160,6 +160,31 @@ async def lifespan(app: FastAPI):
             if removed:
                 print(f"[Main] Nettoyage tâches : {removed} entrée(s) supprimée(s)")
 
+    def _slim_repeats():
+        from app.database import SessionLocal, engine
+        from app.services import analysis_events
+        db = SessionLocal()
+        try:
+            done = analysis_events.slim_old_repeats(db)
+        finally:
+            db.close()
+        # SQLite garde la place libérée pour lui : seul VACUUM rend le fichier plus petit
+        if done >= 200:
+            with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                conn.exec_driver_sql("VACUUM")
+        return done
+
+    async def _slim_repeats_loop():
+        while True:
+            await asyncio.sleep(3600)
+            try:
+                done = await asyncio.to_thread(_slim_repeats)
+                if done:
+                    print(f"[Main] Maintenance : {done} ancienne(s) répétition(s) d'alerte allégée(s)")
+            except Exception as e:
+                print(f"[Main] Allègement des répétitions en échec : {e}")
+            await asyncio.sleep(86400 - 3600)
+
     async def _run_meta_analyses_loop():
         while True:
             await asyncio.sleep(600)  # Vérifie toutes les 10 minutes
@@ -259,6 +284,7 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(_cleanup_tasks())
     asyncio.create_task(_run_meta_analyses_loop())
+    asyncio.create_task(_slim_repeats_loop())
     asyncio.create_task(_daily_update_check())
     asyncio.create_task(_inactivity_checker())
     asyncio.create_task(_resolution_checker())
@@ -342,6 +368,7 @@ from app.routers import meta_analysis as meta_router
 from app.routers import keyword_learning as kw_learning_router
 from app.routers import webhook as webhook_router
 from app.routers import diagnostics as diagnostics_router
+from app.routers import triage as triage_router
 
 app.include_router(rules.router)
 app.include_router(config.router)
@@ -354,6 +381,7 @@ app.include_router(meta_router.router)
 app.include_router(kw_learning_router.router)
 app.include_router(webhook_router.router)
 app.include_router(diagnostics_router.router)
+app.include_router(triage_router.router)
 
 
 # ── Pages ──

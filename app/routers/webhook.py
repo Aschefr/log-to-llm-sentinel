@@ -1,23 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Query
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Request, Query
 from app.database import SessionLocal
-from app.models import Rule
+from app.models import GlobalConfig, Rule
+from app import logger
 from collections import deque
 from pathlib import Path
 from typing import Optional
 from datetime import datetime, timezone
-import logging
+import asyncio
+import json
 import os
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+import re
 
 router = APIRouter(prefix="/api/webhook", tags=["webhook"])
-logger = logging.getLogger(__name__)
 
 # Instance globale de l'orchestrateur (injectée au démarrage)
 _orchestrator = None
@@ -26,6 +20,10 @@ _orchestrator = None
 _BUFFER_MAX = 2000
 _webhook_buffers: dict[str, deque] = {}
 _WEBHOOK_LOG_DIR = Path(os.environ.get("SENTINEL_DATA_DIR", "/app/data")) / "webhooks"
+MAX_LINE_CHARS = 10_000
+# Un gabarit qui colle le message dans le JSON sans l'échapper : un guillemet ou une trace d'exception le rend invalide,
+# et ce sont justement les erreurs les plus utiles.
+_UNESCAPED_LINES = re.compile(r'^\s*\{\s*"lines"\s*:\s*\[\s*"(.*)"\s*\]\s*\}\s*$', re.DOTALL)
 
 def set_orchestrator(orchestrator_instance):
     global _orchestrator
@@ -75,10 +73,60 @@ def _append_to_disk(token: str, lines: list[str]):
         from app.utils.log_utils import rotate_log_file
         rotate_log_file(fp, limit_mb * 1024 * 1024)
     except Exception as e:
-        logger.warning(f"Webhook log write error: {e}")
+        logger.warning("Webhook", f"Écriture du journal {fp.name} : {e}")
+
+
+def _as_text(item) -> str:
+    return item if isinstance(item, str) else json.dumps(item, ensure_ascii=False)
+
+
+def parse_lines(body: bytes, content_type: str) -> list[str]:
+    """Les lignes d'un envoi, quel qu'en soit le format. Un log n'est jamais refusé pour sa forme : ce qui n'est pas du
+    JSON valide est lu comme du texte."""
+    text = body.decode("utf-8", errors="replace")
+    items = [text]
+    if "application/json" in content_type:
+        try:
+            data = json.loads(text)
+            data = data["lines"] if isinstance(data, dict) and "lines" in data else data
+            items = data if isinstance(data, list) else [data]
+        except ValueError:
+            salvaged = _UNESCAPED_LINES.match(text)
+            items = [salvaged.group(1) if salvaged else text]
+    lines = []
+    for item in items:
+        for line in _as_text(item).splitlines():
+            line = line.strip()
+            if len(line) > MAX_LINE_CHARS:
+                line = line[:MAX_LINE_CHARS] + f" …[TRONQUÉ : {len(line)} chars]"
+            if line:
+                lines.append(line)
+    return lines
+
+
+def _find_rule(rule_id_or_token: str) -> Optional[Rule]:
+    """La connexion à la base est rendue tout de suite : gardée pendant la suite de l'envoi, une rafale les épuiserait
+    toutes et chaque requête attendrait les autres."""
+    db = SessionLocal()
+    try:
+        if rule_id_or_token.isdigit():
+            return db.query(Rule).filter(Rule.id == int(rule_id_or_token)).first()
+        return db.query(Rule).filter(Rule.log_file_path == f"[WEBHOOK]:{rule_id_or_token}").first()
+    finally:
+        db.close()
+
+
+def _mark_received(rule_id: int):
+    db = SessionLocal()
+    try:
+        db.query(Rule).filter(Rule.id == rule_id).update(
+            {Rule.last_line_received_at: datetime.utcnow(), Rule.inactivity_notified: False}, synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
 
 @router.post("/logs/{rule_id_or_token}")
-async def receive_logs(rule_id_or_token: str, request: Request, db: Session = Depends(get_db)):
+async def receive_logs(rule_id_or_token: str, request: Request):
     """
     Reçoit des logs d'une machine externe et les injecte directement dans l'orchestrateur.
     Supporte les payloads JSON ({"lines": [...]}) ou le texte brut (une ligne par ligne).
@@ -86,35 +134,14 @@ async def receive_logs(rule_id_or_token: str, request: Request, db: Session = De
     if not _orchestrator:
         raise HTTPException(status_code=500, detail="orchestrator_not_configured")
         
-    if rule_id_or_token.isdigit():
-        rule = db.query(Rule).filter(Rule.id == int(rule_id_or_token)).first()
-    else:
-        rule = db.query(Rule).filter(Rule.log_file_path == f"[WEBHOOK]:{rule_id_or_token}").first()
-        
+    rule = _find_rule(rule_id_or_token)
     if not rule:
         raise HTTPException(status_code=404, detail="rule_not_found")
         
     if not rule.enabled:
         raise HTTPException(status_code=400, detail="rule_disabled")
 
-    content_type = request.headers.get("content-type", "")
-    lines = []
-    
-    if "application/json" in content_type:
-        try:
-            data = await request.json()
-            if isinstance(data, dict) and "lines" in data:
-                lines = data["lines"]
-            elif isinstance(data, list):
-                lines = data
-            else:
-                lines = [str(data)]
-        except Exception:
-            raise HTTPException(status_code=400, detail="invalid_json")
-    else:
-        body_bytes = await request.body()
-        text = body_bytes.decode('utf-8', errors='ignore')
-        lines = [line.strip() for line in text.splitlines() if line.strip()]
+    lines = parse_lines(await request.body(), request.headers.get("content-type", ""))
 
     if not lines:
         return {"status": "ok", "message": "Aucune ligne à traiter"}
@@ -126,15 +153,21 @@ async def receive_logs(rule_id_or_token: str, request: Request, db: Session = De
     stamped = [f"{ts}  {line}" for line in lines]
     for s in stamped:
         buf.append(s)
-    _append_to_disk(token, stamped)
+    await asyncio.to_thread(_append_to_disk, token, stamped)
 
     # Mettre à jour la date de dernière ligne reçue et réinitialiser le statut d'inactivité (MON-14 & MON-15)
-    rule.last_line_received_at = datetime.utcnow()
-    rule.inactivity_notified = False
-    db.commit()
+    # Hors de la boucle : une base occupée ne doit retarder ni l'émetteur, ni les autres sources
+    try:
+        await asyncio.to_thread(_mark_received, rule.id)
+    except Exception as e:
+        logger.warning("Webhook", f"Date de dernière ligne de la règle {rule.id} : {e}")
 
-    await _orchestrator.handle_new_lines(rule, lines)
-    
+    # Les lignes sont reçues : une erreur de traitement ne doit pas les faire passer pour refusées
+    try:
+        await _orchestrator.handle_new_lines(rule, lines)
+    except Exception as e:
+        logger.error("Webhook", f"Traitement de {len(lines)} ligne(s) de la règle {rule.id} : {e}")
+
     return {"status": "ok", "lines_received": len(lines)}
 
 

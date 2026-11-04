@@ -114,7 +114,9 @@ class Orchestrator:
             self._buffers[rule_id]["matched_keywords"].update(matched_keywords)
 
             # Démarrer le timer anti-spam si pas déjà en cours
-            if self._buffers[rule_id]["task"] is None:
+            # (une tâche morte, sur une base occupée par exemple, ne doit pas couper les alertes de la règle)
+            task = self._buffers[rule_id]["task"]
+            if task is None or task.done():
                 self._buffers[rule_id]["task"] = asyncio.create_task(self._flush_buffer(rule_id))
         finally:
             db.close()

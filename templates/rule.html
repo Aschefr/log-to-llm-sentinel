@@ -52,8 +52,10 @@
                 </label>
                 <label class="rp-inline-label"><input type="checkbox" id="an-open-only"> <span data-i18n="rule.open_only">Incidents ouverts seulement</span></label>
                 <button type="button" class="btn btn-secondary btn-sm" id="an-mark-read" data-i18n="monitor.mark_all_read">Tout marquer comme lu</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="an-triage" data-i18n="triage.title">Trier mes non lues</button>
             </div>
         </div>
+        <div id="triage-last"></div>
         <details class="rule-notes" id="an-notes">
             <summary><span data-i18n="common.notes_title">Notes pour l'IA</span> <span class="rule-notes-count">0</span></summary>
             <div class="rule-notes-body">
@@ -75,6 +77,6 @@
 
 {% block scripts %}
 <script src="/static/js/rule_form.js?v=8"></script>
-<script src="/static/js/rule_page.js?v=13"></script>
+<script src="/static/js/rule_page.js?v=14"></script>
 <script src="/static/js/rule_keywords.js?v=5"></script>
 {% endblock %}

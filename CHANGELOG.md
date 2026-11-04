@@ -7,11 +7,22 @@ All notable changes to this project will be documented in this file.
 ### Added
 - **Several diagnostic connections, chosen per rule**: add as many read-only Docker and SSH connections as you need in Configuration > Diagnostics, then tick in each rule which ones the AI may use. A conversation about an alert only reaches the machines of its rule, so the AI no longer checks the wrong server. An existing configuration carries over and stays available to all rules.
 
+- **Autopilot or manual, at a glance**: each rule in the Rules list now shows whether the autopilot keeps its settings up to date or you do.
+- **Sort my unread**: on demand, the AI goes through your unread events and suggests which ones can be marked as read, with a reason for each. You untick what you want to keep and validate with one click, and the last sort can be undone. Critical events, events first seen less than a day ago and events seen only once in the last 7 days are never suggested, whatever the AI answers.
+
 ### Changed
+- **Old alert repeats take much less room**: after 30 days, the repeats of an event keep their lines, dates, severity and summary, and lose the rest (prompt, surrounding log lines, full analysis). The latest occurrence of each event for each severity, critical alerts and alerts you gave feedback on stay whole. Time to resolution, statistics and keyword tuning are unchanged.
 - **Docker proxy on Unraid**: use the *dockersocket* app already in Community Apps, instead of a dedicated template. The connection test no longer needs `INFO=1`, so a stricter proxy passes it. Existing installations keep working.
 - **No more log character limit to set**: how many lines the AI receives for an alert now follows the context size: about a quarter of it, from 2,000 to 30,000 characters. With a large context, a burst of lines is no longer cut at 5,000 characters.
 
 ### Fixed
+- **Webhook: log lines with quotes or stack traces were lost**: the Home Assistant template from the README produced invalid JSON for any line containing a double quote or an exception, and Sentinel refused it without a trace. These lines are now accepted as they are, with nothing to change in Home Assistant, and the README template now escapes them properly. A payload is no longer refused for its format.
+- **Webhook: a busy database or a slow AI check could delay or lose lines**: answering the sender no longer waits for the database or for the AI validation of a resolution, which could exceed Home Assistant's 10-second timeout. The configured log rotation limit is also respected, it was ignored for webhooks.
+- **Log files: lines cut in two**: a line written in several steps was read as two lines, so a keyword could go unnoticed. Sentinel now waits for the end of the line.
+- **Log files: reading could stop for good**: a line over 1 MB froze the rule, a failed watcher was never restarted, and a brief database error could stop new rules from being picked up. A processing error also re-sent the same lines every second.
+- **Log files: changing a rule's file had no effect until a restart**, and the old read position was kept for the new file.
+- **Rules could stop alerting until a restart**: a grouping timer that failed, on a busy database for instance, blocked all later alerts of its rule.
+- **Dropdown lists in the dark theme**: some lists opened with light text on a white background.
 - **Alert card buttons**: marking an alert as not relevant lengthened its label, which squeezed *Deepen with AI* and *Investigate* onto two lines. They now keep their size, and the other buttons wrap instead.
 - **Docker image**: local files that had no place in it (git history, working notes, scratch scripts, the local compose override) are now left out.
 
