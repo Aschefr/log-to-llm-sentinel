@@ -55,7 +55,7 @@ function noteFormHtml({ text = '', withScope = false, hint = true }) {
             <legend>${escapeHtml(noteT('common.note_scope_label', 'S’applique à'))}</legend>
             <label><input type="radio" name="${id}-scope" value="event" checked>
                 <span><strong>${escapeHtml(noteScopeLabel('event'))}</strong>
-                <span class="form-hint">${escapeHtml(noteT('common.note_scope_event_hint', 'Celles qui partagent au moins une de ces lignes, à part ce qui change (heure, adresse, numéro). Un autre mot, comme un autre nom de domaine, en fait une autre alerte.'))} <span data-reach="event"></span></span></span></label>
+                <span class="form-hint">${escapeHtml(noteT('common.note_scope_event_hint', 'Celles qui partagent au moins une de ces lignes, à part ce qui change (heure, adresse, nom de domaine, numéro). Un autre message en fait une autre alerte.'))} <span data-reach="event"></span></span></span></label>
             <label><input type="radio" name="${id}-scope" value="source">
                 <span><strong>${escapeHtml(noteScopeLabel('source'))}</strong>
                 <span class="form-hint">${escapeHtml(noteT('common.note_scope_source_hint', 'Même celles qui n’ont aucun rapport avec celle-ci, et toutes les suivantes.'))} <span data-reach="source"></span></span></span></label>

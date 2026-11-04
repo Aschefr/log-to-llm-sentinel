@@ -15,7 +15,12 @@ _SIG_RULES = [
     (re.compile(r"^<\d+>"), ""),
     (re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"), "<ID>"),
     (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b"), "<IP>"),
+    # Nom de domaine public (une requête DNS, un site visité). Pas com.docker.backend.exe ni java.lang.Exception, qui
+    # distinguent un événement d'un autre : d'où la liste des terminaisons, et le refus d'une suite après la dernière.
+    (re.compile(r"\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+(?:com|net|org|fr|de|eu|uk|be|ch|io|co|app|dev|info|biz|tv|me|ai|cloud|arpa)\b(?!\.?[\w-])\.?"), "<HOST>"),
+    (re.compile(r"(?:[a-zA-Z0-9-]+\.)+(?=\])"), "<HOST>"),  # nom DNS absolu en fin de champ : [QUERY: rpi5ssd.local.]
     (re.compile(r"\b(?=[0-9a-fA-F]*\d)(?=[0-9a-fA-F]*[a-fA-F])[0-9a-fA-F]{8,}\b"), "<HEX>"),
+    (re.compile(r"\b((?:[A-Za-z0-9]+_)?(?:ID|id)[ :=]+)[0-9a-fA-F]{1,8}\b"), r"\1<N>"),  # valeur d'un identifiant, même sans chiffre (TXN_ID fdbd)
     (re.compile(r"\[\d+\]"), "[<N>]"),
     (re.compile(r"\b\d{4,}\b"), "<N>"),
     (re.compile(r"\s+"), " "),

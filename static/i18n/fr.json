@@ -748,7 +748,7 @@
     "note_scope_event": "Cette alerte et les alertes similaires",
     "note_scope_related": "Alerte similaire",
     "note_scope_source": "Toutes les alertes de cette règle",
-    "note_scope_event_hint": "Celles qui partagent au moins une de ces lignes, à part ce qui change (heure, adresse, numéro). Un autre mot, comme un autre nom de domaine, en fait une autre alerte.",
+    "note_scope_event_hint": "Celles qui partagent au moins une de ces lignes, à part ce qui change (heure, adresse, nom de domaine, numéro). Un autre message en fait une autre alerte.",
     "note_scope_source_hint": "Même celles qui n'ont aucun rapport avec celle-ci, et toutes les suivantes.",
     "note_reach_one": "Aujourd'hui : cette alerte seulement, sur {total}.",
     "note_reach_many": "Aujourd'hui : {n} alertes sur {total}.",

@@ -748,7 +748,7 @@
     "note_scope_event": "This alert and similar alerts",
     "note_scope_related": "Similar alert",
     "note_scope_source": "All alerts of this rule",
-    "note_scope_event_hint": "Those sharing at least one of these lines, apart from what changes (time, address, number). A different word, such as another domain name, makes it a different alert.",
+    "note_scope_event_hint": "Those sharing at least one of these lines, apart from what changes (time, address, domain name, number). A different message makes it a different alert.",
     "note_scope_source_hint": "Even those unrelated to this one, and all the next ones.",
     "note_reach_one": "Today: this alert only, out of {total}.",
     "note_reach_many": "Today: {n} alerts out of {total}.",

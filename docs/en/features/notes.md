@@ -6,7 +6,7 @@ The AI only knows what the logs say. A note tells it what they cannot: the opera
 
 Open an event on the dashboard or in a rule's **Analyses** tab, then choose **Add a note** (500 characters at most, 30 notes per rule). A note applies to one of two scopes:
 
-* **This alert and similar alerts**: alerts with the same error lines, and alerts that share at least one of them (shown as *Similar alert*). Lines are compared apart from what changes, such as the time, an address or a number. A different word, such as another domain name, makes it a different alert.
+* **This alert and similar alerts**: alerts with the same error lines, and alerts that share at least one of them (shown as *Similar alert*). Lines are compared apart from what changes, such as the time, an address, a public domain name or a number. A different message makes it a different alert.
 * **All alerts of this rule**: every alert of the rule, even unrelated ones, and all the next ones.
 
 The form says how many alerts each choice concerns today.
