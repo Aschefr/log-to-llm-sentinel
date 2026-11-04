@@ -3,19 +3,20 @@ Textes des prompts envoyés au LLM (FR / EN), centralisés.
 """
 
 # Sortie structurée de l'analyse d'alerte (paramètre `format` d'Ollama)
-# Le raisonnement passe avant le verdict : le modèle ne choisit pas la gravité avant d'avoir regardé les lignes
+# log_manipulation d'abord : le modèle regarde si une ligne cherche à l'influencer avant de choisir la gravité.
+# La gravité reste avant le raisonnement : placée après, un OOM kill passait de critical (6 fois sur 10) à warning (10 sur 10).
 ALERT_SCHEMA = {
     "type": "object",
     "properties": {
-        "probable_cause": {"type": "string"},
-        "explanation": {"type": "string"},
         "log_manipulation": {"type": "boolean"},
         "severity": {"type": "string", "enum": ["info", "warning", "critical"]},
         "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
         "summary": {"type": "string"},
+        "probable_cause": {"type": "string"},
+        "explanation": {"type": "string"},
         "actions": {"type": "array", "items": {"type": "string"}},
     },
-    "required": ["probable_cause", "explanation", "log_manipulation", "severity", "confidence", "summary", "actions"],
+    "required": ["log_manipulation", "severity", "confidence", "summary", "probable_cause", "explanation", "actions"],
 }
 
 ALERT_SYSTEM = {
