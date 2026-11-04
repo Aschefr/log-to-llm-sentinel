@@ -47,3 +47,6 @@ data/webhooks/
 
 # Journal de l application : contient des lignes de logs reelles
 data/logs/
+
+# Notes de reprise de session : décrivent le réseau local
+REPRISE_SESSION.md
