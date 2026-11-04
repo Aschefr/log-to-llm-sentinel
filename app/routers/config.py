@@ -91,7 +91,6 @@ class ConfigUpdate(BaseModel):
     apprise_url: Optional[str] = None
     apprise_tags: Optional[str] = None
     apprise_max_chars: Optional[int] = None
-    max_log_chars: Optional[int] = None
     monitor_log_lines: Optional[int] = None
     debug_mode: Optional[bool] = None
     site_lang: Optional[str] = None  # langue du site (header) pour notifications
@@ -138,7 +137,6 @@ def get_config():
             "apprise_url": config.apprise_url,
             "apprise_tags": config.apprise_tags,
             "apprise_max_chars": config.apprise_max_chars,
-            "max_log_chars": config.max_log_chars,
             "monitor_log_lines": config.monitor_log_lines,
             "debug_mode": config.debug_mode,
             "ollama_prompt_lang": config.ollama_prompt_lang or 'fr',
@@ -201,8 +199,6 @@ async def update_config(config_data: ConfigUpdate):
             config.apprise_tags = config_data.apprise_tags
         if config_data.apprise_max_chars is not None:
             config.apprise_max_chars = config_data.apprise_max_chars
-        if config_data.max_log_chars is not None:
-            config.max_log_chars = config_data.max_log_chars
         if config_data.monitor_log_lines is not None:
             config.monitor_log_lines = config_data.monitor_log_lines
         if config_data.debug_mode is not None:

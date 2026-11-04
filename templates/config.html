@@ -76,9 +76,6 @@
                         <button type="button" class="chip" data-ctx="131072" onclick="setOllamaCtx(131072)">128K</button>
                     </div>
                 {% endcall %}
-                {% call field('max-log-chars', 'config.max_log_chars', 'Limite de caractères par log', 'config.max_log_chars_hint', 'Évite de saturer le serveur avec des logs massifs.', row_class='cfg-row--short') %}
-                    <input type="number" id="max-log-chars" value="5000" min="500" max="50000">
-                {% endcall %}
             </div>
 
             <div class="rp-card" id="chat-settings">
@@ -427,6 +424,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=13"></script>
-<script src="/static/js/diagnostics_config.js?v=4"></script>
+<script src="/static/js/config.js?v=14"></script>
+<script src="/static/js/diagnostics_config.js?v=5"></script>
 {% endblock %}

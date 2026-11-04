@@ -8,10 +8,18 @@ ANALYSIS_TEMPERATURE = 0.2
 DEFAULT_CTX = 32768
 MIN_CTX = 8192   # le plus gros échange mesuré : 5 900 tokens de prompt et 990 de réponse
 MAX_CTX = 131072
+# Lignes d'une alerte envoyées à l'IA : un quart du contexte (3 caractères par token), le reste va au contexte et à l'historique.
+# Plafond : au-delà, un paquet de lignes répétitives ralentit l'analyse sans rien lui apprendre.
+MIN_LOG_CHARS = 2000
+MAX_LOG_CHARS = 30000
 
 
 def clamp_ctx(value: int) -> int:
     return max(MIN_CTX, min(MAX_CTX, int(value)))
+
+
+def log_chars_for(ctx: int) -> int:
+    return max(MIN_LOG_CHARS, min(MAX_LOG_CHARS, ctx * 3 // 4))
 
 
 def config_to_dict(config: Optional[GlobalConfig]) -> dict:
@@ -33,7 +41,7 @@ def config_to_dict(config: Optional[GlobalConfig]) -> dict:
         "apprise_url": config.apprise_url if config else "",
         "apprise_tags": config.apprise_tags if config else "",
         "apprise_max_chars": config.apprise_max_chars if config else 1900,
-        "max_log_chars": config.max_log_chars if config else 5000,
+        "max_log_chars": log_chars_for(config.ollama_ctx if config and config.ollama_ctx else DEFAULT_CTX),
         "monitor_log_lines": config.monitor_log_lines if config else 60,
         "debug_mode": config.debug_mode if config else False,
         "ollama_prompt_lang": (config.ollama_prompt_lang or 'fr') if config else 'fr',

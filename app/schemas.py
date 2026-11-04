@@ -20,7 +20,6 @@ class GlobalConfigCreate(BaseModel):
     apprise_url: str = ""
     apprise_tags: str = ""
     apprise_max_chars: int = 1900
-    max_log_chars: int = 5000
     debug_mode: bool = False
     ollama_prompt_lang: str = 'fr'  # 'fr' | 'en'
     discord_webhook_url: Optional[str] = None

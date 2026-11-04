@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- **No more log character limit to set**: how many lines the AI receives for an alert now follows the context size: about a quarter of it, from 2,000 to 30,000 characters. With a large context, a burst of lines is no longer cut at 5,000 characters.
+
+### Fixed
+- **Alert card buttons**: marking an alert as not relevant lengthened its label, which squeezed *Deepen with AI* and *Investigate* onto two lines. They now keep their size, and the other buttons wrap instead.
+- **Docker image**: local files that had no place in it (git history, working notes, scratch scripts, the local compose override) are now left out.
+
 ## [1.7.0] - 2026-11-04
 
 ### Added
