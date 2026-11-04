@@ -210,7 +210,7 @@ def scan(files: list, start: datetime, end: datetime, keywords: list, excluded: 
             "local_offset_h": local_offset.total_seconds() / 3600, "gaps": gaps}
 
 
-def event_candidates(result: dict, days: float, room: int) -> list:
+def event_candidates(result: dict, days: float, room: int, named_only: bool = False) -> list:
     """Lignes sans niveau d'erreur d'une source qui journalise surtout des événements (audit, sécurité, réseau). Elle
     n'a peut-être aucune ligne d'erreur : l'arbitre doit quand même voir ce qu'elle raconte pour choisir ce qui mérite
     une analyse. Les événements nommés (CEF) sont regroupés par nom ; sans nom, seulement si le journal reste lisible."""
@@ -222,7 +222,7 @@ def event_candidates(result: dict, days: float, room: int) -> list:
             g = groups.setdefault(cef[0], {"count": 0, "examples": [], "signature": cef[0]})
             g["count"] += t["count"]
             g["examples"] = (g["examples"] + t["examples"])[:3]
-    if not groups and len(result["templates"]) <= EVENT_MAX_TEMPLATES:
+    if not groups and not named_only and len(result["templates"]) <= EVENT_MAX_TEMPLATES:
         for sig, t in result["templates"].items():
             if t["status"] is None and not t["error_like"]:
                 groups[sig] = {"count": t["count"], "examples": t["examples"], "signature": sig}
@@ -241,9 +241,10 @@ def scan_candidates(db, rule: Rule, result: dict, days: float):
              if t["status"] is None and t["error_like"] and t["count"] >= BLIND_MIN_COUNT]
     blind.sort(key=lambda c: c["count"], reverse=True)
     blind = blind[:BLIND_MAX]
-    # Une règle du pilote sans mot-clé ne peut rien détecter : c'est à lui de trouver ce qui mérite une analyse
-    if ap.enabled(rule) and not rule.get_keywords() and len(blind) < BLIND_MAX:
-        blind += event_candidates(result, days, BLIND_MAX - len(blind))
+    # Le pilote choisit ce qui mérite une analyse, même sans ligne d'erreur : une source d'événements en a peu (une latence
+    # WAN n'est pas une erreur). Une fois qu'elle a un mot-clé, seuls les événements nommés : le reste est trop bavard.
+    if ap.enabled(rule) and len(blind) < BLIND_MAX:
+        blind += event_candidates(result, days, BLIND_MAX - len(blind), named_only=bool(rule.get_keywords()))
 
     alerts = kt.alert_stats(db, rule)
     noise = []

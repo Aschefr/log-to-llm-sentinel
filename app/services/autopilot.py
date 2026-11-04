@@ -46,6 +46,7 @@ AUTOPILOT_PATTERNS_MAX = 8      # motifs appris actifs au plus, par règle
 OBSERVE_HOURS = 24
 OBSERVE_MAX_ROUNDS = 7          # une source toujours muette n'est pas observée indéfiniment
 MIN_HISTORY_LINES = 50          # en dessous, l'historique ne suffit pas : observation
+SILENCE_MIN_GAPS = 50           # écarts entre lignes en dessous desquels le rythme d'une source reste inconnu
 MIN_HISTORY_SPAN_H = 6          # … ni un historique court et peu fourni (moins de RICH_HISTORY_LINES lignes)
 RICH_HISTORY_LINES = 500
 REFRESH_DAYS = 7
@@ -239,12 +240,15 @@ def grouping_window(timestamps: List[datetime]) -> Optional[int]:
 
 
 def silence_hours(gaps_s: List[float], span_h: float) -> Optional[int]:
-    """Délai (h) avant d'alerter sur une source muette : le double du plus long silence habituel (99e centile des
-    écarts entre lignes), entre 1 h et 7 jours. None si la période observée est trop courte pour en juger."""
+    """Délai (h) avant d'alerter sur une source muette : le double du plus long silence observé, entre 1 h et 7 jours.
+    Une source très bavarde en rafales se tait aussi longtemps qu'une autre : un centile masquerait ses vrais silences.
+    Une source qui écrit peu n'a pas montré son rythme : au moins un jour. None si la période est trop courte pour en juger."""
     if span_h < MIN_HISTORY_SPAN_H:
         return None
-    longest = _quantile(gaps_s, 0.99) if len(gaps_s) >= 100 else (max(gaps_s) if gaps_s else 0)
-    return int(min(168, max(1, math.ceil(longest * 2 / 3600))))
+    hours = math.ceil(max(gaps_s, default=0) * 2 / 3600)
+    if len(gaps_s) < SILENCE_MIN_GAPS:
+        hours = max(hours, 24)
+    return int(min(168, max(1, hours)))
 
 
 def top_signatures(templates: dict) -> List[str]:

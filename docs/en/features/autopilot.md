@@ -12,7 +12,7 @@ When the rule is created, Sentinel reads the last 7 days of the log (current fil
 * The [keyword arbiter](keyword-learning.md) chooses the **keywords** and **exclusions**, with the usual checks.
 * Two settings come from the real rhythm of the lines, without the AI:
   * the **grouping window**: long enough to gather the lines of one event (twice the usual gap between them, 30 s to 5 min);
-  * the **silence delay**: twice the longest usual silence of the source (1 h to 7 days), before warning that the source is silent.
+  * the **silence delay**: twice the longest silence seen on the source (1 h to 7 days), and at least a day for a source that writes few lines, before warning that the source is silent.
 
 The rule page shows *Autopilot · reading history* in its header, and the setup card in the **Keywords** tab. One notification sums up what was set.
 
