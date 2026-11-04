@@ -270,7 +270,7 @@ async function testAndSaveSsh() {
     if (res.script_outdated) {
         diagResult('diag-ssh-result', false, dT('diag.script_outdated', '⚠ Connecté, mais le script installé sur le serveur est ancien : recolle le bloc de l’étape 2.'));
     } else {
-        diagResult('diag-ssh-result', true, `✓ ${dT('diag.connected', 'Connecté')}${res.host_fingerprint ? ' · ' + res.host_fingerprint.split(' ')[1] : ''} · ${dT('diag.saved_ok', 'enregistré')}`);
+        diagResult('diag-ssh-result', true, `✓ ${dT('diag.connected', 'Connecté')}${(res.host_fingerprint || '').match(/SHA256:\S+/) ? ' · ' + res.host_fingerprint.match(/SHA256:\S+/)[0] : ''} · ${dT('diag.saved_ok', 'enregistré')}`);
     }
     out.textContent = res.output;
     out.classList.remove('hidden');
