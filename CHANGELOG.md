@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.7.0] - 2026-11-04
 
 ### Added
 - **New dashboard**: a watch post that opens on a verdict (*All good*, or the list of problems, also shown in the browser tab), then what needs attention (open alerts, silent sources, autopilot failures, Ollama problems, unread analyses), the alerts over 7 days by severity, the autopilot's state and latest decisions, the state of Ollama, and the history. When Sentinel stops responding the page says the state is unknown instead of showing old data as fine.
