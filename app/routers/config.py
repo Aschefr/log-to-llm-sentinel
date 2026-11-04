@@ -95,6 +95,8 @@ class ConfigUpdate(BaseModel):
     monitor_log_lines: Optional[int] = None
     debug_mode: Optional[bool] = None
     site_lang: Optional[str] = None  # langue du site (header) pour notifications
+    chat_system_prompt: Optional[str] = None
+    chat_compression_mode: Optional[str] = None
     instance_name: Optional[str] = None  # nom de l'instance (multi-déploiement)
     discord_webhook_url: Optional[str] = None
     auto_delete_analyses: Optional[bool] = None
@@ -141,6 +143,8 @@ def get_config():
             "debug_mode": config.debug_mode,
             "ollama_prompt_lang": config.ollama_prompt_lang or 'fr',
             "site_lang": config.site_lang or 'fr',
+            "chat_system_prompt": config.chat_system_prompt or '',
+            "chat_compression_mode": config.chat_compression_mode or '',
             "instance_name": config.instance_name or '',
             "discord_webhook_url": config.discord_webhook_url or '',
             "auto_delete_analyses": config.auto_delete_analyses,
@@ -205,6 +209,10 @@ async def update_config(config_data: ConfigUpdate):
             config.debug_mode = config_data.debug_mode
         if config_data.site_lang is not None:
             config.site_lang = config_data.site_lang
+        if config_data.chat_system_prompt is not None:
+            config.chat_system_prompt = config_data.chat_system_prompt.strip()
+        if config_data.chat_compression_mode in ("", "summary", "compact", "truncate"):
+            config.chat_compression_mode = config_data.chat_compression_mode
         if config_data.instance_name is not None:
             config.instance_name = config_data.instance_name
         if config_data.discord_webhook_url is not None:

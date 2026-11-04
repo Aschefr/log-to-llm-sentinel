@@ -294,7 +294,8 @@ class GlobalConfig(Base):
     site_lang = Column(String, default='fr')  # langue du site (header) — utilisée pour les notifications
     instance_name = Column(String, default='')  # nom de l'instance pour différencier les notifications multi-déploiement
     chat_system_prompt = Column(Text, default="")
-    chat_lang = Column(String, default="")  # Default header lang if empty
+    chat_lang = Column(String, default="")  # Plus utilisée : le chat suit la langue du site
+    chat_compression_mode = Column(String, default="")  # Contexte plein : "" (demander), summary, compact, truncate
     auto_delete_analyses = Column(Boolean, default=False)
     auto_delete_retention_days = Column(Integer, default=30)
     discord_webhook_url = Column(String, nullable=True)
@@ -319,7 +320,7 @@ class ChatConversation(Base):
     compression_mode = Column(String, nullable=True) # 'compact', 'summary'
     compressed_context = Column(Text, nullable=True)
     compressed_at = Column(DateTime, nullable=True)
-    auto_compression_mode = Column(String, nullable=True)  # mode auto mémorisé pour cette conv
+    auto_compression_mode = Column(String, nullable=True)  # Plus utilisée : le réglage est dans Configuration
     
     messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan")
     compressions = relationship("ChatCompression", back_populates="conversation", cascade="all, delete-orphan", order_by="ChatCompression.compressed_at")

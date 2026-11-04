@@ -47,6 +47,7 @@ class ChatTaskEntry:
     token_buffer: list = field(default_factory=list)
     error: Optional[str] = None
     created_at: datetime = field(default_factory=datetime.utcnow)
+    task: Optional[asyncio.Task] = None  # Génération en cours, pour pouvoir l'arrêter
     # Événement signalé à chaque nouveau token (pour réveiller les lecteurs SSE)
     _new_token: asyncio.Event = field(default_factory=asyncio.Event)
 

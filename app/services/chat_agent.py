@@ -64,12 +64,14 @@ def _parse_args(raw) -> dict:
 async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
                          emit_text: Callable[[str], None], emit_event: Callable[[dict], None],
                          use_tools: bool, conversation_id: Optional[int] = None,
-                         limits: AgentLimits = AgentLimits(), lang: str = "fr") -> AgentResult:
+                         limits: AgentLimits = AgentLimits(), lang: str = "fr",
+                         result: Optional[AgentResult] = None) -> AgentResult:
     """
     Exécute un tour de chat complet. `messages` est complété au fil des appels d'outils.
     emit_text reçoit les tokens visibles, emit_event les événements d'outils et d'actions.
+    `result` se remplit au fil du tour : l'appelant le garde pour conserver ce qui précède un arrêt.
     """
-    result = AgentResult()
+    result = result if result is not None else AgentResult()
     calls, seen = 0, {}
     budget = int(config.get("ollama_ctx", 4096) * CHARS_PER_TOKEN * TOOL_BUDGET_RATIO)
     used = 0

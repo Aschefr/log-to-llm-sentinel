@@ -50,8 +50,10 @@ A setting is saved when you leave its field (or press Enter), and the result sho
 * **Which model to choose**: three [recommended models](../features/recommended-models.md), with their memory and speed as measured. One click selects a model if it is installed, otherwise prepares its download.
 * **Download a model**: enter any model tag and click **Download** to pull it onto the host.
 * **Context**: 8K to 128K, 32K recommended. Meta-analyses and the chat use the same value, which also avoids reloading the model.
+* **Chat instructions**: optional text added to every [Log Chat](chat.md) conversation, such as your setup or the tone you want.
+* **When the context is full**: what the chat does when a conversation exceeds what the model can read at once: ask, summarize with the AI, compact, or forget the oldest messages.
 
-The temperature is set to 0.2 and analyses are written in the site's language: the study behind these recommendations settled both, so there is nothing to adjust.
+The temperature is set to 0.2, and analyses and the chat are written in the site's language: the study behind these recommendations settled both, so there is nothing to adjust.
 
 ---
 

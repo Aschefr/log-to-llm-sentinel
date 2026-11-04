@@ -371,6 +371,8 @@ async function loadConfig() {
         document.getElementById('max-log-chars').value = config.max_log_chars || 5000;
         document.getElementById('monitor-log-lines').value = config.monitor_log_lines || 60;
         document.getElementById('instance-name').value = config.instance_name || '';
+        document.getElementById('chat-system-prompt').value = config.chat_system_prompt || '';
+        document.getElementById('chat-compression-mode').value = config.chat_compression_mode || '';
         document.getElementById('ollama-ctx').value = config.ollama_ctx || 32768;
         syncCtxChips();
         window.__desiredAppriseTags = config.apprise_tags || '';
@@ -668,6 +670,8 @@ async function saveConfig() {
             : (parseInt(document.getElementById('apprise-max-chars').value) || 1900),
         discord_webhook_url: document.getElementById('discord-webhook-url') ? document.getElementById('discord-webhook-url').value : '',
         max_log_chars: parseInt(document.getElementById('max-log-chars').value) || 5000,
+        chat_system_prompt: document.getElementById('chat-system-prompt').value,
+        chat_compression_mode: document.getElementById('chat-compression-mode').value,
         monitor_log_lines: parseInt(document.getElementById('monitor-log-lines').value) || 60,
         ollama_ctx: Math.min(131072, Math.max(8192, parseInt(document.getElementById('ollama-ctx').value) || 32768)),
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,

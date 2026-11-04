@@ -80,6 +80,21 @@
                     <input type="number" id="max-log-chars" value="5000" min="500" max="50000">
                 {% endcall %}
             </div>
+
+            <div class="rp-card" id="chat-settings">
+                <h2 data-i18n="config.chat_title">Log chat</h2>
+                {% call field('chat-system-prompt', 'config.chat_prompt', 'Instructions pour le chat', 'config.chat_prompt_hint', "Facultatif. Ajoutées à chaque conversation : ton installation, le ton voulu. Le chat répond dans la langue du site.") %}
+                    <textarea id="chat-system-prompt" rows="3" data-i18n-placeholder="config.chat_prompt_placeholder" placeholder="Ex : mes serveurs tournent sous Unraid, réponds en quelques lignes."></textarea>
+                {% endcall %}
+                {% call field('chat-compression-mode', 'config.chat_compression', 'Quand le contexte est plein', 'config.chat_compression_hint', "Ce que fait le chat quand une conversation dépasse ce que le modèle peut lire d'un coup.") %}
+                    <select id="chat-compression-mode">
+                        <option value="" data-i18n="config.chat_compression_ask">Me demander</option>
+                        <option value="summary" data-i18n="config.chat_compression_summary">Résumer par l'IA (garde le sens)</option>
+                        <option value="compact" data-i18n="config.chat_compression_compact">Compacter (retire les répétitions)</option>
+                        <option value="truncate" data-i18n="config.chat_compression_truncate">Oublier les plus anciens (immédiat)</option>
+                    </select>
+                {% endcall %}
+            </div>
         </section>
 
         <!-- ── Notifications ── -->

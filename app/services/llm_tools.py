@@ -408,7 +408,7 @@ async def apply_action(action_id: int) -> dict:
             act.status = "applied"
             from app.models import GlobalConfig
             cfg = db.query(GlobalConfig).first()
-            act.result = describe_effect(act.action, params, cfg.chat_lang if cfg and cfg.chat_lang else "fr")
+            act.result = describe_effect(act.action, params, cfg.site_lang if cfg and cfg.site_lang else "fr")
         except Exception as e:
             act.status = "failed"
             act.result = str(e)[:500]

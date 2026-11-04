@@ -156,6 +156,13 @@ def init_db():
         "UPDATE global_config SET ollama_ctx = 8192 WHERE ollama_ctx < 8192",
         # La langue des analyses suit désormais celle du site
         "UPDATE global_config SET ollama_prompt_lang = site_lang WHERE site_lang IS NOT NULL AND site_lang != ''",
+        "ALTER TABLE global_config ADD COLUMN chat_compression_mode VARCHAR DEFAULT ''",
+        # Le chat suit la langue du site : l'ancien prompt par défaut imposerait une langue
+        """UPDATE global_config SET chat_system_prompt = '' WHERE chat_system_prompt IN (
+            'Tu es un expert DevOps francophone. Réponds en français de manière directe et concise.',
+            'You are an English-speaking DevOps expert. Answer in English directly and concisely.')""",
+        # Les titres ne portent plus d'emoji : la page dessine ses propres repères
+        "UPDATE chat_conversations SET title = substr(title, 3) WHERE title LIKE '🔎 %'",
     ]
 
     with engine.connect() as conn:
