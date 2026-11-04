@@ -3168,9 +3168,12 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 .event-note-form .form-hint { margin: 0; }
 .event-note-form-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.4rem 1rem; }
 .event-note-counter { color: var(--text-secondary); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
-.event-note-scopes { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.9rem; margin: 0; padding: 0; border: 0; font-size: 0.82rem; }
-.event-note-scopes legend { float: left; margin-right: 0.6rem; padding: 0; color: var(--text-secondary); }
-.event-note-scopes label { display: inline-flex; align-items: center; gap: 0.3rem; min-height: 1.75rem; cursor: pointer; }
+.event-note-scopes { display: flex; flex-direction: column; gap: 0.4rem; margin: 0; padding: 0; border: 0; font-size: 0.85rem; }
+.event-note-scopes legend { margin-bottom: 0.3rem; padding: 0; color: var(--text-secondary); }
+.event-note-scopes label { display: flex; align-items: flex-start; gap: 0.45rem; cursor: pointer; }
+.event-note-scopes input { flex: none; margin: 0.2rem 0 0; }
+.event-note-scopes strong { display: block; font-weight: 500; }
+.event-note-scopes .form-hint { display: block; margin: 0.1rem 0 0; }
 .event-note-error { margin: 0; color: var(--danger); font-size: 0.82rem; }
 .event-note-form-actions { display: flex; gap: 0.5rem; }
 .rule-notes { margin-bottom: 0.9rem; border: 1px solid var(--border); border-radius: 8px; }

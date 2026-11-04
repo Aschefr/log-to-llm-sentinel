@@ -227,6 +227,19 @@ def list_analysis_notes(analysis_id: int):
         db.close()
 
 
+@router.get("/analyses/{analysis_id}/notes/reach")
+def analysis_note_reach(analysis_id: int):
+    """Les alertes qu'une note posée sur cette analyse concernerait aujourd'hui."""
+    db = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="analysis_not_found")
+        return event_notes.reach(db, analysis)
+    finally:
+        db.close()
+
+
 @router.put("/notes/{note_id}")
 def update_note(note_id: int, data: dict):
     db = SessionLocal()

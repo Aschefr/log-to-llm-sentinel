@@ -79,6 +79,13 @@ def for_analysis(db, analysis: Analysis, limit: Optional[int] = PROMPT_NOTES) ->
     return for_lines(db, analysis.rule_id, analysis_lines(analysis), limit)
 
 
+def reach(db, analysis: Analysis) -> dict:
+    """Combien d'alertes de la règle une note posée sur cette analyse concernerait aujourd'hui."""
+    signatures = event_signatures(analysis_lines(analysis))
+    rows = db.query(Analysis).filter(Analysis.rule_id == analysis.rule_id).all()
+    return {"similar": sum(1 for a in rows if signatures & event_signatures(analysis_lines(a))), "total": len(rows)}
+
+
 def for_rule(db, rule_id, source_only: bool = False, limit: Optional[int] = RULE_NOTES) -> List[dict]:
     """Sans alerte précise : la source d'abord, les plus récentes ensuite."""
     notes = [to_dict(n) for n in rule_rows(db, rule_id) if not (source_only and n.event_key)]

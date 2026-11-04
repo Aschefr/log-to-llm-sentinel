@@ -8,9 +8,9 @@ function noteT(key, fallback) {
 
 function noteScopeLabel(scope) {
     return {
-        event: noteT('common.note_scope_event', 'Cet événement'),
-        related: noteT('common.note_scope_related', 'Événement lié'),
-        source: noteT('common.note_scope_source', 'Toute la source'),
+        event: noteT('common.note_scope_event', 'Cette alerte et les alertes similaires'),
+        related: noteT('common.note_scope_related', 'Alerte similaire'),
+        source: noteT('common.note_scope_source', 'Toutes les alertes de cette règle'),
     }[scope] || scope;
 }
 
@@ -28,7 +28,7 @@ function noteItemHtml(note, opts = {}) {
         ? `<code class="event-note-line">${escapeHtml(note.line)}</code>` : '';
     return `<li class="event-note" data-note="${note.id}">
         <div class="event-note-meta">
-            <span class="event-note-scope">${escapeHtml(opts.showLine && note.scope === 'event' ? noteT('common.note_scope_an_event', 'Un événement') : noteScopeLabel(note.scope))}</span>
+            <span class="event-note-scope">${escapeHtml(opts.showLine && note.scope === 'event' ? noteT('common.note_scope_an_event', 'Une alerte et les alertes similaires') : noteScopeLabel(note.scope))}</span>
             <span>${note.updated_at ? escapeHtml(formatDate(note.updated_at)) : ''}</span>
             <span class="event-note-actions">
                 <button type="button" class="btn-link" onclick="editNote(this)">${escapeHtml(noteT('common.edit', 'Modifier'))}</button>
@@ -53,8 +53,12 @@ function noteFormHtml({ text = '', withScope = false, hint = true }) {
     const id = `note-${Math.random().toString(36).slice(2, 9)}`;
     const scope = withScope ? `<fieldset class="event-note-scopes">
             <legend>${escapeHtml(noteT('common.note_scope_label', 'S’applique à'))}</legend>
-            <label><input type="radio" name="${id}-scope" value="event" checked> ${escapeHtml(noteT('common.note_scope_event', 'Cet événement'))}</label>
-            <label><input type="radio" name="${id}-scope" value="source"> ${escapeHtml(noteT('common.note_scope_source', 'Toute la source'))}</label>
+            <label><input type="radio" name="${id}-scope" value="event" checked>
+                <span><strong>${escapeHtml(noteScopeLabel('event'))}</strong>
+                <span class="form-hint">${escapeHtml(noteT('common.note_scope_event_hint', 'Celles qui partagent au moins une de ces lignes, à part ce qui change (heure, adresse, numéro). Un autre mot, comme un autre nom de domaine, en fait une autre alerte.'))} <span data-reach="event"></span></span></span></label>
+            <label><input type="radio" name="${id}-scope" value="source">
+                <span><strong>${escapeHtml(noteScopeLabel('source'))}</strong>
+                <span class="form-hint">${escapeHtml(noteT('common.note_scope_source_hint', 'Même celles qui n’ont aucun rapport avec celle-ci, et toutes les suivantes.'))} <span data-reach="source"></span></span></span></label>
         </fieldset>` : '';
     return `<form class="event-note-form" onsubmit="event.preventDefault(); submitNoteForm(this)">
         <label class="event-note-label" for="${id}">${escapeHtml(noteT('common.note_label', 'Ce que l’IA devrait savoir'))}</label>
@@ -62,8 +66,8 @@ function noteFormHtml({ text = '', withScope = false, hint = true }) {
             placeholder="${escapeHtml(noteT('common.note_placeholder', 'Ex. : ce serveur tourne sous Unraid, sans systemd.'))}">${escapeHtml(text)}</textarea>
         <div class="event-note-form-row">
             <span class="event-note-counter" aria-live="polite">${text.length}/${NOTE_MAX_CHARS}</span>
-            ${scope}
         </div>
+        ${scope}
         ${hint ? `<p class="form-hint">${escapeHtml(noteT('common.note_hint', 'Elle informe l’IA sans jamais faire taire une alerte. Prise en compte dès la prochaine analyse ; « Ré-essayer » l’applique à celle-ci.'))}</p>` : ''}
         <p class="event-note-error hidden" role="alert"></p>
         <div class="event-note-form-actions">
@@ -93,6 +97,22 @@ function openNoteForm(btn) {
     form._opener = btn;
     section.append(form);
     form.querySelector('textarea').focus();
+    showNoteReach(form, section.dataset.analysis);
+}
+
+/** Says how many alerts each scope concerns today. Without the figures, the form still works. */
+async function showNoteReach(form, analysisId) {
+    let reach;
+    try {
+        reach = await apiFetch(`/api/monitor/analyses/${analysisId}/notes/reach`);
+    } catch (_) {
+        return;
+    }
+    const similar = reach.similar > 1
+        ? noteT('common.note_reach_many', 'Aujourd’hui : {n} alertes sur {total}.').replace('{n}', reach.similar)
+        : noteT('common.note_reach_one', 'Aujourd’hui : cette alerte seulement, sur {total}.');
+    form.querySelector('[data-reach="event"]').textContent = similar.replace('{total}', reach.total);
+    form.querySelector('[data-reach="source"]').textContent = noteT('common.note_reach_total', 'Aujourd’hui : {total} alertes.').replace('{total}', reach.total);
 }
 
 function closeNoteForm(form) {
