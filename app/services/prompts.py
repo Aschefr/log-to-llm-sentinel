@@ -96,6 +96,7 @@ LABELS = {
         "tool_limit": "Limite d'appels d'outils atteinte pour ce tour : outil non exécuté.",
         "tool_budget": "[Budget de contexte des outils épuisé : résultat tronqué.]",
         "turn_timeout": "*(Réponse interrompue : durée maximale du tour atteinte.)*",
+        "empty_answer": "*(Le modèle n'a rien écrit. Tu peux régénérer la réponse, ou poser une question plus précise.)*",
     },
     "en": {
         "rule": "Monitored rule",
@@ -137,6 +138,7 @@ LABELS = {
         "tool_limit": "Tool call limit reached for this turn: tool not executed.",
         "tool_budget": "[Tool context budget exhausted: result truncated.]",
         "turn_timeout": "*(Answer interrupted: maximum turn duration reached.)*",
+        "empty_answer": "*(The model wrote nothing. You can regenerate the answer, or ask a more precise question.)*",
     },
 }
 

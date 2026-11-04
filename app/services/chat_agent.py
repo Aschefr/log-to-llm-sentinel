@@ -82,7 +82,8 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
         for round_idx in range(limits.max_rounds + 1):
             tools_now = available_tools() if use_tools and round_idx < limits.max_rounds and calls < limits.max_calls else None
             if use_tools and tools_now is None:
-                messages.append({"role": "system", "content": label(lang, "tools_exhausted")})
+                # En "user" : en "system", qwen3.8 l'ignore et redemande des outils même sans en recevoir, donc n'écrit rien
+                messages.append({"role": "user", "content": label(lang, "tools_exhausted")})
 
             content, tool_calls, think = "", [], _ThinkFilter()
             stream = ollama.generate_stream(
@@ -148,6 +149,12 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
         tail = "\n\n" + label(lang, "turn_timeout")
         result.text += tail
         emit_text(tail)
+    if not result.text.strip():
+        # Un silence ressemble à une panne : l'utilisateur doit savoir que le modèle n'a rien écrit
+        logger.warning("ChatAgent", f"Réponse vide après {len(result.tools)} appel(s) d'outils")
+        empty = label(lang, "empty_answer")
+        result.text += empty
+        emit_text(empty)
     return result
 
 

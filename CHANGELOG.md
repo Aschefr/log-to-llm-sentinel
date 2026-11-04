@@ -42,6 +42,7 @@ All notable changes to this project will be documented in this file.
 - **E-mail notifications** now escape the log line, the AI's answer, keywords and the rule's name.
 
 ### Fixed
+- **The chat could answer nothing at all**: when the AI reached its tool limit, some models ignored the instruction to answer and kept asking for tools, which left an empty reply. The instruction now reaches them, and a reply left empty says so.
 - **Alerts that differ only by a domain name or a short identifier** counted as different events, in plain text lines: a DNS failure repeated on many sites filled the unread list, never reused a verdict and kept the AI busy. They are now one event. Existing alerts and notes are regrouped once, at startup.
 - **Phone display**: the Analyses tab of a rule ran off the screen and made the whole page scroll sideways. Fields no longer zoom the page on iPhone, buttons are easier to tap, the Rules page header is aligned, and the chat stays usable in landscape.
 - **Long incident timelines** took tens of screens: the steps between the first and the latest ones are now folded.
