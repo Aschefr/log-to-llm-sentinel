@@ -505,7 +505,13 @@ body {
     50% { opacity: 1; }
     100% { opacity: 0.6; }
 }
-.analysis-footer { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.analysis-footer { margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; }
+/* Le groupe de gauche passe à la ligne : un libellé qui s'allonge ne doit pas écraser les boutons de droite */
+@media (min-width: 769px) {
+    .analysis-footer { align-items: flex-start; }
+    .analysis-footer > div { flex: 1 1 0; min-width: 0; }
+    .analysis-footer > .btn { flex: none; white-space: nowrap; }
+}
 
 .markdown-body code {
     background: rgba(255, 255, 255, 0.08);
