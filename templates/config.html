@@ -224,6 +224,12 @@
                         <span class="diag-status" id="diag-docker-status"></span>
                     </div>
                     <p class="form-hint" data-i18n="diag.docker_hint">Via un proxy du socket Docker qui n'autorise que la lecture (état, santé, redémarrages, logs, consommation). Sentinel ne monte jamais le socket lui-même.</p>
+                    <ul class="diag-links hidden" id="diag-docker-links"></ul>
+                    <h4 class="diag-form-title" id="diag-docker-form-title" data-i18n="diag.link_new">Nouvelle connexion</h4>
+                    <div class="form-group">
+                        <label for="diag-docker-name" data-i18n="diag.link_name">Nom</label>
+                        <input type="text" id="diag-docker-name" data-i18n-placeholder="diag.link_name_docker" placeholder="ex. : Docker d'Unraid" maxlength="60">
+                    </div>
                     <div class="form-group">
                         <label for="diag-docker-url" data-i18n="diag.docker_url">Adresse du proxy</label>
                         <input type="text" id="diag-docker-url" class="mono" placeholder="http://docker-proxy:2375" spellcheck="false">
@@ -231,6 +237,7 @@
                     <div class="diag-actions">
                         <button type="button" class="btn btn-primary btn-sm" id="diag-docker-test" data-i18n="diag.test_save">Tester et enregistrer</button>
                         <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-docker-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
+                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-docker-cancel" data-i18n="common.cancel">Annuler</button>
                         <span class="form-hint" id="diag-docker-result"></span>
                     </div>
                     <details class="diag-howto">
@@ -247,9 +254,9 @@
                         <div class="diag-howto-body hidden" data-howto="docker-unraid">
                             <ol class="diag-steps">
                                 <li data-i18n-html="diag.unraid_step1">Dans le terminal d'Unraid, crée un réseau dédié (une seule fois) : <code>docker network create sentinel</code>. Pour le voir dans la liste des réseaux, active <i>Paramètres › Docker › Preserve user defined networks</i>.</li>
-                                <li data-i18n-html="diag.unraid_step2">Dans l'onglet Apps, installe le modèle <b>Log-to-LLM-Sentinel-Docker-Proxy</b> et choisis le réseau <code>sentinel</code>.</li>
+                                <li data-i18n-html="diag.unraid_step2">Dans l'onglet Apps, installe <b>dockersocket</b> (IBRACORP) et choisis le réseau <code>sentinel</code>. Garde <code>CONTAINERS=1</code> et <code>POST=0</code>.</li>
                                 <li data-i18n-html="diag.unraid_step3">Modifie le conteneur Log-to-LLM-Sentinel et choisis aussi le réseau <code>sentinel</code>.</li>
-                                <li data-i18n-html="diag.unraid_step4">L'adresse <code>http://sentinel-docker-proxy:2375</code> est pré-remplie : clique sur Tester et enregistrer.</li>
+                                <li data-i18n-html="diag.unraid_step4">L'adresse <code>http://dockersocket:2375</code> est pré-remplie : clique sur Tester et enregistrer.</li>
                             </ol>
                             <p class="form-hint" data-i18n="diag.unraid_no_port">Ne publie pas le port du proxy sur ton réseau : même en lecture seule, il expose la configuration de tous tes conteneurs.</p>
                         </div>
@@ -263,6 +270,7 @@
                         <span class="diag-status" id="diag-host-status"></span>
                     </div>
                     <p class="form-hint" data-i18n="diag.host_hint">Une clé SSH générée par Sentinel, autorisée sur le serveur uniquement pour un script de contrôles en lecture seule (disque, mémoire, charge, partages réseau, services). Même volée, elle ne permet rien d'autre.</p>
+                    <ul class="diag-links hidden" id="diag-ssh-links"></ul>
                     <ol class="diag-steps">
                         <li>
                             <span data-i18n="diag.step_key">Génère la clé de Sentinel.</span>
@@ -284,6 +292,11 @@
                         </li>
                         <li>
                             <span data-i18n="diag.step_settings">Vérifie l'adresse du serveur et l'utilisateur indiqué à la fin du bloc, puis clique sur Tester et enregistrer.</span>
+                            <h4 class="diag-form-title" id="diag-ssh-form-title" data-i18n="diag.link_new">Nouvelle connexion</h4>
+                            <div class="form-group">
+                                <label for="diag-ssh-name" data-i18n="diag.link_name">Nom</label>
+                                <input type="text" id="diag-ssh-name" data-i18n-placeholder="diag.link_name_ssh" placeholder="ex. : Serveur Unraid" maxlength="60">
+                            </div>
                             <div class="diag-fields">
                                 <label class="rf-stack"><span data-i18n="diag.ssh_host">Adresse du serveur</span><input type="text" id="diag-ssh-host" class="mono" placeholder="192.168.1.10" spellcheck="false"></label>
                                 <label class="rf-stack"><span data-i18n="diag.ssh_port">Port</span><input type="number" id="diag-ssh-port" min="1" max="65535" value="22"></label>
@@ -292,6 +305,7 @@
                             <div class="diag-actions">
                                 <button type="button" class="btn btn-primary btn-sm" id="diag-ssh-test" data-i18n="diag.test_save">Tester et enregistrer</button>
                                 <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-ssh-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
+                                <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-ssh-cancel" data-i18n="common.cancel">Annuler</button>
                                 <span class="form-hint" id="diag-ssh-result"></span>
                             </div>
                             <pre class="diag-code hidden" id="diag-ssh-output"></pre>
@@ -303,8 +317,6 @@
                         <pre class="diag-code" id="diag-ssh-uninstall"></pre>
                         <div class="diag-actions">
                             <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-ssh-uninstall" data-i18n="common.copy">Copier</button>
-                            <button type="button" class="btn btn-secondary btn-sm" id="diag-ssh-forget" data-i18n="diag.forget_server">Oublier le serveur dans Sentinel</button>
-                            <span class="form-hint" id="diag-ssh-forget-result"></span>
                         </div>
                     </details>
                 </div>
@@ -425,5 +437,5 @@
 
 {% block scripts %}
 <script src="/static/js/config.js?v=14"></script>
-<script src="/static/js/diagnostics_config.js?v=5"></script>
+<script src="/static/js/diagnostics_config.js?v=8"></script>
 {% endblock %}

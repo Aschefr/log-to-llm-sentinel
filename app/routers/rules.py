@@ -78,6 +78,7 @@ class RuleCreate(BaseModel):
     resolution_ai_mode: str = "ambiguous"
     resolution_learn: bool = True
     probe_type: str = "none"
+    diagnostic_link_ids: Optional[List[int]] = None  # None : toutes les connexions
     probe_target: str = ""
     probe_expect: str = ""
     keyword_tuning_mode: str = "auto"
@@ -112,6 +113,7 @@ class RuleUpdate(BaseModel):
     resolution_ai_mode: Optional[str] = None
     resolution_learn: Optional[bool] = None
     probe_type: Optional[str] = None
+    diagnostic_link_ids: Optional[List[int]] = None
     probe_target: Optional[str] = None
     probe_expect: Optional[str] = None
     keyword_tuning_mode: Optional[str] = None
@@ -286,6 +288,7 @@ def get_rule(rule_id: int):
             "probe_target": rule.probe_target or "",
             "probe_expect": rule.probe_expect or "",
             "keyword_tuning_mode": rule.keyword_tuning_mode or "auto",
+            "diagnostic_link_ids": rule.get_diagnostic_link_ids(),
             "keyword_pending": db.query(KeywordChange).filter(KeywordChange.rule_id == rule.id,
                                                               KeywordChange.status == "pending").count(),
             "autopilot": ap.public(rule),
@@ -328,6 +331,7 @@ async def create_rule(rule_data: RuleCreate):
             probe_target=rule_data.probe_target.strip(),
             probe_expect=rule_data.probe_expect.strip(),
             keyword_tuning_mode=_choice(rule_data.keyword_tuning_mode, kt.MODES, "keyword_tuning_mode"),
+            diagnostic_link_ids_json=json.dumps(rule_data.diagnostic_link_ids) if rule_data.diagnostic_link_ids is not None else None,
         )
         rule.set_keywords(rule_data.keywords)
         rule.set_excluded_patterns(rule_data.excluded_patterns)
@@ -427,6 +431,9 @@ async def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.probe_target = rule_data.probe_target.strip()
         if rule_data.probe_expect is not None:
             rule.probe_expect = rule_data.probe_expect.strip()
+        if "diagnostic_link_ids" in rule_data.model_fields_set:
+            ids = rule_data.diagnostic_link_ids
+            rule.diagnostic_link_ids_json = json.dumps(ids) if ids is not None else None
         if rule_data.keyword_tuning_mode is not None:
             rule.keyword_tuning_mode = _choice(rule_data.keyword_tuning_mode, kt.MODES, "keyword_tuning_mode")
         # Une modification à la main prime sur l'arbitre et sur le pilote : ils ne reviennent pas dessus

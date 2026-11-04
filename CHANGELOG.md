@@ -4,7 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Several diagnostic connections, chosen per rule**: add as many read-only Docker and SSH connections as you need in Configuration > Diagnostics, then tick in each rule which ones the AI may use. A conversation about an alert only reaches the machines of its rule, so the AI no longer checks the wrong server. An existing configuration carries over and stays available to all rules.
+
 ### Changed
+- **Docker proxy on Unraid**: use the *dockersocket* app already in Community Apps, instead of a dedicated template. The connection test no longer needs `INFO=1`, so a stricter proxy passes it. Existing installations keep working.
 - **No more log character limit to set**: how many lines the AI receives for an alert now follows the context size: about a quarter of it, from 2,000 to 30,000 characters. With a large context, a burst of lines is no longer cut at 5,000 characters.
 
 ### Fixed

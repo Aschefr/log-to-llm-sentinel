@@ -13,7 +13,7 @@ from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessa
 from app.services.app_config import config_to_dict
 from app.services.chat_agent import run_agent_turn, replay_tool_messages, AgentLimits, AgentResult
 from app.services.llm_tools import apply_action, action_to_dict
-from app.services.prompts import CHAT_ANALYSIS_CONTEXT, CHAT_TOOLS_INSTRUCTIONS, DIAG_TOOLS_INSTRUCTIONS, INVESTIGATION_PROMPT
+from app.services.prompts import CHAT_ANALYSIS_CONTEXT, CHAT_TOOLS_INSTRUCTIONS, DIAG_TOOLS_INSTRUCTIONS, DIAG_LINKS_INSTRUCTIONS, INVESTIGATION_PROMPT
 from app.services import dashboard_watch, diagnostics, event_notes
 from app.services.alert_analysis import render_notes
 from app.services.orchestrator import Orchestrator
@@ -279,12 +279,16 @@ def build_chat_messages(conv_id: int, db: Session, with_tools: bool = False) -> 
         block_lines.append(mode_text)
     if with_tools:
         block_lines.extend(["", CHAT_TOOLS_INSTRUCTIONS.get(lang, CHAT_TOOLS_INSTRUCTIONS["fr"])])
-        avail = diagnostics.availability()
+        links = diagnostics.links_for_conversation(db, conv_id)
+        kinds = {link["kind"] for link in links}
         diag_tools = (["docker_list_containers", "docker_container_status", "docker_container_logs", "docker_container_stats"]
-                      if avail["docker"] else []) + (["host_check"] if avail["host"] else [])
+                      if "docker" in kinds else []) + (["host_check"] if "ssh" in kinds else [])
         if diag_tools:
             text = DIAG_TOOLS_INSTRUCTIONS.get(lang, DIAG_TOOLS_INSTRUCTIONS["fr"]).replace("{tools}", ", ".join(diag_tools))
             block_lines.extend(["", text])
+            if any(sum(l["kind"] == kind for l in links) > 1 for kind in kinds):
+                listing = "\n".join(f"- {l['name']} ({'Docker' if l['kind'] == 'docker' else 'SSH'})" for l in links)
+                block_lines.append(DIAG_LINKS_INSTRUCTIONS.get(lang, DIAG_LINKS_INSTRUCTIONS["fr"]).replace("{links}", listing))
 
     system = "\n".join(block_lines).strip()
     messages = [{"role": "system", "content": system}] if system else []

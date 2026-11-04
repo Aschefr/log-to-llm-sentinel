@@ -516,12 +516,33 @@ function _ruleFormData() {
         keyword_tuning_mode: _radioValue('rule-keyword-tuning', 'auto'),
         autopilot: document.getElementById('rule-autopilot').checked,
     };
+    const access = [...document.querySelectorAll('#rf-access-list input[type="checkbox"]')];
+    if (access.length) {
+        // Tout coché : les connexions ajoutées plus tard en profitent aussi
+        data.diagnostic_link_ids = access.every(c => c.checked) ? null : access.filter(c => c.checked).map(c => Number(c.value));
+    }
     // Existing rule: keywords and exclusions are edited in the Keywords tab, never overwritten from here
     if (document.getElementById('rule-id').value) {
         delete data.keywords;
         delete data.excluded_patterns;
     }
     return data;
+}
+
+/** Connections the AI may use for this rule (null: all of them). The section stays hidden without any connection. */
+async function renderRuleAccess(selected) {
+    const section = document.getElementById('rf-access');
+    if (!section) return;
+    const token = (renderRuleAccess.token = (renderRuleAccess.token || 0) + 1);
+    let links = [];
+    try {
+        links = (await apiFetch('/api/diagnostics')).links;
+    } catch (_) { /* sans la liste, le choix enregistré reste tel quel */ }
+    if (token !== renderRuleAccess.token) return;
+    section.classList.toggle('hidden', !links.length);
+    document.getElementById('rf-access-list').innerHTML = links.map(l => `<label class="rf-check">
+        <input type="checkbox" value="${l.id}" ${selected === null || selected.includes(l.id) ? 'checked' : ''}>
+        <span><strong>${escapeHtml(l.name)}</strong> <span class="form-hint">${l.kind === 'docker' ? 'Docker' : 'SSH'}</span></span></label>`).join('');
 }
 
 /** Hint of the keyword tuning mode; the history option is offered for a new rule only. */
@@ -594,6 +615,7 @@ async function editRule(id) {
         document.getElementById('rule-resolution-success').checked = ['pattern', 'both'].includes(rule.resolution_mode);
         document.getElementById('rule-resolution-learn').checked = rule.resolution_learn !== false;
         _setRadio('rule-resolution-ai-mode', rule.resolution_ai_mode || 'ambiguous');
+        renderRuleAccess(rule.diagnostic_link_ids ?? null);
         document.getElementById('rule-probe-type').value = rule.probe_type || 'none';
         document.getElementById('rule-probe-target').value = rule.probe_target || '';
         document.getElementById('rule-probe-expect').value = rule.probe_expect || '';
@@ -821,3 +843,7 @@ function applyTemplate(type) {
         fetchFilePreview(t.path);
     }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('rule-form') && !document.getElementById('rule-id').value) renderRuleAccess(null);
+});

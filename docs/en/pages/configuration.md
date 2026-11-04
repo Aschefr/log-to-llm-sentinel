@@ -12,7 +12,7 @@ The six tabs at the top of the page each show the real state of what they config
 | **Ollama** | Connected with its model, model missing, unreachable, or not set up |
 | **Notifications** | Incomplete, not tested, or the result and time of the latest test or real send. Changing the settings of the method brings it back to *not tested*: an older success no longer proves anything. |
 | **Sources** | Syslog off, not listening, on with nothing received in 7 days, or the number of sources and the latest line |
-| **Diagnostics** | Which of Docker and the server are set up. This is checked by **Test and save** in that tab, not every time the page opens. |
+| **Diagnostics** | Which Docker and server connections are set up. This is checked by **Test and save** in that tab, not every time the page opens. |
 | **Data** | Size of the data folder and how long data is kept |
 | **Advanced** | Whether debug mode is on |
 

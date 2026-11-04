@@ -1,19 +1,22 @@
-"""Configuration et test du diagnostic en lecture seule (proxy Docker, SSH limité)."""
+"""Connexions de diagnostic en lecture seule (proxies Docker, serveurs en SSH limité) et leurs tests."""
 import asyncio
+import json
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from app.database import SessionLocal
-from app.models import GlobalConfig
+from app.models import DiagnosticLink, Rule
 from app.services import diagnostics as diag
 
 router = APIRouter(prefix="/api/diagnostics", tags=["diagnostics"])
 
 
-class DiagSettings(BaseModel):
-    docker_proxy_url: Optional[str] = None
+class LinkBody(BaseModel):
+    name: str
+    kind: str
+    docker_url: Optional[str] = None
     ssh_host: Optional[str] = None
     ssh_port: Optional[int] = None
     ssh_user: Optional[str] = None
@@ -23,38 +26,88 @@ class DockerTest(BaseModel):
     url: str
 
 
+class SshTest(BaseModel):
+    ssh_host: str
+    ssh_port: int = 22
+    ssh_user: str
+
+
 def _error(e: Exception):
     raise HTTPException(status_code=400, detail=str(e))
 
 
+def _link_values(db, body: LinkBody, link_id: Optional[int] = None) -> dict:
+    name = body.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="link_name_required")
+    same = db.query(DiagnosticLink).filter(DiagnosticLink.id != (link_id or 0)).all()
+    if any(l.name.lower() == name.lower() for l in same):
+        raise HTTPException(status_code=422, detail="link_name_taken")
+    if body.kind == "docker":
+        url = (body.docker_url or "").strip().rstrip("/")
+        if not url.startswith(("http://", "https://")):
+            raise HTTPException(status_code=422, detail="link_url_invalid")
+        return {"name": name, "kind": "docker", "docker_url": url}
+    if body.kind == "ssh":
+        host, user, port = (body.ssh_host or "").strip(), (body.ssh_user or "").strip(), body.ssh_port or 22
+        if not host or not user:
+            raise HTTPException(status_code=422, detail="link_host_required")
+        if not 1 <= port <= 65535:
+            raise HTTPException(status_code=422, detail="link_port_invalid")
+        return {"name": name, "kind": "ssh", "ssh_host": host, "ssh_port": port, "ssh_user": user}
+    raise HTTPException(status_code=422, detail="link_kind_invalid")
+
+
 @router.get("")
 def get_status():
-    cfg = diag.settings()
-    return {**cfg, "public_key": diag.public_key(), "available": diag.availability(cfg),
-            "host_fingerprint": diag.host_fingerprint(), "host_checks": list(diag.HOST_CHECKS)}
-
-
-@router.put("")
-def update_settings(body: DiagSettings):
     db = SessionLocal()
     try:
-        config = db.query(GlobalConfig).first()
-        if not config:
-            config = GlobalConfig()
-            db.add(config)
-        if body.docker_proxy_url is not None:
-            url = body.docker_proxy_url.strip().rstrip("/")
-            if url and not url.startswith(("http://", "https://")):
-                raise HTTPException(status_code=422, detail="docker_proxy_url doit commencer par http:// ou https://")
-            config.docker_proxy_url = url
-        if body.ssh_host is not None:
-            config.ssh_host = body.ssh_host.strip()
-        if body.ssh_port is not None:
-            if not 1 <= body.ssh_port <= 65535:
-                raise HTTPException(status_code=422, detail="port SSH invalide")
-            config.ssh_port = body.ssh_port
-        if body.ssh_user is not None:
-            config.ssh_user = body.ssh_user.strip()
+        links = [diag.link_dict(l) for l in db.query(DiagnosticLink).order_by(DiagnosticLink.kind, DiagnosticLink.id).all()]
+        rules = [(r.name, r.get_diagnostic_link_ids()) for r in db.query(Rule).order_by(Rule.name).all()]
+        for link in links:
+            link["rules"] = [name for name, ids in rules if ids is None or link["id"] in ids]
+            if link["kind"] == "ssh":
+                link["host_fingerprint"] = diag.host_fingerprint(link["ssh_host"], link["ssh_port"])
+        return {"links": links, "rule_count": len(rules), "public_key": diag.public_key(), "available": diag.availability(), "host_checks": list(diag.HOST_CHECKS)}
+    finally:
+        db.close()
+
+
+@router.post("/links")
+def add_link(body: LinkBody):
+    db = SessionLocal()
+    try:
+        link = DiagnosticLink(**_link_values(db, body))
+        db.add(link)
+        db.commit()
+        return diag.link_dict(link)
+    finally:
+        db.close()
+
+
+@router.put("/links/{link_id}")
+def update_link(link_id: int, body: LinkBody):
+    db = SessionLocal()
+    try:
+        link = db.query(DiagnosticLink).filter(DiagnosticLink.id == link_id).first()
+        if not link:
+            raise HTTPException(status_code=404, detail="link_not_found")
+        for key, value in _link_values(db, body, link_id).items():
+            setattr(link, key, value)
+        db.commit()
+        return diag.link_dict(link)
+    finally:
+        db.close()
+
+
+@router.delete("/links/{link_id}")
+def delete_link(link_id: int):
+    db = SessionLocal()
+    try:
+        if not db.query(DiagnosticLink).filter(DiagnosticLink.id == link_id).delete():
+            raise HTTPException(status_code=404, detail="link_not_found")
+        for rule in db.query(Rule).filter(Rule.diagnostic_link_ids_json != None).all():
+            rule.diagnostic_link_ids_json = json.dumps([i for i in rule.get_diagnostic_link_ids() if i != link_id])
         db.commit()
         return {"status": "ok"}
     finally:
@@ -96,22 +149,15 @@ def ssh_uninstall(platform: str = "linux"):
 
 
 @router.post("/ssh/test")
-async def test_ssh(body: Optional[DiagSettings] = None):
-    """Teste les valeurs saisies (body) sans les enregistrer ; à défaut, la configuration enregistrée."""
-    cfg = diag.settings()
-    if body:
-        if body.ssh_host is not None:
-            cfg["ssh_host"] = body.ssh_host.strip()
-        if body.ssh_port is not None:
-            cfg["ssh_port"] = body.ssh_port
-        if body.ssh_user is not None:
-            cfg["ssh_user"] = body.ssh_user.strip()
+async def test_ssh(body: SshTest):
+    """Teste les valeurs saisies sans les enregistrer."""
+    cfg = {"ssh_host": body.ssh_host.strip(), "ssh_port": body.ssh_port, "ssh_user": body.ssh_user.strip()}
     if not 1 <= int(cfg["ssh_port"]) <= 65535:
         return {"ok": False, "error": "port SSH invalide"}
     try:
-        out = await asyncio.to_thread(diag.run_host_check, "overview", None, cfg)
+        out = await asyncio.to_thread(diag.run_host_check, cfg, "overview")
         version = await asyncio.to_thread(diag.installed_script_version, cfg)
-        return {"ok": True, "output": out[:3000], "host_fingerprint": diag.host_fingerprint(),
+        return {"ok": True, "output": out[:3000], "host_fingerprint": diag.host_fingerprint(cfg["ssh_host"], cfg["ssh_port"]),
                 "script_version": version, "script_outdated": version != diag.DIAG_SCRIPT_VERSION}
     except diag.DiagnosticError as e:
         return {"ok": False, "error": str(e)}

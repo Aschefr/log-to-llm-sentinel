@@ -175,6 +175,13 @@ You can check the actual state of the server yourself (read-only): {tools}.
 - These tools change nothing: never present restarting a container or a service as something you can do.""",
 }
 
+DIAG_LINKS_INSTRUCTIONS = {
+    "fr": """Ces connexions correspondent à des machines différentes. Choisis avec le paramètre connection celle de la machine concernée, et dis laquelle tu as interrogée :
+{links}""",
+    "en": """These connections are different machines. Use the connection parameter to pick the one for the machine concerned, and say which one you checked:
+{links}""",
+}
+
 INVESTIGATION_PROMPT = {
     "fr": """Lance une investigation complète de l'alerte #{analysis_id} (règle #{rule_id}) :
 1. Récupère le contexte élargi autour des lignes déclenchantes.

@@ -48,12 +48,17 @@ class Rule(Base):
     probe_expect = Column(String, default="")                 # Codes HTTP attendus (ex. "200" ou "200,204") ; vide = 2xx/3xx
 
     # ── Ajustement automatique des mots-clés (KW-2) ──
+    diagnostic_link_ids_json = Column(Text, nullable=True)    # Connexions de diagnostic de la règle ; vide (NULL) = toutes
     keyword_tuning_mode = Column(String, default="auto")      # 'auto' (l'IA arbitre et applique) | 'suggest' | 'off'
     keyword_stats_json = Column(Text, default="{}")           # {"days": {date: {"lines": n, "hits": {motif: n}}}, "reviews": {motif: iso}}
     keyword_tuned_at = Column(DateTime, nullable=True)        # Dernière revue par l'arbitre
 
     # ── Pilote automatique (AP-1) ──
     autopilot_json = Column(Text, default="{}")               # état du pilote : voir app/services/autopilot.py
+
+    def get_diagnostic_link_ids(self):
+        """None : toutes les connexions. Une liste : seulement celles-là."""
+        return _json.loads(self.diagnostic_link_ids_json) if self.diagnostic_link_ids_json else None
 
     def get_keywords(self):
         import json
@@ -442,6 +447,19 @@ class KeywordChange(Base):
     session_id = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     decided_at = Column(DateTime, nullable=True)
+
+
+class DiagnosticLink(Base):
+    """Connexion de diagnostic en lecture seule : un proxy Docker ou un serveur en SSH limité."""
+    __tablename__ = "diagnostic_links"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)  # l'IA la désigne par ce nom
+    kind = Column(String, nullable=False)  # 'docker' | 'ssh'
+    docker_url = Column(String, default="")
+    ssh_host = Column(String, default="")
+    ssh_port = Column(Integer, default=22)
+    ssh_user = Column(String, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class EventNote(Base):

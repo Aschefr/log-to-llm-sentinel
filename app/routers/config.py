@@ -608,6 +608,8 @@ def cleanup_maintenance_data():
 def export_config(with_history: bool = False):
     db = SessionLocal()
     try:
+        from app.services import diagnostics
+        from app.models import DiagnosticLink
         from app.models import Rule, MetaAnalysisConfig, Analysis, ResolutionVerdict, ChatConversation, ChatMessage, ChatCompression, MetaAnalysisResult, KeywordLearningSession, EventNote
         from datetime import datetime
         
@@ -632,7 +634,8 @@ def export_config(with_history: bool = False):
                 "global_config": [to_dict(c) for c in db.query(GlobalConfig).all()],
                 "rules": [to_dict(r) for r in db.query(Rule).all()],
                 "meta_analysis_configs": [to_dict(m) for m in db.query(MetaAnalysisConfig).all()],
-                "event_notes": [to_dict(n) for n in db.query(EventNote).all()]
+                "event_notes": [to_dict(n) for n in db.query(EventNote).all()],
+                "diagnostic_links": [to_dict(l) for l in db.query(DiagnosticLink).all()]
             }
         }
         
@@ -699,6 +702,8 @@ async def import_config(file: UploadFile = File(...)):
         except json.JSONDecodeError:
             raise HTTPException(status_code=400, detail="Le fichier backup.json n'est pas un JSON valide.")
         
+        from app.services import diagnostics
+        from app.models import DiagnosticLink
         from app.models import Rule, MetaAnalysisConfig, Analysis, ResolutionVerdict, ChatConversation, ChatMessage, ChatCompression, MetaAnalysisResult, KeywordLearningSession, EventNote
         from datetime import datetime
         
@@ -726,6 +731,7 @@ async def import_config(file: UploadFile = File(...)):
         db.query(GlobalConfig).delete()
         db.query(Rule).delete()
         db.query(MetaAnalysisConfig).delete()
+        db.query(DiagnosticLink).delete()
         db.query(EventNote).delete()  # liées aux règles remplacées, même si la sauvegarde n'en contient pas
         
         # Restore configs
@@ -740,6 +746,11 @@ async def import_config(file: UploadFile = File(...)):
 
         for row in config_data.get("event_notes", []):
             db.add(from_dict(EventNote, row))
+
+        for row in config_data.get("diagnostic_links", []):
+            db.add(from_dict(DiagnosticLink, row))
+        db.flush()
+        diagnostics.migrate_legacy(db)  # une sauvegarde d'avant les connexions
             
         # Restore history if present
         history_data = data.get("history", {})

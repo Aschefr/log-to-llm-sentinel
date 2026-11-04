@@ -6,6 +6,7 @@ Garde-fous : les outils n'acceptent que des identifiants (jamais de chemin libre
 en lignes et en caractères, et la recherche se fait par sous-chaîne (pas de regex fournie par le LLM).
 """
 import asyncio
+import copy
 import json
 import re
 from collections import Counter, defaultdict
@@ -444,8 +445,24 @@ def _is_problem(c: dict) -> bool:
     return False
 
 
-def docker_list_containers(db, only_problems=False, **_):
-    rows = _diag(diag.docker_containers)
+def _link(db, kind, connection, conversation_id) -> dict:
+    """La connexion demandée, si cette conversation y a droit. Sans précision, la seule disponible."""
+    links = diag.links_for_conversation(db, conversation_id, kind)
+    if not links:
+        raise ToolError(f"aucune connexion {'Docker' if kind == 'docker' else 'SSH'} pour cette conversation")
+    names = ", ".join(l["name"] for l in links)
+    if connection:
+        for link in links:
+            if link["name"].lower() == str(connection).strip().lower():
+                return link
+        raise ToolError(f"connexion « {connection} » inconnue (disponibles : {names})")
+    if len(links) > 1:
+        raise ToolError(f"précise connection parmi : {names}")
+    return links[0]
+
+
+def docker_list_containers(db, only_problems=False, connection=None, _conversation_id=None, **_):
+    rows = _diag(diag.docker_containers, _link(db, "docker", connection, _conversation_id)["docker_url"])
     data = json.loads(rows)
     if only_problems:
         data = [c for c in data if _is_problem(c)]
@@ -454,21 +471,21 @@ def docker_list_containers(db, only_problems=False, **_):
     return "\n".join(f"- {c['name']} — {c['state']} — {c['status']} — {c['image']}" for c in data)
 
 
-def docker_container_status(db, name, **_):
-    return _diag(diag.docker_container_status, name)
+def docker_container_status(db, name, connection=None, _conversation_id=None, **_):
+    return _diag(diag.docker_container_status, _link(db, "docker", connection, _conversation_id)["docker_url"], name)
 
 
-def docker_container_logs(db, name, lines=100, since_minutes=None, **_):
-    out = _diag(diag.docker_container_logs, name, _clip(lines, 1, diag.MAX_LOG_LINES, 100), since_minutes)
+def docker_container_logs(db, name, lines=100, since_minutes=None, connection=None, _conversation_id=None, **_):
+    out = _diag(diag.docker_container_logs, _link(db, "docker", connection, _conversation_id)["docker_url"], name, _clip(lines, 1, diag.MAX_LOG_LINES, 100), since_minutes)
     return out or "(aucune ligne)"
 
 
-def docker_container_stats(db, name, **_):
-    return _diag(diag.docker_container_stats, name)
+def docker_container_stats(db, name, connection=None, _conversation_id=None, **_):
+    return _diag(diag.docker_container_stats, _link(db, "docker", connection, _conversation_id)["docker_url"], name)
 
 
-def host_check(db, check, target=None, **_):
-    return _diag(diag.run_host_check, check, target)
+def host_check(db, check, target=None, connection=None, _conversation_id=None, **_):
+    return _diag(diag.run_host_check, _link(db, "ssh", connection, _conversation_id), check, target)
 
 
 # ── Définitions (format Ollama) et exécution ───────────────────────────────────
@@ -522,10 +539,28 @@ HOST_TOOLS = [
 ]
 
 
-def available_tools() -> list:
-    """Outils du chat : les outils de diagnostic ne sont proposés au LLM que s'ils sont configurés."""
-    avail = diag.availability()
-    return TOOLS + (DOCKER_TOOLS if avail["docker"] else []) + (HOST_TOOLS if avail["host"] else [])
+def _for_links(tools: list, links: list) -> list:
+    """Outils de diagnostic pour ces connexions. À partir de deux, l'IA doit dire laquelle elle interroge."""
+    if not links:
+        return []
+    if len(links) == 1:
+        return tools
+    tools = copy.deepcopy(tools)
+    for tool in tools:
+        params = tool["function"]["parameters"]
+        params["properties"]["connection"] = {"type": "string", "enum": [l["name"] for l in links]}
+        params["required"].append("connection")
+    return tools
+
+
+def available_tools(conversation_id: Optional[int] = None) -> list:
+    """Outils du chat : les outils de diagnostic ne sont proposés que pour les connexions de cette conversation."""
+    db = SessionLocal()
+    try:
+        return (TOOLS + _for_links(DOCKER_TOOLS, diag.links_for_conversation(db, conversation_id, "docker"))
+                + _for_links(HOST_TOOLS, diag.links_for_conversation(db, conversation_id, "ssh")))
+    finally:
+        db.close()
 
 
 _EXECUTORS = {
@@ -574,7 +609,8 @@ def tool_label(name: str, args: dict, lang: str = "fr") -> str:
         "docker_container_stats": f"Container usage {args.get('name', '')}",
         "host_check": f"Host: {args.get('check', '')}" + (f" {args['target']}" if args.get("target") else ""),
     }
-    return (en if lang == "en" else fr).get(name, name)
+    text = (en if lang == "en" else fr).get(name, name)
+    return f"{text} · {args['connection']}" if args.get("connection") else text
 
 
 def _run_sync(name: str, args: dict, conversation_id: Optional[int]) -> str:

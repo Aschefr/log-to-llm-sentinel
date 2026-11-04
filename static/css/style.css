@@ -2912,6 +2912,13 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .diag-card { border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
 .diag-card-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 .diag-card-head h3 { margin: 0; font-size: 1rem; }
+.diag-links { display: flex; flex-direction: column; gap: 0.5rem; margin: 0; padding: 0; list-style: none; }
+.diag-link { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.25rem 0.75rem; padding: 0.55rem 0.7rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; }
+.diag-link-main { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; overflow-wrap: anywhere; }
+.diag-link-main .form-hint { margin: 0; }
+.diag-link .diag-actions { margin: 0; }
+.diag-form-title { margin: 0.25rem 0 0; font-size: 0.88rem; font-weight: 600; }
+.rf-access-list { display: flex; flex-direction: column; gap: 0.35rem; }
 .diag-status { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); }
 .diag-status--on { background: rgba(16, 185, 129, 0.15); color: var(--success); border-color: transparent; }
 .diag-actions { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 0.4rem 0; }

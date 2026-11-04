@@ -59,7 +59,6 @@ services:
     container_name: sentinel-docker-proxy
     environment:
       CONTAINERS: 1
-      INFO: 1
       POST: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro

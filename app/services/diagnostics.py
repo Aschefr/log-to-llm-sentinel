@@ -2,7 +2,7 @@
 Diagnostic en lecture seule de l'infrastructure, pour le chat et l'investigation :
 
 - Docker : via un proxy du socket Docker qui n'autorise que les requêtes de lecture
-  (ex. tecnativa/docker-socket-proxy avec CONTAINERS=1, INFO=1, POST=0). Sentinel ne monte jamais le socket.
+  (ex. tecnativa/docker-socket-proxy avec CONTAINERS=1, POST=0). Sentinel ne monte jamais le socket.
 - Serveur : via SSH, avec une clé générée par Sentinel et limitée côté serveur à un script
   (option `command=` d'authorized_keys). Sentinel ne transmet qu'un nom de contrôle d'une liste fermée.
 
@@ -15,12 +15,12 @@ import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 import httpx
 
 from app.database import SessionLocal
-from app.models import GlobalConfig
+from app.models import Analysis, ChatConversation, DiagnosticLink, GlobalConfig, Rule
 
 DOCKER_TIMEOUT_S = 8.0
 SSH_TIMEOUT_S = 20
@@ -54,34 +54,55 @@ def key_path() -> Path:
     return ssh_dir() / "sentinel_diag_ed25519"
 
 
-def settings() -> dict:
+def link_dict(link: DiagnosticLink) -> dict:
+    return {"id": link.id, "name": link.name, "kind": link.kind, "docker_url": link.docker_url or "",
+            "ssh_host": link.ssh_host or "", "ssh_port": link.ssh_port or 22, "ssh_user": link.ssh_user or ""}
+
+
+def all_links(db, kind: Optional[str] = None) -> List[dict]:
+    """Connexions utilisables. Sans la clé de Sentinel, aucune connexion SSH ne peut servir."""
+    rows = db.query(DiagnosticLink).order_by(DiagnosticLink.kind, DiagnosticLink.id).all()
+    return [link_dict(r) for r in rows if (not kind or r.kind == kind) and (r.kind != "ssh" or key_path().exists())]
+
+
+def links_for_rule(db, rule: Rule, kind: Optional[str] = None) -> List[dict]:
+    allowed = rule.get_diagnostic_link_ids()
+    return [link for link in all_links(db, kind) if allowed is None or link["id"] in allowed]
+
+
+def links_for_conversation(db, conversation_id: Optional[int], kind: Optional[str] = None) -> List[dict]:
+    """Une conversation née d'une alerte n'a accès qu'aux connexions de sa règle ; une conversation libre, à toutes."""
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conversation_id).first() if conversation_id else None
+    analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first() if conv and conv.analysis_id else None
+    rule = db.query(Rule).filter(Rule.id == analysis.rule_id).first() if analysis else None
+    return links_for_rule(db, rule, kind) if rule else all_links(db, kind)
+
+
+def availability() -> dict:
     db = SessionLocal()
     try:
-        c = db.query(GlobalConfig).first()
-        return {
-            "docker_proxy_url": ((c.docker_proxy_url if c else "") or "").strip().rstrip("/"),
-            "ssh_host": ((c.ssh_host if c else "") or "").strip(),
-            "ssh_port": (c.ssh_port if c else None) or 22,
-            "ssh_user": ((c.ssh_user if c else "") or "").strip(),
-        }
+        return {"docker": bool(all_links(db, "docker")), "host": bool(all_links(db, "ssh"))}
     finally:
         db.close()
 
 
-def availability(cfg: Optional[dict] = None) -> dict:
-    cfg = cfg or settings()
-    return {
-        "docker": bool(cfg["docker_proxy_url"]),
-        "host": bool(cfg["ssh_host"] and cfg["ssh_user"] and key_path().exists()),
-    }
+def migrate_legacy(db):
+    """L'ancienne configuration unique devient des connexions, et les règles sans choix continuent d'y avoir accès."""
+    config = db.query(GlobalConfig).first()
+    if not config:
+        return
+    url = (config.docker_proxy_url or "").strip().rstrip("/")
+    if url:
+        db.add(DiagnosticLink(name="Docker", kind="docker", docker_url=url))
+    if (config.ssh_host or "").strip() and (config.ssh_user or "").strip():
+        db.add(DiagnosticLink(name="Serveur", kind="ssh", ssh_host=config.ssh_host.strip(), ssh_port=config.ssh_port or 22, ssh_user=config.ssh_user.strip()))
+    config.docker_proxy_url, config.ssh_host, config.ssh_user = "", "", ""
+    db.commit()
 
 
 # ── Docker (proxy en lecture seule) ─────────────────────────────────────────────
 
-def _docker_get(path: str, params: dict = None, base: str = None, raw: bool = False):
-    base = base or settings()["docker_proxy_url"]
-    if not base:
-        raise DiagnosticError("diagnostic Docker non configuré")
+def _docker_get(base: str, path: str, params: dict = None, raw: bool = False):
     try:
         with httpx.Client(base_url=base, timeout=DOCKER_TIMEOUT_S) as client:
             resp = client.get(path, params=params)
@@ -104,13 +125,18 @@ def _check_container(name: str) -> str:
 
 
 def docker_test(base: str) -> dict:
-    info = _docker_get("/info", base=base.strip().rstrip("/"))
-    return {"server_version": info.get("ServerVersion"), "containers": info.get("Containers"),
-            "running": info.get("ContainersRunning"), "name": info.get("Name")}
+    """Seul CONTAINERS est exigé : c'est ce que les outils utilisent, et /info est refusé par défaut sur ces proxys."""
+    base = base.strip().rstrip("/")
+    rows = _docker_get(base, "/containers/json", {"all": "true"})
+    try:
+        version = _docker_get(base, "/version").get("Version")
+    except DiagnosticError:
+        version = None
+    return {"server_version": version, "containers": len(rows), "running": sum(c.get("State") == "running" for c in rows)}
 
 
-def docker_containers(all_containers: bool = True) -> list:
-    rows = _docker_get("/containers/json", {"all": "true" if all_containers else "false"})
+def docker_containers(base: str, all_containers: bool = True) -> list:
+    rows = _docker_get(base, "/containers/json", {"all": "true" if all_containers else "false"})
     return [{
         "name": (c.get("Names") or ["?"])[0].lstrip("/"),
         "image": c.get("Image"),
@@ -119,8 +145,8 @@ def docker_containers(all_containers: bool = True) -> list:
     } for c in rows]
 
 
-def docker_container_status(name: str) -> dict:
-    d = _docker_get(f"/containers/{_check_container(name)}/json")
+def docker_container_status(base: str, name: str) -> dict:
+    d = _docker_get(base, f"/containers/{_check_container(name)}/json")
     state = d.get("State") or {}
     health = state.get("Health") or {}
     return {
@@ -160,16 +186,16 @@ def _demux_logs(data: bytes) -> str:
     return data.decode("utf-8", errors="replace")
 
 
-def docker_container_logs(name: str, lines: int = 100, since_minutes: Optional[int] = None) -> str:
+def docker_container_logs(base: str, name: str, lines: int = 100, since_minutes: Optional[int] = None) -> str:
     lines = max(1, min(int(lines or 100), MAX_LOG_LINES))
     params = {"stdout": "true", "stderr": "true", "timestamps": "true", "tail": str(lines)}
     if since_minutes:
         params["since"] = str(int(datetime.utcnow().timestamp()) - int(since_minutes) * 60)
-    return _demux_logs(_docker_get(f"/containers/{_check_container(name)}/logs", params, raw=True)).strip()
+    return _demux_logs(_docker_get(base, f"/containers/{_check_container(name)}/logs", params, raw=True)).strip()
 
 
-def docker_container_stats(name: str) -> dict:
-    s = _docker_get(f"/containers/{_check_container(name)}/stats", {"stream": "false"})
+def docker_container_stats(base: str, name: str) -> dict:
+    s = _docker_get(base, f"/containers/{_check_container(name)}/stats", {"stream": "false"})
     cpu, pre = s.get("cpu_stats") or {}, s.get("precpu_stats") or {}
     cpu_delta = (cpu.get("cpu_usage") or {}).get("total_usage", 0) - (pre.get("cpu_usage") or {}).get("total_usage", 0)
     sys_delta = (cpu.get("system_cpu_usage") or 0) - (pre.get("system_cpu_usage") or 0)
@@ -211,9 +237,8 @@ def generate_key(force: bool = False) -> str:
     return public_key()
 
 
-def run_host_check(check: str, arg: Optional[str] = None, cfg: Optional[dict] = None, _raw: Optional[str] = None) -> str:
-    cfg = cfg or settings()
-    if not availability(cfg)["host"]:
+def run_host_check(cfg: dict, check: str, arg: Optional[str] = None, _raw: Optional[str] = None) -> str:
+    if not (cfg.get("ssh_host") and cfg.get("ssh_user") and key_path().exists()):
         raise DiagnosticError("diagnostic serveur non configuré")
     if check not in HOST_CHECKS:
         raise DiagnosticError(f"contrôle inconnu « {check} » (disponibles : {', '.join(HOST_CHECKS)})")
@@ -237,12 +262,14 @@ def run_host_check(check: str, arg: Optional[str] = None, cfg: Optional[dict] = 
     return out or err or "(aucune sortie)"
 
 
-def host_fingerprint() -> Optional[str]:
+def host_fingerprint(host: str, port: int = 22) -> Optional[str]:
     kh = ssh_dir() / "known_hosts"
     if not kh.exists() or not shutil.which("ssh-keygen"):
         return None
-    res = subprocess.run(["ssh-keygen", "-l", "-f", str(kh)], capture_output=True, timeout=10)
-    return res.stdout.decode("utf-8", errors="replace").strip().splitlines()[0] if res.returncode == 0 and res.stdout else None
+    target = host if int(port) == 22 else f"[{host}]:{int(port)}"
+    res = subprocess.run(["ssh-keygen", "-l", "-F", target, "-f", str(kh)], capture_output=True, timeout=10)
+    lines = [l for l in res.stdout.decode("utf-8", errors="replace").splitlines() if l and not l.startswith("#")]
+    return lines[0].strip() if res.returncode == 0 and lines else None
 
 
 # ── Script installé sur le serveur ──────────────────────────────────────────────
@@ -341,9 +368,9 @@ def _script() -> str:
     return DIAG_SCRIPT.replace("@VERSION@", DIAG_SCRIPT_VERSION)
 
 
-def installed_script_version(cfg: Optional[dict] = None) -> Optional[str]:
+def installed_script_version(cfg: dict) -> Optional[str]:
     """Version du script installé sur le serveur (None si ancien script sans numéro de version)."""
-    out = run_host_check("overview", cfg=cfg, _raw="version")
+    out = run_host_check(cfg, "overview", _raw="version")
     m = re.match(r"^sentinel-diag (\S+)$", out.strip())
     return m.group(1) if m else None
 

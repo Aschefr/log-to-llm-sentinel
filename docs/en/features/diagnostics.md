@@ -12,9 +12,23 @@ Everything is **read-only**: nothing can be started, stopped, restarted or modif
 
 ---
 
+## Several machines, chosen per rule
+
+You can add as many connections as you need, Docker or SSH, each with a name, in *Configuration > Diagnostics*: for example SSH to your Unraid server and the Docker of this machine. Sentinel uses the same SSH key for all of them, so the block of step 2 is the same on every server.
+
+Each rule then says which ones the AI may use, in **AI access for diagnosis** in its Settings tab, also on autopilot, since only you know which machine a log comes from:
+
+* A conversation started from an alert only has access to the connections of its rule. A rule with nothing ticked gets no diagnostic tools.
+* A free conversation has access to all of them, and the AI says which one it checked.
+* A rule with everything ticked also gets the connections added later.
+
+A previous single configuration becomes two connections named *Docker* and *Serveur*, available to all rules.
+
+---
+
 ## 1. Docker diagnostics
 
-Sentinel talks to [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy), which only forwards **read** requests to the Docker socket (`CONTAINERS=1`, `INFO=1`, `POST=0`). Sentinel itself never mounts the socket.
+Sentinel talks to [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy), which only forwards **read** requests to the Docker socket (`CONTAINERS=1`, `POST=0`). Sentinel itself never mounts the socket.
 
 > ⚠️ Never mount `/var/run/docker.sock` directly into Sentinel, even with `:ro`: the read-only flag does not restrict the Docker API and the socket is equivalent to root access on the host.
 
@@ -27,7 +41,6 @@ Add this service to the same `docker-compose.yml` as Sentinel (the [configurator
     container_name: sentinel-docker-proxy
     environment:
       CONTAINERS: 1
-      INFO: 1
       POST: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
@@ -41,9 +54,9 @@ Run `docker compose up -d`, then in Sentinel: **Configuration › Diagnostics �
 Unraid has no compose and containers on its default bridge cannot reach each other by name, so both containers go on a dedicated network:
 
 1. In the Unraid terminal, once: `docker network create sentinel`. To see it in the *Network type* list, *Settings › Docker › Preserve user defined networks* must be set to **Yes** (the Docker service has to be stopped to change it).
-2. **Apps** tab → install **Log-to-LLM-Sentinel-Docker-Proxy** → *Network type*: `sentinel`. Do not add a port mapping.
+2. **Apps** tab → install **dockersocket** (IBRACORP) → *Network type*: `sentinel`. Keep `CONTAINERS=1` and `POST=0`, and do not add a port mapping.
 3. Edit the **Log-to-LLM-Sentinel** container → *Network type*: `sentinel`.
-4. Sentinel → **Configuration › Diagnostics**: choose the Unraid tab under *How to install it?* so the address `http://sentinel-docker-proxy:2375` is filled in, then click **Test and save**.
+4. Sentinel → **Configuration › Diagnostics**: choose the Unraid tab under *How to install it?* so the address `http://dockersocket:2375` is filled in, then click **Test and save**.
 
 > Do not publish the proxy port on your LAN: even read-only, it exposes the configuration of every container (including environment variables). Sentinel strips environment variables and labels before passing container details to the AI.
 

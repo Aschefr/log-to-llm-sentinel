@@ -80,7 +80,7 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
     async def _turn():
         nonlocal calls, used
         for round_idx in range(limits.max_rounds + 1):
-            tools_now = available_tools() if use_tools and round_idx < limits.max_rounds and calls < limits.max_calls else None
+            tools_now = available_tools(conversation_id) if use_tools and round_idx < limits.max_rounds and calls < limits.max_calls else None
             if use_tools and tools_now is None:
                 # En "user" : en "system", qwen3.8 l'ignore et redemande des outils même sans en recevoir, donc n'écrit rien
                 messages.append({"role": "user", "content": label(lang, "tools_exhausted")})

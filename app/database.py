@@ -129,6 +129,7 @@ def init_db():
         "ALTER TABLE global_config ADD COLUMN ssh_host VARCHAR DEFAULT ''",
         "ALTER TABLE global_config ADD COLUMN ssh_port INTEGER DEFAULT 22",
         "ALTER TABLE global_config ADD COLUMN ssh_user VARCHAR DEFAULT ''",
+        "ALTER TABLE rules ADD COLUMN diagnostic_link_ids_json TEXT",
         # KW-2: ajustement automatique des mots-clés (tables keyword_changes / keyword_templates créées par create_all)
         "ALTER TABLE rules ADD COLUMN keyword_tuning_mode VARCHAR DEFAULT 'auto'",
         "ALTER TABLE rules ADD COLUMN keyword_stats_json TEXT DEFAULT '{}'",
@@ -173,10 +174,12 @@ def init_db():
             except Exception:
                 pass  # Colonne déjà présente
 
+    from app.services import diagnostics
     from app.services import analysis_events  # enregistre aussi le calcul de la clé à la création d'une analyse
     db = SessionLocal()
     try:
         analysis_events.backfill(db)
         analysis_events.rekey(db)
+        diagnostics.migrate_legacy(db)
     finally:
         db.close()
