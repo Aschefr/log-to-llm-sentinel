@@ -21,6 +21,7 @@
                 <span class="toggle-slider"></span>
                 <span class="toggle-label" data-i18n="rule.enabled">Activée</span>
             </label>
+            <button type="button" id="rp-autopilot-btn" class="btn btn-secondary btn-sm hidden" data-i18n="rule.ap_rerun" data-i18n-title="rule.ap_rerun_title" title="Relit les 7 derniers jours du journal et revoit les mots-clés, le regroupement, le silence et le seuil. La règle continue d'alerter pendant ce temps.">Relancer le pilote</button>
             <button type="button" id="rp-test-btn" class="btn btn-secondary btn-sm" data-i18n="rule.test">Tester</button>
             <button type="button" id="rp-download-btn" class="btn btn-secondary btn-sm" data-i18n="rule.download_log">Télécharger le log</button>
             <button type="button" id="rp-delete-btn" class="btn btn-danger btn-sm" data-i18n="common.delete">Supprimer</button>
@@ -74,6 +75,6 @@
 
 {% block scripts %}
 <script src="/static/js/rule_form.js?v=7"></script>
-<script src="/static/js/rule_page.js?v=12"></script>
-<script src="/static/js/rule_keywords.js?v=4"></script>
+<script src="/static/js/rule_page.js?v=13"></script>
+<script src="/static/js/rule_keywords.js?v=5"></script>
 {% endblock %}

@@ -26,6 +26,15 @@ async def start_session(body: StartRequest):
     return {"session_id": session_id}
 
 
+@router.post("/rules/{rule_id}/rerun-autopilot")
+async def rerun_autopilot(rule_id: int):
+    try:
+        session_id = kls.rerun_autopilot(rule_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404 if str(e) == "rule_not_found" else 422, detail=str(e))
+    return {"session_id": session_id}
+
+
 @router.get("/{session_id}/status")
 def get_status(session_id: int):
     data = kls.get_session_status(session_id)

@@ -120,6 +120,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (TABS.includes(tab) && tab !== RP.tab) selectTab(tab);
     });
     document.getElementById('rp-enabled').addEventListener('change', toggleEnabled);
+    document.getElementById('rp-autopilot-btn').addEventListener('click', rerunAutopilot);
     document.getElementById('rp-test-btn').addEventListener('click', testRule);
     document.getElementById('rp-download-btn').addEventListener('click', () => { window.location.href = `/api/rules/${RP.id}/download`; });
     document.getElementById('rp-delete-btn').addEventListener('click', e => deleteRule(e.currentTarget));
@@ -487,7 +488,26 @@ function goToSettings(sectionId) {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+/** Re-reads the log right away instead of waiting for the weekly re-read. Its progress and result are in the Keywords tab. */
+async function rerunAutopilot(e) {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+        await apiFetch(`/api/keyword-learning/rules/${RP.id}/rerun-autopilot`, { method: 'POST' });
+        await loadHeader();
+        selectTab('keywords');
+    } catch (err) {
+        alert(err.message);
+        btn.disabled = false;
+    }
+}
+
 function setAutopilotPill(a) {
+    const btn = document.getElementById('rp-autopilot-btn');
+    if (btn) {
+        btn.classList.toggle('hidden', !(a && a.enabled));
+        btn.disabled = !!a && ['learning', 'observing'].includes(a.status);
+    }
     const pill = document.getElementById('rp-autopilot');
     if (!pill) return;
     pill.classList.toggle('hidden', !(a && a.enabled));

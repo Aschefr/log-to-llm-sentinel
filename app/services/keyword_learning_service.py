@@ -340,6 +340,23 @@ def start_session(rule_id: int, mode: str = "history", hours: int = 168, refresh
     return session_id
 
 
+def rerun_autopilot(rule_id: int) -> int:
+    """Relance demandée par l'utilisateur : la relecture hebdomadaire tout de suite, ou la mise en place si la règle
+    n'est pas prête. Une session déjà en cours est simplement reprise. Lève ValueError si le pilote n'est pas actif."""
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise ValueError("rule_not_found")
+        state = ap.load(rule)
+        if not state.get("enabled"):
+            raise ValueError("autopilot_off")
+        ready = state.get("status") == "active"
+    finally:
+        db.close()
+    return start_session(rule_id, "history", 168, refresh=ready)
+
+
 def start_setup_session(rule_id: int) -> Optional[int]:
     """Session demandée à la création ou à l'activation du pilote : un échec n'empêche pas d'enregistrer la règle,
     mais il doit se voir dans les logs."""

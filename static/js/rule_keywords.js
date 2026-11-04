@@ -147,7 +147,8 @@ async function renderKeywords() {
         const period = `${fmtWhen(s.period_start)} → ${fmtWhen(s.period_end)}`;
         session = `
         <section class="rp-card">
-            <div class="rp-card-head"><h2>${esc(sum.autopilot && !sum.refresh ? T('rule.ap_session_title', 'Mise en place par le pilote automatique')
+            <div class="rp-card-head"><h2>${esc(sum.refresh ? T('rule.ap_session_refresh', 'Relecture par le pilote automatique')
+                : sum.autopilot ? T('rule.ap_session_title', 'Mise en place par le pilote automatique')
                 : s.mode === 'live' ? T('rule.kw_session_live', 'Observation') : T('rule.kw_session_history', 'Analyse de l’historique'))}</h2>
                 <span class="rp-muted">${esc(period)}</span></div>
             ${body}

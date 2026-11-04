@@ -38,6 +38,7 @@ The autopilot runs the rule without asking you anything:
 * **Repeated events**: when the last 3 analyses containing the same event were all rated `info` (or flagged *Not relevant*, unless rated `critical`), its lines stop going to the AI, and the rule no longer stays in alert because of them. The event is analyzed again every 6 hours, so a change of verdict brings it back. New events, and events rated higher or whose analysis failed, are always analyzed. The dashboard lists the event once in the autopilot's latest decisions.
 * *Review now* in the Keywords tab also runs this upkeep.
 * Every week the log is read again: the grouping window and the silence delay are recomputed, and the context is rewritten only if the content of the log changed noticeably (less than half of its most frequent lines are still there).
+* **Run the autopilot again**, at the top of the rule page, does this re-read right away, on the last 7 days of the log, and also reviews the keywords. The rule keeps alerting meanwhile; progress and result appear in the Keywords tab, where keyword changes can be undone.
 * If the setup fails (AI unreachable…), the rule keeps alerting on error-level lines and Sentinel tries again 6 hours later. Cancelling the setup stops these retries; *Analyze history* in the Keywords tab resumes it.
 
 ## 4. You keep control
