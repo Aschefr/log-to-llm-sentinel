@@ -26,3 +26,18 @@ htmlcov/
 .vscode/
 *.swp
 *.bak
+
+# Rien de local ni de privé dans l'image publique : notes de travail, réglages de ce PC, historique git
+.git/
+.impeccable/
+REPRISE_SESSION.md
+docker-compose.override.yml
+scratch/
+*.db
+CLAUDE.md
+PRODUCT.md
+DevTracker.yaml
+BUILD_GUIDE.md
+test_ollama.py
+screenshots/
+scripts/
