@@ -3147,7 +3147,7 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 /* Analyses grouped by event */
 .event-count { font-variant-numeric: tabular-nums; }
 .event-occurrences { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; margin-bottom: 0.75rem; color: var(--text-secondary); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
-.event-occurrence-list { flex-basis: 100%; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.event-occurrence-list { flex-basis: 100%; min-width: 0; display: flex; flex-direction: column; border-top: 1px solid var(--border); }
 .event-occurrence { display: flex; align-items: center; gap: 0.6rem; min-height: 2.25rem; padding: 0.25rem 0.35rem; border-bottom: 1px solid var(--border); color: inherit; text-decoration: none; }
 .event-occurrence:hover { background: rgba(59, 130, 246, 0.06); }
 .event-occurrence:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

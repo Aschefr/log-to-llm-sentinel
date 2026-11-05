@@ -432,6 +432,18 @@ async function loadOpenCveSheets() {
     }
 }
 
+/** Closes the rule's open incident, as on its overview tab. */
+function resolveIncidentFromCard(ruleId, btn) {
+    showInlineConfirm(btn, _cardT('rule.resolve_confirm', 'Clore l’incident en cours ?'), async () => {
+        try {
+            await apiFetch(`/api/monitor/rules/${ruleId}/resolve`, { method: 'POST' });
+            window.location.reload();
+        } catch (e) {
+            alert(`${_cardT('common.error', 'Erreur')}: ${e.message}`);
+        }
+    });
+}
+
 function renderAnalysisCard(a, opts = {}) {
     const collapsed = opts.collapsed !== false;
     const showDelete = opts.showDelete || false;
@@ -583,6 +595,7 @@ function renderAnalysisCard(a, opts = {}) {
                     ${ev ? `<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openNoteForm(this)">📝 ${_t('common.note_add', 'Ajouter une note')}</button>` : ''}
                     ${a.rule_id ? `<button class="btn btn-secondary btn-sm${flagged ? ' is-flagged' : ''}" onclick="event.stopPropagation(); toggleIrrelevant(${a.id}, this)" aria-pressed="${flagged}"
                         title="${_t('common.irrelevant_title', 'L’IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne')}">👎 ${flagged ? _t('common.irrelevant_done', 'Signalée pas pertinente') : _t('common.irrelevant', 'Pas pertinente')}</button>` : ''}
+                    ${ev && ev.rule_in_alert && !a.resolution_status ? `<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); resolveIncidentFromCard(${a.rule_id}, this)">${_t('rule.resolve', 'Marquer comme résolu')}</button>` : ''}
                     ${a.rule_id && !opts.hideRuleLink ? `<a class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" href="/rules/${a.rule_id}?analysis=${a.id}#analyses">🔍 ${_t('common.view_rule', 'Voir dans la règle')}</a>` : ''}
                 </div>
                 <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); openChat(${a.id})">💬 ${_t('common.deepen', 'Deepen')}</button>
@@ -660,7 +673,7 @@ function deleteEvent(ruleId, key, count, btn) {
 function eventCardSignature(ev) {
     const a = ev.analysis;
     const notes = (ev.notes || []).map(n => `${n.id}:${n.updated_at}:${n.scope}`).join(',');
-    return [a.id, ev.unread, ev.count, ev.last_at, ev.severity, a.resolution_status, a.resolved_at, a.summary, ev.flagged, notes, (a.ollama_response || '').length].join('|');
+    return [a.id, ev.unread, ev.count, ev.last_at, ev.severity, a.resolution_status, a.resolved_at, a.summary, ev.flagged, ev.rule_in_alert, notes, (a.ollama_response || '').length].join('|');
 }
 
 /** Card of one event, as a DOM element. */

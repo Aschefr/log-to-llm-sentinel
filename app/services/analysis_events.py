@@ -184,7 +184,7 @@ def summarize(db, rule_id: Optional[int] = None, days: Optional[int] = None, ope
     Un événement est non lu tant qu'aucune occurrence n'a été lue, ou si une occurrence non lue est plus grave que tout
     ce qui a été lu : une simple répétition d'un événement déjà vu ne le remet pas en non lu."""
     q = db.query(Analysis.id, Analysis.rule_id, Rule.name, Analysis.event_key, Analysis.severity, Analysis.viewed,
-                 Analysis.analyzed_at, Analysis.resolution_status, Analysis.feedback).join(Rule, Analysis.rule_id == Rule.id)
+                 Analysis.analyzed_at, Analysis.resolution_status, Analysis.feedback, Rule.alert_status).join(Rule, Analysis.rule_id == Rule.id)
     if rule_id is not None:
         q = q.filter(Analysis.rule_id == rule_id)
     if days:
@@ -200,7 +200,7 @@ def summarize(db, rule_id: Optional[int] = None, days: Optional[int] = None, ope
             g = groups[key] = {"key": row.event_key, "rule_id": row.rule_id, "rule_name": row.name, "count": 0,
                                "last_at": row.analyzed_at, "first_at": row.analyzed_at, "latest_id": row.id,
                                "severities": {}, "read_rank": -1, "unread_rank": -1, "unread_id": None, "open": 0,
-                               "flag_rank": -1}
+                               "flag_rank": -1, "rule_in_alert": row.alert_status in ("alert", "resolving")}
         severity = row.severity if row.severity in SEVERITIES else "info"
         g["count"] += 1
         g["first_at"] = row.analyzed_at
@@ -220,6 +220,8 @@ def summarize(db, rule_id: Optional[int] = None, days: Optional[int] = None, ope
             "key": g["key"], "rule_id": g["rule_id"], "rule_name": g["rule_name"], "count": g["count"],
             "first_at": iso(g["first_at"]), "last_at": iso(g["last_at"]), "severities": g["severities"],
             "severity": max(g["severities"], key=_rank), "unread": unread, "open_count": g["open"],
+            # De vieilles analyses restent sans statut sur une règle revenue à la normale : il n'y a alors rien à clore
+            "rule_in_alert": g["rule_in_alert"],
             # Signalé : reste vrai pour une répétition de même gravité, pas pour une occurrence plus grave
             "flagged": g["flag_rank"] >= 0 and g["flag_rank"] == max(_rank(s) for s in g["severities"]),
             # Ce qui justifie de rouvrir l'événement, sinon sa dernière occurrence
