@@ -77,6 +77,30 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
     used = 0
     options = {"temperature": config.get("ollama_temp", 0.1), "num_ctx": config.get("ollama_ctx", 4096)}
 
+    async def _generate(tools_now):
+        """Un tour de génération : le texte visible part vers result et emit_text."""
+        content, tool_calls, think = "", [], _ThinkFilter()
+        stream = ollama.generate_stream(
+            None, url=config.get("ollama_url"), model=config.get("ollama_model"),
+            options=options, think=config.get("ollama_think", True),
+            messages=messages, tools=tools_now,
+        )
+        # aclosing : referme le flux HTTP dès la sortie de boucle
+        async with semaphore, contextlib.aclosing(stream):
+            async for chunk in stream:
+                if "error" in chunk:
+                    raise RuntimeError(chunk["error"])
+                msg = chunk.get("message", {})
+                visible = think.feed(msg.get("content", "") or "")
+                if visible:
+                    content += visible
+                    result.text += visible
+                    emit_text(visible)
+                tool_calls.extend(msg.get("tool_calls") or [])
+                if chunk.get("done"):
+                    break
+        return content, tool_calls
+
     async def _turn():
         nonlocal calls, used
         for round_idx in range(limits.max_rounds + 1):
@@ -85,29 +109,14 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
                 # En "user" : en "system", qwen3.8 l'ignore et redemande des outils même sans en recevoir, donc n'écrit rien
                 messages.append({"role": "user", "content": label(lang, "tools_exhausted")})
 
-            content, tool_calls, think = "", [], _ThinkFilter()
-            stream = ollama.generate_stream(
-                None, url=config.get("ollama_url"), model=config.get("ollama_model"),
-                options=options, think=config.get("ollama_think", True),
-                messages=messages, tools=tools_now,
-            )
-            # aclosing : referme le flux HTTP dès la sortie de boucle
-            async with semaphore, contextlib.aclosing(stream):
-                async for chunk in stream:
-                    if "error" in chunk:
-                        raise RuntimeError(chunk["error"])
-                    msg = chunk.get("message", {})
-                    visible = think.feed(msg.get("content", "") or "")
-                    if visible:
-                        content += visible
-                        result.text += visible
-                        emit_text(visible)
-                    tool_calls.extend(msg.get("tool_calls") or [])
-                    if chunk.get("done"):
-                        break
+            content, tool_calls = await _generate(tools_now)
 
             # Au tour final (outils retirés), on ignore d'éventuels appels : la réponse texte fait foi
             if not tool_calls or tools_now is None:
+                # qwen3.8 s'arrête parfois sans rien écrire après beaucoup d'outils : une relance suffit (18 fois sur 18)
+                if not result.text.strip():
+                    messages.append({"role": "user", "content": label(lang, "empty_retry")})
+                    await _generate(None)
                 return
             if result.text and not result.text.endswith("\n"):
                 result.text += "\n\n"

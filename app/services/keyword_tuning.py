@@ -883,6 +883,19 @@ def record_manual_change(rule_id: int, kind: str, action: str, value: str, origi
 
 # ── Notification ───────────────────────────────────────────────────────────────────
 
+def short_reason(text: str, limit: int = 260) -> str:
+    """Raison lisible dans une notification : des phrases entières, sinon une coupure à un mot, signalée.
+    Le texte complet reste dans l'onglet Mots-clés."""
+    text = " ".join((text or "").split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    ends = [m.end() for m in re.finditer(r"[.!?](?=\s)", cut)]
+    if ends and ends[-1] >= 60:
+        return cut[:ends[-1]]
+    return cut[:cut.rfind(" ")].rstrip(" ,;:(") + " …"
+
+
 async def notify_changes(rule_name: str, notify: bool, changes: List[dict], config: dict, title: str = None,
                          extra: Optional[List[str]] = None):
     """Une notification par revue. extra : lignes déjà formatées (réglages définis par le pilote automatique)."""
@@ -895,7 +908,7 @@ async def notify_changes(rule_name: str, notify: bool, changes: List[dict], conf
     sign = {("keyword", "add"): "+ mot-clé" if fr else "+ keyword", ("keyword", "remove"): "− mot-clé" if fr else "− keyword",
             ("exclusion", "add"): "+ exclusion", ("exclusion", "remove"): "− exclusion"}
     lines = list(extra or [])
-    lines += [f"- {sign[(c['kind'], c['action'])]} `{c['value']}` — {c['reason'][:200]}" for c in applied]
+    lines += [f"- {sign[(c['kind'], c['action'])]} `{c['value']}` — {short_reason(c['reason'])}" for c in applied]
     if pending:
         lines.append(("\n**À valider dans l'onglet Mots-clés :**" if fr else "\n**To review in the Keywords tab:**"))
         lines += [f"- {sign[(c['kind'], c['action'])]} `{c['value']}`" for c in pending]

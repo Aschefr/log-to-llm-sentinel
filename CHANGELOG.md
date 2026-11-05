@@ -12,6 +12,9 @@ All notable changes to this project will be documented in this file.
 - **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
 
 ### Fixed
+- **Keyword notifications cut mid-sentence**: the reason of a change was cut at 200 characters. It now ends on a whole sentence, the full text staying in the Keywords tab.
+- **Investigations that ended with no answer**: after using many tools, the AI could stop without writing anything, in 17 of 37 test runs that used all their tool calls. It is now asked once more to write its answer, which worked 18 times out of 18.
+- **Model reloaded during a chat**: the automatic title of a new conversation asked for a different context size, so Ollama reloaded the model for the title and again for the next question, about 57 s lost on the tested setup.
 - **Incidents closing too early**: when a return-to-normal line appeared, the AI judged it on the few lines just received, so a harmless line in the middle of a restart loop could close the incident. It now reads the last 30 lines of the log, errors included, and no longer works out durations from the times in log lines, which may be in another time zone. Replaying four real early closures: closed 16 times out of 20 before, 0 after; three fictional real recoveries still close every time.
 - **Autopilot and silent sources**: a rule put under autopilot kept a silence notification turned off earlier, with no way to see it in this mode. A silent source now always notifies under autopilot. Rules already under autopilot switch to this at the update.
 - **English interface**: part of the rule page and the Configuration tabs could stay in French, and full dates kept the French format.
