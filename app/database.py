@@ -160,6 +160,9 @@ def init_db():
         # La langue des analyses suit désormais celle du site
         "UPDATE global_config SET ollama_prompt_lang = site_lang WHERE site_lang IS NOT NULL AND site_lang != ''",
         "ALTER TABLE global_config ADD COLUMN chat_compression_mode VARCHAR DEFAULT ''",
+        # Recherche web et fiches CVE
+        "ALTER TABLE diagnostic_links ADD COLUMN web_url VARCHAR DEFAULT ''",
+        "ALTER TABLE global_config ADD COLUMN cve_lookup_enabled BOOLEAN DEFAULT 0",
         # Le chat suit la langue du site : l'ancien prompt par défaut imposerait une langue
         """UPDATE global_config SET chat_system_prompt = '' WHERE chat_system_prompt IN (
             'Tu es un expert DevOps francophone. Réponds en français de manière directe et concise.',

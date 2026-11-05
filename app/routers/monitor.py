@@ -12,6 +12,8 @@ from app.services.task_manager import task_manager
 from app.services.app_config import load_config_dict
 from app.services.alert_analysis import analysis_lines
 
+from app.services import cve_lookup
+
 router = APIRouter(prefix="/api/monitor", tags=["monitor"])
 
 # Référence à l'orchestrateur partagé (accès aux buffers en mémoire)
@@ -508,6 +510,21 @@ async def retry_analysis(analysis_id: int):
 
         asyncio.create_task(_do_retry())
         return {"status": "pending", "task_id": entry.task_id}
+    finally:
+        db.close()
+
+
+@router.get("/analyses/{analysis_id}/cve")
+def get_analysis_cve(analysis_id: int):
+    """Fiches des CVE cités par cette analyse. Elles informent et ne changent jamais la gravité."""
+    db = SessionLocal()
+    try:
+        analysis = db.query(Analysis).filter(Analysis.id == analysis_id).first()
+        if not analysis:
+            raise HTTPException(status_code=404, detail="analysis_not_found")
+        if not cve_lookup.enabled(db):
+            return {"enabled": False, "sheets": []}
+        return {"enabled": True, "sheets": cve_lookup.sheets_for_text(db, analysis.triggered_line)}
     finally:
         db.close()
 

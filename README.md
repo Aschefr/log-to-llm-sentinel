@@ -32,6 +32,7 @@ Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. 
 - 🤖 **Self-tuning keywords**: Not sure what to look for? Leave the keywords empty: the local AI reads the log history, adds keywords for the errors nothing catches, and removes the noise — every change checked against your data and undoable.
 - 📨 **Syslog Server & Relay**: Turn Sentinel into a remote syslog UDP server (listening on port 10514 UDP on host). Ingest remote logs (e.g., from Unraid) and optionally forward them to a secondary syslog server as a relay.
 - 📥 **Sort my unread**: Back after a few days? The AI goes through your unread events and suggests which ones can be marked as read, with a reason for each. You validate, and you can undo.
+- 🔎 **CVE sheets and web search** (optional): an alert citing a CVE shows whether it is actively exploited and which versions are affected, and the chat can search the web through your own SearXNG, with queries filtered so nothing private leaves.
 - 🛡️ **Log line safety**: Log lines can hold text chosen by an attacker. Sentinel treats them as data, and a line that tries to talk the AI out of an alert is flagged instead of obeyed.
 - 🔗 **Home Assistant Ready**: Use Webhooks to stream logs from your smart home directly to Sentinel.
 - 🔔 **Smart Notifications**: Integrated with SMTP and Apprise (Discord, Telegram, Slack). Sentinel intelligently adapts to character limits by asking the local AI to generate concise summaries when needed, ensuring critical alerts always fit your favorite messaging platform.

@@ -99,9 +99,12 @@ function syslogStatusView(y) {
 }
 
 function diagnosticsStatusView(d) {
-    if (d.docker && d.host) return ['ok', cfgT('config.status_diag_both', 'Docker et serveur')];
-    if (d.docker) return ['ok', cfgT('config.status_diag_docker', 'Docker')];
-    if (d.host) return ['ok', cfgT('config.status_diag_host', 'Serveur')];
+    const parts = [];
+    if (d.docker) parts.push(cfgT('config.status_diag_docker', 'Docker'));
+    if (d.host) parts.push(cfgT('config.status_diag_host', 'Serveur'));
+    if (d.web) parts.push('Web');
+    if (d.cve) parts.push('CVE');
+    if (parts.length) return ['ok', parts.join(' · ')];
     return ['idle', cfgT('config.status_diag_off', 'Non configuré')];
 }
 

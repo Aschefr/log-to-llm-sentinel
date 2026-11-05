@@ -365,6 +365,33 @@ async function resolveManually(btn) {
 }
 
 /* ── Overview tab ──────────────────────────────────────────────────────────── */
+/** Blocked attempts of a CEF source, grouped without AI. Refreshed every 5 min: it reads the end of the log file. */
+async function loadAttacks() {
+    if (RP.attacksAt && Date.now() - RP.attacksAt < 300000) return;
+    RP.attacksAt = Date.now();
+    try {
+        const { summary } = await apiFetch(`/api/rules/${RP.id}/attacks`);
+        RP.attacksHtml = summary ? attacksHtml(summary) : '';
+    } catch (_) {
+        RP.attacksHtml = '';
+    }
+    const slot = document.getElementById('rp-attacks');
+    if (slot) slot.innerHTML = RP.attacksHtml;
+}
+
+function attacksHtml(s) {
+    const rows = s.ports.map(p => `<tr>
+        <td><strong>${esc(p.port)}</strong></td><td>${esc(p.direction || '—')}</td><td>${p.flows}</td><td>${p.sources}</td>
+        <td class="mono rp-sig" title="${esc(p.signature)}">${esc(p.signature || '—')}</td></tr>`).join('');
+    return `<section class="rp-card rp-table-card">
+        <div class="rp-card-head"><h2>${esc(T('rule.attacks', 'Tentatives bloquées · {n} jours', { n: s.days }))}</h2>
+            <span class="rp-muted">${esc(T('rule.attacks_total', '{n} flux, regroupés sans IA', { n: s.flows }))}</span></div>
+        <div class="rp-scroll"><table class="rp-table">
+            <thead><tr><th>${esc(T('rule.attacks_port', 'Port visé'))}</th><th>${esc(T('rule.attacks_direction', 'Sens'))}</th><th>${esc(T('rule.attacks_flows', 'Flux'))}</th><th>${esc(T('rule.attacks_sources', 'Sources'))}</th><th>${esc(T('rule.attacks_signature', 'Signature la plus vue'))}</th></tr></thead>
+            <tbody>${rows}</tbody></table></div>
+    </section>`;
+}
+
 async function renderOverview() {
     const panel = document.getElementById('tab-overview');
     let s;
@@ -375,6 +402,7 @@ async function renderOverview() {
         return;
     }
     if (RP.tab !== 'overview') return;
+    loadAttacks();
     const inc = s.incident;
     const openAnalysis = s.latest.find(a => a.status === 'open');
     let incidentHtml;
@@ -487,7 +515,7 @@ async function renderOverview() {
         </a>`).join('') : `<p class="rp-muted">${esc(T('rule.no_alert_30d', 'Aucune alerte enregistrée.'))}</p>`}
     </section>`;
 
-    panel.innerHTML = autopilotJourneyHtml(s.autopilot) + incidentHtml + activityHtml + statsHtml + recHtml + latestHtml;
+    panel.innerHTML = autopilotJourneyHtml(s.autopilot) + incidentHtml + activityHtml + statsHtml + `<div id="rp-attacks">${RP.attacksHtml || ''}</div>` + recHtml + latestHtml;
 }
 
 function nextCheckText(iso) {

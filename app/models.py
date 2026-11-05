@@ -301,6 +301,7 @@ class GlobalConfig(Base):
     instance_name = Column(String, default='')  # nom de l'instance pour différencier les notifications multi-déploiement
     chat_system_prompt = Column(Text, default="")
     chat_lang = Column(String, default="")  # Plus utilisée : le chat suit la langue du site
+    cve_lookup_enabled = Column(Boolean, default=False)  # fiches CVE depuis NVD : une sortie vers Internet, au choix
     chat_compression_mode = Column(String, default="")  # Contexte plein : "" (demander), summary, compact, truncate
     auto_delete_analyses = Column(Boolean, default=False)
     auto_delete_retention_days = Column(Integer, default=30)
@@ -450,13 +451,22 @@ class KeywordChange(Base):
     decided_at = Column(DateTime, nullable=True)
 
 
+class CveEntry(Base):
+    """Fiche d'un CVE tirée de NVD, gardée quelques jours : ces données changent peu et NVD limite les requêtes."""
+    __tablename__ = "cve_entries"
+    cve_id = Column(String, primary_key=True)
+    data_json = Column(Text, nullable=False)
+    fetched_at = Column(DateTime, default=datetime.utcnow)
+
+
 class DiagnosticLink(Base):
     """Connexion de diagnostic en lecture seule : un proxy Docker ou un serveur en SSH limité."""
     __tablename__ = "diagnostic_links"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)  # l'IA la désigne par ce nom
-    kind = Column(String, nullable=False)  # 'docker' | 'ssh'
+    kind = Column(String, nullable=False)  # 'docker' | 'ssh' | 'web'
     docker_url = Column(String, default="")
+    web_url = Column(String, default="")   # instance SearXNG
     ssh_host = Column(String, default="")
     ssh_port = Column(Integer, default=22)
     ssh_user = Column(String, default="")

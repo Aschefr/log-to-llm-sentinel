@@ -15,6 +15,7 @@ from app.services import keyword_tuning as kt
 from app.services import keyword_learning_service as kls
 from app.utils import keyword_match
 from app.services.orchestrator import Orchestrator
+from app.services import attack_summary
 from app.services.app_config import config_to_dict, llm_options
 from app.services import rule_stats
 from app.services.probe_service import run_probe, PROBE_TYPES
@@ -555,6 +556,19 @@ def _snapshot(rule: Rule) -> Optional[dict]:
     if snap.get("probe"):
         snap["probe"] = {**snap["probe"], "at": rule_stats.iso(snap["probe"]["at"])}
     return snap
+
+
+@router.get("/{rule_id}/attacks")
+def get_rule_attacks(rule_id: int, days: int = 7):
+    """Tentatives bloquées regroupées, pour une source au format CEF. Vide pour les autres."""
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="Règle introuvable")
+        return {"summary": attack_summary.summary(rule, max(1, min(days, 30)))}
+    finally:
+        db.close()
 
 
 @router.get("/{rule_id}/summary")

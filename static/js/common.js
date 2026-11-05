@@ -373,6 +373,65 @@ function renderMarkdown(text) {
     return `<p style="white-space: pre-wrap;">${escapeHtml(text || '')}</p>`;
 }
 
+const _cardT = (k, fb) => (window.t && window.t(k) !== k) ? window.t(k) : fb;
+
+const CEF_FACTS = [['UNIFIipsSignature', 'signature', 'Signature'], ['src', 'source', 'Source'], ['UNIFIsrcRegion', 'region', 'Pays'],
+    ['dst', 'destination', 'Destination'], ['dpt', 'port', 'Port'], ['proto', 'protocol', 'Protocole'], ['act', 'action', 'Action'],
+    ['UNIFIdirection', 'direction', 'Sens'], ['UNIFIrisk', 'risk', 'Risque']];
+
+/** What a CEF line states, read without any AI: facts the analysis below may interpret, but cannot change. */
+function cefFactsHtml(line) {
+    if (!line || !line.includes('CEF:')) return '';
+    const value = key => {
+        const m = line.match(new RegExp(`(?:^|[\\s|])${key}=(.*?)(?=\\s+[A-Za-z_][\\w.-]*=|$)`, 'm'));
+        return m ? m[1].trim() : '';
+    };
+    const items = CEF_FACTS.map(([key, id, fallback]) => [_cardT(`common.fact_${id}`, fallback), value(key)]).filter(([, v]) => v);
+    if (!items.length) return '';
+    return `<dl class="analysis-facts" aria-label="${escapeHtml(_cardT('common.facts_title', 'Ce que dit la ligne'))}">${items.map(([k, v]) =>
+        `<div><dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd></div>`).join('')}</dl>`;
+}
+
+const CVE_PATTERN = /CVE-\d{4}-\d{4,7}/i;
+
+function cveSlotHtml(a) {
+    if (!a.triggered_line || !CVE_PATTERN.test(a.triggered_line)) return '';
+    queueMicrotask(loadOpenCveSheets);
+    return `<div class="analysis-cve" data-cve-analysis="${a.id}"></div>`;
+}
+
+function cveSheetHtml(s) {
+    if (s.error) return `<p class="form-hint">${escapeHtml(s.id)} : ${escapeHtml(_cardT('common.cve_unavailable', 'base NVD injoignable.'))}</p>`;
+    if (!s.found) return `<p class="form-hint">${escapeHtml(s.id)} : ${escapeHtml(_cardT('common.cve_missing', 'absent de la base NVD. Il peut être trop récent ou ne pas exister.'))}</p>`;
+    const kev = s.kev_added
+        ? `<span class="cve-badge cve-badge--kev">${escapeHtml(_cardT('common.cve_kev', 'Exploitée activement · KEV depuis {date}').replace('{date}', s.kev_added))}</span>`
+        : `<span class="cve-badge">${escapeHtml(_cardT('common.cve_no_kev', 'Pas au catalogue KEV'))}</span>`;
+    const score = s.score != null ? `<span class="cve-badge">CVSS ${escapeHtml(String(s.score))}</span>` : '';
+    const products = (s.products || []).length
+        ? `<p class="cve-products"><strong>${escapeHtml(_cardT('common.cve_affected', 'Versions touchées'))} :</strong> ${s.products.map(escapeHtml).join(' · ')}</p>` : '';
+    return `<div class="cve-sheet">
+        <div class="cve-head"><a href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.id)}</a> ${kev} ${score}</div>
+        ${products}
+        <p class="form-hint">${escapeHtml(s.description || '')}</p>
+    </div>`;
+}
+
+/** Sheets of the CVEs cited by open cards. Fetched once per card, only when it is open. */
+async function loadOpenCveSheets() {
+    const slots = document.querySelectorAll('[id^="analysis-card-"]:not(.collapsed) .analysis-cve[data-cve-analysis]:not([data-loaded])');
+    for (const slot of slots) {
+        slot.dataset.loaded = '1';
+        try {
+            const res = await apiFetch(`/api/monitor/analyses/${slot.dataset.cveAnalysis}/cve`);
+            slot.innerHTML = res.enabled
+                ? res.sheets.map(cveSheetHtml).join('')
+                : `<p class="form-hint"><a href="/config#diagnostic">${escapeHtml(_cardT('common.cve_enable_hint', 'Afficher la fiche officielle de ce CVE'))}</a></p>`;
+        } catch (_) {
+            slot.innerHTML = '';
+        }
+    }
+}
+
 function renderAnalysisCard(a, opts = {}) {
     const collapsed = opts.collapsed !== false;
     const showDelete = opts.showDelete || false;
@@ -510,6 +569,8 @@ function renderAnalysisCard(a, opts = {}) {
                 ${a.matched_keywords.map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join(' ')}
             </div>` : ''}
             <div class="analysis-line">${highlightKeywords(a.triggered_line || '', a.matched_keywords || [])}</div>
+            ${cefFactsHtml(a.triggered_line)}
+            ${cveSlotHtml(a)}
             ${a.reused_from ? `<p class="form-hint analysis-reused">${_t('common.analysis_reused', 'Même événement : analyse reprise, sans nouvel appel à l’IA.')}</p>` : ''}
             <div class="analysis-response markdown-body">${a.ollama_response ? renderMarkdown(a.ollama_response) : ''}</div>
             ${resolutionBlock}
@@ -699,6 +760,7 @@ function toggleAnalysisCardGeneric(event, card) {
     }
 
     if (!isCollapsed) {
+        loadOpenCveSheets();
         const idAttr = card.id;
         if (idAttr && idAttr.startsWith('analysis-card-')) {
             const analysisId = parseInt(idAttr.replace('analysis-card-', ''));

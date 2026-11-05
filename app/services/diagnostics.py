@@ -56,7 +56,8 @@ def key_path() -> Path:
 
 def link_dict(link: DiagnosticLink) -> dict:
     return {"id": link.id, "name": link.name, "kind": link.kind, "docker_url": link.docker_url or "",
-            "ssh_host": link.ssh_host or "", "ssh_port": link.ssh_port or 22, "ssh_user": link.ssh_user or ""}
+            "ssh_host": link.ssh_host or "", "ssh_port": link.ssh_port or 22, "ssh_user": link.ssh_user or "",
+            "web_url": link.web_url or ""}
 
 
 def all_links(db, kind: Optional[str] = None) -> List[dict]:
@@ -81,7 +82,7 @@ def links_for_conversation(db, conversation_id: Optional[int], kind: Optional[st
 def availability() -> dict:
     db = SessionLocal()
     try:
-        return {"docker": bool(all_links(db, "docker")), "host": bool(all_links(db, "ssh"))}
+        return {"docker": bool(all_links(db, "docker")), "host": bool(all_links(db, "ssh")), "web": bool(all_links(db, "web"))}
     finally:
         db.close()
 

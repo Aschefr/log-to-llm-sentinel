@@ -17,8 +17,8 @@ from sqlalchemy import desc
 
 from app import logger
 from app.database import SessionLocal
-from app.models import Analysis, Rule, ResolutionVerdict, MetaAnalysisConfig, ChatAction
-from app.services import log_source
+from app.models import Analysis, ChatAction, ChatConversation, GlobalConfig, MetaAnalysisConfig, ResolutionVerdict, Rule
+from app.services import attack_summary, cve_lookup, log_source, web_search
 from app.services import diagnostics as diag
 from app.services import event_notes
 from app.services.alert_analysis import analysis_lines, render_notes, short_summary
@@ -325,6 +325,13 @@ def propose_action(db, action=None, reason=None, rule_id=None, analysis_id=None,
                    _conversation_id=None, **_):
     if action not in ACTIONS:
         raise ToolError(f"Action inconnue. Actions possibles : {', '.join(ACTIONS)}.")
+    cited = _alert_citing_cve(db, _conversation_id)
+    if action == "mark_resolved" and cited:
+        raise ToolError("Clôture non proposée : cette alerte cite une faille. Clore l'incident ne corrige rien, et seul l'utilisateur "
+                        "sait si la machine est à jour et si l'attaque est restée sans effet. Dis-lui ce qu'il reste à vérifier.")
+    if action == "add_excluded_pattern" and cited and str(value or "").strip().lower() in cited.lower():
+        raise ToolError("Exclusion non proposée : ce motif est dans la ligne de cette alerte de sécurité, il masquerait les prochaines "
+                        "tentatives, y compris une attaque de la même source.")
     params = {}
     for key in ACTIONS[action]:
         val = {"rule_id": rule_id, "analysis_id": analysis_id, "config_id": config_id, "value": value}[key]
@@ -449,7 +456,7 @@ def _link(db, kind, connection, conversation_id) -> dict:
     """La connexion demandée, si cette conversation y a droit. Sans précision, la seule disponible."""
     links = diag.links_for_conversation(db, conversation_id, kind)
     if not links:
-        raise ToolError(f"aucune connexion {'Docker' if kind == 'docker' else 'SSH'} pour cette conversation")
+        raise ToolError(f"aucune connexion {dict(docker='Docker', ssh='SSH', web='de recherche web')[kind]} pour cette conversation")
     names = ", ".join(l["name"] for l in links)
     if connection:
         for link in links:
@@ -484,6 +491,43 @@ def docker_container_stats(db, name, connection=None, _conversation_id=None, **_
     return _diag(diag.docker_container_stats, _link(db, "docker", connection, _conversation_id)["docker_url"], name)
 
 
+def _alert_citing_cve(db, conversation_id) -> str:
+    """La ligne de l'alerte de cette conversation si elle cite un CVE, sinon une chaîne vide."""
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conversation_id).first() if conversation_id else None
+    analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first() if conv and conv.analysis_id else None
+    return analysis.triggered_line if analysis and cve_lookup.first_cve(analysis.triggered_line) else ""
+
+
+def _lang(db) -> str:
+    config = db.query(GlobalConfig).first()
+    return (config.ollama_prompt_lang if config else "") or "fr"
+
+
+def lookup_cve(db, cve=None, **_):
+    if not cve_lookup.enabled(db):
+        raise ToolError("Les fiches CVE sont désactivées dans Configuration > Diagnostic.")
+    return cve_lookup.sheet_text(cve_lookup.lookup(db, cve), _lang(db))
+
+
+def web_search_tool(db, query=None, connection=None, _conversation_id=None, **_):
+    link = _link(db, "web", connection, _conversation_id)
+    why = web_search.query_refusal(query, web_search.private_terms(db))
+    if why:
+        reasons = {"empty": "vide", "long": "trop longue : ne colle pas une ligne de log", "ip": "elle contient une adresse IP",
+                   "mac": "elle contient une adresse MAC", "mail": "elle contient une adresse e-mail", "path": "elle contient un chemin de machine",
+                   "token": "elle contient un identifiant ou un jeton", "domain": "elle contient un domaine interne", "name": "elle contient le nom d'une de tes machines"}
+        raise ToolError(f"Requête refusée, {reasons[why]}. Elle partirait vers des moteurs publics : reformule avec seulement des termes publics (produit, version, message d'erreur, CVE).")
+    try:
+        return web_search.search_text(link["web_url"], query, _lang(db))
+    except web_search.WebSearchError as e:
+        raise ToolError(f"recherche web indisponible ({e}). Dis-le à l'utilisateur et n'invente rien.")
+
+
+def get_attack_summary(db, rule_id, days=7, **_):
+    rule = _rule(db, rule_id)
+    return attack_summary.summary_text(attack_summary.summary(rule, _clip(days, 1, 30, 7)), _lang(db))
+
+
 def host_check(db, check, target=None, connection=None, _conversation_id=None, **_):
     return _diag(diag.run_host_check, _link(db, "ssh", connection, _conversation_id), check, target)
 
@@ -514,6 +558,8 @@ TOOLS = [
         {"rule_id": _INT, "days": _INT}, ["rule_id"]),
     _fn("get_resolution_history", "Historique des verdicts de résolution (retour à la normale) d'une règle.",
         {"rule_id": _INT, "limit": _INT}, ["rule_id"]),
+    _fn("get_attack_summary", "Tentatives bloquées par le pare-feu sur une source CEF (UniFi…), regroupées par port et sens : flux, nombre de sources, signature. Montre ce qui est exposé et visé, au-delà d'une alerte isolée.",
+        {"rule_id": _INT, "days": _INT}, ["rule_id"]),
     _fn("propose_action", "Propose une modification à l'utilisateur, qui devra la confirmer (rien n'est appliqué sans son accord). "
         "Actions : add_excluded_pattern / add_keyword / remove_keyword (rule_id + value), mark_resolved (rule_id), "
         "exclude_from_mttr (analysis_id : exclut UNE analyse précise du calcul du MTTR, ne change ni la règle ni les futures alertes), "
@@ -532,6 +578,14 @@ DOCKER_TOOLS = [
         {"name": {"type": "string"}, "lines": _INT, "since_minutes": _INT}, ["name"]),
     _fn("docker_container_stats", "Consommation instantanée d'un conteneur Docker : CPU, mémoire et limite, processus, réseau.",
         {"name": {"type": "string"}}, ["name"]),
+]
+CVE_TOOLS = [
+    _fn("lookup_cve", "Fiche officielle d'un CVE (base NVD) : description, score, exploitation active (catalogue KEV de la CISA), versions touchées. À appeler pour tout CVE cité, avant une recherche web.",
+        {"cve": {"type": "string"}}, ["cve"]),
+]
+WEB_TOOLS = [
+    _fn("web_search", "Recherche sur le web pour ce qui manque : message d'erreur inconnu, comportement d'un logiciel, version corrigée. Uniquement des termes publics et courts : jamais d'adresse IP, de nom de machine, de chemin, ni une ligne de log entière.",
+        {"query": {"type": "string"}}, ["query"]),
 ]
 HOST_TOOLS = [
     _fn("host_check", "Contrôle en lecture seule du serveur hôte. check : overview (charge, mémoire, disques), disk, memory, load, processes, mounts (partages réseau NFS/SMB), network, kernel (derniers messages du noyau, sans le bruit réseau de Docker), syslog, array (état de l'array Unraid et de ses disques, ou RAID logiciel / ZFS), failed-services, service (état d'un service systemd, target = nom), journal (journal d'un service systemd, target = nom). Sur Unraid, pas de systemd : utiliser syslog, array et processes.",
@@ -558,7 +612,9 @@ def available_tools(conversation_id: Optional[int] = None) -> list:
     db = SessionLocal()
     try:
         return (TOOLS + _for_links(DOCKER_TOOLS, diag.links_for_conversation(db, conversation_id, "docker"))
-                + _for_links(HOST_TOOLS, diag.links_for_conversation(db, conversation_id, "ssh")))
+                + _for_links(HOST_TOOLS, diag.links_for_conversation(db, conversation_id, "ssh"))
+                + (CVE_TOOLS if cve_lookup.enabled(db) else [])
+                + _for_links(WEB_TOOLS, diag.links_for_conversation(db, conversation_id, "web")))
     finally:
         db.close()
 
@@ -569,6 +625,7 @@ _EXECUTORS = {
     "get_rule_stats": get_rule_stats, "get_resolution_history": get_resolution_history, "propose_action": propose_action,
     "docker_list_containers": docker_list_containers, "docker_container_status": docker_container_status,
     "docker_container_logs": docker_container_logs, "docker_container_stats": docker_container_stats, "host_check": host_check,
+    "lookup_cve": lookup_cve, "web_search": web_search_tool, "get_attack_summary": get_attack_summary,
 }
 
 
@@ -586,6 +643,9 @@ def tool_label(name: str, args: dict, lang: str = "fr") -> str:
         "get_rule_stats": f"Statistiques{r}",
         "get_resolution_history": f"Historique de résolution{r}",
         "propose_action": f"Proposition : {args.get('action', '')}",
+        "lookup_cve": f"Fiche {args.get('cve', '')}",
+        "web_search": f"Web : {args.get('query', '')}",
+        "get_attack_summary": f"Tentatives bloquées{r}",
         "docker_list_containers": "Conteneurs Docker" + (" en anomalie" if args.get("only_problems") else ""),
         "docker_container_status": f"État du conteneur {args.get('name', '')}",
         "docker_container_logs": f"Logs du conteneur {args.get('name', '')}",
@@ -603,6 +663,9 @@ def tool_label(name: str, args: dict, lang: str = "fr") -> str:
         "get_rule_stats": f"Statistics{r}",
         "get_resolution_history": f"Resolution history{r}",
         "propose_action": f"Proposal: {args.get('action', '')}",
+        "lookup_cve": f"Sheet {args.get('cve', '')}",
+        "web_search": f"Web: {args.get('query', '')}",
+        "get_attack_summary": f"Blocked attempts{r}",
         "docker_list_containers": "Docker containers" + (" with problems" if args.get("only_problems") else ""),
         "docker_container_status": f"Container status {args.get('name', '')}",
         "docker_container_logs": f"Container logs {args.get('name', '')}",

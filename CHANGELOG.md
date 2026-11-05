@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **CVE sheets** (optional): an analysis citing a CVE shows its official NVD sheet: actively exploited or not (CISA's KEV catalog), affected versions, score. Only the CVE number leaves your network, and a sheet never changes a severity.
+- **Web search in the chat and investigations** (optional): the AI can search the web through your own SearXNG. Queries holding an address, a path or a machine name are refused, and results are treated as data from strangers. The compose file includes a private SearXNG under the `web` profile. Automatic alert analysis never uses it.
+- **Blocked attempts at a glance**: the overview of a CEF source (UniFi and others) groups blocked attempts by target port, without AI, and analysis cards show the fields of the line.
+- **Security alerts in the chat**: on an alert citing a CVE, the AI answers whether you are vulnerable, whether it got through and whether it is exploited, separating facts from deductions. It no longer proposes closing such an incident.
 - **Docker logs as a source**: follow a container's logs through the read-only Docker proxy, with no file to mount. Reading resumes where it stopped after a restart of Sentinel or of the container.
 - **Home Assistant as a source**: Sentinel reads its log directly with a long-lived access token, with no automation to install, and stack traces arrive whole.
 - **MQTT as a source**: follow the topics of an MQTT server (Zigbee2MQTT, Tasmota, ESPHome). The connection test shows the active topics.

@@ -331,6 +331,62 @@
                         </div>
                     </details>
                 </div>
+                <!-- ── Recherche web ── -->
+                <div class="diag-card">
+                    <div class="diag-card-head">
+                        <h3 data-i18n="diag.web_title">Recherche web (SearXNG)</h3>
+                        <span class="diag-status" id="diag-web-status"></span>
+                    </div>
+                    <p class="form-hint" data-i18n="diag.web_hint">Pour le chat et les investigations seulement. Les requêtes partent vers des moteurs publics : Sentinel refuse celles qui contiennent une adresse, un chemin ou le nom d'une de tes machines. L'analyse automatique des alertes n'y a jamais accès.</p>
+                    <ul class="diag-links hidden" id="diag-web-links"></ul>
+                    <h4 class="diag-form-title" id="diag-web-form-title" data-i18n="diag.link_new">Nouvelle connexion</h4>
+                    <div class="form-group">
+                        <label for="diag-web-name" data-i18n="diag.link_name">Nom</label>
+                        <input type="text" id="diag-web-name" data-i18n-placeholder="diag.link_name_web" placeholder="ex. SearXNG" spellcheck="false">
+                    </div>
+                    <div class="form-group">
+                        <label for="diag-web-url" data-i18n="diag.web_url">Adresse de l'instance</label>
+                        <input type="text" id="diag-web-url" class="mono" placeholder="http://searxng:8080" spellcheck="false">
+                    </div>
+                    <div class="diag-actions">
+                        <button type="button" class="btn btn-primary btn-sm" id="diag-web-test" data-i18n="diag.test_save">Tester et enregistrer</button>
+                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-web-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
+                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-web-cancel" data-i18n="common.cancel">Annuler</button>
+                        <span class="form-hint" id="diag-web-result"></span>
+                    </div>
+                    <details class="diag-howto">
+                        <summary data-i18n="diag.howto">Comment l'installer ?</summary>
+                        <div class="rp-seg diag-platforms" role="group" data-target="web">
+                            <button type="button" class="active" data-platform="compose">Docker compose</button>
+                            <button type="button" data-platform="unraid">Unraid</button>
+                        </div>
+                        <div class="diag-howto-body" data-howto="web-compose">
+                            <p class="form-hint" data-i18n-html="diag.web_compose_hint">Le fichier compose de Sentinel contient déjà ce service, sans port publié. Lance-le avec <code>docker compose --profile web up -d</code>, puis garde l'adresse proposée.</p>
+                        </div>
+                        <div class="diag-howto-body hidden" data-howto="web-unraid">
+                            <ol class="diag-steps">
+                                <li data-i18n-html="diag.web_unraid_step1">Dans l'onglet Apps, installe <b>SearXNG</b>.</li>
+                                <li data-i18n-html="diag.web_unraid_step2">Dans son <code>settings.yml</code>, généralement sous <code>/mnt/user/appdata/searxng/</code>, ajoute <code>json</code> sous <code>search: formats:</code>, à côté de <code>html</code>. Sans ça, SearXNG répond 403.</li>
+                                <li data-i18n-html="diag.web_unraid_step3">Redémarre SearXNG.</li>
+                                <li data-i18n-html="diag.web_unraid_step4">Saisis ici son adresse, par exemple <code>http://IP-DU-SERVEUR:8080</code>, ou <code>http://searxng:8080</code> s'il est sur le même réseau Docker que Sentinel.</li>
+                            </ol>
+                        </div>
+                    </details>
+                    <p class="form-hint" data-i18n="diag.web_engines">Beaucoup de moteurs bloquent les adresses résidentielles : le test indique ceux qui répondent vraiment depuis chez toi.</p>
+                </div>
+                <!-- ── Fiches CVE ── -->
+                <div class="diag-card">
+                    <div class="diag-card-head">
+                        <h3 data-i18n="diag.cve_title">Fiches CVE (NVD)</h3>
+                        <span class="diag-status" id="diag-cve-status"></span>
+                    </div>
+                    <p class="form-hint" data-i18n="diag.cve_hint">Quand une alerte cite un CVE, Sentinel affiche sa fiche officielle : exploitation active (catalogue KEV de la CISA), versions touchées, score. Seul le numéro du CVE part vers NVD. La fiche informe et ne change jamais la gravité : une ligne de log peut citer n'importe quel CVE.</p>
+                    <label class="rf-check"><input type="checkbox" id="diag-cve-enabled"> <span data-i18n="diag.cve_enable">Afficher les fiches CVE</span></label>
+                    <div class="diag-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" id="diag-cve-test" data-i18n="diag.link_test">Tester</button>
+                        <span class="form-hint" id="diag-cve-result"></span>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -447,7 +503,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=15"></script>
-<script src="/static/js/diagnostics_config.js?v=9"></script>
+<script src="/static/js/config.js?v=16"></script>
+<script src="/static/js/diagnostics_config.js?v=10"></script>
 <script src="/static/js/source_connections.js?v=2"></script>
 {% endblock %}

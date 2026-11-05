@@ -3619,6 +3619,18 @@ details[open] > summary > .chat-chevron { transform: rotate(90deg); }
 .tool-chip { max-width: 100%; padding: 0.1rem 0.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 999px; }
 .tool-chip.running { border-color: var(--accent); }
 .tool-chip.error { color: var(--danger); border-color: var(--danger); }
+.analysis-facts { display: flex; flex-wrap: wrap; gap: 0.35rem 1.1rem; margin: 0.6rem 0 0; font-size: 0.78rem; }
+.analysis-facts dt { color: var(--text-secondary); font-size: 0.7rem; }
+.analysis-facts dd { margin: 0; overflow-wrap: anywhere; }
+.analysis-cve:empty { display: none; }
+.analysis-cve { margin-top: 0.6rem; }
+.cve-sheet { padding: 0.55rem 0.75rem; font-size: 0.82rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; }
+.cve-sheet + .cve-sheet { margin-top: 0.4rem; }
+.cve-sheet p { margin: 0.3rem 0 0; }
+.cve-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; font-weight: 600; }
+.cve-badge { padding: 0.05rem 0.45rem; font-size: 0.72rem; font-weight: 600; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 999px; }
+.cve-badge--kev { color: var(--danger); border-color: var(--danger); }
+.cve-products { overflow-wrap: anywhere; }
 .tool-call { max-width: 100%; }
 .tool-call[open] { flex-basis: 100%; }
 .tool-call > summary { display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; list-style: none; cursor: pointer; }

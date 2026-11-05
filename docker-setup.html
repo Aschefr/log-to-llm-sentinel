@@ -350,6 +350,16 @@
                         <span class="slider"></span>
                     </label>
                 </div>
+                <div class="toggle-row">
+                    <div class="toggle-info">
+                        <h4>Web search (SearXNG)</h4>
+                        <p>Lets the AI of the chat and investigations search the web through a private SearXNG, with no published port. Queries go to public search engines. Off by default.</p>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="enable_web_search" onchange="generate()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
                 <p class="hint">Server diagnostics (disk, memory, network shares, services) are set up later from Sentinel: <b>Configuration › Diagnostics</b> generates a restricted SSH key and the block to paste on your server.</p>
             </div>
 
@@ -465,6 +475,7 @@ ${docker ? '4' : '3'}. Ollama: set your Ollama address in
         function generate() {
             const platform = document.getElementById('platform').value;
             const dockerDiag = document.getElementById('enable_docker_diag').checked;
+            const webSearch = document.getElementById('enable_web_search').checked;
             ['network-card', 'volumes-card', 'ollama-card'].forEach(id =>
                 document.getElementById(id).style.display = platform === 'unraid' ? 'none' : '');
             document.getElementById('output-label').textContent = platform === 'unraid' ? 'UNRAID STEPS' : 'DOCKER-COMPOSE.YML';
@@ -509,12 +520,20 @@ ${docker ? '4' : '3'}. Ollama: set your Ollama address in
                 yaml += `\n  # ==============================================================================\n  # DOCKER DIAGNOSTICS (OPTIONAL, READ-ONLY)\n  # Lets the AI check container state, health, restarts and logs.\n  # Only read requests go through: no start, stop, restart or exec.\n  # In Sentinel: Configuration > Diagnostics > Docker proxy address = http://docker-proxy:2375\n  # ==============================================================================\n  docker-proxy:\n    image: tecnativa/docker-socket-proxy:v0.5.0\n    container_name: sentinel-docker-proxy\n    environment:\n      CONTAINERS: 1\n      POST: 0\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n    # No "ports:" section: only Sentinel can reach it, through the compose network.\n    restart: unless-stopped\n`;
             }
 
+            if (webSearch) {
+                yaml += `\n  # ==============================================================================\n  # WEB SEARCH (OPTIONAL)\n  # In Sentinel: Configuration > Diagnostics > http://searxng:8080\n  # ==============================================================================\n  searxng:\n    image: searxng/searxng:2026.7.6-556d08c39\n    container_name: sentinel-searxng\n    environment:\n      - SEARXNG_SECRET=\${SEARXNG_SECRET:-log-to-llm-sentinel-private-instance}\n    configs:\n      - source: searxng_settings\n        target: /etc/searxng/settings.yml\n    cap_drop: [ALL]\n    cap_add: [CHOWN, SETGID, SETUID]\n    security_opt: ["no-new-privileges:true"]\n    # No "ports:" section: only Sentinel can reach it.\n    restart: unless-stopped\n`;
+            }
+
             if (ollamaMode === 'internal') {
                 yaml += `\n  # ==============================================================================\n  # OPTIONAL: OLLAMA LOCAL AI SERVER\n  # ==============================================================================\n  ollama:\n    image: ollama/ollama:latest\n    container_name: ollama-server\n    ports:\n      - "11434:11434"\n    volumes:\n      - ./ollama_data:/root/.ollama\n    environment:\n      - OLLAMA_KV_CACHE_TYPE=q8_0\n`;
                 if (ollamaGpu) {
                     yaml += `    # Enables Nvidia GPU acceleration\n    deploy:\n      resources:\n        reservations:\n          devices:\n            - driver: nvidia\n              count: 1\n              capabilities: [gpu]\n`;
                 }
                 yaml += `    restart: unless-stopped\n\nvolumes:\n  ollama_data:\n`;
+            }
+
+            if (webSearch) {
+                yaml += `\nconfigs:\n  searxng_settings:\n    content: |\n      use_default_settings: true\n      server:\n        limiter: false\n        image_proxy: false\n      search:\n        formats:\n          - html\n          - json\n`;
             }
 
             document.getElementById('output').textContent = yaml;

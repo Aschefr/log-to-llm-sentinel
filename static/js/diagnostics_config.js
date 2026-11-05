@@ -1,12 +1,13 @@
 // ─── Configuration du diagnostic en lecture seule (proxy Docker, SSH limité) ───
 
-const DIAG = { platform: { docker: 'compose', ssh: 'linux' }, status: null, editing: { docker: null, ssh: null } };
+const DIAG = { platform: { docker: 'compose', ssh: 'linux', web: 'compose' }, status: null, editing: { docker: null, ssh: null, web: null } };
 
 // Valeurs par défaut selon la plateforme : pré-remplies (et non en simple placeholder)
 // pour qu'un clic sur « Tester et enregistrer » suffise.
 const DIAG_DEFAULTS = {
     docker: { field: 'diag-docker-url', compose: 'http://docker-proxy:2375', unraid: 'http://dockersocket:2375' },
     ssh: { field: 'diag-ssh-user', linux: 'sentinel-diag', unraid: 'root' },
+    web: { field: 'diag-web-url', compose: 'http://searxng:8080', unraid: '' },
 };
 
 function isDiagDefault(target, value) {
@@ -53,13 +54,14 @@ function diagLinks(kind) {
 }
 
 function diagStatusBadge(kind) {
-    const el = document.getElementById(kind === 'docker' ? 'diag-docker-status' : 'diag-host-status');
+    const el = document.getElementById({ docker: 'diag-docker-status', ssh: 'diag-host-status', web: 'diag-web-status' }[kind]);
     const n = diagLinks(kind).length;
     el.textContent = n ? dT(n > 1 ? 'diag.links_many' : 'diag.links_one', '{n} connexion(s)').replace('{n}', n) : dT('diag.status_off', 'non configuré');
     el.className = 'diag-status ' + (n ? 'diag-status--on' : '');
 }
 
 function diagLinkTarget(l) {
+    if (l.kind === 'web') return l.web_url;
     return l.kind === 'docker' ? l.docker_url : `${l.ssh_user}@${l.ssh_host}${l.ssh_port !== 22 ? ':' + l.ssh_port : ''}`;
 }
 
@@ -90,6 +92,28 @@ async function refreshDiag() {
     DIAG.status = await apiFetch('/api/diagnostics');
     renderLinks('docker');
     renderLinks('ssh');
+    renderLinks('web');
+    renderCve();
+}
+
+function renderCve() {
+    const on = !!DIAG.status.cve_lookup;
+    document.getElementById('diag-cve-enabled').checked = on;
+    const el = document.getElementById('diag-cve-status');
+    el.textContent = on ? dT('diag.cve_on', 'activé') : dT('diag.status_disabled', 'désactivé');
+    el.className = 'diag-status ' + (on ? 'diag-status--on' : '');
+}
+
+/** What the test of a SearXNG instance found: results, and which engines really answer from here. */
+function webTestText(res) {
+    if (!res.results) {
+        const failed = res.failed.length ? res.failed.join(', ') : dT('diag.web_no_engine', 'aucun');
+        return dT('diag.web_blocked', 'L’instance répond, mais aucun moteur ne renvoie de résultat pour l’instant (sans réponse : {failed}). Ils bloquent souvent pour un temps : réessaie plus tard.').replace('{failed}', failed);
+    }
+    const engines = res.engines.length ? res.engines.join(', ') : dT('diag.web_no_engine', 'aucun');
+    let text = dT('diag.web_ok', '{n} résultats · moteurs qui répondent : {engines}').replace('{n}', res.results).replace('{engines}', engines);
+    if (res.failed.length) text += ` · ${dT('diag.web_failed', 'sans réponse')} : ${res.failed.join(', ')}`;
+    return text;
 }
 
 /** Empties the form of a kind, ready for a new connection. The first one starts with the platform's defaults. */
@@ -98,7 +122,11 @@ async function resetLinkForm(kind) {
     document.getElementById(`diag-${kind}-name`).value = '';
     document.getElementById(`diag-${kind}-cancel`).classList.add('hidden');
     document.getElementById(`diag-${kind}-form-title`).textContent = dT('diag.link_new', 'Nouvelle connexion');
-    document.getElementById(kind === 'docker' ? 'diag-docker-save' : 'diag-ssh-save').classList.add('hidden');
+    document.getElementById(`diag-${kind}-save`).classList.add('hidden');
+    if (kind === 'web') {
+        document.getElementById('diag-web-url').value = diagLinks('web').length ? '' : DIAG_DEFAULTS.web[DIAG.platform.web];
+        return;
+    }
     if (kind === 'docker') {
         document.getElementById('diag-docker-url').value = diagLinks('docker').length ? '' : DIAG_DEFAULTS.docker[DIAG.platform.docker];
         return;
@@ -122,7 +150,9 @@ function editLink(kind, id) {
     document.getElementById(`diag-${kind}-name`).value = l.name;
     document.getElementById(`diag-${kind}-cancel`).classList.remove('hidden');
     document.getElementById(`diag-${kind}-form-title`).textContent = dT('diag.link_edit', 'Modifier « {name} »').replace('{name}', l.name);
-    if (kind === 'docker') {
+    if (kind === 'web') {
+        document.getElementById('diag-web-url').value = l.web_url;
+    } else if (kind === 'docker') {
         document.getElementById('diag-docker-url').value = l.docker_url;
     } else {
         document.getElementById('diag-ssh-host').value = l.ssh_host;
@@ -137,11 +167,14 @@ async function testLinkRow(kind, id, li) {
     const out = li.querySelector('.diag-link-result');
     out.textContent = dT('diag.testing', 'Test en cours…');
     out.className = 'form-hint diag-link-result';
-    const res = kind === 'docker'
+    const res = kind === 'web'
+        ? await apiFetch('/api/diagnostics/web/test', { method: 'POST', body: { url: l.web_url } })
+        : kind === 'docker'
         ? await apiFetch('/api/diagnostics/docker/test', { method: 'POST', body: { url: l.docker_url } })
         : await apiFetch('/api/diagnostics/ssh/test', { method: 'POST', body: { ssh_host: l.ssh_host, ssh_port: l.ssh_port, ssh_user: l.ssh_user } });
-    out.textContent = res.ok ? `✓ ${dT('diag.connected', 'Connecté')}` : `✗ ${res.error}`;
-    out.classList.add(res.ok ? 'rf-ok' : 'rf-ko');
+    const empty = res.ok && kind === 'web' && !res.results;
+    out.textContent = !res.ok ? `✗ ${res.error}` : empty ? `⚠ ${webTestText(res)}` : `✓ ${kind === 'web' ? webTestText(res) : dT('diag.connected', 'Connecté')}`;
+    out.classList.add(res.ok && !empty ? 'rf-ok' : 'rf-ko');
 }
 
 function diagLinkError(e) {
@@ -163,6 +196,7 @@ async function saveLink(kind, values, resultId) {
     if (!name && kind === 'docker') {
         try { name = new URL(values.docker_url).hostname; } catch (_) { name = 'Docker'; }
     }
+    if (!name && kind === 'web') name = 'SearXNG';
     try {
         await apiFetch(id ? `/api/diagnostics/links/${id}` : '/api/diagnostics/links', { method: id ? 'PUT' : 'POST', body: { name, kind, ...values } });
         await refreshDiag();
@@ -182,6 +216,7 @@ async function loadDiagnostics() {
         if (diagLinks('ssh').some(l => l.ssh_user === DIAG_DEFAULTS.ssh.unraid)) DIAG.platform.ssh = 'unraid';
         await resetLinkForm('docker');
         await resetLinkForm('ssh');
+        await resetLinkForm('web');
         selectPlatform('docker', DIAG.platform.docker);
         document.querySelectorAll('.diag-platforms[data-target="ssh"] button').forEach(b =>
             b.classList.toggle('active', b.dataset.platform === DIAG.platform.ssh));
@@ -240,6 +275,27 @@ async function testAndSaveDocker() {
     }
 }
 
+async function testAndSaveWeb() {
+    const url = document.getElementById('diag-web-url').value.trim();
+    const anyway = document.getElementById('diag-web-save');
+    anyway.classList.add('hidden');
+    if (!url) {
+        diagResult('diag-web-result', false, dT('diag.err_url', 'L’adresse doit commencer par http:// ou https://.'));
+        return;
+    }
+    diagResult('diag-web-result', null, dT('diag.testing', 'Test en cours…'));
+    const res = await apiFetch('/api/diagnostics/web/test', { method: 'POST', body: { url } });
+    if (!res.ok) {
+        diagResult('diag-web-result', false, `✗ ${res.error}`);
+        anyway.classList.remove('hidden');
+        return;
+    }
+    if (await saveLink('web', { web_url: url }, 'diag-web-result')) {
+        await resetLinkForm('web');
+        diagResult('diag-web-result', res.results > 0, `${res.results ? '✓' : '⚠'} ${webTestText(res)}`);
+    }
+}
+
 function sshFields() {
     return {
         ssh_host: document.getElementById('diag-ssh-host').value.trim(),
@@ -287,7 +343,24 @@ document.addEventListener('DOMContentLoaded', () => {
             diagResult('diag-docker-result', null, dT('diag.saved_untested', 'Enregistré sans test réussi.'));
         }
     });
-    ['docker', 'ssh'].forEach(kind => {
+    document.getElementById('diag-web-test').addEventListener('click', testAndSaveWeb);
+    document.getElementById('diag-web-save').addEventListener('click', async () => {
+        if (await saveLink('web', { web_url: document.getElementById('diag-web-url').value.trim() }, 'diag-web-result')) {
+            await resetLinkForm('web');
+            diagResult('diag-web-result', null, dT('diag.saved_untested', 'Enregistré sans test réussi.'));
+        }
+    });
+    document.getElementById('diag-cve-enabled').addEventListener('change', async (e) => {
+        const res = await apiFetch('/api/diagnostics/cve', { method: 'POST', body: { enabled: e.target.checked } });
+        DIAG.status.cve_lookup = res.enabled;
+        renderCve();
+    });
+    document.getElementById('diag-cve-test').addEventListener('click', async () => {
+        diagResult('diag-cve-result', null, dT('diag.testing', 'Test en cours…'));
+        const res = await apiFetch('/api/diagnostics/cve/test', { method: 'POST' });
+        diagResult('diag-cve-result', res.ok, res.ok ? `✓ ${dT('diag.cve_ok', 'NVD répond')}` : `✗ ${res.error}`);
+    });
+    ['docker', 'ssh', 'web'].forEach(kind => {
         document.getElementById(`diag-${kind}-cancel`).addEventListener('click', () => {
             resetLinkForm(kind);
             diagResult(`diag-${kind}-result`, null, '');

@@ -66,6 +66,29 @@ services:
     restart: unless-stopped
 
   # ==============================================================================
+  # WEB SEARCH (OPTIONAL)
+  # Lets the AI of the chat and investigations search the web through a private
+  # SearXNG. Queries go to public search engines; Sentinel refuses those holding an
+  # address, a path or a machine name. Automatic alert analysis never uses it.
+  # Start with: docker compose --profile web up -d
+  # In Sentinel: Configuration > Diagnostics > http://searxng:8080
+  # ==============================================================================
+  searxng:
+    image: searxng/searxng:2026.7.6-556d08c39
+    container_name: sentinel-searxng
+    profiles: ["web"]
+    environment:
+      - SEARXNG_SECRET=${SEARXNG_SECRET:-log-to-llm-sentinel-private-instance}
+    configs:
+      - source: searxng_settings
+        target: /etc/searxng/settings.yml
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETGID, SETUID]
+    security_opt: ["no-new-privileges:true"]
+    # No "ports:" section: only Sentinel can reach it, through the compose network.
+    restart: unless-stopped
+
+  # ==============================================================================
   # OPTIONAL: OLLAMA LOCAL AI SERVER
   # ==============================================================================
   # If you don't have an Ollama instance on another machine, you can
@@ -92,3 +115,15 @@ services:
 
 # volumes:
 #   ollama_data:
+
+configs:
+  searxng_settings:
+    content: |
+      use_default_settings: true
+      server:
+        limiter: false
+        image_proxy: false
+      search:
+        formats:
+          - html
+          - json

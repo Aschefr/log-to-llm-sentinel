@@ -556,7 +556,7 @@ async function renderRuleAccess(selected) {
     section.classList.toggle('hidden', !links.length);
     document.getElementById('rf-access-list').innerHTML = links.map(l => `<label class="rf-check">
         <input type="checkbox" value="${l.id}" ${selected === null || selected.includes(l.id) ? 'checked' : ''}>
-        <span><strong>${escapeHtml(l.name)}</strong> <span class="form-hint">${l.kind === 'docker' ? 'Docker' : 'SSH'}</span></span></label>`).join('');
+        <span><strong>${escapeHtml(l.name)}</strong> <span class="form-hint">${{ docker: 'Docker', ssh: 'SSH', web: 'Web' }[l.kind]}</span></span></label>`).join('');
 }
 
 /** Hint of the keyword tuning mode; the history option is offered for a new rule only. */

@@ -13,6 +13,8 @@ from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessa
 from app.services.app_config import config_to_dict, llm_options
 from app.services.chat_agent import run_agent_turn, replay_tool_messages, AgentLimits, AgentResult
 from app.services.llm_tools import apply_action, action_to_dict
+from app.services import cve_lookup
+from app.services.prompts import SECURITY_ALERT_INSTRUCTIONS, WEB_TOOLS_INSTRUCTIONS
 from app.services.prompts import CHAT_ANALYSIS_CONTEXT, CHAT_TOOLS_INSTRUCTIONS, DIAG_TOOLS_INSTRUCTIONS, DIAG_LINKS_INSTRUCTIONS, INVESTIGATION_PROMPT
 from app.services import dashboard_watch, diagnostics, event_notes
 from app.services.alert_analysis import render_notes
@@ -282,6 +284,8 @@ def build_chat_messages(conv_id: int, db: Session, with_tools: bool = False) -> 
         block_lines.extend(["", CHAT_TOOLS_INSTRUCTIONS.get(lang, CHAT_TOOLS_INSTRUCTIONS["fr"])])
         links = diagnostics.links_for_conversation(db, conv_id)
         kinds = {link["kind"] for link in links}
+        web_available = "web" in kinds
+        links, kinds = [l for l in links if l["kind"] != "web"], kinds - {"web"}
         diag_tools = (["docker_list_containers", "docker_container_status", "docker_container_logs", "docker_container_stats"]
                       if "docker" in kinds else []) + (["host_check"] if "ssh" in kinds else [])
         if diag_tools:
@@ -290,6 +294,12 @@ def build_chat_messages(conv_id: int, db: Session, with_tools: bool = False) -> 
             if any(sum(l["kind"] == kind for l in links) > 1 for kind in kinds):
                 listing = "\n".join(f"- {l['name']} ({'Docker' if l['kind'] == 'docker' else 'SSH'})" for l in links)
                 block_lines.append(DIAG_LINKS_INSTRUCTIONS.get(lang, DIAG_LINKS_INSTRUCTIONS["fr"]).replace("{links}", listing))
+        external = (["lookup_cve"] if cve_lookup.enabled(db) else []) + (["web_search"] if web_available else [])
+        if external:
+            block_lines.extend(["", WEB_TOOLS_INSTRUCTIONS.get(lang, WEB_TOOLS_INSTRUCTIONS["fr"]).replace("{tools}", ", ".join(external))])
+        cited = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first() if conv.analysis_id else None
+        if cited and cve_lookup.first_cve(cited.triggered_line):
+            block_lines.extend(["", SECURITY_ALERT_INSTRUCTIONS.get(lang, SECURITY_ALERT_INSTRUCTIONS["fr"])])
 
     system = "\n".join(block_lines).strip()
     messages = [{"role": "system", "content": system}] if system else []

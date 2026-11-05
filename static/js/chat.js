@@ -99,6 +99,7 @@ function renderStatus() {
         const parts = [T('chat.st_logs', 'Logs et alertes')];
         if (st.diagnostics.docker) parts.push('Docker');
         if (st.diagnostics.host) parts.push(T('chat.st_host', 'Hôte'));
+        if (st.diagnostics.web) parts.push('Web');
         setTile('chat-st-access', 'ok', parts.join(' · '));
     }
 

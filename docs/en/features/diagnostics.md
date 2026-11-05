@@ -14,6 +14,10 @@ Everything is **read-only**: nothing can be started, stopped, restarted or modif
 
 ---
 
+To let the AI look outside your network, see [Web Search and CVE Sheets](web-search.md).
+
+---
+
 ## Several machines, chosen per rule
 
 You can add as many connections as you need, Docker or SSH, each with a name, in *Configuration > Diagnostics*: for example SSH to your Unraid server and the Docker of this machine. Sentinel uses the same SSH key for all of them, so the block of step 2 is the same on every server.
