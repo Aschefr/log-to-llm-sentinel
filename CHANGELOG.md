@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - **Connection guides**: each source shows a short step-by-step guide in the rule form, and says clearly when it cannot be read, in the rule list, on the rule page and on the dashboard.
 
 ### Changed
+- **Chat: check what the AI read**: each entry of *What the AI looked at* now opens on the raw output of the tool, so an answer can be checked against what it was based on. This also works for past conversations.
 - **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
 
 ### Fixed

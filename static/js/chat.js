@@ -463,7 +463,11 @@ function toolTraceHtml(tools, open = false) {
     const chips = tools.map(tool => {
         const cls = tool.running ? ' running' : (tool.error ? ' error' : '');
         const suffix = tool.running ? ' …' : (tool.lines != null ? ` · ${tool.lines} ${tool.lines === 1 ? T('chat.tool_line', 'ligne') : T('chat.tool_lines', 'lignes')}` : '');
-        return `<span class="tool-chip${cls}" title="${escapeAttr(tool.label)}">${escapeHtml(tool.label)}${suffix}</span>`;
+        const chip = `<span class="tool-chip${cls}" title="${escapeAttr(tool.label)}">${escapeHtml(tool.label)}${suffix}</span>`;
+        if (tool.running || tool.output == null) return chip;
+        // Sortie brute de l'outil : pour vérifier d'où vient la réponse
+        const output = tool.output ? escapeHtml(tool.output) : escapeHtml(T('chat.tool_no_output', '(aucune sortie)'));
+        return `<details class="tool-call"><summary>${CHEVRON}${chip}</summary><pre class="tool-output">${output}</pre></details>`;
     }).join('');
     return `<details class="tool-trace"${open ? ' open' : ''}><summary>${CHEVRON}<span>${escapeHtml(T('chat.tools_used', 'Ce que l\'IA a consulté'))} (${tools.length})</span></summary><div class="tool-chips">${chips}</div></details>`;
 }
@@ -524,6 +528,7 @@ function handleStreamEvent(ev, aiBubble) {
             known.running = false;
             known.error = ev.error;
             known.lines = ev.lines;
+            known.output = ev.output;
         }
         const html = toolTraceHtml(CHAT.streamTools, true);
         const old = aiBubble.querySelector('.tool-trace');

@@ -3619,6 +3619,12 @@ details[open] > summary > .chat-chevron { transform: rotate(90deg); }
 .tool-chip { max-width: 100%; padding: 0.1rem 0.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 999px; }
 .tool-chip.running { border-color: var(--accent); }
 .tool-chip.error { color: var(--danger); border-color: var(--danger); }
+.tool-call { max-width: 100%; }
+.tool-call[open] { flex-basis: 100%; }
+.tool-call > summary { display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; list-style: none; cursor: pointer; }
+.tool-call > summary::-webkit-details-marker { display: none; }
+.tool-call > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tool-output { max-height: 20rem; margin: 0.35rem 0 0.25rem; padding: 0.5rem 0.65rem; overflow: auto; color: var(--text-primary); font-family: 'Consolas', monospace; font-size: 0.75rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; }
 .action-card { display: flex; flex-direction: column; gap: 0.35rem; max-width: var(--chat-text); padding: 0.65rem 0.8rem; font-size: 0.86rem; background: var(--bg-secondary); border: 1px solid var(--warning); border-radius: 0.6rem; }
 .action-card.applied { border-color: var(--success); }
 .action-card.rejected, .action-card.failed { border-color: var(--border); }

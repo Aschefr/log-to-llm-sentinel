@@ -440,6 +440,7 @@
     "truncated_banner": "{n} older messages are no longer read by the AI",
     "delete_btn_title": "Delete conversation",
     "tools_used": "What the AI looked at",
+    "tool_no_output": "(no output)",
     "tool_line": "line",
     "tool_lines": "lines",
     "action_proposed": "Proposed action",

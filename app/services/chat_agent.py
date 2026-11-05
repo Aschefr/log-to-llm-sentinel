@@ -132,9 +132,9 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
                         output = truncate_output(output, max(200, budget - used)) + "\n" + label(lang, "tool_budget")
                     used += len(output)
                     seen[key] = True
-                    n_lines = output.count("\n")
+                    n_lines = len(output.splitlines())
                     emit_event({"type": "tool_result", "id": call_id, "name": name,
-                                "error": output.startswith("Erreur"), "lines": n_lines})
+                                "error": output.startswith("Erreur"), "lines": n_lines, "output": output})
                     result.tools.append({"name": name, "args": args, "label": lbl, "result": output})
                     if name == "propose_action" and output.startswith("Action #"):
                         action_id = int(output.split("#", 1)[1].split()[0])
