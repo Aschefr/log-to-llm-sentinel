@@ -408,6 +408,7 @@ RESOLUTION_SYSTEM = {
 
 Méthode :
 - Appuie-toi uniquement sur les données fournies.
+- Durées : seules celles de la section « Incident en cours » font foi. Les heures des lignes de log peuvent être dans un autre fuseau horaire que l'UTC : ne calcule jamais une durée à partir d'elles.
 - Vérification par délai d'inactivité : l'absence de nouvelle erreur pendant tout le délai EST l'élément principal en faveur de la résolution. Ne rejette pas au seul motif qu'aucune ligne de succès n'est visible. Si le log a continué d'écrire des lignes normales, c'est un signe supplémentaire de bonne santé ; s'il est resté totalement muet, le service est peut-être arrêté : tiens-en compte selon le contexte.
 - Vérification par motif de résolution : confirme que la ligne indique bien la fin du problème décrit par l'incident, et non une étape d'un redémarrage en boucle ou d'une erreur répétée.
 - "explanation" : une ou deux phrases en français, rédigées avant le verdict.
@@ -417,6 +418,7 @@ Méthode :
 
 Method:
 - Rely only on the data provided.
+- Durations: only those in the "Ongoing incident" section count. The times in log lines may be in another time zone than UTC: never work out a duration from them.
 - Inactivity timeout check: the absence of any new error during the whole timeout IS the main evidence for resolution. Do not reject only because no success line is visible. If the log kept writing normal lines, that is an additional sign of health; if it stayed completely silent, the service may be stopped: take it into account depending on the context.
 - Resolution pattern check: confirm that the line really indicates the end of the problem described by the incident, and not a step of a restart loop or a repeated error.
 - "explanation": one or two sentences in English, written before the verdict.

@@ -18,7 +18,7 @@ A silent source also appears in **Needs attention** on the [Dashboard](../pages/
 ## 2. Setting the Limit
 In the **Notifications** section of a rule's Settings tab, tick **Send an alert if inactive** and enter the number of hours allowed without a line.
 
-With the [autopilot](autopilot.md), you have nothing to set: the limit comes from the real rhythm of the source, twice the longest silence seen, and is recomputed every week.
+With the [autopilot](autopilot.md), you have nothing to set: the limit comes from the real rhythm of the source, twice the longest silence seen, and is recomputed every week. The notification is always on in this mode.
 
 ---
 
