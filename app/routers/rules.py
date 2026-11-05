@@ -15,7 +15,7 @@ from app.services import keyword_tuning as kt
 from app.services import keyword_learning_service as kls
 from app.utils import keyword_match
 from app.services.orchestrator import Orchestrator
-from app.services.app_config import config_to_dict
+from app.services.app_config import config_to_dict, llm_options
 from app.services import rule_stats
 from app.services.probe_service import run_probe, PROBE_TYPES
 from app.services import connected_sources
@@ -855,7 +855,8 @@ _Ceci est un test manuel depuis l'interface Log to LLM Sentinel._
                         coro = orchestrator.ollama.analyze_async(
                             prompt=summary_prompt,
                             url=config_dict.get("ollama_url"),
-                            model=config_dict.get("ollama_model")
+                            model=config_dict.get("ollama_model"),
+                            options=llm_options(config_dict),
                         )
                         summary = await cancel_on_disconnect(
                             request,

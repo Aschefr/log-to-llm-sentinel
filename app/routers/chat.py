@@ -10,7 +10,7 @@ import json
 
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessage, ChatCompression, ChatAction
-from app.services.app_config import config_to_dict
+from app.services.app_config import config_to_dict, llm_options
 from app.services.chat_agent import run_agent_turn, replay_tool_messages, AgentLimits, AgentResult
 from app.services.llm_tools import apply_action, action_to_dict
 from app.services.prompts import CHAT_ANALYSIS_CONTEXT, CHAT_TOOLS_INSTRUCTIONS, DIAG_TOOLS_INSTRUCTIONS, DIAG_LINKS_INSTRUCTIONS, INVESTIGATION_PROMPT
@@ -828,8 +828,9 @@ async def auto_title_conversation(conv_id: int, db: Session = Depends(get_db)):
                     prompt=title_prompt,
                     url=ollama_url,
                     model=ollama_model,
-                    options={"temperature": 0.3, "num_ctx": 512},
-                    think=True  # Laisse le modèle réfléchir si besoin, analyze_async nettoiera les balises <think>
+                    # Même contexte que le reste : un autre recharge le modèle, ici puis à la question suivante (environ 57 s)
+                    options=llm_options(config_to_dict(cfg), temperature=0.3),
+                    think=False
                 )
     except Exception as e:
         logger.error("ChatRouter", f"Auto-title error: {e}")
