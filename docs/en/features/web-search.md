@@ -49,9 +49,14 @@ Then enter `http://searxng:8080` in *Configuration > Diagnostics > Web search* a
 ### Search engines
 Many engines block home addresses with a CAPTCHA or a rate limit. **Test and save** shows which ones really answer from your connection. When engines fail and nothing comes back, the AI is told that nothing can be concluded, which is different from "no results".
 
+### Limits on searches
+Engines block an address that sends searches in bursts, then unblock it gradually. So Sentinel sends at most 4 searches per answer and 30 per hour across the app. If every engine fails, it stops searching for 15 minutes, since insisting prolongs the block, and the AI must say the search failed. A successful **Test** ends that pause.
+
+You always see it: the attempt shows in red under *What the AI looked at*, with the reason in its output; the chat's status bar shows the pause and the time left; and *Configuration > Diagnostics* says which engines did not answer.
+
 ### What protects you
 * **Query filter**: a query is refused if it holds an IP or MAC address, an e-mail, a machine path, a token, an internal domain or the name of one of your machines, so a log line cannot use the AI to send them out.
-* **Results are data**: the AI gets short excerpts, presented as text from strangers. It is told not to obey them and that they never justify a proposed action on their own.
+* **Results are data**: the AI gets short excerpts, presented as text from strangers. It is told not to obey them, that they never justify a proposed action on their own, and to give the address of each page it uses.
 * **What the AI looked at**: each query and its results stay readable under the answer.
 
 This lowers the risk without removing it, and a query is still sent to public engines.

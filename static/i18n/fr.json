@@ -502,7 +502,9 @@
     "empty_thread": "Pose ta première question ci-dessous.",
     "investigation_plan": "Plan d'investigation donné à l'IA",
     "edit_send": "Renvoyer",
-    "attached_title": "Alerte d'origine"
+    "attached_title": "Alerte d'origine",
+    "st_web_paused": "Web en pause ({n} min) : moteurs sans réponse",
+    "st_web_full": "Web : limite de l’heure atteinte"
   },
   "config": {
     "title": "Configuration",
@@ -1453,7 +1455,9 @@
     "cve_ok": "NVD répond",
     "status_disabled": "désactivé",
     "cve_on": "activé",
-    "web_blocked": "L’instance répond, mais aucun moteur ne renvoie de résultat pour l’instant (sans réponse : {failed}). Ils bloquent souvent pour un temps : réessaie plus tard."
+    "web_blocked": "L’instance répond, mais aucun moteur ne renvoie de résultat pour l’instant (sans réponse : {failed}). Ils bloquent souvent pour un temps : réessaie plus tard.",
+    "web_paused": "Recherches suspendues encore {n} min : aucun moteur n’a répondu ({engines}). Insister prolongerait le blocage. Tester relance dès qu’un moteur répond.",
+    "web_full": "Limite atteinte : {n} recherches cette heure. L’IA reprendra quand l’heure sera écoulée."
   },
   "triage": {
     "title": "Trier mes non lues",

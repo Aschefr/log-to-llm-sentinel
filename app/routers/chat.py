@@ -13,7 +13,7 @@ from app.models import Rule, Analysis, GlobalConfig, ChatConversation, ChatMessa
 from app.services.app_config import config_to_dict, llm_options
 from app.services.chat_agent import run_agent_turn, replay_tool_messages, AgentLimits, AgentResult
 from app.services.llm_tools import apply_action, action_to_dict
-from app.services import cve_lookup
+from app.services import cve_lookup, web_search
 from app.services.prompts import SECURITY_ALERT_INSTRUCTIONS, WEB_TOOLS_INSTRUCTIONS
 from app.services.prompts import CHAT_ANALYSIS_CONTEXT, CHAT_TOOLS_INSTRUCTIONS, DIAG_TOOLS_INSTRUCTIONS, DIAG_LINKS_INSTRUCTIONS, INVESTIGATION_PROMPT
 from app.services import dashboard_watch, diagnostics, event_notes
@@ -90,6 +90,7 @@ async def chat_status(db: Session = Depends(get_db)):
         "ollama": ollama,
         "tools": tools,
         "diagnostics": diagnostics.availability(),
+        "web_search": web_search.status(),
         "pending_actions": [{"id": a.id, "conversation_id": a.conversation_id} for a in actions],
         "compression_mode": _compression_mode(db),
     }

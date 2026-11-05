@@ -338,6 +338,7 @@
                         <span class="diag-status" id="diag-web-status"></span>
                     </div>
                     <p class="form-hint" data-i18n="diag.web_hint">Pour le chat et les investigations seulement. Les requêtes partent vers des moteurs publics : Sentinel refuse celles qui contiennent une adresse, un chemin ou le nom d'une de tes machines. L'analyse automatique des alertes n'y a jamais accès.</p>
+                    <p class="form-hint rf-ko hidden" id="diag-web-pause" role="status"></p>
                     <ul class="diag-links hidden" id="diag-web-links"></ul>
                     <h4 class="diag-form-title" id="diag-web-form-title" data-i18n="diag.link_new">Nouvelle connexion</h4>
                     <div class="form-group">
@@ -504,6 +505,6 @@
 
 {% block scripts %}
 <script src="/static/js/config.js?v=16"></script>
-<script src="/static/js/diagnostics_config.js?v=10"></script>
+<script src="/static/js/diagnostics_config.js?v=11"></script>
 <script src="/static/js/source_connections.js?v=2"></script>
 {% endblock %}

@@ -99,8 +99,12 @@ function renderStatus() {
         const parts = [T('chat.st_logs', 'Logs et alertes')];
         if (st.diagnostics.docker) parts.push('Docker');
         if (st.diagnostics.host) parts.push(T('chat.st_host', 'Hôte'));
-        if (st.diagnostics.web) parts.push('Web');
-        setTile('chat-st-access', 'ok', parts.join(' · '));
+        const web = st.diagnostics.web ? st.web_search : null;
+        const webDown = web && (web.paused || web.hour_full);
+        if (web && web.paused) parts.push(T('chat.st_web_paused', 'Web en pause ({n} min) : moteurs sans réponse').replace('{n}', web.minutes_left));
+        else if (web && web.hour_full) parts.push(T('chat.st_web_full', 'Web : limite de l’heure atteinte'));
+        else if (web) parts.push('Web');
+        setTile('chat-st-access', webDown ? 'warn' : 'ok', parts.join(' · '));
     }
 
     const count = st.pending_actions.length;

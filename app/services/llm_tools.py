@@ -517,6 +517,9 @@ def web_search_tool(db, query=None, connection=None, _conversation_id=None, **_)
                    "mac": "elle contient une adresse MAC", "mail": "elle contient une adresse e-mail", "path": "elle contient un chemin de machine",
                    "token": "elle contient un identifiant ou un jeton", "domain": "elle contient un domaine interne", "name": "elle contient le nom d'une de tes machines"}
         raise ToolError(f"Requête refusée, {reasons[why]}. Elle partirait vers des moteurs publics : reformule avec seulement des termes publics (produit, version, message d'erreur, CVE).")
+    refused = web_search.quota_refusal(_conversation_id, _lang(db))
+    if refused:
+        return refused
     try:
         return web_search.search_text(link["web_url"], query, _lang(db))
     except web_search.WebSearchError as e:

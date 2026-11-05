@@ -502,7 +502,9 @@
     "empty_thread": "Ask your first question below.",
     "investigation_plan": "Investigation plan given to the AI",
     "edit_send": "Resend",
-    "attached_title": "Original alert"
+    "attached_title": "Original alert",
+    "st_web_paused": "Web paused ({n} min): engines not answering",
+    "st_web_full": "Web: hourly limit reached"
   },
   "config": {
     "title": "Configuration",
@@ -1453,7 +1455,9 @@
     "cve_ok": "NVD answers",
     "status_disabled": "off",
     "cve_on": "on",
-    "web_blocked": "The instance answers, but no engine returns results for now (no answer: {failed}). They often block for a while: try again later."
+    "web_blocked": "The instance answers, but no engine returns results for now (no answer: {failed}). They often block for a while: try again later.",
+    "web_paused": "Searches suspended for {n} more min: no engine answered ({engines}). Insisting would prolong the block. Test resumes as soon as an engine answers.",
+    "web_full": "Limit reached: {n} searches this hour. The AI will resume once the hour has passed."
   },
   "triage": {
     "title": "Sort my unread",

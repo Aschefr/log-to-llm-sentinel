@@ -94,6 +94,23 @@ async function refreshDiag() {
     renderLinks('ssh');
     renderLinks('web');
     renderCve();
+    renderWebPause();
+}
+
+/** Says plainly why the AI is not searching at the moment. */
+function renderWebPause() {
+    const el = document.getElementById('diag-web-pause');
+    const s = DIAG.status.web_search || {};
+    let text = '';
+    if (s.paused) {
+        const engines = s.engines.length ? s.engines.join(', ') : dT('diag.web_no_engine', 'aucun');
+        text = dT('diag.web_paused', 'Recherches suspendues encore {n} min : aucun moteur n’a répondu ({engines}). Insister prolongerait le blocage. Tester relance dès qu’un moteur répond.')
+            .replace('{n}', s.minutes_left).replace('{engines}', engines);
+    } else if (s.hour_full) {
+        text = dT('diag.web_full', 'Limite atteinte : {n} recherches cette heure. L’IA reprendra quand l’heure sera écoulée.').replace('{n}', s.hour_limit);
+    }
+    el.textContent = text;
+    el.classList.toggle('hidden', !text);
 }
 
 function renderCve() {
@@ -175,6 +192,7 @@ async function testLinkRow(kind, id, li) {
     const empty = res.ok && kind === 'web' && !res.results;
     out.textContent = !res.ok ? `✗ ${res.error}` : empty ? `⚠ ${webTestText(res)}` : `✓ ${kind === 'web' ? webTestText(res) : dT('diag.connected', 'Connecté')}`;
     out.classList.add(res.ok && !empty ? 'rf-ok' : 'rf-ko');
+    if (kind === 'web') { DIAG.status = await apiFetch('/api/diagnostics'); renderWebPause(); }
 }
 
 function diagLinkError(e) {

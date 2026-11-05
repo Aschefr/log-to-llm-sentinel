@@ -83,7 +83,7 @@ def get_status():
             link["rules"] = [name for name, ids in rules if ids is None or link["id"] in ids]
             if link["kind"] == "ssh":
                 link["host_fingerprint"] = diag.host_fingerprint(link["ssh_host"], link["ssh_port"])
-        return {"cve_lookup": cve_lookup.enabled(db), "links": links, "rule_count": len(rules), "public_key": diag.public_key(), "available": diag.availability(), "host_checks": list(diag.HOST_CHECKS)}
+        return {"cve_lookup": cve_lookup.enabled(db), "web_search": web_search.status(), "links": links, "rule_count": len(rules), "public_key": diag.public_key(), "available": diag.availability(), "host_checks": list(diag.HOST_CHECKS)}
     finally:
         db.close()
 
