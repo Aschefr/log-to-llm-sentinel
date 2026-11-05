@@ -1,5 +1,7 @@
 # Dashboard Page
 
+![Dashboard](../../../screenshots/log-to-llm-sentinel_dashboard.png)
+
 The **Dashboard** is the home screen of Log-to-LLM Sentinel. It is a watch post: it first answers "is everything fine?", then shows only what needs an action.
 
 The page updates by itself every 15 seconds, and right away when you come back to its tab. An update never closes or moves what you are reading.
@@ -25,6 +27,8 @@ Only what calls for an action, most serious first:
 * **Silent sources**: no line for longer than the rule's limit. A rule under autopilot observation is not listed: its rhythm is not known yet, so its silence is shown in the Autopilot block instead.
 * **Unread events**: **View** opens the *Unread* filter of the history. They do not change the verdict.
 * **Sort my unread**: the AI goes through your unread events and suggests which ones can be marked as read, with a reason for each. You untick what you want to keep, then validate. Nothing changes before that, and the last sort can be undone for 7 days. Critical events, events first seen less than a day ago and events seen only once in the last 7 days are never suggested. Marking as read closes no incident and deletes nothing. The same button is on the *Analyses* tab of a rule, limited to that rule.
+
+![Sort my unread](../../../screenshots/log-to-llm-sentinel_triage.png)
 
 ---
 

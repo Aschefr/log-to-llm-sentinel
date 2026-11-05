@@ -11,6 +11,7 @@ The **Rules** entry is where you watch and configure everything Sentinel monitor
 * **Filters**: All / In alert / Enabled / Disabled, plus a search field (name or source).
 * **One row per rule**, disabled rules included:
   * *State*: Normal, In alert (since when), or Disabled. A disabled rule that still has an open incident is shown as *incident still open*.
+  * *Rule*: its name and source, with a tag saying who keeps its settings up to date: **Autopilot** (also *setting up* or *failed*) or **Manual**.
   * *Alerts 7 d*: one bar per day, coloured by the highest severity of the day.
   * *Last incident*: its one-sentence summary, time, severity and whether it is open or how long it took to resolve.
   * *MTTR*: median resolution time over 30 days.
@@ -21,7 +22,9 @@ The **Rules** entry is where you watch and configure everything Sentinel monitor
 ---
 
 ## 2. Rule page (`/rules/{id}`)
-The header shows the name, state, source and keywords, an **Enabled** toggle and the **Test**, **Download log** and **Delete** buttons.
+![Rule page](../../../screenshots/log-to-llm-sentinel_rule.png)
+
+The header shows the name, state, source and keywords, an **Enabled** toggle and the **Test**, **Download log** and **Delete** buttons, plus **Readjust this rule with AI** on a rule under [autopilot](../features/autopilot.md).
 
 ### Overview tab
 * **Ongoing incident** (when the rule is in alert): summary of the latest analysis, last error, next resolution check and required calm, number of normal lines received since the last error (is the log still alive?), and the health probe result. Buttons: *Investigate with AI*, *Open in chat*, *Mark as resolved*.
@@ -31,10 +34,14 @@ The header shows the name, state, source and keywords, an **Enabled** toggle and
 * **Latest analyses**: click one to open it in the Analyses tab.
 
 ### Live log tab
+![Live log](../../../screenshots/log-to-llm-sentinel_rule_live_log.png)
+
 The former Monitor viewer: live tail with keyword highlighting, *Matches* / *All* / per-keyword / per-exclusion filters, freeze and copy, and a detail panel when clicking a line (related analysis, or *Analyse with AI* for an unmatched line).
 
 ### Analyses tab
-* Filters with real counters: All, Unread, Critical, Warning, Info; period (7 days, 30 days, all); *Open incidents only*; *Mark all as read*.
+![Analyses tab](../../../screenshots/log-to-llm-sentinel_rule_analyses.png)
+
+* Filters with real counters: All, Unread, Critical, Warning, Info; period (7 days, 30 days, all); *Open incidents only*; *Mark all as read*; *Sort my unread*, which asks the AI which events of this rule can be marked as read (see the [Dashboard](dashboard.md)).
 * Each collapsed card shows the one-sentence summary, a recurrence badge (*× N in 7 d* or *new*) and the resolution time.
 * Expanded cards keep the usual actions: retry, notify, prompt, deepen in chat, investigate, delete — plus **Not relevant**, which asks the AI arbiter to stop this kind of alert (see [Keyword tuning](../features/keyword-learning.md)), and **Add a note**, which tells the AI what the logs cannot (see [Notes for the AI](../features/notes.md)).
 * **Notes for the AI**, above the list: all the notes of the rule, to read, edit or delete, and to add one on all alerts of the rule.
@@ -46,12 +53,16 @@ See [Incident Resolution](../features/resolution-tracking.md): closing condition
 See [Keyword tuning](../features/keyword-learning.md): tuning mode, history analysis and observation, changes to review, keywords and exclusions with their real hits and alerts, blind spots being watched, change history with undo.
 
 ### Settings tab
+![Settings tab](../../../screenshots/log-to-llm-sentinel_rule_settings.png)
+
 Two cards choose the mode (the autopilot also sets the notification threshold and the return-to-normal lines, see its page). With the [autopilot](../features/autopilot.md), only the source is shown; choose **Manual** to see the five sections below (fields set by the autopilot carry an **AI** badge) — saving in Manual stops the autopilot, saving in Autopilot starts it again.
 1. **Source**: name (optional for a new rule with the autopilot: the AI chooses it), local file (with file browser and preview), webhook URL or syslog hostname.
 2. **Detection**: the [automatic tuning](../features/keyword-learning.md) mode and the **grouping window** — lines detected during this window are analysed together in a single AI call. Keywords and ignored lines are typed here only when creating a manual rule (with *analyze the last 7 days* on creation); afterwards they are managed in the Keywords tab.
 3. **AI analysis**: application context (what this rule monitors and what is normal here) and the number of **context lines** read from the source before and after the detected lines.
 4. **Notifications**: notify alerts from a minimum severity, notify when an incident closes, alert when the source goes silent for N hours.
 5. **Return to normal**: see [Incident Resolution](../features/resolution-tracking.md).
+
+**AI access for diagnosis** lists the [diagnostic connections](../features/diagnostics.md) the AI may use for this rule. It is also shown on autopilot, since only you know which machine a log comes from.
 
 ---
 

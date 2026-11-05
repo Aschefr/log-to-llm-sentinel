@@ -1,5 +1,7 @@
 # Autopilot
 
+![Choosing the autopilot for a new rule](../../../screenshots/log-to-llm-sentinel_rule_new.png)
+
 With the autopilot, you only give a rule its **source** (a log file, a syslog host or a webhook). Sentinel reads the log and the local AI sets up the rest of the rule, then keeps it up to date. The autopilot is on by default for a new rule.
 
 ---
@@ -45,5 +47,6 @@ The autopilot runs the rule without asking you anything:
 
 * In **Settings**, a rule on autopilot only shows its source and the autopilot's state. Choose **Manual** to see every setting: the ones set by the autopilot carry an **AI** badge. Saving in Manual stops the autopilot and keeps everything as it is.
 * Choose **Autopilot** again and save to switch it back on: it re-reads the log history, keeps the rule's name and a context you wrote, and manages the grouping window, the silence delay, and the context if it is empty.
+* The **Rules** list shows at a glance which rules are on autopilot and which are manual.
 * Keywords and exclusions are managed in the **Keywords** tab, where every change can be undone.
 * A *manual* rule (autopilot off) is set up by hand, as before; the quick templates fill a manual rule.

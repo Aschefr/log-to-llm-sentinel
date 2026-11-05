@@ -19,7 +19,13 @@ document.addEventListener('DOMContentLoaded', () => {
     setupTabs();
     refreshStatus();
     setInterval(() => { if (!document.hidden) refreshStatus(); }, 30000);
-    if (window.i18n && window.i18n.onLanguageChange) window.i18n.onLanguageChange(refreshStatus);
+    // The language file can arrive after the first render: everything written by a script is drawn again
+    window.i18n?.onLanguageChange(() => {
+        refreshStatus();
+        renderRecommendedModels();
+        loadSyslogHosts();
+        if (typeof refreshDiag === 'function') refreshDiag().then(renderSnippet).catch(() => {});
+    });
 });
 
 function cfgT(key, fallback, vars) {
@@ -224,7 +230,7 @@ function renderRecommendedModels() {
         const isInstalled = installed.includes(m.model);
         const current = select && select.value === m.model;
         const state = !installed.length ? '' : isInstalled ? cfgT('config.model_installed', 'Installé') : cfgT('config.model_to_download', 'À télécharger');
-        const detail = cfgT('config.model_detail', '{gb} Go · {s} s par analyse').replace('{gb}', m.memory).replace('{s}', m.seconds);
+        const detail = cfgT('config.model_detail', '{gb} Go · {s} s par analyse').replace('{gb}', window.i18n?.getCurrentLang?.() === 'fr' ? m.memory : m.memory.replace(',', '.')).replace('{s}', m.seconds);
         return `<button type="button" class="cfg-status-item${current ? ' active' : ''}" data-model="${m.model}" aria-pressed="${Boolean(current)}">
             <span class="cfg-status-text">
                 <span class="cfg-status-detail">${escapeHtml(cfgT(m.tier[0], m.tier[1]))}</span>

@@ -2,7 +2,7 @@
 
 ![Global Configuration](../../../screenshots/log-to-llm-sentinel_config.png)
 
-The **Configuration** page handles global integration credentials, LLM parameters, maintenance settings, and system backup/restoration.
+The **Configuration** page is the single place for the AI model, notifications, sources, diagnostics, data and backups.
 
 ## Tabs and their state
 The six tabs at the top of the page each show the real state of what they configure, in text and with a colored dot.
@@ -23,7 +23,23 @@ A setting is saved when you leave its field (or press Enter), and the result sho
 
 ---
 
-## 1. Notifications tab
+## 1. Ollama tab
+* **Ollama URL**: The access endpoint of your Ollama instance (default: `http://host.docker.internal:11434` for Docker hosts).
+* **Model Selection**: Dropdown list populated dynamically by queries to Ollama.
+* **Model (Manual Override)**: Text field to specify a model manually (e.g., `llama3:latest`).
+* **Which model to choose**: three [recommended models](../features/recommended-models.md), with their memory and speed as measured. One click selects a model if it is installed, otherwise prepares its download.
+* **Download a model**: enter any model tag and click **Download** to pull it onto the host.
+* **Context**: 8K to 128K, 32K recommended. Meta-analyses and the chat use the same value, which also avoids reloading the model. How many log lines the AI receives for an alert follows from it, so there is no separate limit to set.
+* **Chat instructions**: optional text added to every [Log Chat](chat.md) conversation, such as your setup or the tone you want.
+* **When the context is full**: what the chat does when a conversation exceeds what the model can read at once: ask, summarize with the AI, compact, or forget the oldest messages.
+
+The temperature is set to 0.2, and analyses and the chat are written in the site's language: the study behind these recommendations settled both, so there is nothing to adjust.
+
+---
+
+## 2. Notifications tab
+![Notifications tab](../../../screenshots/log-to-llm-sentinel_config_notifications.png)
+
 * **Instance Name**: Prefixed in notification subjects, to tell several Sentinel instances apart.
 * **Primary Notification Method**: Dropdown selector to choose between `Email (SMTP)`, `Apprise`, or `Discord Webhook`.
 * **SMTP Settings**:
@@ -39,26 +55,15 @@ A setting is saved when you leave its field (or press Enter), and the result sho
   * *Test Apprise Button*: Sends a test notification.
 * **Discord Settings**:
   * *Discord Webhook URL*: Paste your Discord channel integration webhook.
+  * *Character Limit (AI Summary)*: The same limit as for Apprise, with presets for Discord, Telegram and SMS.
   * *Test Discord Button*: Sends a test message.
 
 ---
 
-## 2. Ollama tab
-* **Ollama URL**: The access endpoint of your Ollama instance (default: `http://host.docker.internal:11434` for Docker hosts).
-* **Model Selection**: Dropdown list populated dynamically by queries to Ollama.
-* **Model (Manual Override)**: Text field to specify a model manually (e.g., `llama3:latest`).
-* **Which model to choose**: three [recommended models](../features/recommended-models.md), with their memory and speed as measured. One click selects a model if it is installed, otherwise prepares its download.
-* **Download a model**: enter any model tag and click **Download** to pull it onto the host.
-* **Context**: 8K to 128K, 32K recommended. Meta-analyses and the chat use the same value, which also avoids reloading the model.
-* **Chat instructions**: optional text added to every [Log Chat](chat.md) conversation, such as your setup or the tone you want.
-* **When the context is full**: what the chat does when a conversation exceeds what the model can read at once: ask, summarize with the AI, compact, or forget the oldest messages.
-
-The temperature is set to 0.2, and analyses and the chat are written in the site's language: the study behind these recommendations settled both, so there is nothing to adjust.
-
----
-
 ## 3. Sources tab
-**Detected sources** lists the hosts that sent lines in the last 7 days and the rule following each one.
+![Sources tab](../../../screenshots/log-to-llm-sentinel_config_sources.png)
+
+**Detected sources** lists the hosts that sent lines in the last 7 days and the rule following each one, with a link to create the rule when there is none.
 
 Sentinel listens on UDP port 514 inside the container (mapped to host port 10514 by default):
 * **Enable Syslog Receiver**: Master checkbox to activate the UDP listener.
@@ -83,11 +88,15 @@ The console uses **two host names**: `Dream Machine Special Edition` for UniFi O
 ---
 
 ## 4. Data tab
+![Data tab](../../../screenshots/log-to-llm-sentinel_config_data.png)
+
 **Maintenance** also holds two resets, each with a confirmation: **Reset the MTTR** removes already resolved incidents from the calculation and keeps the analyses; **Delete all analyses** permanently deletes every analysis of every rule.
 
 * **Auto-Delete Old Data**: Toggle switch to purge old logs.
 * **Retention Period**: Purge frequency (`1 week`, `1 month`, `6 months`, `1 year`).
+* **Maximum log file size**: Size at which Syslog and Webhook log files are rotated.
 * **Clean Up Now Button**: Triggers an immediate database cleanup.
+* **Old repeats**: Nothing to set. After 30 days, the repeats of an event keep their lines, dates, severity and summary and lose the rest (prompt, surrounding lines, full answer), which takes much less room. The latest occurrence of each event, critical alerts and alerts you gave feedback on stay whole, and statistics do not change.
 * **Export Configuration**:
   * *Include history*: Checkbox to export historical logs and chat databases.
   * *Generate Zip Button*: Generates and downloads a ZIP backup of rules, configs, and history.

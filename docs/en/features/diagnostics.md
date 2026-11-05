@@ -1,5 +1,7 @@
 # Infrastructure Diagnostics (read-only)
 
+![Diagnostics tab](../../../screenshots/log-to-llm-sentinel_config_diagnostics.png)
+
 AI analyses often recommend checks such as `docker ps`, `docker logs`, `df -h` or `systemctl status`. With diagnostics enabled, the assistant of the **Chat** and of **Investigate (🔎)** runs these checks itself and answers from what it actually sees.
 
 Everything is **read-only**: nothing can be started, stopped, restarted or modified. Diagnostics are never used by the automatic alert analysis, only in the chat and investigations. Both parts are optional and independent.

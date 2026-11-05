@@ -1,5 +1,7 @@
 # Incident Resolution
 
+![Resolution tab](../../../screenshots/log-to-llm-sentinel_rule_resolution.png)
+
 Sentinel tracks when an alert returns to normal, which feeds the MTTR and closes incidents without manual work. Everything is configured in the **Return to normal** section of a rule's Settings tab and observed in its **Resolution** tab.
 
 ---

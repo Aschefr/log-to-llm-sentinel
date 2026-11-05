@@ -1,5 +1,7 @@
 # Keyword tuning
 
+![Keywords tab](../../../screenshots/log-to-llm-sentinel_rule_keywords.png)
+
 Sentinel keeps each rule's keywords and exclusions up to date by itself. The local AI acts as an **arbiter**: it reads what actually happens in the log, decides what to change, and every decision is checked against your data before it is applied. Every change is logged and can be undone in one click.
 
 ---

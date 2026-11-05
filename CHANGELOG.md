@@ -10,6 +10,16 @@ All notable changes to this project will be documented in this file.
 - **MQTT as a source**: follow the topics of an MQTT server (Zigbee2MQTT, Tasmota, ESPHome). The connection test shows the active topics.
 - **Log shippers**: a webhook rule also accepts the Loki and OpenTelemetry formats, so Fluent Bit, Grafana Alloy, Promtail, Vector or the OpenTelemetry Collector can send to Sentinel, including Windows event logs through Fluent Bit.
 - **Connection guides**: each source shows a short step-by-step guide in the rule form, and says clearly when it cannot be read, in the rule list, on the rule page and on the dashboard.
+
+### Changed
+- **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
+
+### Fixed
+- **English interface**: part of the rule page and the Configuration tabs could stay in French, and full dates kept the French format.
+
+## [1.8.0] - 2026-11-04
+
+### Added
 - **Several diagnostic connections, chosen per rule**: add as many read-only Docker and SSH connections as you need in Configuration > Diagnostics, then tick in each rule which ones the AI may use. A conversation about an alert only reaches the machines of its rule, so the AI no longer checks the wrong server. An existing configuration carries over and stays available to all rules.
 
 - **Autopilot or manual, at a glance**: each rule in the Rules list now shows whether the autopilot keeps its settings up to date or you do.
