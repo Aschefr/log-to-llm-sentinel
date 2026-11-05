@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - **Connection guides**: each source shows a short step-by-step guide in the rule form, and says clearly when it cannot be read, in the rule list, on the rule page and on the dashboard.
 
 ### Changed
+- **Docker Desktop on Windows**: the README explains how to keep the database in a Docker volume. In a folder of the Windows disk, each request waited about 1.3 s for the database on our test PC, against 50 ms on Linux.
 - **Which rules use a diagnostic connection**: under each Docker, server or web search connection, *All rules* opens a list of the rules with a box each, to give or take its access from several rules at once.
 - **AI access in a rule**: the rule settings list every diagnostic access, Docker, server, web search and CVE sheets. One that is not set up shows greyed and opens its setup.
 - **Home Assistant and MQTT connections in Configuration**: the form opens under a title, with the same connection guide as in a rule and a Cancel button.
@@ -26,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
 
 ### Fixed
+- **Pages rebuilding themselves while loading**: the dashboard showed its history, then emptied it and asked for it again once the translations arrived, and every page downloaded the whole translation file again. The dashboard panels and the rules summary now keep their shape while their data arrives.
 - **SearXNG install guide**: the Unraid tab showed the Docker compose text.
 - **Chat on a phone**: the message box could sit hidden behind the browser's bar, seen on Firefox for Android. The page was sized as if that bar were not there.
 - **Keyword notifications cut mid-sentence**: the reason of a change was cut at 200 characters. It now ends on a whole sentence, the full text staying in the Keywords tab.

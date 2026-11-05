@@ -65,9 +65,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('analysis-viewed', refresh);
     document.addEventListener('events-changed', refresh);
     setupChartTip();
-    window.i18n?.onLanguageChange(() => {
+    let shownLang = null;
+    window.i18n?.onLanguageChange(lang => {
+        const first = shownLang === null;
+        shownLang = lang;
         renderAll();
-        resetHistory();
+        // Le premier rendu se fait avec les textes français de secours : seule une autre langue oblige à tout redessiner
+        if (!first || lang !== 'fr') resetHistory();
     });
 });
 
@@ -87,6 +91,7 @@ async function loadWatch() {
         DASH.failed = true;
     }
     renderAll();
+    unskel('dash-trend-body', 'dash-pilot');
 }
 
 async function loadOllama() {
@@ -96,6 +101,7 @@ async function loadOllama() {
         DASH.ollama = null;
     }
     renderAll();
+    unskel('dash-ollama');
 }
 
 function renderAll() {

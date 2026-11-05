@@ -3805,6 +3805,13 @@ select option, select optgroup { background-color: var(--bg-primary); color: var
 .sc-topic:hover { border-color: var(--accent); }
 .sc-form:not(.sc-form--pick) .sc-topic { cursor: default; pointer-events: none; }
 .sc-topic-count { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+/* Emplacement réservé tant que la première réponse n'est pas arrivée : la page garde sa forme */
+.skel:empty { border-radius: 0.5rem; background: linear-gradient(90deg, rgba(148, 163, 184, 0.07) 25%, rgba(148, 163, 184, 0.14) 50%, rgba(148, 163, 184, 0.07) 75%) 0 0 / 200% 100%; animation: skel 1.4s ease-in-out infinite; }
+.skel--line:empty { min-height: 3rem; }
+.skel--list:empty { min-height: 10rem; }
+.skel--chart:empty { min-height: 13rem; }
+@keyframes skel { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+@media (prefers-reduced-motion: reduce) { .skel:empty { animation: none; } }
 #rs-mqtt-seen { margin-top: 0.4rem; }
 #rs-mqtt-seen-hint:empty { display: none; }
 .sc-config-panel { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }

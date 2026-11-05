@@ -44,6 +44,7 @@ async function loadOverview() {
     } catch (e) {
         document.getElementById('ro-table').innerHTML = `<div class="loading">${escapeHtml(roT('common.error', 'Erreur'))} : ${escapeHtml(e.message)}</div>`;
     }
+    unskel('ro-kpis');
 }
 
 function ruleState(r) {

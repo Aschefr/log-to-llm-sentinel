@@ -82,6 +82,21 @@ Open a terminal in your project folder and run:
 docker-compose up -d
 ```
 
+> **Docker Desktop on Windows: keep the database in a Docker volume.** A folder of your Windows disk, like `./data`, is shared with the container through a slow network layer, and every page then waits for the database: about 1.3 s per request on our test PC, against 50 ms on Linux. Add this to your `docker-compose.yml` to keep `sentinel.db` inside Docker while the rest of `./data` stays on your disk:
+>
+> ```yaml
+> services:
+>   sentinel:
+>     volumes:
+>       - sentinel-db:/app/db
+>     environment:
+>       - DATABASE_URL=sqlite:////app/db/sentinel.db
+> volumes:
+>   sentinel-db:
+> ```
+>
+> On an existing install, stop Sentinel and copy `data/sentinel.db` into the volume first, or Sentinel starts with an empty database.
+
 ### 5. Access the Interface
 Once the containers are started, open your browser and go to the port you chose (default is 10911):
 👉 **[http://localhost:10911](http://localhost:10911)**

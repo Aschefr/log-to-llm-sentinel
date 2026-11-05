@@ -99,6 +99,11 @@ function formatRelativeTime(dateString) {
     return `${prefix} ${timeStr}`;
 }
 
+/** Ends the loading placeholder of these containers, once their first answer arrived (or failed). */
+function unskel(...ids) {
+    ids.forEach(id => document.getElementById(id)?.classList.remove('skel'));
+}
+
 function escapeHtml(text) {
     if (!text) return '';
     const map = {

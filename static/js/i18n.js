@@ -88,7 +88,7 @@
      */
     async function loadLanguage(lang) {
         try {
-            const res = await fetch(`/static/i18n/${lang}.json?v=${Date.now()}`);
+            const res = await fetch(`/static/i18n/${lang}.json`, { cache: 'no-cache' });
             if (!res.ok) throw new Error(`Fichier de langue introuvable: ${lang}`);
             _translations = await res.json();
             _currentLang = lang;

@@ -22,16 +22,16 @@
     <div class="dash-grid">
         <section class="dash-panel dash-trend" id="dash-trend" aria-labelledby="dash-trend-title">
             <h2 class="dash-panel-title" id="dash-trend-title" data-i18n="dashboard.trend_title">Alertes · 7 jours</h2>
-            <div id="dash-trend-body"></div>
+            <div id="dash-trend-body" class="skel skel--chart"></div>
             <div class="dash-tip hidden" id="dash-tip" role="status"></div>
         </section>
         <section class="dash-panel dash-pilot" aria-labelledby="dash-pilot-title">
             <h2 class="dash-panel-title" id="dash-pilot-title" data-i18n="dashboard.pilot_title">Pilote automatique</h2>
-            <div id="dash-pilot"></div>
+            <div id="dash-pilot" class="skel skel--list"></div>
         </section>
         <section class="dash-panel dash-ollama-panel" aria-labelledby="dash-ollama-title">
             <h2 class="dash-panel-title" id="dash-ollama-title" data-i18n="dashboard.ollama_title">Ollama</h2>
-            <div id="dash-ollama"></div>
+            <div id="dash-ollama" class="skel skel--line"></div>
         </section>
     </div>
 
@@ -48,5 +48,5 @@
 
 {% block scripts %}
 <script src="/static/js/source_connections.js?v=4"></script>
-<script src="/static/js/dashboard.js?v=9"></script>
+<script src="/static/js/dashboard.js?v=10"></script>
 {% endblock %}
