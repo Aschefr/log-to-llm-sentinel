@@ -68,6 +68,7 @@ class Orchestrator:
             excluded = db_rule.get_excluded_patterns()
             # Pilote automatique pas encore prêt : alerter quand même sur les lignes de niveau erreur explicite
             observing = autopilot.is_observing(db_rule)
+            piloted = autopilot.enabled(db_rule)
 
             # Filtrer les lignes contenant au moins un mot-clé (les exclusions sont prioritaires)
             matching_lines = []
@@ -90,8 +91,11 @@ class Orchestrator:
                 elif observing and error_level(line):
                     matching_lines.append(line)
                     matched_keywords.add(autopilot.OBSERVE_KEYWORD)
+                elif piloted and autopilot.serious_line(line):
+                    matching_lines.append(line)
+                    matched_keywords.add(autopilot.SERIOUS_KEYWORD)
 
-            if not keywords and not observing:
+            if not keywords and not piloted:
                 logger.debug("Orchestrator", f"Règle '{db_rule.name}' : aucun mot-clé configuré, ignorée")
                 return
 
@@ -163,7 +167,7 @@ class Orchestrator:
                     logger.debug("Orchestrator", f"'{rule.name}' : {len(quiet)} événement(s) répétitif(s) non analysé(s)")
                 if not lines:
                     return
-                matched_keywords = [k for k in matched_keywords if k == autopilot.OBSERVE_KEYWORD
+                matched_keywords = [k for k in matched_keywords if k in (autopilot.OBSERVE_KEYWORD, autopilot.SERIOUS_KEYWORD)
                                     or any(keyword_match.matching([k], l) for l in lines)]
 
             # Lignes brutes conservées (bornées) : servent au prompt, au retry et à la récurrence

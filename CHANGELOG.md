@@ -4,10 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Autopilot catches a serious line the first time**: out of memory, kernel panic, segfault, disk or file system errors and an unresponsive NFS server are analyzed even if no keyword matches. Until now, such a line had to come back several times before the autopilot could notice it.
+
 ### Changed
 - **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
 
 ### Fixed
+- **Incidents closing too early**: when a return-to-normal line appeared, the AI judged it on the few lines just received, so a harmless line in the middle of a restart loop could close the incident. It now reads the last 30 lines of the log, errors included, and no longer works out durations from the times in log lines, which may be in another time zone. Replaying four real early closures: closed 16 times out of 20 before, 0 after; three fictional real recoveries still close every time.
+- **Autopilot and silent sources**: a rule put under autopilot kept a silence notification turned off earlier, with no way to see it in this mode. A silent source now always notifies under autopilot. Rules already under autopilot switch to this at the update.
 - **English interface**: part of the rule page and the Configuration tabs could stay in French, and full dates kept the French format.
 
 ## [1.8.0] - 2026-11-04

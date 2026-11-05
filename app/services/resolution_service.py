@@ -495,6 +495,7 @@ class ResolutionService:
             ai_accepted = False
             low_confidence_rejected = False
             effective_threshold = AI_CONFIDENCE_THRESHOLD
+            learn_lines = context_lines
 
             if use_ai:
                 db = SessionLocal()
@@ -502,6 +503,11 @@ class ResolutionService:
                     rule = db.query(Rule).filter(Rule.id == rule_id).first()
                     if not rule:
                         raise Exception("Regle introuvable avant appel IA")
+
+                    # Motif : le lot reçu ne montre que l'instant présent. L'IA juge sur les dernières lignes du journal,
+                    # erreurs comprises, sinon une ligne anodine au milieu d'une boucle de redémarrage suffit à clore.
+                    if resolution_patterns:
+                        context_lines = await asyncio.to_thread(_tail, rule.log_file_path) or context_lines
 
                     verdict = await self._validate_with_ai(db, rule, trigger, context_lines, resolution_patterns, resolution_line)
                     confidence = verdict.get("confidence", 0)
@@ -601,7 +607,7 @@ class ResolutionService:
                         await self._mark_resolved(db, rule_id, trigger,
                                                   ai_explanation=verdict.get("explanation"),
                                                   confidence=confidence,
-                                                  context_lines=context_lines,
+                                                  context_lines=learn_lines,
                                                   resolution_line=resolution_line,
                                                   resolution_patterns=resolution_patterns,
                                                   learn=pattern_triggered)

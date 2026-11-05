@@ -18,6 +18,7 @@ Un réglage modifié à la main n'est plus touché par le pilote.
 """
 import json
 import math
+import re
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -32,7 +33,7 @@ from app.utils.log_utils import clean_log_line
 
 MANAGED_FIELDS = ("name", "application_context", "anti_spam_delay", "inactivity_period_hours", "notify_severity_threshold")
 RHYTHM_FIELDS = ("anti_spam_delay", "inactivity_period_hours", "notify_severity_threshold")  # toujours gérés à l'activation
-STATE_VERSION = 2               # 2 : seuil de notification géré
+STATE_VERSION = 3               # 2 : seuil de notification géré ; 3 : notification de silence active
 NOTIFY_MIN_ALERTS = 10          # alertes sur 30 jours avant de juger le seuil de notification
 NOTIFY_LOW_SHARE = 0.7          # part d'alertes « info » (ou signalées pas pertinentes) qui fait passer à « warning »
 SEVERITIES = ("info", "warning", "critical")
@@ -54,6 +55,16 @@ REFRESH_DAYS = 7
 PROFILE_CHANGE_OVERLAP = 0.5    # contexte revu si moins de la moitié des modèles fréquents sont encore là
 TOP_SIGNATURES = 40
 OBSERVE_KEYWORD = "[error level]"   # mot-clé affiché pour les alertes de la phase d'observation
+SERIOUS_KEYWORD = "[serious line]"  # mot-clé affiché pour une panne franche qu'aucun mot-clé n'attrape
+# Pannes franches, rares par nature : une seule ligne vaut une analyse, sans attendre que l'arbitre en fasse un mot-clé
+# (il lui faut plusieurs occurrences). Rejoué sur 4 mois de logs réels : quelques événements, aucune fausse piste.
+SERIOUS_LINE = re.compile(
+    r"out of memory|oom[-_ ]?kill|killed process|kernel panic|segfault|segmentation fault|general protection fault"
+    r"|core dumped|i/o error|disk\S* (?:read|write) error|medium error|uncorrectable|bad sector|read-only file ?system"
+    r"|remount(?:ing|ed)?.{0,40}read-only|ext4-fs error|xfs.{0,40}corrupt|btrfs.{0,40}(?:error|corrupt)"
+    r"|no space left on device|disk full|nfs: server .{0,80}not responding|blocked for more than \d+ seconds"
+    r"|soft lockup|hard lockup|machine check|hardware error|database disk image is malformed|data corruption"
+    r"|filesystem corrupt", re.I)
 NAME_MAX = 60
 CONTEXT_MAX = 800
 
@@ -149,6 +160,10 @@ def enabled(rule: Rule) -> bool:
     return bool(load(rule).get("enabled"))
 
 
+def serious_line(line: str) -> bool:
+    return bool(SERIOUS_LINE.search(line))
+
+
 def is_observing(rule: Rule) -> bool:
     """Règle pas encore prête (lecture de l'historique, observation, ou échec en attente d'un nouvel essai) :
     elle alerte sur les lignes de niveau erreur explicite."""
@@ -174,7 +189,8 @@ def default_name(log_file_path: str) -> str:
 
 def enable(rule: Rule, new_rule: bool, user_values: Optional[dict] = None):
     """Active le pilote. Nouvelle règle : il gère tout ce que l'utilisateur n'a pas rempli. Règle existante : il garde
-    le nom et un contexte déjà écrit, et gère la fenêtre de regroupement et le délai de silence."""
+    le nom et un contexte déjà écrit, et gère la fenêtre de regroupement et le délai de silence. Dans les deux cas,
+    une source muette notifie : le pilote calcule le délai, et le réglage n'est pas affiché dans ce mode."""
     user_values = user_values or {}
     if new_rule:
         managed = [f for f in MANAGED_FIELDS if f in RHYTHM_FIELDS or not user_values.get(f)]
@@ -184,6 +200,7 @@ def enable(rule: Rule, new_rule: bool, user_values: Optional[dict] = None):
     data.update({"enabled": True, "status": "learning", "managed": managed, "v": STATE_VERSION,
                  "values": {f: getattr(rule, f) for f in managed}, "error": None})
     save(rule, data)
+    rule.inactivity_warning_enabled = rule.inactivity_notify = True
 
 
 def disable(rule: Rule):
@@ -325,13 +342,15 @@ def history_too_short(lines: int, span_h: float) -> bool:
 
 def upgrade_state(rule: Rule):
     """Règles mises sous pilote par une version précédente : le seuil de notification, resté à sa valeur par défaut,
-    passe sous la gestion du pilote."""
+    passe sous la gestion du pilote, et une source muette notifie."""
     data = load(rule)
     if not data.get("enabled") or data.get("v", 1) >= STATE_VERSION:
         return
     if (rule.notify_severity_threshold or "info") == "info" and "notify_severity_threshold" not in data.get("managed", []):
         data.setdefault("managed", []).append("notify_severity_threshold")
         data.setdefault("values", {})["notify_severity_threshold"] = rule.notify_severity_threshold or "info"
+    if data.get("v", 1) < 3:
+        rule.inactivity_warning_enabled = rule.inactivity_notify = True
     data["v"] = STATE_VERSION
     save(rule, data)
 
