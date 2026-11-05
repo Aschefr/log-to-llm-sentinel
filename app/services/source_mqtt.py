@@ -100,6 +100,17 @@ async def run(spec: dict, sink):
         client.disconnect()
 
 
+def topic_overview(topics: set, per_root: int = 3, limit: int = 30) -> dict:
+    """Shared first levels as `root/#`, busiest first, and a few topics of each root rather than the first 30 in alphabetical order."""
+    roots: dict = {}
+    for t in sorted(topics):
+        roots.setdefault(t.split("/")[0] if "/" in t else "", []).append(t)
+    order = sorted(roots, key=lambda r: (-len(roots[r]), r))
+    prefixes = [{"topic": f"{r}/#", "count": len(roots[r])} for r in order if r and len(roots[r]) > 1][:12]
+    sample = [t for r in order for t in roots[r][:per_root]][:limit]
+    return {"prefixes": prefixes, "topics": sample}
+
+
 async def test(spec: dict, topic: Optional[str] = None) -> dict:
     """Vérifie la connexion et écoute un instant : montrer les sujets actifs évite de les deviner."""
     loop = asyncio.get_running_loop()
@@ -133,7 +144,7 @@ async def test(spec: dict, topic: Optional[str] = None) -> dict:
         if error:
             raise error
         await asyncio.sleep(SAMPLE_SECONDS)
-        return {"topics": sorted(topics)[:30], "topic_count": len(topics)}
+        return {**topic_overview(topics), "topic_count": len(topics)}
     finally:
         client.loop_stop()
         client.disconnect()

@@ -36,6 +36,10 @@ class DockerTest(BaseModel):
     url: str
 
 
+class KeyImport(BaseModel):
+    private_key: str
+
+
 class SshTest(BaseModel):
     ssh_host: str
     ssh_port: int = 22
@@ -181,21 +185,32 @@ async def ssh_key(force: bool = False):
         _error(e)
 
 
+@router.post("/ssh/key/import")
+async def ssh_key_import(body: KeyImport):
+    try:
+        return {"public_key": await asyncio.to_thread(diag.import_key, body.private_key)}
+    except (diag.DiagnosticError, OSError) as e:
+        _error(e)
+
+
 @router.get("/ssh/install")
-def ssh_install(platform: str = "linux"):
+def ssh_install(platform: str = "linux", user: str = diag.DEFAULT_ACCOUNT):
     if platform not in ("linux", "unraid"):
         raise HTTPException(status_code=422, detail="platform: linux ou unraid")
     try:
-        return {"platform": platform, "snippet": diag.install_snippet(platform)}
+        return {"platform": platform, "snippet": diag.install_snippet(platform, user)}
     except diag.DiagnosticError as e:
         _error(e)
 
 
 @router.get("/ssh/uninstall")
-def ssh_uninstall(platform: str = "linux"):
+def ssh_uninstall(platform: str = "linux", user: str = diag.DEFAULT_ACCOUNT):
     if platform not in ("linux", "unraid"):
         raise HTTPException(status_code=422, detail="platform: linux ou unraid")
-    return {"platform": platform, "snippet": diag.uninstall_snippet(platform)}
+    try:
+        return {"platform": platform, "snippet": diag.uninstall_snippet(platform, user)}
+    except diag.DiagnosticError as e:
+        _error(e)
 
 
 @router.post("/ssh/test")

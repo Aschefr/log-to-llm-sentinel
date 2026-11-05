@@ -3791,6 +3791,30 @@ select option, select optgroup { background-color: var(--bg-primary); color: var
 .sc-topics:empty { display: none; }
 .sc-topic { padding: 0.15rem 0.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; color: var(--text-primary); cursor: pointer; overflow-wrap: anywhere; text-align: left; }
 .sc-topic:hover { border-color: var(--accent); }
+.sc-form:not(.sc-form--pick) .sc-topic { cursor: default; pointer-events: none; }
+.sc-topic-count { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+#rs-mqtt-seen { margin-top: 0.4rem; }
+#rs-mqtt-seen-hint:empty { display: none; }
+.sc-config-panel { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+.sc-config-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.sc-config-head h3 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+.sc-config-panel .sc-form { margin-top: 0.2rem; }
+/* Accès de l'IA dans une règle : ce qui n'est pas configuré reste visible, grisé, et mène à sa configuration */
+.rf-access-list { margin-top: 0.6rem; }
+.rf-access-list .rf-check { margin-top: 0; }
+.rf-access-box { flex: none; box-sizing: border-box; width: 1rem; height: 1rem; border: 1.5px solid var(--border); border-radius: 3px; }
+.rf-access-box.is-on { position: relative; background: var(--accent); border-color: var(--accent); opacity: 0.6; }
+.rf-access-box.is-on::after { content: ""; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.rf-access-off { color: var(--text-secondary); text-decoration: none; opacity: 0.7; }
+.rf-access-off strong { font-weight: 500; }
+.rf-access-off:hover { opacity: 1; }
+.rf-access-off:hover .form-hint { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.rf-access-off:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 0.3rem; }
+.rf-access-global { cursor: default; }
+.diag-key-import { display: flex; flex-direction: column; gap: 0.4rem; }
+.diag-key-import textarea { box-sizing: border-box; width: 100%; padding: 0.5rem 0.65rem; resize: vertical; color: var(--text-primary); font-size: 0.74rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; }
+.diag-account { max-width: 16rem; }
+.diag-account input { padding: 0.45rem 0.65rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; color: var(--text-primary); font-size: 0.85rem; }
 #rs-shipper-details pre { white-space: pre; overflow-x: auto; margin: 0; }
 #rs-shipper-details .rp-seg { align-self: flex-start; max-width: 100%; }
 @media (max-width: 640px) {

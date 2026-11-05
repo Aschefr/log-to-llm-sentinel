@@ -21,10 +21,12 @@ function selectPlatform(target, platform) {
         b.classList.toggle('active', b.dataset.platform === platform));
     const input = document.getElementById(DIAG_DEFAULTS[target].field);
     // Un deuxième proxy n'a pas la même adresse que le premier ; l'utilisateur SSH, lui, dépend seulement de la plateforme
-    if ((target === 'ssh' || !diagLinks('docker').length) && isDiagDefault(target, input.value.trim())) input.value = DIAG_DEFAULTS[target][platform];
-    if (target === 'ssh') renderSnippet();
-    else document.querySelectorAll('[data-howto^="docker-"]').forEach(el =>
-        el.classList.toggle('hidden', el.dataset.howto !== `docker-${platform}`));
+    if ((target === 'ssh' || !diagLinks(target).length) && isDiagDefault(target, input.value.trim())) input.value = DIAG_DEFAULTS[target][platform];
+    if (target === 'ssh') {
+        document.getElementById('diag-account-row').classList.toggle('hidden', platform !== 'linux');
+        renderSnippet();
+    } else document.querySelectorAll(`[data-howto^="${target}-"]`).forEach(el =>
+        el.classList.toggle('hidden', el.dataset.howto !== `${target}-${platform}`));
 }
 
 const DOCKER_COMPOSE_SNIPPET = `  docker-proxy:
@@ -232,6 +234,9 @@ async function loadDiagnostics() {
         // Plateforme déduite de la première connexion, puis valeurs par défaut
         if (diagLinks('docker').some(l => [DIAG_DEFAULTS.docker.unraid, 'http://sentinel-docker-proxy:2375'].includes(l.docker_url))) DIAG.platform.docker = 'unraid';
         if (diagLinks('ssh').some(l => l.ssh_user === DIAG_DEFAULTS.ssh.unraid)) DIAG.platform.ssh = 'unraid';
+        const account = diagLinks('ssh').find(l => l.ssh_user && l.ssh_user !== 'root');
+        if (account) setAccount(account.ssh_user);
+        document.getElementById('diag-account-row').classList.toggle('hidden', DIAG.platform.ssh !== 'linux');
         await resetLinkForm('docker');
         await resetLinkForm('ssh');
         await resetLinkForm('web');
@@ -260,14 +265,23 @@ async function renderSnippet() {
         pre.textContent = dT('diag.snippet_need_key', '← Génère d’abord la clé.');
         return;
     }
+    const query = `platform=${DIAG.platform.ssh}&user=${encodeURIComponent(DIAG_DEFAULTS.ssh.linux)}`;
     try {
-        const res = await apiFetch(`/api/diagnostics/ssh/install?platform=${DIAG.platform.ssh}`);
+        const res = await apiFetch(`/api/diagnostics/ssh/install?${query}`);
         pre.textContent = res.snippet;
-        const un = await apiFetch(`/api/diagnostics/ssh/uninstall?platform=${DIAG.platform.ssh}`);
+        const un = await apiFetch(`/api/diagnostics/ssh/uninstall?${query}`);
         document.getElementById('diag-ssh-uninstall').textContent = un.snippet;
     } catch (e) {
         pre.textContent = e.message;
     }
+}
+
+/** The Linux account name: it becomes the platform default of the user field and goes into both blocks. */
+function setAccount(name) {
+    const user = document.getElementById('diag-ssh-user');
+    if (DIAG.platform.ssh === 'linux' && !DIAG.editing.ssh && user.value.trim() === DIAG_DEFAULTS.ssh.linux) user.value = name;
+    DIAG_DEFAULTS.ssh.linux = name;
+    document.getElementById('diag-ssh-account').value = name;
 }
 
 // Teste les valeurs saisies et n'enregistre que si le test réussit (« Enregistrer quand même » est proposé sinon)
@@ -410,6 +424,45 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('diag-key-generate').addEventListener('click', () => genKey(false));
     document.getElementById('diag-key-regenerate').addEventListener('click', (e) => {
         showInlineConfirm(e.currentTarget, dT('diag.regenerate_confirm', 'L’ancienne clé ne fonctionnera plus : il faudra recoller le bloc sur le serveur. Continuer ?'), () => genKey(true));
+    });
+
+    const importBox = document.getElementById('diag-key-import');
+    const pasteBtn = document.getElementById('diag-key-paste');
+    const showImport = (open) => {
+        importBox.classList.toggle('hidden', !open);
+        pasteBtn.setAttribute('aria-expanded', String(open));
+        document.getElementById('diag-key-result').textContent = '';
+        if (open) document.getElementById('diag-key-private').focus();
+        else document.getElementById('diag-key-private').value = '';
+    };
+    pasteBtn.addEventListener('click', () => showImport(importBox.classList.contains('hidden')));
+    document.getElementById('diag-key-paste-cancel').addEventListener('click', () => showImport(false));
+    const importKey = async () => {
+        const result = document.getElementById('diag-key-result');
+        try {
+            const res = await apiFetch('/api/diagnostics/ssh/key/import', { method: 'POST', body: { private_key: document.getElementById('diag-key-private').value } });
+            showImport(false);
+            renderKey(res.public_key);
+            loadDiagnostics();
+            diagResult('diag-ssh-result', true, `✓ ${dT('diag.key_imported', 'Clé enregistrée. Recolle le bloc sur le serveur si elle n’y est pas déjà autorisée.')}`);
+        } catch (e) {
+            result.textContent = `✗ ${e.message}`;
+            result.className = 'form-hint rf-ko';
+        }
+    };
+    document.getElementById('diag-key-use').addEventListener('click', (e) => {
+        if (!document.getElementById('diag-pubkey').textContent) return importKey();
+        showInlineConfirm(e.currentTarget, dT('diag.regenerate_confirm', 'L’ancienne clé ne fonctionnera plus : il faudra recoller le bloc sur le serveur. Continuer ?'), importKey);
+    });
+    let accountTimer = null;
+    document.getElementById('diag-ssh-account').addEventListener('input', (e) => {
+        clearTimeout(accountTimer);
+        accountTimer = setTimeout(() => {
+            const name = e.target.value.trim();
+            if (!name) return;
+            setAccount(name);
+            renderSnippet();
+        }, 300);
     });
 
     document.getElementById('diag-ssh-test').addEventListener('click', testAndSaveSsh);

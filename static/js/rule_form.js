@@ -543,20 +543,42 @@ function _ruleFormData() {
     return data;
 }
 
-/** Connections the AI may use for this rule (null: all of them). The section stays hidden without any connection. */
+/** Connections the AI may use for this rule (null: all of them). A kind with no connection shows greyed, linking to its setup. */
 async function renderRuleAccess(selected) {
     const section = document.getElementById('rf-access');
     if (!section) return;
     const token = (renderRuleAccess.token = (renderRuleAccess.token || 0) + 1);
-    let links = [];
+    let status;
     try {
-        links = (await apiFetch('/api/diagnostics')).links;
-    } catch (_) { /* sans la liste, le choix enregistré reste tel quel */ }
+        status = await apiFetch('/api/diagnostics');
+    } catch (_) {
+        return; // sans la liste, le choix enregistré reste tel quel
+    }
     if (token !== renderRuleAccess.token) return;
-    section.classList.toggle('hidden', !links.length);
-    document.getElementById('rf-access-list').innerHTML = links.map(l => `<label class="rf-check">
-        <input type="checkbox" value="${l.id}" ${selected === null || selected.includes(l.id) ? 'checked' : ''}>
-        <span><strong>${escapeHtml(l.name)}</strong> <span class="form-hint">${{ docker: 'Docker', ssh: 'SSH', web: 'Web' }[l.kind]}</span></span></label>`).join('');
+    const t = (k, fb) => { const v = window.t ? window.t(k) : null; return v && v !== k ? v : fb; };
+    const kinds = [
+        ['docker', t('diag.docker_title', 'Conteneurs Docker')],
+        ['ssh', t('diag.host_title', 'Serveur (SSH limité)')],
+        ['web', t('diag.web_title', 'Recherche web (SearXNG)')],
+    ];
+    const off = (title, note) => `<a class="rf-check rf-access-off" href="/config#diagnostic" target="_blank" rel="noopener">
+        <span class="rf-access-box" aria-hidden="true"></span>
+        <span><strong>${escapeHtml(title)}</strong> <span class="form-hint">${escapeHtml(note)}</span></span></a>`;
+    const setup = t('rf.access_off', 'Non configuré : le configurer');
+    const rows = kinds.map(([kind, title]) => {
+        const links = (status.links || []).filter(l => l.kind === kind);
+        if (!links.length) return off(title, setup);
+        return links.map(l => `<label class="rf-check">
+            <input type="checkbox" value="${l.id}" ${selected === null || selected.includes(l.id) ? 'checked' : ''}>
+            <span><strong>${escapeHtml(l.name)}</strong> <span class="form-hint">${escapeHtml(title)}</span></span></label>`).join('');
+    });
+    const cve = t('diag.cve_title', 'Fiches CVE (NVD)');
+    rows.push(status.cve_lookup
+        ? `<div class="rf-check rf-access-global"><span class="rf-access-box is-on" aria-hidden="true"></span>
+            <span><strong>${escapeHtml(cve)}</strong> <span class="form-hint">${escapeHtml(t('rf.access_cve_on', 'Activées pour toutes les règles'))}</span></span></div>`
+        : off(cve, setup));
+    section.classList.remove('hidden');
+    document.getElementById('rf-access-list').innerHTML = rows.join('');
 }
 
 /** Hint of the keyword tuning mode; the history option is offered for a new rule only. */

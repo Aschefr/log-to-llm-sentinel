@@ -238,6 +238,35 @@ def generate_key(force: bool = False) -> str:
     return public_key()
 
 
+def import_key(private_key: str) -> str:
+    """Uses a private key pasted by the user (one from an earlier install, say) instead of a generated one."""
+    if not shutil.which("ssh-keygen"):
+        raise DiagnosticError("ssh-keygen introuvable dans le conteneur")
+    text = (private_key or "").replace("\r\n", "\n").strip() + "\n"
+    if "PRIVATE KEY-----" not in text or len(text) > 20000:
+        raise DiagnosticError("colle la clé privée entière, de -----BEGIN à -----END")
+    ssh_dir().mkdir(parents=True, exist_ok=True)
+    os.chmod(ssh_dir(), 0o700)
+    tmp = ssh_dir() / "import_tmp"
+    try:
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
+            f.write(text)
+        res = subprocess.run(["ssh-keygen", "-y", "-P", "", "-f", str(tmp)], capture_output=True, text=True, timeout=30)
+        pub = res.stdout.strip()
+        if res.returncode != 0 or not pub.startswith(("ssh-", "ecdsa-")):
+            raise DiagnosticError("clé illisible, ou protégée par une phrase de passe : Sentinel a besoin d'une clé sans phrase de passe")
+        if len(pub.split()) < 3:
+            pub += " sentinel-diag"
+        os.replace(tmp, key_path())
+        key_path().with_suffix(".pub").write_text(pub + "\n", encoding="utf-8")
+    finally:
+        if tmp.exists():
+            tmp.unlink()
+    os.chmod(key_path(), 0o600)
+    return public_key()
+
+
 def run_host_check(cfg: dict, check: str, arg: Optional[str] = None, _raw: Optional[str] = None) -> str:
     if not (cfg.get("ssh_host") and cfg.get("ssh_user") and key_path().exists()):
         raise DiagnosticError("diagnostic serveur non configuré")
@@ -376,7 +405,34 @@ def installed_script_version(cfg: dict) -> Optional[str]:
     return m.group(1) if m else None
 
 
-def install_snippet(platform: str) -> str:
+DEFAULT_ACCOUNT = "sentinel-diag"
+ACCOUNT_COMMENT = "Log-to-LLM Sentinel"
+_ACCOUNT_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
+
+
+def check_account(name: str) -> str:
+    """Name of the Linux account the install block creates: a new account, never root."""
+    name = (name or "").strip()
+    if not _ACCOUNT_RE.match(name) or name == "root":
+        raise DiagnosticError("nom de compte invalide : minuscules, chiffres, - ou _, 32 caractères au plus, pas root")
+    return name
+
+
+def _guarded(account: str, body: str, refusal: str) -> str:
+    """Runs body only on an account Sentinel created; the default name keeps working for older installs."""
+    if account == DEFAULT_ACCOUNT:
+        return body
+    return (
+        f"\n# 0. Vérification : le compte {account} doit avoir été créé par Sentinel\n"
+        f"if id -u {account} >/dev/null 2>&1 && [ \"$(getent passwd {account} | cut -d: -f5)\" != '{ACCOUNT_COMMENT}' ]; then\n"
+        f"  echo \"{refusal}\"\n"
+        "else\n"
+        f"{body}"
+        "fi\n"
+    )
+
+
+def install_snippet(platform: str, account: str = DEFAULT_ACCOUNT) -> str:
     """Bloc à coller dans un terminal root du serveur (Linux classique ou Unraid).
 
     Les lignes qui modifient le serveur viennent en tête, sous des titres numérotés ;
@@ -414,33 +470,37 @@ def install_snippet(platform: str) -> str:
             f"{_script()}SENTINEL_SCRIPT\n"
             "\necho 'Sentinel : diagnostic installé. Utilisateur à renseigner : root'\n"
         )
+    u = check_account(account)
     line = f'restrict,command="/usr/local/bin/sentinel-diag" {pub}'
-    return (
-        rule
-        + "# Log-to-LLM Sentinel — diagnostic serveur pour Linux (Debian, Ubuntu…)\n"
-        "# À coller dans un terminal du serveur. Ce bloc :\n"
-        "#  1. crée l'utilisateur système sentinel-diag (sans mot de passe ni sudo),\n"
-        "#  2. autorise la clé de Sentinel à lancer UNIQUEMENT le script de contrôles,\n"
-        "#  3. installe ce script, en lecture seule : /usr/local/bin/sentinel-diag.\n"
-        "# Seules les étapes 1 à 3 modifient le serveur ; la suite est le contenu du script.\n"
-        + rule
-        + "\n# 1. Utilisateur dédié, autorisé à lire les journaux système\n"
-        "sudo useradd --system --create-home --shell /bin/bash sentinel-diag 2>/dev/null || true\n"
-        "sudo usermod -aG systemd-journal,adm sentinel-diag 2>/dev/null || true\n"
+    body = (
+        "\n# 1. Utilisateur dédié, autorisé à lire les journaux système\n"
+        f"sudo useradd --system --create-home --shell /bin/bash --comment '{ACCOUNT_COMMENT}' {u} 2>/dev/null || true\n"
+        f"sudo usermod -aG systemd-journal,adm {u} 2>/dev/null || true\n"
         "\n# 2. Clé de Sentinel, limitée au script (option restrict,command=)\n"
-        "sudo install -d -m 700 -o sentinel-diag -g sentinel-diag /home/sentinel-diag/.ssh\n"
-        f"echo '{line}' | sudo tee /home/sentinel-diag/.ssh/authorized_keys >/dev/null\n"
-        "sudo chown sentinel-diag: /home/sentinel-diag/.ssh/authorized_keys\n"
-        "sudo chmod 600 /home/sentinel-diag/.ssh/authorized_keys\n"
+        f"sudo install -d -m 700 -o {u} -g {u} /home/{u}/.ssh\n"
+        f"echo '{line}' | sudo tee /home/{u}/.ssh/authorized_keys >/dev/null\n"
+        f"sudo chown {u}: /home/{u}/.ssh/authorized_keys\n"
+        f"sudo chmod 600 /home/{u}/.ssh/authorized_keys\n"
         "\n# 3. Script de contrôles : tout ce qui suit, jusqu'à SENTINEL_SCRIPT\n"
         "sudo tee /usr/local/bin/sentinel-diag >/dev/null <<'SENTINEL_SCRIPT'\n"
         f"{_script()}SENTINEL_SCRIPT\n"
         "sudo chmod 755 /usr/local/bin/sentinel-diag\n"
-        "\necho 'Sentinel : diagnostic installé. Utilisateur à renseigner : sentinel-diag'\n"
+        f"\necho 'Sentinel : diagnostic installé. Utilisateur à renseigner : {u}'\n"
+    )
+    return (
+        rule
+        + "# Log-to-LLM Sentinel — diagnostic serveur pour Linux (Debian, Ubuntu…)\n"
+        "# À coller dans un terminal du serveur. Ce bloc :\n"
+        f"#  1. crée l'utilisateur système {u} (sans mot de passe ni sudo),\n"
+        "#  2. autorise la clé de Sentinel à lancer UNIQUEMENT le script de contrôles,\n"
+        "#  3. installe ce script, en lecture seule : /usr/local/bin/sentinel-diag.\n"
+        "# Seules les étapes 1 à 3 modifient le serveur ; la suite est le contenu du script.\n"
+        + rule
+        + _guarded(u, body, f"Sentinel : le compte {u} existe déjà et n'a pas été créé par Sentinel. Rien n'a été modifié : choisis un autre nom dans Sentinel.")
     )
 
 
-def uninstall_snippet(platform: str) -> str:
+def uninstall_snippet(platform: str, account: str = DEFAULT_ACCOUNT) -> str:
     """Bloc qui défait exactement ce qu'a installé install_snippet (ne dépend pas de la clé)."""
     rule = "# " + "═" * 78 + "\n"
     if platform == "unraid":
@@ -459,18 +519,22 @@ def uninstall_snippet(platform: str) -> str:
             "rmdir /boot/config/sentinel 2>/dev/null\n"
             "echo 'Sentinel : accès retiré.'\n"
         )
+    u = check_account(account)
+    body = (
+        "# 1. Clé de Sentinel (retirée en premier : plus aucune connexion possible)\n"
+        f"sudo rm -f /home/{u}/.ssh/authorized_keys\n"
+        "# 2. Script de contrôles\n"
+        "sudo rm -f /usr/local/bin/sentinel-diag\n"
+        "# 3. Utilisateur dédié et son dossier personnel\n"
+        f"sudo userdel -r {u} 2>/dev/null || true\n"
+        "echo 'Sentinel : accès retiré.'\n"
+    )
     return (
         rule
         + "# Log-to-LLM Sentinel — retrait du diagnostic serveur pour Linux\n"
         "# À coller dans un terminal du serveur. Retire la clé de Sentinel, son script et son utilisateur.\n"
         + rule
-        + "# 1. Clé de Sentinel (retirée en premier : plus aucune connexion possible)\n"
-        "sudo rm -f /home/sentinel-diag/.ssh/authorized_keys\n"
-        "# 2. Script de contrôles\n"
-        "sudo rm -f /usr/local/bin/sentinel-diag\n"
-        "# 3. Utilisateur dédié et son dossier personnel\n"
-        "sudo userdel -r sentinel-diag 2>/dev/null || true\n"
-        "echo 'Sentinel : accès retiré.'\n"
+        + _guarded(u, body, f"Sentinel : le compte {u} n'a pas été créé par Sentinel. Rien n'a été retiré.")
     )
 
 

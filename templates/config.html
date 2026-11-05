@@ -288,6 +288,16 @@
                             <div class="diag-actions">
                                 <button type="button" class="btn btn-secondary btn-sm" id="diag-key-generate" data-i18n="diag.generate_key">Générer la clé</button>
                                 <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-key-regenerate" data-i18n="diag.regenerate_key">Régénérer</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="diag-key-paste" aria-expanded="false" aria-controls="diag-key-import" data-i18n="diag.key_paste">Coller une clé existante</button>
+                            </div>
+                            <div class="diag-key-import hidden" id="diag-key-import">
+                                <label for="diag-key-private" class="form-hint" data-i18n="diag.key_paste_hint">Clé privée OpenSSH sans phrase de passe, par exemple celle d'une installation précédente de Sentinel. Elle reste dans Sentinel et n'est jamais réaffichée.</label>
+                                <textarea id="diag-key-private" class="mono" rows="5" spellcheck="false" autocomplete="off" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+                                <div class="diag-actions">
+                                    <button type="button" class="btn btn-primary btn-sm" id="diag-key-use" data-i18n="diag.key_use">Utiliser cette clé</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" id="diag-key-paste-cancel" data-i18n="common.cancel">Annuler</button>
+                                    <span class="form-hint" id="diag-key-result" role="status"></span>
+                                </div>
                             </div>
                             <code class="diag-pubkey hidden" id="diag-pubkey"></code>
                         </li>
@@ -298,6 +308,9 @@
                                 <button type="button" class="active" data-platform="linux">Linux</button>
                                 <button type="button" data-platform="unraid">Unraid</button>
                             </div>
+                            <label class="rf-stack diag-account" id="diag-account-row"><span data-i18n="diag.account">Compte créé sur le serveur</span>
+                                <input type="text" id="diag-ssh-account" class="mono" value="sentinel-diag" maxlength="32" spellcheck="false" autocomplete="off" aria-describedby="diag-account-hint"></label>
+                            <p class="form-hint" id="diag-account-hint" data-i18n="diag.account_hint">Change-le avant de copier le bloc. Si ce compte existe déjà sans avoir été créé par Sentinel, le bloc s'arrête sans rien modifier.</p>
                             <pre class="diag-code" id="diag-ssh-snippet"></pre>
                             <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-ssh-snippet" data-i18n="common.copy">Copier</button>
                         </li>
@@ -505,6 +518,6 @@
 
 {% block scripts %}
 <script src="/static/js/config.js?v=16"></script>
-<script src="/static/js/diagnostics_config.js?v=11"></script>
-<script src="/static/js/source_connections.js?v=2"></script>
+<script src="/static/js/diagnostics_config.js?v=12"></script>
+<script src="/static/js/source_connections.js?v=4"></script>
 {% endblock %}

@@ -130,7 +130,16 @@ async function scTest(kind, form) {
     scResult(kind, form, true, res.topic_count
         ? scT('mqtt_test_topics', 'Connecté. {n} sujet(s) actif(s) vus en 3 secondes :', { n: res.topic_count })
         : scT('mqtt_test_ok', 'Connecté. Aucun message vu en 3 secondes.'));
-    topics.innerHTML = (res.topics || []).map(t => `<button type="button" class="sc-topic mono" data-topic="${scEsc(t)}">${scEsc(t)}</button>`).join('');
+    topics.innerHTML = scTopicChips(res);
+}
+
+/** Shared prefixes first (`zigbee2mqtt/#`, with how many topics they cover), then a few topics of each. */
+function scTopicItems(res) {
+    return [...(res.prefixes || []), ...(res.topics || []).map(topic => ({ topic }))];
+}
+
+function scTopicChips(res) {
+    return scTopicItems(res).map(t => `<button type="button" class="sc-topic mono" data-topic="${scEsc(t.topic)}">${scEsc(t.topic)}${t.count ? ` <span class="sc-topic-count">${t.count}</span>` : ''}</button>`).join('');
 }
 
 async function scSave(kind, form, onSaved) {
@@ -149,6 +158,7 @@ async function scSave(kind, form, onSaved) {
 function scMountForm(container, kind, conn, onSaved, onTopic) {
     container.innerHTML = scFormHtml(kind, conn);
     const form = container.querySelector('.sc-form');
+    form.classList.toggle('sc-form--pick', !!onTopic);
     form.querySelector('[data-sc-test]').addEventListener('click', () => scTest(kind, form));
     form.querySelector('[data-sc-save]').addEventListener('click', () => scSave(kind, form, onSaved));
     form.querySelector(`#sc-${kind}-topics`).addEventListener('click', e => {
@@ -178,6 +188,42 @@ function rsShowConnection(kind, selected) {
         const input = document.getElementById('rs-mqtt-topic');
         if (input) input.value = topic;
     });
+    if (kind === 'mqtt') rsLoadTopics();
+}
+
+/** Topics of the chosen MQTT connection, heard for 3 seconds, offered under "Topic to follow". */
+async function rsLoadTopics() {
+    const conn = SC.connections.find(c => String(c.id) === document.getElementById('rs-mqtt-conn')?.value);
+    const list = document.getElementById('rs-mqtt-list');
+    const chips = document.getElementById('rs-mqtt-seen');
+    const hint = document.getElementById('rs-mqtt-seen-hint');
+    if (!list) return;
+    const token = (rsLoadTopics.token = (rsLoadTopics.token || 0) + 1);
+    list.innerHTML = '';
+    chips.innerHTML = '';
+    hint.className = 'form-hint';
+    hint.textContent = conn ? scT('mqtt_listening', 'Écoute du serveur MQTT pendant 3 secondes…') : '';
+    if (!conn) return;
+    let res;
+    try {
+        res = await apiFetch('/api/sources/connections/test', { method: 'POST',
+            body: { id: conn.id, kind: 'mqtt', name: conn.name, address: conn.address, port: conn.port, username: conn.username || '', secret: '', use_tls: !!conn.use_tls } });
+    } catch (e) {
+        res = { ok: false, code: 'internal', detail: e.message };
+    }
+    if (token !== rsLoadTopics.token) return;
+    if (!res.ok) {
+        hint.textContent = scErrorText(res.code, res.detail);
+        hint.className = 'form-hint rf-ko';
+        return;
+    }
+    if (!(res.topics || []).length) {
+        hint.textContent = scT('mqtt_seen_none', 'Aucun message vu en 3 secondes : tape le sujet à suivre.');
+        return;
+    }
+    list.innerHTML = scTopicItems(res).map(t => `<option value="${scEsc(t.topic)}"></option>`).join('');
+    chips.innerHTML = scTopicChips(res);
+    hint.textContent = scT('mqtt_seen', '{n} sujet(s) vus en 3 secondes. Clique pour choisir :', { n: res.topic_count || topics.length });
 }
 
 async function rsShowDocker(selected, container) {
@@ -327,6 +373,11 @@ function rsCopyShipper(button) {
 
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('rs-docker-conn')?.addEventListener('change', rsLoadContainers);
+    document.getElementById('rs-mqtt-conn')?.addEventListener('change', rsLoadTopics);
+    document.getElementById('rs-mqtt-seen')?.addEventListener('click', e => {
+        const topic = e.target.closest('[data-topic]');
+        if (topic) document.getElementById('rs-mqtt-topic').value = topic.dataset.topic;
+    });
     document.getElementById('rs-shippers')?.addEventListener('click', e => {
         const b = e.target.closest('[data-shipper]');
         if (b) rsSelectShipper(b.dataset.shipper);
@@ -360,14 +411,46 @@ async function scConfigRender() {
     document.getElementById('cfg-source-form').innerHTML = '';
 }
 
-function scConfigAdd(kind) {
+const SC_GUIDES = {
+    homeassistant: [
+        'Dans Home Assistant, ouvre ton <b>profil</b> (ton nom, en bas à gauche), onglet <b>Sécurité</b>, puis <b>Jetons d\'accès longue durée</b> &gt; <b>Créer un jeton</b>. Le compte doit être administrateur.',
+        'Colle le jeton ci-dessous avec l\'adresse de Home Assistant, puis clique sur <b>Tester</b>.',
+        'C\'est tout : aucune automatisation à installer. Sentinel reçoit les <b>avertissements et les erreurs</b>, traces d\'exception comprises ; Home Assistant ne publie pas les autres niveaux par ce canal.',
+    ],
+    mqtt: [
+        'Indique l\'adresse de ton serveur MQTT (Mosquitto, le module de Home Assistant…) et ses identifiants s\'il en demande, puis clique sur <b>Tester</b> : Sentinel écoute 3 secondes et affiche les sujets actifs.',
+        'Choisis ce qu\'il faut suivre. <code>+</code> remplace un niveau, <code>#</code> remplace tout ce qui suit : <code>zigbee2mqtt/#</code>, <code>tele/+/LWT</code>.',
+        'Chaque ligne reçue commence par son sujet. Les messages retenus sont ignorés : ce sont d\'anciens états, pas des événements. Évite <code>#</code> seul, souvent très bavard.',
+    ],
+};
+
+/** Opens the connection form in Configuration, under a title and with the same guide as in a rule. */
+function scConfigOpen(kind, conn) {
     const target = document.getElementById('cfg-source-form');
-    scMountForm(target, kind, null, scConfigRender);
+    const prefix = kind === 'homeassistant' ? 'hass' : 'mqtt';
+    const steps = SC_GUIDES[kind].map((fb, i) => `<li>${scT(`${prefix}_step${i + 1}`, fb)}</li>`).join('');
+    const title = conn ? scT('cfg_edit', 'Modifier « {name} »', { name: conn.name })
+        : kind === 'homeassistant' ? scT('cfg_new_hass', 'Nouvelle connexion Home Assistant') : scT('cfg_new_mqtt', 'Nouveau serveur MQTT');
+    target.innerHTML = `<div class="sc-config-panel">
+        <div class="sc-config-head"><h3>${scEsc(title)}</h3>
+            <button type="button" class="btn btn-secondary btn-sm" data-sc-close>${scEsc(window.t ? window.t('common.cancel') : 'Annuler')}</button></div>
+        <details class="diag-howto" ${conn ? '' : 'open'}><summary>${scEsc(scT('guide_title', 'Guide de connexion'))}</summary>
+            <div class="diag-howto-body"><ol class="rs-steps">${steps}</ol></div></details>
+        <div class="sc-config-body"></div>
+    </div>`;
+    target.querySelector('[data-sc-close]').addEventListener('click', () => { target.innerHTML = ''; });
+    scMountForm(target.querySelector('.sc-config-body'), kind, conn, scConfigRender);
+    target.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    target.querySelector('.sc-form input')?.focus({ preventScroll: true });
+}
+
+function scConfigAdd(kind) {
+    scConfigOpen(kind, null);
 }
 
 function scConfigEdit(id) {
     const conn = SC.connections.find(c => c.id === id);
-    scMountForm(document.getElementById('cfg-source-form'), conn.kind, conn, scConfigRender);
+    scConfigOpen(conn.kind, conn);
 }
 
 function scConfigDelete(id, button) {

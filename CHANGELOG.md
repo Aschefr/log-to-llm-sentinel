@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Your own SSH key and account name**: the limited SSH access accepts a private key pasted from an earlier install, and on Linux the account the install block creates can have another name than `sentinel-diag`. The block stops without changing anything if that account already exists and was not created by Sentinel.
+- **MQTT topics to pick from**: once an MQTT connection is chosen in a rule, Sentinel listens for 3 seconds and offers the topics it saw under *Topic to follow*, shared prefixes first (`zigbee2mqtt/#`).
 - **CVE sheets** (optional): an analysis citing a CVE shows its official NVD sheet: actively exploited or not (CISA's KEV catalog), affected versions, score. Only the CVE number leaves your network, and a sheet never changes a severity.
 - **Web search in the chat and investigations** (optional): the AI can search the web through your own SearXNG. Queries holding an address, a path or a machine name are refused, and results are treated as data from strangers. Searches are limited, pause for 15 minutes if every engine fails, and the chat and Configuration say so. The compose file includes a private SearXNG under the `web` profile. Automatic alert analysis never uses it.
 - **Blocked attempts at a glance**: the overview of a CEF source (UniFi and others) groups blocked attempts by target port, without AI, and analysis cards show the fields of the line.
@@ -17,10 +19,13 @@ All notable changes to this project will be documented in this file.
 - **Connection guides**: each source shows a short step-by-step guide in the rule form, and says clearly when it cannot be read, in the rule list, on the rule page and on the dashboard.
 
 ### Changed
+- **AI access in a rule**: the rule settings list every diagnostic access, Docker, server, web search and CVE sheets. One that is not set up shows greyed and opens its setup.
+- **Home Assistant and MQTT connections in Configuration**: the form opens under a title, with the same connection guide as in a rule and a Cancel button.
 - **Chat: check what the AI read**: each entry of *What the AI looked at* now opens on the raw output of the tool, so an answer can be checked against what it was based on. This also works for past conversations.
 - **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
 
 ### Fixed
+- **SearXNG install guide**: the Unraid tab showed the Docker compose text.
 - **Chat on a phone**: the message box could sit hidden behind the browser's bar, seen on Firefox for Android. The page was sized as if that bar were not there.
 - **Keyword notifications cut mid-sentence**: the reason of a change was cut at 200 characters. It now ends on a whole sentence, the full text staying in the Keywords tab.
 - **Investigations that ended with no answer**: after using many tools, the AI could stop without writing anything, in 17 of 37 test runs that used all their tool calls. It is now asked once more to write its answer, which worked 18 times out of 18.

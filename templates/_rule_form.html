@@ -171,7 +171,10 @@
                     <div id="rs-mqtt-form"></div>
                 </details>
                 <label for="rs-mqtt-topic" data-i18n="sources.mqtt_topic">Sujet à suivre</label>
-                <input type="text" id="rs-mqtt-topic" class="mono" autocomplete="off" spellcheck="false" placeholder="zigbee2mqtt/#">
+                <input type="text" id="rs-mqtt-topic" class="mono" list="rs-mqtt-list" autocomplete="off" spellcheck="false" placeholder="zigbee2mqtt/#">
+                <datalist id="rs-mqtt-list"></datalist>
+                <p class="form-hint" id="rs-mqtt-seen-hint" role="status"></p>
+                <div class="sc-topics" id="rs-mqtt-seen"></div>
                 <p class="form-hint rf-ko" id="rs-mqtt-error" role="alert"></p>
                 <p class="form-hint rs-status"></p>
             </div>
