@@ -252,9 +252,9 @@ If you want to run Log to LLM Sentinel locally for development without Docker:
 ### 3. Run the Server
 Launch the FastAPI development server:
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 10911
 ```
-The application will be accessible at: 👉 **http://localhost:8000**
+The application will be accessible at: 👉 **http://localhost:10911**
 
 ---
 
