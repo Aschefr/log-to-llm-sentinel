@@ -439,6 +439,7 @@
     "truncated_banner": "{n} messages anciens ne sont plus lus par l'IA",
     "delete_btn_title": "Supprimer la conversation",
     "tools_used": "Ce que l'IA a consulté",
+    "tool_no_output": "(aucune sortie)",
     "tool_line": "ligne",
     "tool_lines": "lignes",
     "action_proposed": "Action proposée",

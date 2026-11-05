@@ -143,13 +143,14 @@ async def get_history(conv_id: int, db: Session = Depends(get_db)):
                 "rule_name": rule.name if rule else None,
             }
 
-    # Trace des outils (libellés seulement) et actions proposées, pour l'affichage
+    # Trace des outils (sorties comprises, pour vérifier la réponse) et actions proposées, pour l'affichage
     lang = _chat_lang(db.query(GlobalConfig).first())
     def _meta(m):
         if not m.metadata_json:
             return None
         meta = json.loads(m.metadata_json)
-        return {"tools": [{"label": t.get("label") or t["name"], "error": str(t.get("result", "")).startswith("Erreur")}
+        return {"tools": [{"label": t.get("label") or t["name"], "error": str(t.get("result", "")).startswith("Erreur"),
+                           "output": str(t.get("result", "")), "lines": len(str(t.get("result", "")).splitlines())}
                           for t in meta.get("tools") or []],
                 "actions": meta.get("actions") or [],
                 "kind": meta.get("kind")}
