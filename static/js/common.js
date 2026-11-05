@@ -60,7 +60,7 @@ function formatDate(dateString) {
     }
     
     const date = new Date(utcString);
-    return date.toLocaleString('fr-FR', {
+    return date.toLocaleString(window.i18n?.getCurrentLang?.() === 'fr' ? 'fr-FR' : undefined, {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',

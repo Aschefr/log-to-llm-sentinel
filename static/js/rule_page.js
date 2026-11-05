@@ -103,7 +103,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     if (!RP.id) {
-        document.getElementById('rp-name').textContent = T('rule.new_title', 'Nouvelle règle');
+        const newTitle = () => { document.getElementById('rp-name').textContent = T('rule.new_title', 'Nouvelle règle'); };
+        newTitle();
+        window.i18n?.onLanguageChange(newTitle);
         resetForm();
         showPanel('settings');
         return;
@@ -135,6 +137,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (params.has('analysis') || params.has('line')) history.replaceState({}, '', location.pathname + location.hash);
 
+    // Registered before the first render: the language file can arrive while it is on its way
+    window.i18n?.onLanguageChange(() => { loadHeader(); if (RP.tab) selectTab(RP.tab); });
     const rule = await loadHeader();
     if (!rule) return;
     editRule(RP.id);
@@ -144,8 +148,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (RP.focusAnalysisId) tab = 'analyses';
     if (selectedLineText) tab = 'log';
     selectTab(TABS.includes(tab) ? tab : 'overview');
-
-    window.i18n?.onLanguageChange(() => { loadHeader(); selectTab(RP.tab); });
 });
 
 function showPanel(tab) {
