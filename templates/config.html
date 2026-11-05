@@ -291,7 +291,7 @@
                                 <button type="button" class="btn btn-secondary btn-sm" id="diag-key-paste" aria-expanded="false" aria-controls="diag-key-import" data-i18n="diag.key_paste">Coller une clé existante</button>
                             </div>
                             <div class="diag-key-import hidden" id="diag-key-import">
-                                <label for="diag-key-private" class="form-hint" data-i18n="diag.key_paste_hint">Clé privée OpenSSH sans phrase de passe, par exemple celle d'une installation précédente de Sentinel. Elle reste dans Sentinel et n'est jamais réaffichée.</label>
+                                <label for="diag-key-private" class="form-hint" data-i18n="diag.key_paste_hint">Clé privée OpenSSH sans phrase de passe, de -----BEGIN à -----END. Sur un autre Sentinel, c'est le fichier data/ssh/sentinel_diag_ed25519 ; la ligne ssh-ed25519… affichée ici est la clé publique, elle ne suffit pas. La clé reste dans Sentinel et n'est jamais réaffichée.</label>
                                 <textarea id="diag-key-private" class="mono" rows="5" spellcheck="false" autocomplete="off" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
                                 <div class="diag-actions">
                                     <button type="button" class="btn btn-primary btn-sm" id="diag-key-use" data-i18n="diag.key_use">Utiliser cette clé</button>
@@ -518,6 +518,6 @@
 
 {% block scripts %}
 <script src="/static/js/config.js?v=16"></script>
-<script src="/static/js/diagnostics_config.js?v=12"></script>
+<script src="/static/js/diagnostics_config.js?v=13"></script>
 <script src="/static/js/source_connections.js?v=4"></script>
 {% endblock %}

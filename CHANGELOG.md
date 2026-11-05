@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - **Connection guides**: each source shows a short step-by-step guide in the rule form, and says clearly when it cannot be read, in the rule list, on the rule page and on the dashboard.
 
 ### Changed
+- **Which rules use a diagnostic connection**: under each Docker, server or web search connection, *All rules* opens a list of the rules with a box each, to give or take its access from several rules at once.
 - **AI access in a rule**: the rule settings list every diagnostic access, Docker, server, web search and CVE sheets. One that is not set up shows greyed and opens its setup.
 - **Home Assistant and MQTT connections in Configuration**: the form opens under a title, with the same connection guide as in a rule and a Cancel button.
 - **Chat: check what the AI read**: each entry of *What the AI looked at* now opens on the raw output of the tool, so an answer can be checked against what it was based on. This also works for past conversations.

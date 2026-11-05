@@ -1,7 +1,7 @@
 """Connexions de diagnostic en lecture seule (proxies Docker, serveurs en SSH limité) et leurs tests."""
 import asyncio
 import json
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -82,12 +82,15 @@ def get_status():
     db = SessionLocal()
     try:
         links = [diag.link_dict(l) for l in db.query(DiagnosticLink).order_by(DiagnosticLink.kind, DiagnosticLink.id).all()]
-        rules = [(r.name, r.get_diagnostic_link_ids()) for r in db.query(Rule).order_by(Rule.name).all()]
+        rules = [(r.id, r.name, r.get_diagnostic_link_ids()) for r in db.query(Rule).order_by(Rule.name).all()]
         for link in links:
-            link["rules"] = [name for name, ids in rules if ids is None or link["id"] in ids]
+            link["rules"] = [name for _, name, ids in rules if ids is None or link["id"] in ids]
+            link["rule_ids"] = [rid for rid, _, ids in rules if ids is None or link["id"] in ids]
             if link["kind"] == "ssh":
                 link["host_fingerprint"] = diag.host_fingerprint(link["ssh_host"], link["ssh_port"])
-        return {"cve_lookup": cve_lookup.enabled(db), "web_search": web_search.status(), "links": links, "rule_count": len(rules), "public_key": diag.public_key(), "available": diag.availability(), "host_checks": list(diag.HOST_CHECKS)}
+        return {"cve_lookup": cve_lookup.enabled(db), "web_search": web_search.status(), "links": links, "rule_count": len(rules),
+                "all_rules": [{"id": rid, "name": name} for rid, name, _ in rules],
+                "public_key": diag.public_key(), "available": diag.availability(), "host_checks": list(diag.HOST_CHECKS)}
     finally:
         db.close()
 
@@ -115,6 +118,35 @@ def update_link(link_id: int, body: LinkBody):
             setattr(link, key, value)
         db.commit()
         return diag.link_dict(link)
+    finally:
+        db.close()
+
+
+class LinkRules(BaseModel):
+    rule_ids: List[int]
+
+
+@router.put("/links/{link_id}/rules")
+def set_link_rules(link_id: int, body: LinkRules):
+    """Gives this connection to exactly these rules, from the connection side. Each rule keeps its other connections.
+    A rule that ends up with every connection goes back to "all", as when saved from the rule form."""
+    db = SessionLocal()
+    try:
+        if not db.query(DiagnosticLink).filter(DiagnosticLink.id == link_id).first():
+            raise HTTPException(status_code=404, detail="link_not_found")
+        all_ids = [l.id for l in db.query(DiagnosticLink).order_by(DiagnosticLink.id).all()]
+        wanted = set(body.rule_ids)
+        for rule in db.query(Rule).all():
+            ids = rule.get_diagnostic_link_ids()
+            if (rule.id in wanted) == (ids is None or link_id in ids):
+                continue
+            if rule.id in wanted:
+                new = sorted(set(ids) | {link_id})
+                rule.diagnostic_link_ids_json = None if set(all_ids) <= set(new) else json.dumps(new)
+            else:
+                rule.diagnostic_link_ids_json = json.dumps([i for i in (all_ids if ids is None else ids) if i != link_id])
+        db.commit()
+        return {"status": "ok"}
     finally:
         db.close()
 

@@ -243,6 +243,11 @@ def import_key(private_key: str) -> str:
     if not shutil.which("ssh-keygen"):
         raise DiagnosticError("ssh-keygen introuvable dans le conteneur")
     text = (private_key or "").replace("\r\n", "\n").strip() + "\n"
+    if text.startswith(("ssh-", "ecdsa-", "sk-")) and "PRIVATE KEY" not in text:
+        raise DiagnosticError(
+            "c'est la clé publique, celle que le serveur autorise. Il faut la clé privée qui va avec : "
+            "le fichier data/ssh/sentinel_diag_ed25519 de l'autre Sentinel, par exemple "
+            "/mnt/user/appdata/log-to-llm-sentinel/data/ssh/sentinel_diag_ed25519 sur Unraid")
     if "PRIVATE KEY-----" not in text or len(text) > 20000:
         raise DiagnosticError("colle la clé privée entière, de -----BEGIN à -----END")
     ssh_dir().mkdir(parents=True, exist_ok=True)

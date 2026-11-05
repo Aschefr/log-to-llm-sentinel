@@ -2917,6 +2917,18 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .diag-link-main { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; overflow-wrap: anywhere; }
 .diag-link-main .form-hint { margin: 0; }
 .diag-link .diag-actions { margin: 0; }
+.diag-link-rules > summary { display: inline-flex; align-items: center; gap: 0.3rem; margin: 0; cursor: pointer; list-style: none; }
+.diag-link-rules > summary::-webkit-details-marker { display: none; }
+.diag-link-rules > summary::before { content: ""; width: 0.38rem; height: 0.38rem; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg); transition: transform 0.15s ease-out; }
+.diag-link-rules[open] > summary::before { transform: rotate(45deg); }
+.diag-link-rules > summary:hover .diag-link-rules-text { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; }
+.diag-link-rules > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 0.25rem; }
+.diag-link-rules-body { display: flex; flex-direction: column; gap: 0.45rem; margin-top: 0.5rem; }
+.diag-link-rules-body > .form-hint { margin: 0; }
+.diag-link-rules-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 0.35rem 1rem; }
+.diag-link-rules-list .rf-check { margin: 0; overflow-wrap: anywhere; }
+.diag-link-rules-saved:empty { display: none; }
+.diag-link:has(.diag-link-rules[open]) .diag-link-main { flex: 1 1 100%; }
 .diag-form-title { margin: 0.25rem 0 0; font-size: 0.88rem; font-weight: 600; }
 .rf-access-list { display: flex; flex-direction: column; gap: 0.35rem; }
 .diag-status { font-size: 0.72rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--bg-secondary); color: var(--text-secondary); border: 1px solid var(--border); }

@@ -1,6 +1,30 @@
 // ─── Configuration du diagnostic en lecture seule (proxy Docker, SSH limité) ───
 
-const DIAG = { platform: { docker: 'compose', ssh: 'linux', web: 'compose' }, status: null, editing: { docker: null, ssh: null, web: null } };
+const DIAG = { platform: { docker: 'compose', ssh: 'linux', web: 'compose' }, status: null, editing: { docker: null, ssh: null, web: null }, openRules: new Set() };
+
+/** Saves which rules may use a connection, a moment after the last tick, then redraws with the list still open. */
+function scheduleLinkRules(kind, li) {
+    const id = Number(li.dataset.link);
+    clearTimeout(scheduleLinkRules.timers?.[id]);
+    scheduleLinkRules.timers = scheduleLinkRules.timers || {};
+    const saved = li.querySelector('.diag-link-rules-saved');
+    saved.textContent = '';
+    scheduleLinkRules.timers[id] = setTimeout(async () => {
+        const ruleIds = [...li.querySelectorAll('input[data-rule]:checked')].map(c => Number(c.dataset.rule));
+        const focused = document.activeElement?.dataset?.rule;
+        try {
+            await apiFetch(`/api/diagnostics/links/${id}/rules`, { method: 'PUT', body: { rule_ids: ruleIds } });
+            await refreshDiag();
+            const row = document.querySelector(`#diag-${kind}-links .diag-link[data-link="${id}"]`);
+            if (focused) row?.querySelector(`input[data-rule="${focused}"]`)?.focus();
+            const note = row?.querySelector('.diag-link-rules-saved');
+            if (note) { note.textContent = `✓ ${dT('meta.saved', 'Enregistré')}`; note.className = 'form-hint diag-link-rules-saved rf-ok'; }
+        } catch (e) {
+            saved.textContent = `✗ ${e.message}`;
+            saved.className = 'form-hint diag-link-rules-saved rf-ko';
+        }
+    }, 500);
+}
 
 // Valeurs par défaut selon la plateforme : pré-remplies (et non en simple placeholder)
 // pour qu'un clic sur « Tester et enregistrer » suffise.
@@ -78,9 +102,23 @@ function renderLinks(kind) {
     const list = document.getElementById(`diag-${kind}-links`);
     const links = diagLinks(kind);
     list.classList.toggle('hidden', !links.length);
+    const rules = DIAG.status.all_rules || [];
     list.innerHTML = links.map(l => `<li class="diag-link" data-link="${l.id}">
         <div class="diag-link-main"><strong>${escapeHtml(l.name)}</strong> <code>${escapeHtml(diagLinkTarget(l))}</code>
-            <span class="form-hint">${escapeHtml(diagLinkRules(l))}</span>
+            ${rules.length ? `<details class="diag-link-rules" ${DIAG.openRules.has(l.id) ? 'open' : ''}>
+                <summary class="form-hint"><span class="diag-link-rules-text">${escapeHtml(diagLinkRules(l))}</span></summary>
+                <div class="diag-link-rules-body">
+                    <p class="form-hint">${escapeHtml(dT('diag.link_rules_hint', 'L’IA n’utilise cette connexion que pour les alertes des règles cochées.'))}</p>
+                    <div class="diag-link-rules-list">${rules.map(r => `<label class="rf-check">
+                        <input type="checkbox" data-rule="${r.id}" ${l.rule_ids.includes(r.id) ? 'checked' : ''}>
+                        <span>${escapeHtml(r.name)}</span></label>`).join('')}</div>
+                    <div class="diag-actions">
+                        <button type="button" class="btn btn-secondary btn-sm" data-rules-set="all">${escapeHtml(dT('diag.link_rules_check_all', 'Tout cocher'))}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-rules-set="none">${escapeHtml(dT('diag.link_rules_check_none', 'Tout décocher'))}</button>
+                        <span class="form-hint diag-link-rules-saved" role="status"></span>
+                    </div>
+                </div>
+            </details>` : `<span class="form-hint">${escapeHtml(diagLinkRules(l))}</span>`}
             <span class="form-hint diag-link-result"></span></div>
         <div class="diag-actions">
             <button type="button" class="btn btn-secondary btn-sm" data-link-action="test">${escapeHtml(dT('diag.link_test', 'Tester'))}</button>
@@ -397,7 +435,23 @@ document.addEventListener('DOMContentLoaded', () => {
             resetLinkForm(kind);
             diagResult(`diag-${kind}-result`, null, '');
         });
-        document.getElementById(`diag-${kind}-links`).addEventListener('click', (e) => {
+        const linkList = document.getElementById(`diag-${kind}-links`);
+        linkList.addEventListener('toggle', (e) => {
+            if (!e.target.matches('.diag-link-rules')) return;
+            const id = Number(e.target.closest('.diag-link').dataset.link);
+            if (e.target.open) DIAG.openRules.add(id); else DIAG.openRules.delete(id);
+        }, true);
+        linkList.addEventListener('change', (e) => {
+            if (e.target.matches('input[data-rule]')) scheduleLinkRules(kind, e.target.closest('.diag-link'));
+        });
+        linkList.addEventListener('click', (e) => {
+            const set = e.target.closest('button[data-rules-set]');
+            if (!set) return;
+            const li = set.closest('.diag-link');
+            li.querySelectorAll('input[data-rule]').forEach(c => { c.checked = set.dataset.rulesSet === 'all'; });
+            scheduleLinkRules(kind, li);
+        });
+        linkList.addEventListener('click', (e) => {
             const btn = e.target.closest('button[data-link-action]');
             if (!btn) return;
             const li = btn.closest('.diag-link');
