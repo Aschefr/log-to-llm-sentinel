@@ -147,6 +147,9 @@ def init_db():
         # Interrupteur général de la surveillance
         "ALTER TABLE global_config ADD COLUMN monitoring_paused BOOLEAN DEFAULT 0",
         "ALTER TABLE global_config ADD COLUMN monitoring_paused_at DATETIME",
+        # Mode discret : seules les alertes critiques sont notifiées
+        "ALTER TABLE global_config ADD COLUMN quiet_mode BOOLEAN DEFAULT 0",
+        "ALTER TABLE global_config ADD COLUMN quiet_mode_at DATETIME",
         # Regroupement des analyses par événement
         "ALTER TABLE analyses ADD COLUMN event_key VARCHAR",
         "CREATE INDEX IF NOT EXISTS ix_analyses_rule_event ON analyses (rule_id, event_key)",

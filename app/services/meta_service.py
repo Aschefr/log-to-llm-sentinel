@@ -340,7 +340,8 @@ class MetaAnalysisService:
         finally:
             db.close()
 
-    async def _send_notification(self, result: MetaAnalysisResult, config: MetaAnalysisConfig, global_cfg: GlobalConfig):
+    async def _send_notification(self, result: MetaAnalysisResult, config: MetaAnalysisConfig, global_cfg: GlobalConfig,
+                                 manual: bool = False):
         """
         Envoie une notification globale pour la méta-analyse.
         """
@@ -443,4 +444,4 @@ class MetaAnalysisService:
             "apprise_tags": global_cfg.apprise_tags,
             "apprise_max_chars": global_cfg.apprise_max_chars or 1900,
             "discord_webhook_url": global_cfg.discord_webhook_url or "",
-        })
+        }, kind="manual" if manual else "info")

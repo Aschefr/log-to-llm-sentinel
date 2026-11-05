@@ -10,6 +10,19 @@ from typing import Optional
 from app import logger
 
 
+def _quiet_mode() -> bool:
+    try:
+        from app.database import SessionLocal
+        from app.services import monitoring
+        db = SessionLocal()
+        try:
+            return monitoring.is_quiet(db)
+        finally:
+            db.close()
+    except Exception:
+        return False  # sans la base, mieux vaut notifier que se taire
+
+
 class NotificationService:
     """
     Service d'envoi de notifications (SMTP par défaut, Apprise en option).
@@ -22,10 +35,18 @@ class NotificationService:
         body: str,
         config: dict,
         to_email: Optional[str] = None,
+        kind: str = "info",
+        severity: Optional[str] = None,
     ) -> bool:
         """
         Envoie une notification selon la méthode configurée.
+        kind : "alert" (avec sa sévérité), "manual" (envoyée par l'utilisateur lui-même) ou "info" (tout le reste :
+        mots-clés, pilote automatique, résolutions, silences, méta-analyses planifiées).
+        En mode discret, seules les alertes critiques et les envois manuels partent.
         """
+        if kind != "manual" and not (kind == "alert" and (severity or "").lower() == "critical") and _quiet_mode():
+            logger.info("Notification", f"Mode discret : non envoyée — {subject[:120]}")
+            return False
         method = config.get("notification_method", "smtp")
         logger.debug("Notification", f"Méthode de notification : {method}")
 

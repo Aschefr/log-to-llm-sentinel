@@ -59,7 +59,7 @@ async def notify_analysis(analysis_id: int):
             
         config = _get_config_dict(config_obj)
         
-        await _orchestrator.trigger_notification(analysis, rule, config, db)
+        await _orchestrator.trigger_notification(analysis, rule, config, db, manual=True)
         
         return {"status": "ok", "message": "Notification envoyée"}
     finally:

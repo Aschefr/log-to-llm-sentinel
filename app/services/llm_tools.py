@@ -398,7 +398,7 @@ async def apply_action(action_id: int) -> dict:
                 from app.models import GlobalConfig
                 a = db.query(Analysis).filter(Analysis.id == params["analysis_id"]).first()
                 rule = _rule(db, a.rule_id)
-                await orchestrator.trigger_notification(a, rule, config_to_dict(db.query(GlobalConfig).first()), db)
+                await orchestrator.trigger_notification(a, rule, config_to_dict(db.query(GlobalConfig).first()), db, manual=True)
             elif act.action == "trigger_meta_analysis":
                 from app.main import meta_service
                 from app.routers.meta_analysis import _running_configs

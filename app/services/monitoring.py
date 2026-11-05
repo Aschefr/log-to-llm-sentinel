@@ -14,12 +14,36 @@ from typing import Optional
 from app.models import GlobalConfig
 from app.services.rule_stats import iso
 
-EXCLUDED_FROM_BACKUP = ("monitoring_paused", "monitoring_paused_at")
+EXCLUDED_FROM_BACKUP = ("monitoring_paused", "monitoring_paused_at", "quiet_mode", "quiet_mode_at")
 
 
 def is_paused(db) -> bool:
     row = db.query(GlobalConfig.monitoring_paused).first()
     return bool(row and row[0])
+
+
+def is_quiet(db) -> bool:
+    """Mode discret : seules les alertes critiques partent. Ce que l'utilisateur envoie lui-même passe toujours."""
+    row = db.query(GlobalConfig.quiet_mode).first()
+    return bool(row and row[0])
+
+
+def quiet_state(db) -> dict:
+    row = db.query(GlobalConfig.quiet_mode, GlobalConfig.quiet_mode_at).first()
+    on = bool(row and row[0])
+    return {"on": on, "since": iso(row[1]) if on else None}
+
+
+def set_quiet(db, on: bool, now: Optional[datetime] = None) -> dict:
+    config = db.query(GlobalConfig).first()
+    if not config:
+        config = GlobalConfig()
+        db.add(config)
+    if on != bool(config.quiet_mode):
+        config.quiet_mode = on
+        config.quiet_mode_at = (now or datetime.utcnow()) if on else None
+    db.commit()
+    return quiet_state(db)
 
 
 def state(db) -> dict:

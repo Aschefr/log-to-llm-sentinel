@@ -890,7 +890,7 @@ _(Analyse complète disponible dans l'interface)_
 """
 
             try:
-                ok = notifier.send(subject, notify_body, config_dict)
+                ok = notifier.send(subject, notify_body, config_dict, kind="manual")
                 if ok:
                     logger.info("TestRule", "Notification de test envoyée avec succès")
                     analysis.notified = True

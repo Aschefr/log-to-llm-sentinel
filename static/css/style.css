@@ -1349,8 +1349,8 @@ body {
         font-size: 0.95rem;
     }
     .nav-links a.active { border-radius: 0.5rem; box-shadow: none; }
-    .nav-right { order: 3; width: 100%; justify-content: flex-end; margin-top: 0.5rem; }
-    .nav-right .nav-switch { margin-right: auto; }
+    .nav-right { order: 3; width: 100%; flex-wrap: wrap; row-gap: 0.5rem; justify-content: flex-end; margin-top: 0.5rem; }
+    .nav-right .nav-switch--quiet { margin-right: auto; }
     .nav-stats { display: none !important; } /* stats hidden, lang-switcher stays */
 
     /* --- Container --- */
@@ -3470,6 +3470,8 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 .nav-switch.is-paused .nav-switch-track { background: var(--warning); opacity: 1; }
 .nav-switch.is-unknown .nav-switch-thumb { transform: translateX(0.35rem); }
 .nav-switch.is-unknown { color: var(--text-secondary); }
+.nav-switch--quiet.is-on .nav-switch-track { background: var(--accent); }
+.nav-switch--quiet.is-on { border-color: var(--accent); }
 .nav-stats { display: flex; align-items: stretch; overflow: hidden; }
 .nav-stats .stat-item { display: flex; align-items: center; gap: 0.3rem; padding: 0 0.65rem; border-left: 1px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; }
 .nav-stats .stat-item:first-child { border-left: 0; }

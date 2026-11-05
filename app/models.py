@@ -282,6 +282,8 @@ class GlobalConfig(Base):
     event_keys_version = Column(Integer, default=0)  # Version du calcul des clés d'événement déjà appliquée aux analyses
     monitoring_paused = Column(Boolean, default=False)  # Interrupteur général : plus rien d'automatique tant qu'il est coupé
     monitoring_paused_at = Column(DateTime, nullable=True)
+    quiet_mode = Column(Boolean, default=False)  # Mode discret : seules les alertes critiques sont notifiées
+    quiet_mode_at = Column(DateTime, nullable=True)
     ollama_url = Column(String, default="http://ollama:11434")
     ollama_model = Column(String, default="gemma4:e4b")
     ollama_temp = Column(Float, default=0.1)

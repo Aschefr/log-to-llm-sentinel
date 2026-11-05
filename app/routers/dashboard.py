@@ -37,6 +37,17 @@ def set_monitoring(data: dict):
         db.close()
 
 
+@router.put("/quiet")
+def set_quiet(data: dict):
+    if not isinstance(data.get("on"), bool):
+        raise HTTPException(status_code=400, detail="on_required")
+    db = SessionLocal()
+    try:
+        return monitoring.set_quiet(db, data["on"])
+    finally:
+        db.close()
+
+
 @router.get("/system-stats")
 def get_system_stats():
     """Retourne les statistiques d'utilisation des ressources."""
@@ -52,6 +63,7 @@ def get_system_stats():
     db = SessionLocal()
     try:
         stats["monitoring"] = monitoring.state(db)
+        stats["quiet"] = monitoring.quiet_state(db)
     finally:
         db.close()
 

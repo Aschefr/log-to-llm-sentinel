@@ -347,9 +347,16 @@ class Orchestrator:
         if self.resolution_service:
             await self.resolution_service.on_error_detected(rule.id, severity=severity)
             
-    async def trigger_notification(self, analysis: Analysis, rule: Rule, config: dict, db, repeats: int = 0) -> bool:
+    async def trigger_notification(self, analysis: Analysis, rule: Rule, config: dict, db, repeats: int = 0,
+                                   manual: bool = False) -> bool:
         """Envoie manuellement ou automatiquement une notification pour une analyse existante."""
         severity = analysis.severity
+        # Mode discret : on s'arrête avant le résumé par l'IA, qui serait un appel pour rien
+        if not manual and (severity or "").lower() != "critical":
+            from app.services import monitoring
+            if monitoring.is_quiet(db):
+                logger.info("Notification", f"Mode discret : alerte {severity} de « {rule.name} » non notifiée")
+                return False
         detection_id = analysis.detection_id
         line = analysis.triggered_line
         response = analysis.ollama_response
@@ -449,7 +456,8 @@ class Orchestrator:
             note = nt('repeat_note', lang).format(n=repeats)
             notify_body += f"\n\n{note}" if is_short_channel else f"<p><em>{html.escape(note)}</em></p>"
 
-        sent = await asyncio.to_thread(self.notifier.send, subject, notify_body, config)
+        sent = await asyncio.to_thread(self.notifier.send, subject, notify_body, config,
+                                       kind="manual" if manual else "alert", severity=severity)
         analysis.notified = bool(sent)
         db.commit()
         return True

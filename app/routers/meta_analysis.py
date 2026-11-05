@@ -319,5 +319,5 @@ async def notify_result(result_id: int, db: Session = Depends(get_db)):
     if not global_cfg:
         raise HTTPException(status_code=400, detail="global_config_not_found")
     from app.main import meta_service
-    await meta_service._send_notification(result, config, global_cfg)
+    await meta_service._send_notification(result, config, global_cfg, manual=True)
     return {"status": "ok"}

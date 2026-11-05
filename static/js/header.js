@@ -1,6 +1,6 @@
 /* En-tête, présent sur toutes les pages : interrupteur de surveillance, version et nouveautés, statistiques, thème. */
 
-const HEADER = { monitoring: undefined, update: null, changelog: null, serverSkew: null, serverOffset: 0 };
+const HEADER = { quiet: undefined, monitoring: undefined, update: null, changelog: null, serverSkew: null, serverOffset: 0 };
 const SEEN_VERSION_KEY = 'sentinel_seen_version';
 
 const HEADER_ICONS = {
@@ -49,6 +49,7 @@ async function updateSystemStats() {
             renderServerTime();
         }
         applyMonitoring(stats.monitoring || null);
+        applyQuiet(stats.quiet || null);
     } catch (e) {
         // Sentinel ne répond pas : on ne prétend pas connaître l'état de la surveillance
         applyMonitoring(null);
@@ -117,6 +118,38 @@ function toggleMonitoring(btn) {
     }
     // Couper la surveillance se fait en un clic de trop : on confirme, et on dit ce que ça implique
     showInlineConfirm(btn, hT('header.monitoring_confirm', 'Mettre la surveillance en pause ? Plus aucune analyse ni notification automatique. Les lignes reçues pendant la pause ne seront pas analysées à la reprise.'), () => setMonitoring(true));
+}
+
+/* ── Mode discret ─────────────────────────────────────────────────────────── */
+
+function applyQuiet(state) {
+    HEADER.quiet = state;
+    const btn = document.getElementById('quiet-switch');
+    if (!btn) return;
+    btn.classList.remove('is-on', 'is-unknown');
+    btn.disabled = !state;
+    btn.setAttribute('aria-checked', state ? String(state.on) : 'mixed');
+    if (!state) {
+        btn.classList.add('is-unknown');
+        btn.title = hT('header.monitoring_unknown_title', 'Sentinel ne répond pas : état de la surveillance inconnu.');
+    } else if (state.on) {
+        btn.classList.add('is-on');
+        const since = state.since ? new Date(state.since).toLocaleString(headerLang(), { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+        btn.title = hT('header.quiet_on_title', 'Mode discret depuis le {since} : seules les alertes critiques sont notifiées. Clique pour tout recevoir de nouveau.', { since });
+    } else {
+        btn.title = hT('header.quiet_off_title', 'Toutes les notifications sont envoyées. Clique pour ne recevoir que les alertes critiques.');
+    }
+}
+
+async function toggleQuiet(btn) {
+    if (!HEADER.quiet) return;
+    btn.disabled = true;
+    try {
+        applyQuiet(await apiFetch('/api/dashboard/quiet', { method: 'PUT', body: { on: !HEADER.quiet.on } }));
+    } catch (e) {
+        btn.disabled = false;
+        btn.title = `${hT('common.error', 'Erreur')} : ${e.message}`;
+    }
 }
 
 /* ── Version et mise à jour ──────────────────────────────────────────────── */
@@ -267,6 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(renderServerTime, 1000);
     restoreUpdateStatus();
     document.getElementById('monitoring-switch').addEventListener('click', e => toggleMonitoring(e.currentTarget));
+    document.getElementById('quiet-switch').addEventListener('click', e => toggleQuiet(e.currentTarget));
     document.getElementById('version-btn').addEventListener('click', openChangelog);
     document.getElementById('changelog-check').addEventListener('click', checkAppUpdate);
     const dialog = document.getElementById('changelog-dialog');
@@ -275,6 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
     dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
     window.i18n?.onLanguageChange(() => {
         applyMonitoring(HEADER.monitoring === undefined ? null : HEADER.monitoring);
+        applyQuiet(HEADER.quiet === undefined ? null : HEADER.quiet);
         renderVersionBadge();
         applyThemeIcon(document.documentElement.getAttribute('data-theme') || 'dark');
         if (dialog.open) renderChangelog();

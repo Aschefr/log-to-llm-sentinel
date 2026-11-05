@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Quiet mode**: a *Quiet* switch in the header lets only critical alerts through. Keyword changes, autopilot adjustments, resolutions, silent sources, scheduled meta-analyses and warning or info alerts are no longer sent; they stay visible in Sentinel. What you send yourself, a test or a resent alert, still goes out.
 - **Your own SSH key and account name**: the limited SSH access accepts a private key pasted from an earlier install, and on Linux the account the install block creates can have another name than `sentinel-diag`. The block stops without changing anything if that account already exists and was not created by Sentinel.
 - **MQTT topics to pick from**: once an MQTT connection is chosen in a rule, Sentinel listens for 3 seconds and offers the topics it saw under *Topic to follow*, shared prefixes first (`zigbee2mqtt/#`).
 - **CVE sheets** (optional): an analysis citing a CVE shows its official NVD sheet: actively exploited or not (CISA's KEV catalog), affected versions, score. Only the CVE number leaves your network, and a sheet never changes a severity.
