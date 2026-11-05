@@ -1,5 +1,7 @@
 # Notes for the AI
 
+![Adding a note](../../../screenshots/log-to-llm-sentinel_note.png)
+
 The AI only knows what the logs say. A note tells it what they cannot: the operating system of a server, a part you just replaced, a known cause. Sentinel sends your notes with the next alerts, so the diagnosis and the proposed actions fit your system.
 
 ## Adding a note

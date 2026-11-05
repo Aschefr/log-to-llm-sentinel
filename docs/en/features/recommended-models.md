@@ -1,19 +1,24 @@
 # Recommended Models
 
+![Choosing a model in Configuration](../../../screenshots/log-to-llm-sentinel_config.png)
+
 Sentinel suggests three models so a new user has nothing to guess. They come from a study on real alerts from a homelab, re-read by hand: 38 alert cases, with the expected severity decided in advance.
 
-| Model | Role | Memory (32K context) | Correct severities /38 | False alarms /15 | Serious cases missed | Time per analysis |
+| Model | Role | Memory (32K context) | Correct severities /38 | False alarms /15 | Serious cases missed /11 | Time per analysis |
 |---|---|---|---|---|---|---|
 | `gemma4:e2b` | | 0.5 GB | 31 | 7 | 0 | 2 s |
 | **`gemma4:e4b`** | **Minimum** | 3.2 GB | 32 | 5 | 0 | 4 s |
-| `qwen3.5:9b` | | 5.7 GB | 33 | 2 | 1 | 4 s |
+| `qwen3.5:9b` | | 5.7 GB | 33 | 2 | 3 | 4 s |
 | **`gemma4:12b`** | **Recommended** | 7.6 GB | 36 | 1 | 1 | 6 s |
 | `mistral-nemo` | | 9.2 GB | 28 | 9 | 1 | 3 s |
-| `qwen3.6:27b` | | 16.1 GB | 35 | 2 | 0 | 12 s |
-| **`qwen3.8:27b`** | **Top quality** | 16.3 GB | 36 | 0 | 0 | 7 s |
-| `gemma4:31b` | | 18.5 GB | 37 | 0 | 0 | 11 s |
+| `qwen3.6:27b` | | 16.1 GB | 35 | 2 | 1 | 12 s |
+| **`qwen3.8:27b`** | **Top quality** | 16.3 GB | 36 | 0 | 2 | 7 s |
+| `gemma4:31b` | | 18.5 GB | 37 | 0 | 1 | 11 s |
 
-*Measured on an RTX 3090 with 24 GB of memory. Nothing was measured without a graphics card. These results come from one machine and one set of logs, in French, so they indicate an order rather than a guarantee.*
+*A serious case is missed when the model rates it `info`. Measured before version 1.8.0, once per model, on an RTX 3090 with 24 GB of memory. Nothing was measured without a graphics card. These results come from one machine and one set of logs, in French, so they indicate an order rather than a guarantee.*
+
+## Measured again on 1.8.0
+Version 1.8.0 changed how alerts are asked of the model ([Log Line Safety](log-safety.md)), so the 38 cases were played again on `qwen3.8:27b`, twice each, thinking off, against the previous prompts. Correct severities went from 72 to 75 of 76, serious cases rated `info` from 4 to 1, with no false alarm in either. The other models were not measured again.
 
 ## Settings that follow from it
 * **Temperature: 0.2.** At 0.7, no recommended model improves, and the minimum model invents more.

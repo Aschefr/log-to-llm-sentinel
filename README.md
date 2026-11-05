@@ -31,6 +31,8 @@ Log to LLM Sentinel is a modern, lightweight, and powerful log monitoring tool. 
 - 🧭 **Autopilot**: Just give the log source. The local AI reads the history (or watches the source for 24 h), names the rule, describes what is normal in this log, picks the keywords, and sizes the grouping window and the silence alert from the real rhythm of the lines.
 - 🤖 **Self-tuning keywords**: Not sure what to look for? Leave the keywords empty: the local AI reads the log history, adds keywords for the errors nothing catches, and removes the noise — every change checked against your data and undoable.
 - 📨 **Syslog Server & Relay**: Turn Sentinel into a remote syslog UDP server (listening on port 10514 UDP on host). Ingest remote logs (e.g., from Unraid) and optionally forward them to a secondary syslog server as a relay.
+- 📥 **Sort my unread**: Back after a few days? The AI goes through your unread events and suggests which ones can be marked as read, with a reason for each. You validate, and you can undo.
+- 🛡️ **Log line safety**: Log lines can hold text chosen by an attacker. Sentinel treats them as data, and a line that tries to talk the AI out of an alert is flagged instead of obeyed.
 - 🔗 **Home Assistant Ready**: Use Webhooks to stream logs from your smart home directly to Sentinel.
 - 🔔 **Smart Notifications**: Integrated with SMTP and Apprise (Discord, Telegram, Slack). Sentinel intelligently adapts to character limits by asking the local AI to generate concise summaries when needed, ensuring critical alerts always fit your favorite messaging platform.
 - 🌍 **Fully Multilingual**: Beautiful interface available in **English** and **French**.
@@ -122,10 +124,10 @@ Sentinel can monitor your Home Assistant logs in real-time. Follow these steps t
 
 ### 1. Create a Webhook Rule in Sentinel
 1. Go to the **Rules** page in Sentinel.
-2. Click **Create New Rule**.
-3. In the **Source of Logs** tab, select **Webhook**.
-4. Give it a name (e.g., "Home Assistant") and click **Create**.
-5. Sentinel will generate a unique URL for you. Copy this URL.
+2. Click **+ New Rule**.
+3. Keep **Autopilot** to let the AI set up the rule, or choose **Manual**.
+4. Under **Source of logs**, select **Webhook API**.
+5. Sentinel generates a unique URL for you. Copy this URL, then click **Save**.
 
 ### 2. Add the automation to Home Assistant
 The best way to integrate this is by using **Packages**, which keeps your configuration clean and modular.
@@ -206,9 +208,13 @@ sudo find /var/lib/docker/volumes/ -name "nextcloud.log" -exec ls -lh {} +
 ## 🛠️ Configuration
 
 Sentinel is highly customizable via the **Configuration** page:
-- **AI Model**: Choose your favorite model from Ollama (Gemma, Llama 3, Mistral...).
-- **Performance**: Adjust "Eco" or "GPU" profiles depending on your hardware.
-- **Privacy**: Fine-tune anti-spam delays and sensitivity thresholds.
+- **AI Model**: Pick one of the [recommended models](docs/en/features/recommended-models.md) or any model from Ollama, and the context size.
+- **Notifications**: Email (SMTP), Apprise or Discord.
+- **Sources**: Syslog receiver and relay.
+- **Diagnostics**: Read-only access for the chat AI to your containers and servers.
+- **Data**: Retention, backups and restore.
+
+The full guide is in the **[documentation](docs/en/README.md)**.
 
 ---
 
