@@ -106,6 +106,7 @@
                         </select>
                         <select id="config-schedule-day" class="hidden" data-i18n-aria-label="meta.schedule_day" aria-label="Jour"></select>
                         <input type="time" id="config-schedule-time" value="00:00" data-i18n-aria-label="meta.schedule_hour" aria-label="Heure">
+                        <p class="form-hint meta-slot-hint hidden" id="meta-slot-hint" role="status"></p>
                     </div>
                 </div>
                 {{ toggle('config-enabled', 'meta.enabled', 'Activée', 'meta.enabled_hint', "Désactivée, elle ne tourne que si tu la lances.") }}
@@ -139,5 +140,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/meta.js?v=13"></script>
+<script src="/static/js/meta.js?v=14"></script>
 {% endblock %}

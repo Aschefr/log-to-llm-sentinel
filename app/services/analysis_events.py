@@ -231,9 +231,11 @@ def summarize(db, rule_id: Optional[int] = None, days: Optional[int] = None, ope
 
 
 def counts(events: List[dict]) -> dict:
-    result = {"total": len(events), "unread": sum(e["unread"] for e in events), "critical": 0, "warning": 0, "info": 0}
+    result = {"total": len(events), "unread": sum(e["unread"] for e in events), "unread_critical": 0,
+              "critical": 0, "warning": 0, "info": 0}
     for e in events:
         result[e["severity"]] += 1
+        result["unread_critical"] += e["unread"] and e["severity"] == "critical"
     return result
 
 

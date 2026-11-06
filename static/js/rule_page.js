@@ -592,11 +592,10 @@ function setupAnalysesToolbar() {
     document.getElementById('an-period').addEventListener('change', e => { RP.an.period = e.target.value; loadAnalyses(true); });
     document.getElementById('an-open-only').addEventListener('change', e => { RP.an.openOnly = e.target.checked; loadAnalyses(true); });
     document.getElementById('an-triage').addEventListener('click', () => openTriage(RP.id));
-    document.getElementById('an-mark-read').addEventListener('click', async () => {
-        await apiFetch(`/api/monitor/rules/${RP.id}/view-all`, { method: 'POST' });
-        loadAnalyses(true);
-        loadHeader();
-    });
+    // events-changed (sent once done) reloads the list, the header and the counters
+    document.getElementById('an-mark-read').addEventListener('click', e => confirmMarkAllRead(e.currentTarget,
+        async () => (await apiFetch(`/api/dashboard/events?limit=1&rule_id=${RP.id}`)).counts,
+        () => apiFetch(`/api/monitor/rules/${RP.id}/view-all`, { method: 'POST' }), RP.id));
 }
 
 function analysesUrl(offset, limit) {

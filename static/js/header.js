@@ -291,10 +291,118 @@ function toggleTheme() {
     applyThemeIcon(next);
 }
 
+/* ── Retour ──────────────────────────────────────────────────────────────── */
+// Une page atteinte par un bouton ou un lien du contenu (Approfondir, Voir dans la règle…) propose de revenir à la page
+// d'avant. Un clic dans le menu commence un nouveau parcours : plus de retour. Chaque page garde le sien, même après un
+// rechargement ou un retour arrière du navigateur.
+
+const BACK_KEY = 'sentinel_back', LEAVE_KEY = 'sentinel_leave', RESTORE_KEY = 'sentinel_restore';
+
+// La page sans ses paramètres : le chat change les siens en cours de route
+function pageKey(href) {
+    return new URL(href || location.href, location.origin).pathname;
+}
+
+function readSession(key) {
+    try {
+        return JSON.parse(sessionStorage.getItem(key) || 'null');
+    } catch (_) {
+        return null;
+    }
+}
+
+function writeSession(key, value) {
+    try {
+        if (value === null) sessionStorage.removeItem(key);
+        else sessionStorage.setItem(key, JSON.stringify(value));
+    } catch (_) { /* stockage indisponible : pas de bouton Retour */ }
+}
+
+// Le nom de la page tel que le menu l'affiche ; celui de la règle sur sa page (le titre du tableau de bord est son verdict)
+function pageTitle() {
+    const own = document.title.split(/\s[-—|]\s/)[0].trim();
+    if (/^\/rules\/\d+/.test(location.pathname)) return own;
+    return document.querySelector('.nav-links a.active')?.textContent.trim() || own;
+}
+
+/** Après Retour, la page revient où on l'avait laissée, une fois son contenu chargé. */
+function restoreScroll(y) {
+    let stop = false;
+    const cancel = () => { stop = true; };
+    ['wheel', 'touchstart', 'keydown'].forEach(ev => window.addEventListener(ev, cancel, { once: true, passive: true }));
+    const started = Date.now();
+    const tick = () => {
+        if (stop) return;
+        const room = document.documentElement.scrollHeight - innerHeight;
+        window.scrollTo(0, Math.min(y, room));
+        if (room < y && Date.now() - started < 5000) setTimeout(tick, 100);
+    };
+    tick();
+}
+
+function setupBack() {
+    const btn = document.getElementById('nav-back');
+    if (!btn) return;
+    const type = performance.getEntriesByType?.('navigation')[0]?.type || 'navigate';
+    const leave = readSession(LEAVE_KEY);
+    writeSession(LEAVE_KEY, null);
+    let trail = readSession(BACK_KEY) || {};
+    const here = pageKey();
+    // Une adresse tapée ou un favori n'a pas de page d'origine : document.referrer est vide
+    const followed = leave && Date.now() - leave.at < 15000 && document.referrer && pageKey(document.referrer) === pageKey(leave.href);
+    if (type === 'navigate') {
+        if (leave?.mode === 'menu' && followed) trail = {};
+        else if (followed && leave.mode !== 'return' && pageKey(leave.href) !== here) trail[here] = { href: leave.href, title: leave.title, y: leave.y };
+        else if (!followed && leave?.mode !== 'return') delete trail[here];
+        writeSession(BACK_KEY, trail);
+    }
+    HEADER.back = trail[here] || null;
+    renderBack();
+    const restore = readSession(RESTORE_KEY);
+    if (restore) {
+        writeSession(RESTORE_KEY, null);
+        if (restore.key === here && restore.y > 0 && Date.now() - restore.at < 15000) restoreScroll(restore.y);
+    }
+    document.querySelectorAll('.nav-links a').forEach(a => a.addEventListener('click', () => { HEADER.leaveMode = 'menu'; }));
+    btn.addEventListener('click', e => {
+        e.preventDefault();
+        const target = HEADER.back;
+        if (!target) return;
+        writeSession(RESTORE_KEY, { key: pageKey(target.href), y: target.y || 0, at: Date.now() });
+        HEADER.leaveMode = 'return';
+        // Juste derrière dans l'historique : le navigateur peut la rendre telle quelle (cartes ouvertes comprises)
+        if (document.referrer && pageKey(document.referrer) === pageKey(target.href) && history.length > 1) history.back();
+        else location.href = target.href;
+    });
+    window.addEventListener('pagehide', () => {
+        writeSession(LEAVE_KEY, { href: location.href, title: pageTitle(), y: Math.round(scrollY), at: Date.now(), mode: HEADER.leaveMode || 'content' });
+        HEADER.leaveMode = null;
+    });
+    // Revenue du cache du navigateur (retour arrière) : la page n'est pas rechargée, le Retour suivant doit redevenir possible
+    window.addEventListener('pageshow', e => {
+        if (!e.persisted) return;
+        writeSession(LEAVE_KEY, null);
+        writeSession(RESTORE_KEY, null);
+    });
+}
+
+function renderBack() {
+    const btn = document.getElementById('nav-back');
+    if (!btn) return;
+    const target = HEADER.back;
+    btn.classList.toggle('hidden', !target);
+    if (!target) return;
+    btn.href = target.href;
+    const title = hT('header.back_title', 'Revenir à : {page}', { page: target.title || pageKey(target.href) });
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
+}
+
 /* ── Démarrage ───────────────────────────────────────────────────────────── */
 
 document.addEventListener('DOMContentLoaded', () => {
     applyThemeIcon(localStorage.getItem('theme') || 'dark');
+    setupBack();
     updateSystemStats();
     setInterval(() => { if (!document.hidden) updateSystemStats(); }, 10000);
     setInterval(renderServerTime, 1000);
@@ -312,6 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
         applyQuiet(HEADER.quiet === undefined ? null : HEADER.quiet);
         renderVersionBadge();
         applyThemeIcon(document.documentElement.getAttribute('data-theme') || 'dark');
+        renderBack();
         if (dialog.open) renderChangelog();
     });
 });

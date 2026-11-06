@@ -281,6 +281,18 @@ def mark_all_analyses_viewed(rule_id: int):
         db.close()
 
 
+@router.post("/view-all")
+def mark_everything_viewed():
+    """Marque comme lues toutes les analyses de toutes les règles."""
+    db = SessionLocal()
+    try:
+        marked = db.query(Analysis).filter(Analysis.viewed == False).update({Analysis.viewed: True})
+        db.commit()
+        return {"status": "ok", "marked": marked}
+    finally:
+        db.close()
+
+
 
 
 @router.get("/syslog/hosts")

@@ -391,6 +391,7 @@ function renderFilters() {
         ['info', labels.info, c.info], ['unread', dT('dashboard.filter_unread', 'Non lues'), c.unread]];
     dSetHtml(document.getElementById('dash-filters'), filters.map(([id, label, n]) =>
         `<button type="button" class="${DASH.filter === id ? 'active' : ''}" aria-pressed="${DASH.filter === id}" onclick="setHistoryFilter('${id}')">${escapeHtml(label)} (${n})</button>`).join(''));
+    document.getElementById('dash-mark-all').classList.toggle('hidden', !c.unread);
 }
 
 function setHistoryFilter(id) {

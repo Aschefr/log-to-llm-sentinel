@@ -287,21 +287,29 @@ function highlightKeywords(text, keywords) {
     }).join('');
 }
 
-function showInlineConfirm(btnElement, message, onConfirmCallback) {
+/** opts.confirmLabel names the confirm button; opts.alternative = {label, onClick} offers a safer way, put first. */
+function showInlineConfirm(btnElement, message, onConfirmCallback, opts = {}) {
     // 1. Fermer toute popup de confirmation existante
     document.querySelectorAll('.inline-confirm-popup').forEach(el => el.remove());
-    
+
     // 2. Créer la popup
     const popup = document.createElement('div');
     popup.className = 'inline-confirm-popup';
-    
+    const alt = opts.alternative;
+
     popup.innerHTML = `
         <div class="inline-confirm-msg">${escapeHtml(message)}</div>
-        <div class="inline-confirm-actions">
-            <button class="btn btn-primary btn-sm confirm-btn">${window.t ? window.t('common.confirm') : 'OK'}</button>
+        <div class="inline-confirm-actions${alt ? ' inline-confirm-actions--three' : ''}">
+            ${alt ? `<button class="btn btn-primary btn-sm alt-btn">${escapeHtml(alt.label)}</button>` : ''}
+            <button class="btn ${alt ? 'btn-secondary' : 'btn-primary'} btn-sm confirm-btn">${escapeHtml(opts.confirmLabel || (window.t ? window.t('common.confirm') : 'OK'))}</button>
             <button class="btn btn-secondary btn-sm cancel-btn">${window.t ? window.t('common.cancel') : 'Annuler'}</button>
         </div>
     `;
+    popup.querySelector('.alt-btn')?.addEventListener('click', e => {
+        e.stopPropagation();
+        popup.remove();
+        alt.onClick();
+    });
     
     document.body.appendChild(popup);
     
@@ -482,6 +490,17 @@ function renderAnalysisCard(a, opts = {}) {
             <svg viewBox="0 0 24 24" width="16" height="16"><path fill="currentColor" d="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19V4M6,19A2,2 0 0,0 8,21H16A2,2 0 0,0 18,19V7H6V19Z" /></svg>
         </button>` : '';
 
+    // Quick actions, usable without opening the card
+    const readBtn = isUnread ? `
+        <button type="button" class="btn-icon card-read-btn" onclick="event.stopPropagation(); markCardRead(${a.id}, this)" title="${escapeHtml(_t('common.mark_read', 'Marquer comme lu'))}" aria-label="${escapeHtml(_t('common.mark_read', 'Marquer comme lu'))}">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="${CARD_ICONS.read}" /></svg>
+        </button>` : '';
+    const flagBtn = a.rule_id ? irrelevantIconHtml(a.id, flagged) : '';
+    const noteBtn = ev ? `
+        <button type="button" class="btn-icon" onclick="event.stopPropagation(); openNoteFromHeader(this)" title="${escapeHtml(_t('common.note_add', 'Ajouter une note'))}" aria-label="${escapeHtml(_t('common.note_add', 'Ajouter une note'))}">
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="${CARD_ICONS.note}" /></svg>
+        </button>` : '';
+
     const ruleName = showRuleName && a.rule_name
         ? `<strong>${_t('dashboard.rule_label', 'Rule:')} ${escapeHtml(a.rule_name)}</strong>`
         : '';
@@ -574,6 +593,9 @@ function renderAnalysisCard(a, opts = {}) {
             </div>
             <div class="analysis-actions">
                 ${kwSummary}
+                ${readBtn}
+                ${flagBtn}
+                ${noteBtn}
                 ${copyBtn}
                 ${deleteBtn}
             </div>
@@ -597,8 +619,8 @@ function renderAnalysisCard(a, opts = {}) {
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); retryAnalysis(${a.id}, this)">🔄 ${_t('common.retry', 'Retry')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); notifyAnalysis(${a.id}, this)">🔔 ${_t('common.notify', 'Notify')}</button>
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); togglePromptView(${a.id}, this)" title="${_t('common.view_prompt_title', 'Show the exact messages sent to the LLM')}">📜 ${_t('common.view_prompt', 'Prompt')}</button>
-                    ${ev ? `<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); openNoteForm(this)">📝 ${_t('common.note_add', 'Ajouter une note')}</button>` : ''}
-                    ${a.rule_id ? `<button class="btn btn-secondary btn-sm${flagged ? ' is-flagged' : ''}" onclick="event.stopPropagation(); toggleIrrelevant(${a.id}, this)" aria-pressed="${flagged}"
+                    ${ev ? `<button type="button" class="btn btn-secondary btn-sm" data-note-open onclick="event.stopPropagation(); openNoteForm(this)">📝 ${_t('common.note_add', 'Ajouter une note')}</button>` : ''}
+                    ${a.rule_id ? `<button class="btn btn-secondary btn-sm${flagged ? ' is-flagged' : ''}" data-irrelevant onclick="event.stopPropagation(); toggleIrrelevant(${a.id}, this)" aria-pressed="${flagged}"
                         title="${_t('common.irrelevant_title', 'L’IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne')}">👎 ${flagged ? _t('common.irrelevant_done', 'Signalée pas pertinente') : _t('common.irrelevant', 'Pas pertinente')}</button>` : ''}
                     ${ev && ev.rule_in_alert && !a.resolution_status ? `<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); resolveIncidentFromCard(${a.rule_id}, this)">${_t('rule.resolve', 'Marquer comme résolu')}</button>` : ''}
                     ${a.rule_id && !opts.hideRuleLink ? `<a class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" href="/rules/${a.rule_id}?analysis=${a.id}#analyses">🔍 ${_t('common.view_rule', 'Voir dans la règle')}</a>` : ''}
@@ -723,24 +745,109 @@ function reconcileEvents(list, events, opts = {}) {
     });
 }
 
-/** Flags (or unflags) an alert as not relevant: the keyword arbiter reviews the rule right away. */
+const CARD_ICONS = {
+    read: 'M0.41,13.41L6,19L7.41,17.58L1.83,12M22.24,5.58L11.66,16.17L7.5,12L6.07,13.41L11.66,19L23.66,7M18,7L16.59,5.58L10.24,11.93L11.66,13.34L18,7Z',
+    irrelevant: 'M19,15V3H23V15H19M15,3A2,2 0 0,1 17,5V15C17,15.55 16.78,16.05 16.41,16.41L9.83,23L8.77,21.94C8.5,21.67 8.33,21.3 8.33,20.88L8.36,20.57L9.31,16H3C1.89,16 1,15.1 1,14V12C1,11.74 1.05,11.5 1.14,11.27L4.16,4.22C4.46,3.5 5.17,3 6,3H15M15,5H5.97L3,12V14H11.78L10.65,19.32L15,14.97V5Z',
+    irrelevantOn: 'M19,15H23V3H19M15,3H6C5.17,3 4.46,3.5 4.16,4.22L1.14,11.27C1.05,11.5 1,11.74 1,12V14A2,2 0 0,0 3,16H9.31L8.36,20.57C8.34,20.67 8.33,20.77 8.33,20.88C8.33,21.3 8.5,21.67 8.77,21.94L9.83,23L16.41,16.41C16.78,16.05 17,15.55 17,15V5C17,3.89 16.1,3 15,3Z',
+    note: 'M14.06,9L15,9.94L5.92,19H5V18.08L14.06,9M17.66,3C17.41,3 17.15,3.1 16.96,3.29L15.13,5.12L18.88,8.87L20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18.17,3.09 17.92,3 17.66,3M14.06,6.19L3,17.25V21H6.75L17.81,9.94L14.06,6.19Z',
+};
+
+function irrelevantIconInner(flagged) {
+    return `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="${flagged ? CARD_ICONS.irrelevantOn : CARD_ICONS.irrelevant}" /></svg>`;
+}
+
+function irrelevantIconTitle(flagged) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    return flagged ? _t('common.irrelevant_done', 'Signalée pas pertinente') : _t('common.irrelevant', 'Pas pertinente');
+}
+
+function irrelevantIconHtml(analysisId, flagged) {
+    const title = escapeHtml(irrelevantIconTitle(flagged));
+    return `<button type="button" class="btn-icon card-flag-btn${flagged ? ' is-flagged' : ''}" data-irrelevant aria-pressed="${flagged}" title="${title}" aria-label="${title}"
+        onclick="event.stopPropagation(); toggleIrrelevant(${analysisId}, this)">${irrelevantIconInner(flagged)}</button>`;
+}
+
+/** Flags (or unflags) an alert as not relevant: the keyword arbiter reviews the rule right away.
+ *  The card has the same button twice, in its header and its footer: both follow. */
 async function toggleIrrelevant(analysisId, btn) {
     const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
     const flagged = btn.getAttribute('aria-pressed') === 'true';
-    btn.disabled = true;
+    const buttons = [...(btn.closest('.analysis-card')?.querySelectorAll('[data-irrelevant]') || [btn])];
+    buttons.forEach(b => { b.disabled = true; });
     try {
         await apiFetch(`/api/monitor/analyses/${analysisId}/feedback?value=${flagged ? 'none' : 'irrelevant'}`, { method: 'POST' });
-        btn.setAttribute('aria-pressed', String(!flagged));
-        btn.classList.toggle('is-flagged', !flagged);
-        btn.textContent = '👎 ' + (flagged ? _t('common.irrelevant', 'Pas pertinente') : _t('common.irrelevant_done', 'Signalée pas pertinente'));
+        buttons.forEach(b => {
+            b.setAttribute('aria-pressed', String(!flagged));
+            b.classList.toggle('is-flagged', !flagged);
+            if (b.classList.contains('btn-icon')) {
+                b.innerHTML = irrelevantIconInner(!flagged);
+                b.title = irrelevantIconTitle(!flagged);
+                b.setAttribute('aria-label', b.title);
+            } else {
+                b.textContent = '👎 ' + irrelevantIconTitle(!flagged);
+            }
+        });
         if (!flagged && typeof showToast === 'function') {
             showToast(_t('common.irrelevant_toast', 'Merci : l’IA réexamine les mots-clés de la règle.'), 'success');
         }
     } catch (e) {
         alert(e.message);
     } finally {
-        btn.disabled = false;
+        buttons.forEach(b => { b.disabled = false; });
     }
+}
+
+/** "Mark everything as read", after a warning: an important alert could go unseen.
+ *  counts: the event counts ({unread, unread_critical}), or a function that fetches them. */
+async function confirmMarkAllRead(btn, counts, markAll, ruleId = null) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    try {
+        if (typeof counts === 'function') counts = await counts();
+    } catch (_) {
+        counts = null;
+    }
+    const n = counts?.unread, critical = counts?.unread_critical || 0;
+    if (counts && !n) {
+        if (typeof showToast === 'function') showToast(_t('common.mark_all_nothing', 'Aucun événement non lu.'), 'success');
+        return;
+    }
+    let message = n === 1 ? _t('common.mark_all_confirm_one', 'Marquer l’événement non lu comme lu ? Tu pourrais passer à côté d’une alerte importante.')
+        : _t('common.mark_all_confirm_many', 'Marquer les {n} événements non lus comme lus ? Tu pourrais passer à côté d’une alerte importante.').replace('{n}', n ?? '');
+    if (critical) message += ' ' + (critical === 1 ? _t('common.mark_all_confirm_critical_one', 'Dont 1 critique.')
+        : _t('common.mark_all_confirm_critical_many', 'Dont {n} critiques.').replace('{n}', critical));
+    showInlineConfirm(btn, message, async () => {
+        try {
+            await markAll();
+            document.dispatchEvent(new CustomEvent('events-changed'));
+            if (typeof showToast === 'function') showToast(_t('common.mark_all_done', 'Tout est marqué comme lu.'), 'success');
+        } catch (e) {
+            alert(`${_t('common.error', 'Erreur')} : ${e.message}`);
+        }
+    }, {
+        confirmLabel: _t('monitor.mark_all_read', 'Tout marquer comme lu'),
+        alternative: typeof openTriage === 'function' ? { label: _t('triage.title', 'Trier mes non lues'), onClick: () => openTriage(ruleId) } : null,
+    });
+}
+
+/** "Mark as read" from a closed card: the card stays closed. */
+async function markCardRead(analysisId, btn) {
+    btn.disabled = true;
+    await markAnalysisAsViewed(analysisId);
+    if (document.getElementById(`analysis-card-${analysisId}`)?.classList.contains('unread')) {
+        btn.disabled = false;  // the request failed: the card is still unread
+        return;
+    }
+    const actions = btn.parentElement;
+    btn.remove();
+    actions.querySelector('button')?.focus();
+}
+
+/** "Add a note" from a closed card: opens the card on its note form. */
+function openNoteFromHeader(btn) {
+    const card = btn.closest('.analysis-card');
+    expandAnalysisCard(card);
+    const opener = card.querySelector('[data-note-open]');
+    if (opener) openNoteForm(opener);
 }
 
 // Cache of viewed analysis IDs to avoid duplicate network requests
@@ -770,7 +877,16 @@ async function markAnalysisAsViewed(analysisId) {
 
 function toggleAnalysisCardGeneric(event, card) {
     if (event.target.closest('button:not(.collapse-toggle), a, .btn')) return;
-    const isCollapsed = card.classList.toggle('collapsed');
+    setAnalysisCardOpen(card, card.classList.contains('collapsed'));
+}
+
+function expandAnalysisCard(card) {
+    if (card.classList.contains('collapsed')) setAnalysisCardOpen(card, true);
+}
+
+function setAnalysisCardOpen(card, open) {
+    const isCollapsed = !open;
+    card.classList.toggle('collapsed', isCollapsed);
     const toggle = card.querySelector('.collapse-toggle');
     if (toggle) {
         toggle.textContent = isCollapsed ? '▶' : '▼';

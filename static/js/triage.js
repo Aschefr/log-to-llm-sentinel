@@ -3,7 +3,7 @@
 // Closing the dialog leaves a running triage alive: reopening picks it up.
 // ──────────────────────────────────────────────────────
 
-const TRIAGE = { job: null, timer: null, ruleId: null, unchecked: new Set() };
+const TRIAGE = { job: null, timer: null, ruleId: null, unchecked: new Set(), seeded: null };
 
 function trT(key, fallback, vars) {
     let s = window.t ? window.t(`triage.${key}`) : '';
@@ -43,6 +43,7 @@ function trDialog() {
 async function openTriage(ruleId = null) {
     TRIAGE.ruleId = ruleId;
     TRIAGE.unchecked = new Set();
+    TRIAGE.seeded = null;
     trDialog().showModal();
     trRender();
     try {
@@ -98,17 +99,28 @@ function trRender() {
 
 function trRenderResult(body, foot, job) {
     const proposals = job.proposals, kept = job.kept;
+    // A recent event has no history: the AI's word is not enough, the user ticks it themself
+    if (TRIAGE.seeded !== job.id) {
+        proposals.filter(p => p.recent).forEach(p => TRIAGE.unchecked.add(trKey(p)));
+        TRIAGE.seeded = job.id;
+    }
+    const recentHint = proposals.some(p => p.recent)
+        ? `<p class="form-hint">${escapeHtml(trT('recent_unchecked', 'Les événements récents sont décochés : l’IA n’avait pas d’historique pour en juger. Coche-les toi-même si tu es d’accord.'))}</p>` : '';
     if (!job.unread) {
         body.innerHTML = `<p class="triage-lead">${escapeHtml(trT('nothing', 'Rien à trier : tu n’as aucun événement non lu.'))}</p>`;
         foot.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('triage-dialog').close()">${escapeHtml(trT('close', 'Fermer'))}</button>`;
         return;
     }
+    // Without proposal, say whether the AI looked at anything: the guards may have kept everything before asking it
     const lead = proposals.length
         ? trCount(proposals.length, 'lead_one', 'L’IA propose de marquer 1 événement comme lu. Décoche ce que tu veux garder.', 'lead_many', 'L’IA propose de marquer {n} événements comme lus. Décoche ce que tu veux garder.')
-        : trT('lead_none', 'L’IA ne propose rien : tout ce qui reste mérite que tu le regardes.');
+        : job.total
+            ? trCount(job.total, 'lead_none_one', 'L’IA a regardé 1 événement et préfère que tu le lises.', 'lead_none_many', 'L’IA a regardé {n} événements et n’en propose aucun : elle préfère que tu les lises.')
+            : trCount(job.unread, 'lead_none_guarded_one', 'L’IA n’a rien eu à regarder : ton événement non lu est critique, il reste à lire d’office.', 'lead_none_guarded_many', 'L’IA n’a rien eu à regarder : tes {n} événements non lus sont critiques, ils restent à lire d’office.');
     const more = job.not_reviewed ? `<p class="form-hint">${escapeHtml(trT('not_reviewed', '{n} autres événements n’ont pas été regardés : relance le tri après celui-ci.', { n: job.not_reviewed }))}</p>` : '';
     body.innerHTML = `<p class="triage-lead">${escapeHtml(lead)}</p>
         ${proposals.length ? `<ul class="triage-list">${proposals.map(trProposalHtml).join('')}</ul>` : ''}
+        ${recentHint}
         ${more}
         ${kept.length ? `<details class="triage-kept" ${proposals.length ? '' : 'open'}>
             <summary>${escapeHtml(trCount(kept.length, 'kept_one', '1 événement reste à lire', 'kept_many', '{n} événements restent à lire'))}</summary>
@@ -131,7 +143,9 @@ function trRenderFoot(foot, job) {
 
 function trMeta(item) {
     const when = new Date(item.last_at).toLocaleDateString([], { day: '2-digit', month: '2-digit' });
-    return [item.rule_name, trCount(item.count, 'seen_one', 'vu 1 fois', 'seen_many', 'vu {n} fois'), trT('last_seen', 'dernière fois le {d}', { d: when })].join(' · ');
+    // Récent : l'IA n'avait pas d'historique pour juger, la personne le sait en validant
+    return [item.rule_name, trCount(item.count, 'seen_one', 'vu 1 fois', 'seen_many', 'vu {n} fois'), trT('last_seen', 'dernière fois le {d}', { d: when }),
+        ...(item.recent ? [trT('recent', 'récent, sans historique')] : [])].join(' · ');
 }
 
 function trEventHtml(item) {
@@ -154,7 +168,6 @@ function trProposalHtml(item) {
 
 function trKeptHtml(item) {
     const reason = { critical: trT('kept_critical', 'Critique : un critique se lit toujours.'),
-        new: trT('kept_new', 'Événement récent : trop tôt pour le juger.'),
         no_answer: trT('kept_no_answer', 'L’IA n’a pas répondu pour celui-ci.') }[item.kind] || item.reason || trT('kept_ai', 'L’IA préfère que tu le regardes.');
     return `<li class="triage-item triage-item--kept">
         <div class="triage-text">${trEventHtml(item)}

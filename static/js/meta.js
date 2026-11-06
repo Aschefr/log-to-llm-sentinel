@@ -86,6 +86,85 @@ function updateScheduleDay(value) {
     if (value) select.value = value;
 }
 
+/* ── Créneau : deux méta-analyses à la même heure se font attendre ──────── */
+
+const META_SLOT_MINUTES = 15;
+
+function slotOf(type, day, utcTime) {
+    const [h, m] = (utcTime || '00:00').split(':').map(Number);
+    return { type: type || 'daily', day: Number(day) || 1, minutes: h * 60 + m };
+}
+
+// Moins de 15 min d'écart, un jour où les deux tournent. Hebdomadaire et mensuelle ne tombent ensemble que certains mois : ignoré.
+function slotsClash(a, b) {
+    const diff = Math.abs(a.minutes - b.minutes);
+    if (Math.min(diff, 1440 - diff) >= META_SLOT_MINUTES) return false;
+    if (a.type === 'daily' || b.type === 'daily') return true;
+    return a.type === b.type && a.day === b.day;
+}
+
+function formSlot() {
+    const type = document.getElementById('config-schedule-type').value;
+    return slotOf(type, document.getElementById('config-schedule-day').value, localToUTC(document.getElementById('config-schedule-time').value || '00:00'));
+}
+
+function slotClashes(slot) {
+    const id = Number(document.getElementById('config-id').value) || null;
+    return META.configs.filter(c => c.enabled && c.id !== id && slotsClash(slot, slotOf(c.schedule_type, c.schedule_day, c.schedule_time)));
+}
+
+/** Le premier créneau libre après celui-ci, de 15 en 15 minutes, le même jour. */
+function freeSlot(slot) {
+    for (let step = 1; step < 1440 / META_SLOT_MINUTES; step++) {
+        const candidate = { ...slot, minutes: (slot.minutes + step * META_SLOT_MINUTES) % 1440 };
+        if (!slotClashes(candidate).length) return candidate;
+    }
+    return null;
+}
+
+function slotTime(slot) {
+    return utcToLocal(`${String(Math.floor(slot.minutes / 60)).padStart(2, '0')}:${String(slot.minutes % 60).padStart(2, '0')}`);
+}
+
+/** proposed: the time was just moved for a new meta-analysis, from this one. */
+function renderSlotHint(proposed = null) {
+    const hint = document.getElementById('meta-slot-hint');
+    const enabled = document.getElementById('config-enabled').checked;
+    const slot = formSlot();
+    const clashes = enabled ? slotClashes(slot) : [];
+    const names = list => list.map(c => `« ${c.name} »`).join(', ');
+    if (proposed && !clashes.length) {
+        hint.textContent = mT('meta.slot_moved', '{time} est déjà pris par {names} : {free} proposé, pour qu’elles ne se fassent pas attendre.',
+            { time: proposed.time, names: names(proposed.clashes), free: slotTime(slot) });
+        hint.classList.remove('hidden', 'meta-slot-hint--warn');
+        return;
+    }
+    const free = clashes.length ? freeSlot(slot) : null;
+    hint.classList.toggle('hidden', !clashes.length);
+    hint.classList.toggle('meta-slot-hint--warn', clashes.length > 0);
+    if (!clashes.length) return;
+    hint.innerHTML = `${escapeHtml(mT('meta.slot_clash', 'Même créneau que {names} : elles se feront attendre.', { names: names(clashes) }))}
+        ${free ? `<button type="button" class="btn btn-secondary btn-sm" id="meta-slot-take">${escapeHtml(mT('meta.slot_take', 'Prendre {time}', { time: slotTime(free) }))}</button>` : ''}`;
+    document.getElementById('meta-slot-take')?.addEventListener('click', () => {
+        document.getElementById('config-schedule-time').value = slotTime(free);
+        renderSlotHint();
+    });
+}
+
+/** A new meta-analysis starts on a free slot. */
+function proposeFreeSlot() {
+    const slot = formSlot();
+    const clashes = slotClashes(slot);
+    const free = clashes.length ? freeSlot(slot) : null;
+    if (!free) {
+        renderSlotHint();
+        return;
+    }
+    const time = slotTime(slot);
+    document.getElementById('config-schedule-time').value = slotTime(free);
+    renderSlotHint({ time, clashes });
+}
+
 /* ── Sources : d'où viennent les lignes des règles ──────────────────────── */
 
 function sourceOf(rule) {
@@ -965,6 +1044,8 @@ function fillForm(c) {
     document.getElementById('config-notify').checked = c ? c.notify_enabled : true;
     document.getElementById('meta-danger').classList.toggle('hidden', !c);
     document.getElementById('meta-reset-row').classList.toggle('hidden', !(c && c.last_run_at));
+    if (c) renderSlotHint();
+    else proposeFreeSlot();
 }
 
 async function submitForm(event) {
@@ -1064,7 +1145,9 @@ function setupDanger() {
 
 document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('config-form').addEventListener('submit', submitForm);
-    document.getElementById('config-schedule-type').addEventListener('change', () => updateScheduleDay());
+    document.getElementById('config-schedule-type').addEventListener('change', () => { updateScheduleDay(); renderSlotHint(); });
+    ['config-schedule-day', 'config-schedule-time', 'config-enabled'].forEach(id =>
+        document.getElementById(id).addEventListener('change', () => renderSlotHint()));
     document.getElementById('meta-run').addEventListener('click', triggerRun);
     document.getElementById('meta-stop').addEventListener('click', () => {
         if (META.abort) META.abort.abort();

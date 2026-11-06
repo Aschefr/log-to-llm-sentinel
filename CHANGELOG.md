@@ -5,6 +5,9 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Meta-analyses keep apart**: a new meta-analysis starts on the first free slot, 15 minutes after any other one that would run at the same time, and the settings warn about a shared slot with a button to take the next free one.
+- **Back button in the header**: a page reached from a button or a link in the content (*Deepen with the AI*, *See in the rule*…) offers to go back to the page you came from. Choosing a page in the menu starts over.
+- **Quick actions on closed alert cards**: mark as read, flag as not relevant and add a note without opening the card. The dashboard history gets a *Mark all as read* button; it and the one on a rule's page now ask first, say how many unread events are critical, and offer *Sort my unread* as a safer way.
 - **Quiet mode**: a *Quiet* switch in the header lets only critical alerts through. Keyword changes, autopilot adjustments, resolutions, silent sources, scheduled meta-analyses and warning or info alerts are no longer sent; they stay visible in Sentinel. What you send yourself, a test or a resent alert, still goes out.
 - **Your own SSH key and account name**: the limited SSH access accepts a private key pasted from an earlier install, and on Linux the account the install block creates can have another name than `sentinel-diag`. The block stops without changing anything if that account already exists and was not created by Sentinel.
 - **MQTT topics to pick from**: once an MQTT connection is chosen in a rule, Sentinel listens for 3 seconds and offers the topics it saw under *Topic to follow*, shared prefixes first (`zigbee2mqtt/#`).
@@ -20,6 +23,8 @@ All notable changes to this project will be documented in this file.
 - **Connection guides**: each source shows a short step-by-step guide in the rule form, and says clearly when it cannot be read, in the rule list, on the rule page and on the dashboard.
 
 ### Changed
+- **Sort my unread also looks at recent events**: they used to stay unread without the AI seeing them. The AI now gets them marked as recent and may suggest one only when a note explicitly covers it, it was flagged as not relevant, or it resolved on its own; a note no longer stretches to another failure. Critical events still always stay to read; recent suggestions say so and start unticked, for you to tick.
+- **Unread alerts stand out**: an unread card is tinted and outlined with a bold summary, like an unread mail; a read card keeps its summary in grey.
 - **Docker Desktop on Windows**: the README explains how to keep the database in a Docker volume. In a folder of the Windows disk, each request waited about 1.3 s for the database on our test PC, against 50 ms on Linux.
 - **Which rules use a diagnostic connection**: under each Docker, server or web search connection, *All rules* opens a list of the rules with a box each, to give or take its access from several rules at once.
 - **AI access in a rule**: the rule settings list every diagnostic access, Docker, server, web search and CVE sheets. One that is not set up shows greyed and opens its setup.
@@ -28,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
 
 ### Fixed
+- **Sort my unread said the AI had nothing to suggest when it had not been asked**: when every unread event is critical, the dialog now says they stay to read on purpose.
 - **Pages rebuilding themselves while loading**: the dashboard showed its history, then emptied it and asked for it again once the translations arrived, and every page downloaded the whole translation file again. The dashboard panels and the rules summary now keep their shape while their data arrives.
 - **SearXNG install guide**: the Unraid tab showed the Docker compose text.
 - **Chat on a phone**: the message box could sit hidden behind the browser's bar, seen on Firefox for Android. The page was sized as if that bar were not there.

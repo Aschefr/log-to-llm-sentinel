@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Log to LLM Sentinel{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
-    <link rel="stylesheet" href="/static/css/style.css?v=56">
+    <link rel="stylesheet" href="/static/css/style.css?v=64">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -30,6 +30,10 @@
                 <span class="nav-version-status" id="version-status"></span>
             </button>
         </div>
+        <a class="nav-back hidden" id="nav-back" href="/">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>
+            <span data-i18n="header.back">Retour</span>
+        </a>
         <!-- Overlay INSIDE navbar so it shares stacking context with nav-links -->
         <div class="nav-overlay" id="nav-overlay" onclick="toggleMobileNav()"></div>
         <div class="nav-links" id="nav-links">
@@ -40,6 +44,7 @@
             <a href="/config" data-i18n="nav.config" class="{% if request.url.path == '/config' %}active{% endif %}">Configuration</a>
         </div>
         <div class="nav-right">
+            <div class="nav-switches">
             <button type="button" class="nav-switch is-unknown" id="monitoring-switch" role="switch" aria-checked="mixed" disabled>
                 <span class="nav-switch-track" aria-hidden="true"><span class="nav-switch-thumb"></span></span>
                 <span class="nav-switch-label" data-i18n="header.monitoring_unknown">État inconnu</span>
@@ -48,6 +53,7 @@
                 <span class="nav-switch-track" aria-hidden="true"><span class="nav-switch-thumb"></span></span>
                 <span class="nav-switch-label" data-i18n="header.quiet">Discret</span>
             </button>
+            </div>
             <div class="nav-stats" id="nav-system-stats">
                 <div class="stat-item" data-i18n-title="nav.tooltip_cpu" title="Utilisation CPU (App / Système)">
                     <span class="stat-label" data-i18n="nav.cpu_app">App</span>
@@ -101,10 +107,10 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
     <script src="/static/js/i18n.js?v=3"></script>
-    <script src="/static/js/common.js?v=26"></script>
-    <script src="/static/js/header.js?v=2"></script>
+    <script src="/static/js/common.js?v=28"></script>
+    <script src="/static/js/header.js?v=4"></script>
     <script src="/static/js/event_notes.js?v=2"></script>
-    <script src="/static/js/triage.js?v=2"></script>
+    <script src="/static/js/triage.js?v=5"></script>
     <script>
     /* ── Mobile hamburger nav toggle ── */
     function toggleMobileNav() {

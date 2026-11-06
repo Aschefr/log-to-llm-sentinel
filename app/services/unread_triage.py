@@ -1,5 +1,6 @@
 """Tri des événements non lus par l'IA, sur demande : elle propose, l'utilisateur valide, et le tri s'annule.
-Un événement critique ou tout neuf n'est jamais proposé, quoi que réponde l'IA. Marquer comme lu ne ferme aucun incident."""
+Un événement critique n'est jamais proposé, quoi que réponde l'IA. Un événement récent lui est soumis comme tel, avec une
+règle plus stricte (pas d'historique pour juger). Marquer comme lu ne ferme aucun incident."""
 import asyncio
 import uuid
 from datetime import datetime, timedelta
@@ -29,14 +30,14 @@ _task: Optional[asyncio.Task] = None
 
 
 def protection(event: dict, now: Optional[datetime] = None) -> Optional[str]:
-    """Pourquoi cet événement reste à lire quoi qu'il arrive : critique, tout récent, ou vu une seule fois il y a peu.
-    Vu une seule fois il y a longtemps et jamais revenu, c'est à l'IA d'en juger."""
-    if event["severity"] == "critical":
-        return "critical"
+    """Pourquoi cet événement reste à lire quoi qu'il arrive : critique."""
+    return "critical" if event["severity"] == "critical" else None
+
+
+def is_recent(event: dict, now: Optional[datetime] = None) -> bool:
+    """Pas encore d'historique pour juger : tout neuf, ou vu une seule fois il y a peu. L'IA le sait et l'applique."""
     age = (now or datetime.utcnow()) - datetime.fromisoformat(event["first_at"].rstrip("Z"))
-    if age < timedelta(hours=NEW_EVENT_HOURS) or (event["count"] < 2 and age < timedelta(days=SEEN_ONCE_DAYS)):
-        return "new"
-    return None
+    return age < timedelta(hours=NEW_EVENT_HOURS) or (event["count"] < 2 and age < timedelta(days=SEEN_ONCE_DAYS))
 
 
 def _item(db, event: dict, reason: str = "", kind: str = "") -> dict:
@@ -47,7 +48,7 @@ def _item(db, event: dict, reason: str = "", kind: str = "") -> dict:
         "rule_id": event["rule_id"], "rule_name": event["rule_name"], "key": event["key"], "analysis_id": event["analysis_id"],
         "severity": event["severity"], "count": event["count"], "first_at": event["first_at"], "last_at": event["last_at"],
         "open_count": event["open_count"], "summary": summary or (clean_log_line(lines[0])[:220] if lines else ""),
-        "reason": reason, "kind": kind,
+        "reason": reason, "kind": kind, "recent": bool(event.get("recent")),
     }
 
 
@@ -66,9 +67,13 @@ def build_messages(db, lang: str, events: List[dict]) -> list:
             facts.append(L("open", count=e["open_count"]))
         if e["flagged"]:
             facts.append(L("flagged"))
+        if e.get("recent"):
+            facts.append(L("recent"))
         block = [" — ".join(facts), L("summary", text=short_summary(a, 300))]
         block += [L("line", text=fence(clean_log_line(line)[:300])) for line in analysis_lines(a)[:3]]
-        block += [L("note", text=" ".join(note["text"].split())[:300]) for note in event_notes.for_analysis(db, a, limit=3)]
+        # Une note sur toute la source n'a pas été écrite pour cet événement : l'IA doit le savoir pour ne pas l'étendre
+        block += [L("note_source" if note["scope"] == "source" else "note", text=" ".join(note["text"].split())[:300])
+                  for note in event_notes.for_analysis(db, a, limit=3)]
         parts.append("\n".join(block))
     head = [L("rule_context", text=text) for text in contexts.values()]
     return [{"role": "system", "content": TRIAGE_SYSTEM.get(lang, TRIAGE_SYSTEM["fr"])},
@@ -95,6 +100,7 @@ def start(rule_id: Optional[int], tuning) -> dict:
             if why:
                 kept.append(_item(db, e, kind=why))
             else:
+                e["recent"] = is_recent(e, now)
                 eligible.append(e)
     finally:
         db.close()
