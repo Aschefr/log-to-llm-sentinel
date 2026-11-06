@@ -23,7 +23,7 @@ All notable changes to this project will be documented in this file.
 - **Connection guides**: each source shows a short step-by-step guide in the rule form, and says clearly when it cannot be read, in the rule list, on the rule page and on the dashboard.
 
 ### Changed
-- **Sort my unread also looks at recent events**: they used to stay unread without the AI seeing them. The AI now gets them marked as recent and may suggest one only when a note explicitly covers it, it was flagged as not relevant, or it resolved on its own; a note no longer stretches to another failure. Critical events still always stay to read; recent suggestions say so and start unticked, for you to tick.
+- **Sort my unread also looks at recent events**: they used to stay unread without the AI seeing them. The AI now gets them marked as recent and may suggest one only when a note explicitly covers it, it was flagged as not relevant, or it resolved on its own; a note no longer stretches to another failure. Critical events still always stay to read, and recent suggestions say so.
 - **Unread alerts stand out**: an unread card is tinted and outlined with a bold summary, like an unread mail; a read card keeps its summary in grey.
 - **Docker Desktop on Windows**: the README explains how to keep the database in a Docker volume. In a folder of the Windows disk, each request waited about 1.3 s for the database on our test PC, against 50 ms on Linux.
 - **Which rules use a diagnostic connection**: under each Docker, server or web search connection, *All rules* opens a list of the rules with a box each, to give or take its access from several rules at once.
@@ -33,6 +33,7 @@ All notable changes to this project will be documented in this file.
 - **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
 
 ### Fixed
+- **Sort my unread progress bar stayed empty**: the AI answers once per batch of 15 events, so with fewer events the bar jumped from empty to done. It now shows which events the AI is reading, a moving bar for that batch, and the time spent.
 - **Sort my unread said the AI had nothing to suggest when it had not been asked**: when every unread event is critical, the dialog now says they stay to read on purpose.
 - **Pages rebuilding themselves while loading**: the dashboard showed its history, then emptied it and asked for it again once the translations arrived, and every page downloaded the whole translation file again. The dashboard panels and the rules summary now keep their shape while their data arrives.
 - **SearXNG install guide**: the Unraid tab showed the Docker compose text.

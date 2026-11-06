@@ -1492,7 +1492,8 @@
     "stop": "Stop sorting",
     "retry": "Sort again",
     "running": "Preparing…",
-    "running_n": "The AI is going through your unread events: {done} of {total}.",
+    "running_batch": "The AI is reading events {from} to {to} of {total}…",
+    "running_since": "For {t} so far. An answer from the AI often takes one to two minutes.",
     "running_hint": "You can close this window: sorting carries on, and the result will be here when you come back.",
     "cancelled": "Sorting stopped. Nothing changed.",
     "failed": "Sorting failed. Nothing changed.",
@@ -1518,7 +1519,6 @@
     "seen_many": "seen {n} times",
     "last_seen": "last on {d}",
     "recent": "recent, no history",
-    "recent_unchecked": "Recent events are unticked: the AI had no history to judge them. Tick them yourself if you agree.",
     "last_one": "Last sort, {d}: 1 event marked as read.",
     "last_many": "Last sort, {d}: {n} events marked as read.",
     "undo": "Undo this sort"

@@ -106,7 +106,7 @@ def start(rule_id: Optional[int], tuning) -> dict:
         db.close()
     eligible.sort(key=lambda e: -e["count"])  # les plus répétés d'abord : c'est là que le tri fait gagner le plus
     _job = {"id": uuid.uuid4().hex, "rule_id": rule_id, "status": "running", "error": None, "started_at": now,
-            "at": iso(now), "applied": False, "unread": len(unread), "total": len(eligible[:MAX_EVENTS]), "done": 0,
+            "at": iso(now), "applied": False, "unread": len(unread), "total": len(eligible[:MAX_EVENTS]), "done": 0, "batch": BATCH_EVENTS,
             "not_reviewed": max(0, len(eligible) - MAX_EVENTS), "proposals": [], "kept": kept}
     if not eligible:
         _job["status"] = "done"

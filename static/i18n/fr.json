@@ -1492,7 +1492,8 @@
     "stop": "Arrêter le tri",
     "retry": "Relancer le tri",
     "running": "Préparation du tri…",
-    "running_n": "L’IA regarde tes événements non lus : {done} sur {total}.",
+    "running_batch": "L’IA lit les événements {from} à {to} sur {total}…",
+    "running_since": "Depuis {t}. Une réponse de l’IA prend souvent une à deux minutes.",
     "running_hint": "Tu peux fermer cette fenêtre : le tri continue, et tu retrouveras le résultat en revenant ici.",
     "cancelled": "Tri arrêté. Rien n’a changé.",
     "failed": "Le tri a échoué. Rien n’a changé.",
@@ -1518,7 +1519,6 @@
     "seen_many": "vu {n} fois",
     "last_seen": "dernière fois le {d}",
     "recent": "récent, sans historique",
-    "recent_unchecked": "Les événements récents sont décochés : l’IA n’avait pas d’historique pour en juger. Coche-les toi-même si tu es d’accord.",
     "last_one": "Dernier tri, le {d} : 1 événement marqué comme lu.",
     "last_many": "Dernier tri, le {d} : {n} événements marqués comme lus.",
     "undo": "Annuler ce tri"
