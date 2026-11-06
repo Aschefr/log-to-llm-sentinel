@@ -72,6 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAll();
         // Le premier rendu se fait avec les textes français de secours : seule une autre langue oblige à tout redessiner
         if (!first || lang !== 'fr') resetHistory();
+        // Historique arrivé avant les traductions : les cartes sont redessinées sur place, sans vider la liste
+        else if (DASH.historyReady) {
+            document.querySelectorAll('#dash-history-list > .analysis-card').forEach(el => { el.dataset.signature = ''; });
+            loadHistory();
+        }
     });
 });
 

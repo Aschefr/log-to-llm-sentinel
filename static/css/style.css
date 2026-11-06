@@ -2834,6 +2834,10 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 
 .analysis-summary-line { flex-basis: 100%; margin-top: 0.35rem; font-size: 0.9rem; line-height: 1.45; color: var(--text-primary); font-weight: 500; }
 .analysis-card.collapsed .analysis-summary-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Component that wrote the triggering lines, before the summary */
+.analysis-src { display: inline-block; margin-right: 0.5rem; padding: 0.05rem 0.4rem; border: 1px solid var(--border); border-radius: 0.3rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);
+    vertical-align: 0.05em; white-space: nowrap; }
 .analysis-header > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; min-width: 0; flex: 1; }
 .recur-badge { font-size: 0.7rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 999px; background: rgba(139, 92, 246, 0.14); color: #a78bfa; }
 .recur-badge--new { background: rgba(59, 130, 246, 0.12); color: var(--accent); }

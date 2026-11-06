@@ -94,6 +94,50 @@ def aggregate_lines(lines: list) -> list:
     return list(groups.values())
 
 
+# Composant qui a écrit une ligne, pour le montrer à côté du résumé : un résumé qui parle d'autre chose se voit alors.
+# Préfixes retirés : ils sont les mêmes pour toutes les lignes de la source et n'apprennent rien.
+_COMPONENT_PREFIXES = ("homeassistant.components.", "homeassistant.helpers.", "custom_components.", "homeassistant.",
+                       "com.docker.backend.exe.", "com.docker.")
+_COMPONENT_PATTERNS = [
+    re.compile(r"\b(?:DEBUG|INFO|WARNING|WARN|ERROR|CRITICAL|FATAL)\s+\[([\w.-]+)\]"),  # Home Assistant, Python : ERROR [logger]
+    re.compile(r"^\[[^\]]*\d{2}:\d{2}[^\]]*\]\[([\w.-]+)\]"),  # Docker Desktop : [horodatage][composant]
+    re.compile(r"^\[([\w .-]{1,40})\] "),  # Nextcloud, ligne JSON nettoyée : [app] message
+    # syslog : hôte, éventuel « modèle,firmware: » des équipements UniFi, puis programme[pid]:
+    re.compile(r"(?<!\d)\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+\S+\s+(?:\S+,\S+:\s+)?([A-Za-z][\w./-]*?)(?:\[\d+\])?:\s"),
+]
+_SYSTEMD_UNIT = re.compile(r"^\s*([\w@.-]+\.(?:service|timer|socket|mount)):")
+
+
+def line_component(line: str) -> str | None:
+    """Le composant qui a écrit la ligne (logger, programme, application), en court, ou None si la forme est inconnue."""
+    text = clean_log_line(line)
+    for pattern in _COMPONENT_PATTERNS:
+        m = pattern.search(text)
+        if not m:
+            continue
+        name = m.group(1)
+        if name == "systemd":  # systemd parle pour une unité : c'est elle qui compte
+            unit = _SYSTEMD_UNIT.match(text[m.end():])
+            if unit:
+                name = unit.group(1)
+        for prefix in _COMPONENT_PREFIXES:
+            if name.startswith(prefix) and len(name) > len(prefix):
+                name = name[len(prefix):]
+                break
+        return name[:48]
+    return None
+
+
+def line_components(lines: list, limit: int = 3) -> list:
+    """Composants des lignes, du plus fréquent au moins fréquent, sans doublon."""
+    counts = {}
+    for line in lines:
+        name = line_component(line)
+        if name:
+            counts[name] = counts.get(name, 0) + 1
+    return [name for name, _ in sorted(counts.items(), key=lambda x: -x[1])][:limit]
+
+
 def clean_log_line(line: str) -> str:
     """Tente de nettoyer une ligne de log si elle est au format JSON (ex: Nextcloud)."""
     stripped = line.strip()

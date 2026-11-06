@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Alert cards name the component that wrote the lines** (a Home Assistant integration, a Docker Desktop part, a syslog program, a systemd unit), before the summary. A summary that talks about something else stands out at a glance.
 - **Meta-analyses keep apart**: a new meta-analysis starts on the first free slot, 15 minutes after any other one that would run at the same time, and the settings warn about a shared slot with a button to take the next free one.
 - **Back button in the header**: a page reached from a button or a link in the content (*Deepen with the AI*, *See in the rule*…) offers to go back to the page you came from. Choosing a page in the menu starts over.
 - **Quick actions on closed alert cards**: mark as read, flag as not relevant and add a note without opening the card. The dashboard history gets a *Mark all as read* button; it and the one on a rule's page now ask first, say how many unread events are critical, and offer *Sort my unread* as a safer way.

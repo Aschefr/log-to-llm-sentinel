@@ -758,6 +758,7 @@
     "confirm_delete_event": "Delete this event and its {n} occurrences?",
     "notes_title": "Notes for the AI",
     "note_add": "Add a note",
+    "component_title": "Component that wrote the lines of this alert",
     "note_label": "What the AI should know",
     "note_placeholder": "E.g. this server runs Unraid, without systemd.",
     "note_hint": "It informs the AI and never silences an alert. Used from the next analysis on; Retry applies it to this one.",

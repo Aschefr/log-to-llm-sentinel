@@ -463,7 +463,8 @@ function renderAnalysisCard(a, opts = {}) {
     const showCopy = opts.showCopy !== false;
     const showRuleName = opts.showRuleName !== false;
     const cardClass = opts.cardClass || 'analysis-card';
-    const _t = (k, fb) => window.t ? window.t(k) : fb;
+    // Traductions pas encore chargées : window.t rend la clé, le texte de secours vaut mieux
+    const _t = (k, fb) => { const s = window.t ? window.t(k) : null; return s && s !== k ? s : fb; };
 
     const collapsedCls = collapsed ? ' collapsed' : '';
     const toggleArrow = collapsed ? '▶' : '▼';
@@ -502,7 +503,7 @@ function renderAnalysisCard(a, opts = {}) {
         </button>` : '';
 
     const ruleName = showRuleName && a.rule_name
-        ? `<strong>${_t('dashboard.rule_label', 'Rule:')} ${escapeHtml(a.rule_name)}</strong>`
+        ? `<strong>${_t('dashboard.rule_label', 'Règle:')} ${escapeHtml(a.rule_name)}</strong>`
         : '';
 
     const resolvedBadge = a.resolution_status === 'resolved'
@@ -518,8 +519,13 @@ function renderAnalysisCard(a, opts = {}) {
             ? `<span class="recur-badge" title="${escapeHtml(_t('common.recurrence_title', 'Déjà vu dans les 7 jours précédents'))}">${escapeHtml(_t('common.recurrence', '× {n} en 7 j').replace('{n}', a.recurrence_7d))}</span>`
             : `<span class="recur-badge recur-badge--new">${escapeHtml(_t('common.recurrence_new', 'nouveau'))}</span>`;
     }
+    // Qui a écrit les lignes déclenchantes : un résumé qui parle d'autre chose se voit d'un coup d'œil
+    const components = (a.components || []).slice(0, 2);
+    const extra = (a.components || []).length - components.length;
+    const sourceTag = components.length
+        ? `<span class="analysis-src" title="${escapeHtml(_t('common.component_title', 'Composant qui a écrit les lignes de cette alerte'))}">${escapeHtml(components.join(' · '))}${extra > 0 ? ` +${extra}` : ''}</span>` : '';
     const summaryLine = a.summary && opts.showSummary !== false
-        ? `<div class="analysis-summary-line">${escapeHtml(a.summary)}</div>` : '';
+        ? `<div class="analysis-summary-line">${sourceTag}${escapeHtml(a.summary)}</div>` : '';
 
     let resolutionBlock = '';
     if (a.resolution_status === 'resolved' && a.resolved_at && a.analyzed_at) {

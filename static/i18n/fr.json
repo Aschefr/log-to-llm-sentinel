@@ -758,6 +758,7 @@
     "confirm_delete_event": "Supprimer cet événement et ses {n} occurrences ?",
     "notes_title": "Notes pour l'IA",
     "note_add": "Ajouter une note",
+    "component_title": "Composant qui a écrit les lignes de cette alerte",
     "note_label": "Ce que l'IA devrait savoir",
     "note_placeholder": "Ex. : ce serveur tourne sous Unraid, sans systemd.",
     "note_hint": "Elle informe l'IA sans jamais faire taire une alerte. Prise en compte dès la prochaine analyse ; « Ré-essayer » l'applique à celle-ci.",

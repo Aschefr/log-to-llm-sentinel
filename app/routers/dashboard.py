@@ -14,6 +14,7 @@ from app.models import GlobalConfig, Rule, Analysis
 from app.services import analysis_events, dashboard_watch, event_notes, monitoring, rule_stats
 from app.services.app_config import config_to_dict
 from app.services.alert_analysis import analysis_lines, short_summary
+from app.utils.log_utils import line_components
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -170,6 +171,8 @@ def _analysis_dict(a: Analysis, rule_name: str, recurrence: dict) -> dict:
         "resolution_ai_explanation": a.resolution_ai_explanation,
         "resolution_ai_confidence": a.resolution_ai_confidence,
         "summary": short_summary(a, 220) if (a.summary or a.ollama_response) else None,
+        # Qui a écrit les lignes déclenchantes : montré devant le résumé, pour voir s'il parle bien de ça
+        "components": line_components(analysis_lines(a)),
         "recurrence_7d": recurrence.get(a.id, 0),
         "resolution_minutes": rule_stats.resolution_minutes(a),
     }
