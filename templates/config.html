@@ -401,6 +401,18 @@
                         <span class="form-hint" id="diag-cve-result"></span>
                     </div>
                 </div>
+                <!-- ── Second regard pendant l'analyse ── -->
+                <div class="diag-card" id="diag-second-look">
+                    <div class="diag-card-head">
+                        <h3 data-i18n="diag.sl_title">Second regard pendant l'analyse</h3>
+                        <span class="diag-status" id="diag-sl-status"></span>
+                    </div>
+                    <p class="form-hint" data-i18n="diag.sl_hint">Après l'analyse d'une alerte, l'IA vérifie l'état réel des machines de la règle avec ses connexions Docker et SSH : 3 contrôles en lecture seule au plus, avant la notification. Ce qu'elle a vérifié s'affiche sur la carte. Chaque alerte concernée demande quelques appels de plus au modèle.</p>
+                    <label class="rf-check"><input type="checkbox" id="diag-sl-enabled"> <span data-i18n="diag.sl_enable">Activer le second regard</span></label>
+                    <label class="rf-check"><input type="checkbox" id="diag-sl-info"> <span data-i18n="diag.sl_info">Aussi sur les alertes info (par défaut : warning et critical)</span></label>
+                    <label class="rf-check"><input type="checkbox" id="diag-sl-lower"> <span data-i18n="diag.sl_lower">Lui permettre de baisser la gravité</span></label>
+                    <p class="form-hint" data-i18n="diag.sl_lower_hint">Par défaut, il ne peut que relever la gravité. S'il peut la baisser, une alerte dont le service est reparti peut passer sous ton seuil de notification. Jamais quand une ligne ou une sortie de contrôle s'adresse à l'IA : dans ce cas, pas de second regard du tout ou pas de baisse.</p>
+                </div>
             </div>
         </section>
 
@@ -518,6 +530,6 @@
 
 {% block scripts %}
 <script src="/static/js/config.js?v=16"></script>
-<script src="/static/js/diagnostics_config.js?v=13"></script>
+<script src="/static/js/diagnostics_config.js?v=14"></script>
 <script src="/static/js/source_connections.js?v=4"></script>
 {% endblock %}

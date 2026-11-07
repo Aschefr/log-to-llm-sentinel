@@ -19,6 +19,7 @@ from app.services.prompts import ALERT_SCHEMA, label
 from app.utils.log_utils import clean_log_line, aggregate_lines, line_signature
 from app.utils import keyword_match
 from app.services import autopilot
+from app.services import second_look as second_look_service
 from app.services.keyword_tuning import error_level
 from app import logger
 from app.utils.notification_i18n import nt
@@ -267,6 +268,14 @@ class Orchestrator:
         logger.add_ollama_log(messages_to_text(messages), parsed["markdown"], detection_id)
         return {"events_text": events_text, "context": context, "messages": messages, **parsed}
 
+    async def second_look(self, rule: Rule, result: dict, config: dict, db) -> Optional[dict]:
+        """Second regard (contrôles en lecture seule) sur une analyse automatique ; une panne ici ne perd pas l'alerte."""
+        try:
+            return await second_look_service.run(self.ollama, self._ollama_semaphore, rule, result, config, db)
+        except Exception as e:
+            logger.error("Orchestrator", f"Second regard impossible pour '{rule.name}' : {e}")
+            return None
+
     @staticmethod
     def apply_result(analysis: Analysis, result: dict):
         """Reporte le résultat d'analyze_alert sur une Analysis (création ou retry)."""
@@ -307,6 +316,8 @@ class Orchestrator:
         else:
             result = await self.analyze_alert(rule, raw_lines, config, db,
                                               matched_keywords=matched_keywords, detection_id=detection_id)
+        # Une répétition reprend le verdict précédent sans appel à l'IA : pas de second regard non plus
+        second_look = None if prior else await self.second_look(rule, result, config, db)
         severity = result["severity"]
 
         analysis = Analysis(
@@ -319,6 +330,7 @@ class Orchestrator:
         )
         self.apply_result(analysis, result)
         analysis.reused_from = prior.id if prior else None
+        analysis.second_look_json = json.dumps(second_look, ensure_ascii=False) if second_look else None
         if result.get("failed"):
             analysis.ai_failed_at = analysis.analyzed_at
         db.add(analysis)
@@ -376,7 +388,9 @@ class Orchestrator:
             matched_keywords=json.loads(analysis.matched_keywords_json or "[]"),
             detection_id=analysis.detection_id, ref_time=analysis.analyzed_at, exclude_id=analysis.id, context=context,
         )
+        second_look = await self.second_look(rule, result, config, db)
         self.apply_result(analysis, result)
+        analysis.second_look_json = json.dumps(second_look, ensure_ascii=False) if second_look else None
         analysis.ai_failed_at = (analysis.ai_failed_at or datetime.utcnow()) if result.get("failed") else None
         return result
 

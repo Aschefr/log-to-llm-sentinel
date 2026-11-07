@@ -526,6 +526,7 @@ function renderAnalysisCard(a, opts = {}) {
         ? `<span class="analysis-src" title="${escapeHtml(_t('common.component_title', 'Composant qui a écrit les lignes de cette alerte'))}">${escapeHtml(components.join(' · '))}${extra > 0 ? ` +${extra}` : ''}</span>` : '';
     const summaryLine = a.summary && opts.showSummary !== false
         ? `<div class="analysis-summary-line">${sourceTag}${escapeHtml(a.summary)}</div>` : '';
+    const slBadge = secondLookBadgeHtml(a.second_look);
 
     let resolutionBlock = '';
     if (a.resolution_status === 'resolved' && a.resolved_at && a.analyzed_at) {
@@ -593,6 +594,7 @@ function renderAnalysisCard(a, opts = {}) {
                 ${a.ai_pending
                     ? `<span class="ai-pending-badge" title="${escapeHtml(_t('common.ai_pending_title', 'L’IA n’a pas répondu : cette alerte sera analysée dès son retour, et notifiée si elle le mérite.'))}">${escapeHtml(_t('common.ai_pending', 'En attente de l’IA'))}</span>`
                     : `<span class="severity-badge ${escapeHtml(ev ? ev.severity : a.severity)}">${escapeHtml(ev ? ev.severity : a.severity)}</span>`}
+                ${slBadge}
                 ${resolvedBadge}
                 ${recurBadge}
                 ${ev ? `<span class="event-note-count${(ev.notes || []).length ? '' : ' hidden'}" title="${escapeHtml(_t('common.notes_title', 'Notes pour l’IA'))}"><span aria-hidden="true">📝 </span><span>${(ev.notes || []).length}</span></span>` : ''}
@@ -620,6 +622,7 @@ function renderAnalysisCard(a, opts = {}) {
             ${cveSlotHtml(a)}
             ${a.reused_from ? `<p class="form-hint analysis-reused">${_t('common.analysis_reused', 'Même événement : analyse reprise, sans nouvel appel à l’IA.')}</p>` : ''}
             <div class="analysis-response markdown-body">${a.ollama_response ? renderMarkdown(a.ollama_response) : ''}</div>
+            ${secondLookChecksHtml(a.second_look)}
             ${resolutionBlock}
             ${ev ? eventNotesHtml(ev, a.id) : ''}
             <div class="analysis-footer">
@@ -638,6 +641,39 @@ function renderAnalysisCard(a, opts = {}) {
             </div>
         </div>
     </div>`;
+}
+
+/* ── Second look: what the AI checked on the machines before the alert was stored ── */
+
+function secondLookBadgeHtml(sl) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    if (!sl) return '';
+    if (sl.status === 'skipped_suspicious') {
+        return `<span class="sl-badge sl-badge--skipped" title="${escapeHtml(_t('common.sl_skipped_title', 'Pas de second regard : une ligne de cette alerte s’adresse à l’IA, elle aurait pu choisir les contrôles.'))}">${escapeHtml(_t('common.sl_skipped', 'non vérifiée'))}</span>`;
+    }
+    if (sl.status !== 'done') return '';
+    const rank = { info: 0, warning: 1, critical: 2 };
+    const before = sl.severity_before, after = sl.severity_after;
+    let text = _t('common.sl_checked', 'vérifiée'), cls = '';
+    if (after !== before) {
+        const up = rank[after] > rank[before];
+        text = (up ? _t('common.sl_raised', 'relevée depuis {s}') : _t('common.sl_lowered', 'baissée depuis {s}')).replace('{s}', before);
+        cls = up ? ' sl-badge--raised' : ' sl-badge--lowered';
+    }
+    const title = _t('common.sl_title', 'Second regard : l’IA a vérifié l’état réel des machines avant d’enregistrer l’alerte ({n} contrôle(s)).')
+        .replace('{n}', (sl.checks || []).length);
+    return `<span class="sl-badge${cls}" title="${escapeHtml(title)}">${escapeHtml(text)}</span>`;
+}
+
+function secondLookChecksHtml(sl) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    if (!sl || !(sl.checks || []).length) return '';
+    const items = sl.checks.map(c => `<li><span class="sl-check-label${c.error ? ' sl-check-label--error' : ''}">${escapeHtml(c.label || '')}</span>
+        <pre class="sl-check-output">${escapeHtml(c.excerpt || '')}</pre></li>`).join('');
+    return `<details class="sl-checks" onclick="event.stopPropagation()">
+        <summary>${escapeHtml(_t('common.sl_outputs', 'Résultats bruts des contrôles ({n})').replace('{n}', sl.checks.length))}</summary>
+        <ul>${items}</ul>
+    </details>`;
 }
 
 /* ── Analyses grouped by event ───────────────────────────────────────────── */

@@ -795,7 +795,14 @@
     "cve_kev": "Exploitée activement · KEV depuis {date}",
     "cve_no_kev": "Pas au catalogue KEV",
     "cve_affected": "Versions touchées",
-    "cve_enable_hint": "Afficher la fiche officielle de ce CVE"
+    "cve_enable_hint": "Afficher la fiche officielle de ce CVE",
+    "sl_skipped": "non vérifiée",
+    "sl_skipped_title": "Pas de second regard : une ligne de cette alerte s’adresse à l’IA, elle aurait pu choisir les contrôles.",
+    "sl_checked": "vérifiée",
+    "sl_raised": "relevée depuis {s}",
+    "sl_lowered": "baissée depuis {s}",
+    "sl_title": "Second regard : l’IA a vérifié l’état réel des machines avant d’enregistrer l’alerte ({n} contrôle(s)).",
+    "sl_outputs": "Résultats bruts des contrôles ({n})"
   },
   "meta": {
     "title": "Méta-analyse",
@@ -1493,7 +1500,14 @@
     "cve_on": "activé",
     "web_blocked": "L’instance répond, mais aucun moteur ne renvoie de résultat pour l’instant (sans réponse : {failed}). Ils bloquent souvent pour un temps : réessaie plus tard.",
     "web_paused": "Recherches suspendues encore {n} min : aucun moteur n’a répondu ({engines}). Insister prolongerait le blocage. Tester relance dès qu’un moteur répond.",
-    "web_full": "Limite atteinte : {n} recherches cette heure. L’IA reprendra quand l’heure sera écoulée."
+    "web_full": "Limite atteinte : {n} recherches cette heure. L’IA reprendra quand l’heure sera écoulée.",
+    "sl_title": "Second regard pendant l'analyse",
+    "sl_hint": "Après l'analyse d'une alerte, l'IA vérifie l'état réel des machines de la règle avec ses connexions Docker et SSH : 3 contrôles en lecture seule au plus, avant la notification. Ce qu'elle a vérifié s'affiche sur la carte. Chaque alerte concernée demande quelques appels de plus au modèle.",
+    "sl_enable": "Activer le second regard",
+    "sl_info": "Aussi sur les alertes info (par défaut : warning et critical)",
+    "sl_lower": "Lui permettre de baisser la gravité",
+    "sl_lower_hint": "Par défaut, il ne peut que relever la gravité. S'il peut la baisser, une alerte dont le service est reparti peut passer sous ton seuil de notification. Jamais quand une ligne ou une sortie de contrôle s'adresse à l'IA : dans ce cas, pas de second regard du tout ou pas de baisse.",
+    "sl_no_link": "sans connexion Docker ni SSH"
   },
   "triage": {
     "title": "Trier mes non lues",

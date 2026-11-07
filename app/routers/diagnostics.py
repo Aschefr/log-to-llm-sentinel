@@ -36,6 +36,12 @@ class DockerTest(BaseModel):
     url: str
 
 
+class SecondLookSetting(BaseModel):
+    enabled: Optional[bool] = None
+    include_info: Optional[bool] = None
+    may_lower: Optional[bool] = None
+
+
 class KeyImport(BaseModel):
     private_key: str
 
@@ -88,7 +94,12 @@ def get_status():
             link["rule_ids"] = [rid for rid, _, ids in rules if ids is None or link["id"] in ids]
             if link["kind"] == "ssh":
                 link["host_fingerprint"] = diag.host_fingerprint(link["ssh_host"], link["ssh_port"])
-        return {"cve_lookup": cve_lookup.enabled(db), "web_search": web_search.status(), "links": links, "rule_count": len(rules),
+        config = db.query(GlobalConfig).first()
+        second_look = {"enabled": bool(config and config.second_look_enabled),
+                       "include_info": bool(config and config.second_look_include_info),
+                       "may_lower": bool(config and config.second_look_may_lower)}
+        return {"cve_lookup": cve_lookup.enabled(db), "web_search": web_search.status(), "second_look": second_look,
+                "links": links, "rule_count": len(rules),
                 "all_rules": [{"id": rid, "name": name} for rid, name, _ in rules],
                 "public_key": diag.public_key(), "available": diag.availability(), "host_checks": list(diag.HOST_CHECKS)}
     finally:
@@ -184,6 +195,25 @@ def set_cve_lookup(body: CveSetting):
         config.cve_lookup_enabled = body.enabled
         db.commit()
         return {"enabled": body.enabled}
+    finally:
+        db.close()
+
+
+@router.post("/second-look")
+def set_second_look(body: SecondLookSetting):
+    """Second regard pendant l'analyse automatique : contrôles en lecture seule sur les connexions de la règle."""
+    db = SessionLocal()
+    try:
+        config = db.query(GlobalConfig).first()
+        if not config:
+            raise HTTPException(status_code=404, detail="config_not_found")
+        for key in ("enabled", "include_info", "may_lower"):
+            value = getattr(body, key)
+            if value is not None:
+                setattr(config, f"second_look_{key}", value)
+        db.commit()
+        return {"enabled": bool(config.second_look_enabled), "include_info": bool(config.second_look_include_info),
+                "may_lower": bool(config.second_look_may_lower)}
     finally:
         db.close()
 

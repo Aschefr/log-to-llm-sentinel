@@ -52,6 +52,9 @@ def config_to_dict(config: Optional[GlobalConfig]) -> dict:
         "auto_delete_retention_days": config.auto_delete_retention_days if config else 30,
         "syslog_enabled": config.syslog_enabled if config else False,
         "syslog_forward_addr": (config.syslog_forward_addr or '') if config else '',
+        "second_look_enabled": bool(config and config.second_look_enabled),
+        "second_look_include_info": bool(config and config.second_look_include_info),
+        "second_look_may_lower": bool(config and config.second_look_may_lower),
     }
 
 

@@ -246,6 +246,7 @@ class Analysis(Base):
     reused_from = Column(Integer, nullable=True)  # Répétition : verdict repris de cette analyse, sans appel à l'IA
     ai_failed_at = Column(DateTime, nullable=True)  # L'IA n'a pas répondu : en attente d'une nouvelle analyse
     ai_retries = Column(Integer, default=0)
+    second_look_json = Column(Text, nullable=True)  # Second regard : contrôles faits par l'IA et gravité avant/après
 
 
 class ResolutionVerdict(Base):
@@ -307,6 +308,10 @@ class GlobalConfig(Base):
     chat_system_prompt = Column(Text, default="")
     chat_lang = Column(String, default="")  # Plus utilisée : le chat suit la langue du site
     cve_lookup_enabled = Column(Boolean, default=False)  # fiches CVE depuis NVD : une sortie vers Internet, au choix
+    # Second regard pendant l'analyse automatique : contrôles en lecture seule sur les connexions de la règle
+    second_look_enabled = Column(Boolean, default=False)
+    second_look_include_info = Column(Boolean, default=False)  # par défaut : alertes warning et critical seulement
+    second_look_may_lower = Column(Boolean, default=False)     # par défaut : il ne peut que relever la gravité
     chat_compression_mode = Column(String, default="")  # Contexte plein : "" (demander), summary, compact, truncate
     auto_delete_analyses = Column(Boolean, default=False)
     auto_delete_retention_days = Column(Integer, default=30)

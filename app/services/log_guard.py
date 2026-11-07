@@ -8,7 +8,10 @@ import secrets
 import unicodedata
 from typing import Iterable
 
-_READER = r"(?:classifier|classifieur|analyst|analyste|analista|moderator|moderateur|llm|chatbot|ai model|modele d'ia|modele ia)"
+_READER = (r"(?:classifier|classifieur|analyst|analyste|analista|moderator|moderateur|llm|chatbot|ai model|modele d'ia|modele ia"
+           r"|ai assistant|assistant ia|assistant d'ia|ai agent|agent ia|assistant|l'ia|ai|ia)")
+# Noms des outils de Sentinel : un programme n'a aucune raison de les écrire dans son journal
+_TOOL = r"(?:host_check|docker_list_containers|docker_container_\w+|propose_action|web_search|lookup_cve|tail_logs|search_logs)"
 _CLASSIFY = r"(?:classify|classifiez|classer|classez|classe ceci|classe cet|mark as|marque comme|marquer comme|rate as)"
 _REPLY = r"(?:answer|reply|respond|repondre|repondez|reponds|responde)"
 _VERDICT = r"(?:info|informational|informationnel|benign|benin|harmless|inoffensi[a-z]+|no action|aucune action)"
@@ -27,6 +30,8 @@ _INSTRUCTION = re.compile("|".join((
     r"</?log\b|##\s*(?:notes?|evenements|events|contexte|context|historique|history)\b|notes? de l'administrateur|administrator notes?",
     # Phrase adressée au lecteur automatique
     rf"\b(?:note|notice|message|instruction|aviso)\s+(?:au|aux|to|for|pour|al)\s+(?:the\s+|le\s+)?{_READER}\b",
+    # Ordre d'appeler un outil de Sentinel (second regard, chat)
+    rf"\b{_TOOL}\b",
 )))
 
 

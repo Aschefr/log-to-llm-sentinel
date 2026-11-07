@@ -5,9 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Second look during analysis** (off by default, *Configuration › Diagnostics*): after analysing a warning or critical alert, the AI checks the real state of the rule's machines through its Docker and SSH connections, with at most 3 read-only checks, before the alert is stored and notified. It confirms the analysis, or raises the severity when a container is still down or restarts in a loop; lowering it is a separate option. The card shows a badge, the finding and the raw check results. An alert with a line addressed to the AI gets no second look, tool outputs are fenced like log lines, the severity never goes down when one of them addresses the AI, and secrets are masked.
 - **Two more server checks for the AI**: `fstab` shows the mounts declared at boot, with passwords, user names and credential files masked, and the state of systemd mount units; `nfs-exports` shows what an NFS server exports, only for a server the machine already mounts from. They help when a share did not come back after a restart. The script on the server goes to version 3: *Test and save* says so, paste the install block again.
 
 ### Fixed
+- **Some lines addressed to the AI went unnoticed**: the check for log lines that try to steer the AI missed "Note to the AI assistant…", "note pour l'IA…" and lines naming Sentinel's own tools. A test model followed such a line no further, but such lines now keep their alert at warning or above and get no second look. On 215,860 real log lines, the wider check flags none more.
 - **Closing an incident while a container is still down**: an investigation found the cause of a stopped container, then proposed to mark the incident as resolved. Sentinel now refuses this proposal while its own checks show a container stopped, unhealthy or restarting in a loop, and the AI says what to do to bring it back instead.
 
 ## [1.9.0] - 2026-11-07

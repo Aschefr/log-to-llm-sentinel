@@ -2838,6 +2838,19 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .analysis-header > div:first-child { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; min-width: 0; flex: 1; }
 .recur-badge { font-size: 0.7rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 999px; background: rgba(139, 92, 246, 0.14); color: #a78bfa; }
 .recur-badge--new { background: rgba(59, 130, 246, 0.12); color: var(--accent); }
+/* Second look: checked on the machines before the alert was stored */
+.sl-badge { display: inline-block; padding: 0.1rem 0.45rem; border: 1px solid var(--border); border-radius: 999px;
+    font-size: 0.7rem; font-weight: 600; color: var(--text-secondary); white-space: nowrap; }
+.sl-badge--raised { border-color: var(--danger); color: var(--danger); }
+.sl-badge--lowered { border-color: var(--success); color: var(--success); }
+.sl-badge--skipped { border-style: dashed; }
+.sl-checks { margin: 0.6rem 0 0.8rem; font-size: 0.82rem; }
+.sl-checks summary { cursor: pointer; color: var(--text-secondary); }
+.sl-checks ul { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.sl-check-label { font-weight: 600; }
+.sl-check-label--error { color: var(--warning); }
+.sl-check-output { margin: 0.2rem 0 0; max-height: 14rem; overflow: auto; padding: 0.4rem 0.6rem; border: 1px solid var(--border);
+    border-radius: 0.3rem; background: var(--bg-secondary); font-size: 0.75rem; white-space: pre-wrap; word-break: break-word; }
 
 .rp-cond { display: flex; flex-direction: column; gap: 0.35rem; }
 .rp-cond-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; font-size: 0.88rem; }

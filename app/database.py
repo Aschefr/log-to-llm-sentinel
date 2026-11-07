@@ -160,6 +160,11 @@ def init_db():
         "ALTER TABLE analyses ADD COLUMN ai_retries INTEGER DEFAULT 0",
         "CREATE INDEX IF NOT EXISTS ix_analyses_ai_failed ON analyses (ai_failed_at)",
         "ALTER TABLE global_config ADD COLUMN ai_outage_notified_at DATETIME",
+        # Second regard pendant l'analyse automatique
+        "ALTER TABLE analyses ADD COLUMN second_look_json TEXT",
+        "ALTER TABLE global_config ADD COLUMN second_look_enabled BOOLEAN DEFAULT 0",
+        "ALTER TABLE global_config ADD COLUMN second_look_include_info BOOLEAN DEFAULT 0",
+        "ALTER TABLE global_config ADD COLUMN second_look_may_lower BOOLEAN DEFAULT 0",
     ]
 
     migrations += [

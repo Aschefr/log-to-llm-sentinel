@@ -458,9 +458,14 @@ def _is_problem(c: dict) -> bool:
     return False
 
 
-def _link(db, kind, connection, conversation_id) -> dict:
-    """La connexion demandée, si cette conversation y a droit. Sans précision, la seule disponible."""
-    links = diag.links_for_conversation(db, conversation_id, kind)
+def _link(db, kind, connection, conversation_id, rule_id=None) -> dict:
+    """La connexion demandée, si cette conversation (ou, pour le second regard, cette règle) y a droit.
+    Sans précision, la seule disponible."""
+    if rule_id is not None:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        links = diag.links_for_rule(db, rule, kind) if rule else []
+    else:
+        links = diag.links_for_conversation(db, conversation_id, kind)
     if not links:
         raise ToolError(f"aucune connexion {dict(docker='Docker', ssh='SSH', web='de recherche web')[kind]} pour cette conversation")
     names = ", ".join(l["name"] for l in links)
@@ -503,8 +508,8 @@ def _status_problem(s: dict) -> Optional[str]:
     return None
 
 
-def docker_list_containers(db, only_problems=False, connection=None, _conversation_id=None, **_):
-    rows = _diag(diag.docker_containers, _link(db, "docker", connection, _conversation_id)["docker_url"])
+def docker_list_containers(db, only_problems=False, connection=None, _conversation_id=None, _rule_id=None, **_):
+    rows = _diag(diag.docker_containers, _link(db, "docker", connection, _conversation_id, _rule_id)["docker_url"])
     data = json.loads(rows)
     for c in data:
         _note_container(_conversation_id, c.get("name"), f"{c.get('state')} — {c.get('status')}" if _is_problem(c) else None)
@@ -515,8 +520,8 @@ def docker_list_containers(db, only_problems=False, connection=None, _conversati
     return "\n".join(f"- {c['name']} — {c['state']} — {c['status']} — {c['image']}" for c in data)
 
 
-def docker_container_status(db, name, connection=None, _conversation_id=None, **_):
-    out = _diag(diag.docker_container_status, _link(db, "docker", connection, _conversation_id)["docker_url"], name)
+def docker_container_status(db, name, connection=None, _conversation_id=None, _rule_id=None, **_):
+    out = _diag(diag.docker_container_status, _link(db, "docker", connection, _conversation_id, _rule_id)["docker_url"], name)
     try:
         state = json.loads(out)
         _note_container(_conversation_id, state.get("name") or name, _status_problem(state))
@@ -525,8 +530,8 @@ def docker_container_status(db, name, connection=None, _conversation_id=None, **
     return out
 
 
-def docker_container_logs(db, name, lines=100, since_minutes=None, connection=None, _conversation_id=None, **_):
-    out = _diag(diag.docker_container_logs, _link(db, "docker", connection, _conversation_id)["docker_url"], name, _clip(lines, 1, diag.MAX_LOG_LINES, 100), since_minutes)
+def docker_container_logs(db, name, lines=100, since_minutes=None, connection=None, _conversation_id=None, _rule_id=None, **_):
+    out = _diag(diag.docker_container_logs, _link(db, "docker", connection, _conversation_id, _rule_id)["docker_url"], name, _clip(lines, 1, diag.MAX_LOG_LINES, 100), since_minutes)
     return out or "(aucune ligne)"
 
 
@@ -574,8 +579,8 @@ def get_attack_summary(db, rule_id, days=7, **_):
     return attack_summary.summary_text(attack_summary.summary(rule, _clip(days, 1, 30, 7)), _lang(db))
 
 
-def host_check(db, check, target=None, connection=None, _conversation_id=None, **_):
-    return _diag(diag.run_host_check, _link(db, "ssh", connection, _conversation_id), check, target)
+def host_check(db, check, target=None, connection=None, _conversation_id=None, _rule_id=None, **_):
+    return _diag(diag.run_host_check, _link(db, "ssh", connection, _conversation_id, _rule_id), check, target)
 
 
 # ── Définitions (format Ollama) et exécution ───────────────────────────────────
@@ -722,21 +727,23 @@ def tool_label(name: str, args: dict, lang: str = "fr") -> str:
     return f"{text} · {args['connection']}" if args.get("connection") else text
 
 
-def _run_sync(name: str, args: dict, conversation_id: Optional[int]) -> str:
+def _run_sync(name: str, args: dict, conversation_id: Optional[int], rule_id: Optional[int] = None) -> str:
     db = SessionLocal()
     try:
-        return _EXECUTORS[name](db, **args, _conversation_id=conversation_id)
+        scope = {"_rule_id": rule_id} if rule_id is not None else {}
+        return _EXECUTORS[name](db, **args, _conversation_id=conversation_id, **scope)
     finally:
         db.close()
 
 
-async def execute_tool(name: str, args: dict, conversation_id: Optional[int] = None) -> str:
-    """Exécute un outil et renvoie un texte borné ; les erreurs sont renvoyées au LLM sous forme de texte."""
+async def execute_tool(name: str, args: dict, conversation_id: Optional[int] = None, rule_id: Optional[int] = None) -> str:
+    """Exécute un outil et renvoie un texte borné ; les erreurs sont renvoyées au LLM sous forme de texte.
+    rule_id : connexions de cette règle seulement (second regard, sans conversation)."""
     if name not in _EXECUTORS:
         return f"Erreur : outil inconnu « {name} »."
     args = {k: v for k, v in (args or {}).items() if not str(k).startswith("_")}
     try:
-        return truncate_output(await asyncio.to_thread(_run_sync, name, args, conversation_id))
+        return truncate_output(await asyncio.to_thread(_run_sync, name, args, conversation_id, rule_id))
     except ToolError as e:
         return f"Erreur : {e}"
     except TypeError as e:

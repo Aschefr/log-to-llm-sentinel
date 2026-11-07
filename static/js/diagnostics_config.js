@@ -134,7 +134,29 @@ async function refreshDiag() {
     renderLinks('ssh');
     renderLinks('web');
     renderCve();
+    renderSecondLook();
     renderWebPause();
+}
+
+/** Second look settings. It needs a Docker or SSH connection: without one, the switches say so instead of doing nothing. */
+function renderSecondLook() {
+    const s = DIAG.status.second_look || {};
+    const usable = (DIAG.status.links || []).some(l => l.kind === 'docker' || l.kind === 'ssh');
+    document.getElementById('diag-sl-enabled').checked = !!s.enabled;
+    document.getElementById('diag-sl-info').checked = !!s.include_info;
+    document.getElementById('diag-sl-lower').checked = !!s.may_lower;
+    ['diag-sl-info', 'diag-sl-lower'].forEach(id => { document.getElementById(id).disabled = !s.enabled; });
+    const el = document.getElementById('diag-sl-status');
+    if (!s.enabled) {
+        el.textContent = dT('diag.status_disabled', 'désactivé');
+        el.className = 'diag-status';
+    } else if (!usable) {
+        el.textContent = dT('diag.sl_no_link', 'sans connexion Docker ni SSH');
+        el.className = 'diag-status';
+    } else {
+        el.textContent = dT('diag.cve_on', 'activé');
+        el.className = 'diag-status diag-status--on';
+    }
 }
 
 /** Says plainly why the AI is not searching at the moment. */
@@ -424,6 +446,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const res = await apiFetch('/api/diagnostics/cve', { method: 'POST', body: { enabled: e.target.checked } });
         DIAG.status.cve_lookup = res.enabled;
         renderCve();
+    });
+    [['diag-sl-enabled', 'enabled'], ['diag-sl-info', 'include_info'], ['diag-sl-lower', 'may_lower']].forEach(([id, key]) => {
+        document.getElementById(id).addEventListener('change', async (e) => {
+            try {
+                DIAG.status.second_look = await apiFetch('/api/diagnostics/second-look', { method: 'POST', body: { [key]: e.target.checked } });
+            } catch (_) {
+                e.target.checked = !e.target.checked;
+            }
+            renderSecondLook();
+        });
     });
     document.getElementById('diag-cve-test').addEventListener('click', async () => {
         diagResult('diag-cve-result', null, dT('diag.testing', 'Test en cours…'));

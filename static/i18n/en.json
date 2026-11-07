@@ -795,7 +795,14 @@
     "cve_kev": "Actively exploited · KEV since {date}",
     "cve_no_kev": "Not in the KEV catalog",
     "cve_affected": "Affected versions",
-    "cve_enable_hint": "Show the official sheet of this CVE"
+    "cve_enable_hint": "Show the official sheet of this CVE",
+    "sl_skipped": "not checked",
+    "sl_skipped_title": "No second look: a line of this alert addresses the AI, it could have picked the checks.",
+    "sl_checked": "checked",
+    "sl_raised": "raised from {s}",
+    "sl_lowered": "lowered from {s}",
+    "sl_title": "Second look: the AI checked the real state of the machines before storing the alert ({n} check(s)).",
+    "sl_outputs": "Raw check results ({n})"
   },
   "meta": {
     "title": "Meta-analysis",
@@ -1493,7 +1500,14 @@
     "cve_on": "on",
     "web_blocked": "The instance answers, but no engine returns results for now (no answer: {failed}). They often block for a while: try again later.",
     "web_paused": "Searches suspended for {n} more min: no engine answered ({engines}). Insisting would prolong the block. Test resumes as soon as an engine answers.",
-    "web_full": "Limit reached: {n} searches this hour. The AI will resume once the hour has passed."
+    "web_full": "Limit reached: {n} searches this hour. The AI will resume once the hour has passed.",
+    "sl_title": "Second look during analysis",
+    "sl_hint": "After analyzing an alert, the AI checks the real state of the rule's machines through its Docker and SSH connections: at most 3 read-only checks, before the notification. What it checked is shown on the card. Each alert concerned takes a few more calls to the model.",
+    "sl_enable": "Turn on the second look",
+    "sl_info": "Also on info alerts (default: warning and critical)",
+    "sl_lower": "Let it lower the severity",
+    "sl_lower_hint": "By default it can only raise the severity. If it may lower it, an alert whose service came back can fall below your notification threshold. Never when a line or a check output addresses the AI: then there is no second look at all, or no lowering.",
+    "sl_no_link": "no Docker or SSH connection"
   },
   "triage": {
     "title": "Sort my unread",

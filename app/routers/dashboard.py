@@ -149,6 +149,21 @@ def get_stats():
         db.close()
 
 
+def _second_look(a: Analysis):
+    """Ce que le second regard a vérifié, pour la carte : le constat est déjà dans l'analyse, ici les sorties brutes."""
+    import json as _json
+    if not a.second_look_json:
+        return None
+    try:
+        r = _json.loads(a.second_look_json)
+    except ValueError:
+        return None
+    return {"status": r.get("status"), "verdict": r.get("verdict"), "severity_before": r.get("severity_before"),
+            "severity_after": r.get("severity_after"),
+            "checks": [{"label": c.get("label"), "error": bool(c.get("error")), "excerpt": c.get("excerpt") or ""}
+                       for c in r.get("checks") or []]}
+
+
 def _analysis_dict(a: Analysis, rule_name: str, recurrence: dict) -> dict:
     import json as _json
     return {
@@ -174,6 +189,7 @@ def _analysis_dict(a: Analysis, rule_name: str, recurrence: dict) -> dict:
         # Qui a écrit les lignes déclenchantes : montré devant le résumé, pour voir s'il parle bien de ça
         "components": line_components(analysis_lines(a)),
         "ai_pending": a.ai_failed_at is not None,  # l'IA n'a pas répondu : pas encore de vraie gravité
+        "second_look": _second_look(a),
         "recurrence_7d": recurrence.get(a.id, 0),
         "resolution_minutes": rule_stats.resolution_minutes(a),
     }
