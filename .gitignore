@@ -41,6 +41,7 @@ data/syslog/.log
 # Lignes syslog reçues (données réelles)
 data/syslog/
 data/webhooks/
+data/sources/
 
 # Impeccable design tool working files
 .impeccable/
@@ -50,3 +51,4 @@ data/logs/
 
 # Notes de reprise de session : décrivent le réseau local
 REPRISE_SESSION.md
+data/ssh/
