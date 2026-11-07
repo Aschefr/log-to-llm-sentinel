@@ -14,7 +14,7 @@ from typing import Optional
 from app.models import GlobalConfig
 from app.services.rule_stats import iso
 
-EXCLUDED_FROM_BACKUP = ("monitoring_paused", "monitoring_paused_at", "quiet_mode", "quiet_mode_at")
+EXCLUDED_FROM_BACKUP = ("monitoring_paused", "monitoring_paused_at", "quiet_mode", "quiet_mode_at", "ai_outage_notified_at")
 
 
 def is_paused(db) -> bool:

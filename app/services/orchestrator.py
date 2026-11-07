@@ -13,7 +13,7 @@ from app.services.notification_service import NotificationService
 from app.services.app_config import config_to_dict, llm_options
 from app.services import event_notes
 from app.services.alert_analysis import (build_history, build_alert_messages, messages_to_text,
-                                         parse_alert_response, detect_severity, guard_log_instruction)
+                                         parse_alert_response, detect_severity, guard_log_instruction, analysis_lines)
 from app.services.log_source import find_context
 from app.services.prompts import ALERT_SCHEMA, label
 from app.utils.log_utils import clean_log_line, aggregate_lines, line_signature
@@ -253,13 +253,16 @@ class Orchestrator:
             except asyncio.TimeoutError:
                 res = {"content": "", "error": "Délai d'attente dépassé (300s)"}
 
-        if res.get("error") or not res.get("content"):
+        failed = bool(res.get("error") or not res.get("content"))
+        if failed:
             markdown = f"[Erreur Ollama] {res.get('error') or 'Aucune réponse'}"
             parsed = {"markdown": markdown, "severity": "info", "summary": None, "data": None}
         else:
             parsed = parse_alert_response(res["content"], lang)
         context_lines = [l for key in ("before", "between", "after") for l in (context or {}).get(key) or []]
         parsed = guard_log_instruction(parsed, raw_lines["lines"] + context_lines, lang)
+        # Sans réponse de l'IA, « info » n'est pas un verdict : l'alerte attend une nouvelle analyse (analysis_retry)
+        parsed["failed"] = failed
         logger.debug("Orchestrator", f"Réponse Ollama reçue : {parsed['markdown'][:200]}")
         logger.add_ollama_log(messages_to_text(messages), parsed["markdown"], detection_id)
         return {"events_text": events_text, "context": context, "messages": messages, **parsed}
@@ -316,11 +319,25 @@ class Orchestrator:
         )
         self.apply_result(analysis, result)
         analysis.reused_from = prior.id if prior else None
+        if result.get("failed"):
+            analysis.ai_failed_at = analysis.analyzed_at
         db.add(analysis)
         db.commit()
         db.refresh(analysis)
+        if result.get("failed"):
+            logger.warning("Orchestrator", f"'{rule.name}' : l'IA n'a pas répondu, alerte #{analysis.id} en attente d'une nouvelle analyse.")
 
-        # 6. Notifier
+        # 6. Notifier — une alerte que l'IA n'a pas pu lire attend sa nouvelle analyse : notifiée à ce moment-là
+        if not result.get("failed") or result.get("log_instruction"):
+            await self.notify_analysis(analysis, rule, result, config, db)
+
+        # Hook de signalement d'erreur pour la résolution
+        if self.resolution_service:
+            await self.resolution_service.on_error_detected(rule.id, severity=severity)
+
+    async def notify_analysis(self, analysis: Analysis, rule: Rule, result: dict, config: dict, db, note: Optional[str] = None):
+        """Notifie l'analyse si sa gravité atteint le seuil de la règle et que l'événement n'a pas déjà été signalé."""
+        severity = result["severity"]
         should_notify = rule.notify_on_match
         # Une ligne qui s'adresse à l'IA est signalée quel que soit le seuil : c'est peut-être une alerte qu'on essaie de taire
         if should_notify and getattr(rule, "notify_severity_threshold", "info") and not result.get("log_instruction"):
@@ -339,16 +356,32 @@ class Orchestrator:
 
         if should_notify:
             try:
-                await self.trigger_notification(analysis, rule, config, db, repeats=repeats)
+                await self.trigger_notification(analysis, rule, config, db, repeats=repeats, note=note)
             except Exception as e:
                 logger.error("Orchestrator", f"Erreur lors de l'envoi de la notification d'alerte : {e}")
 
-        # Hook de signalement d'erreur pour la résolution
-        if self.resolution_service:
-            await self.resolution_service.on_error_detected(rule.id, severity=severity)
-            
+    async def reanalyze(self, analysis: Analysis, rule: Rule, config: dict, db) -> dict:
+        """Nouvelle analyse d'une alerte enregistrée, à partir de ses lignes brutes et de son contexte d'origine.
+        L'historique est calculé par rapport à la date de la détection. Le résultat est reporté sur l'analyse."""
+        if analysis.triggered_lines_json:
+            raw = json.loads(analysis.triggered_lines_json)
+        else:
+            lines = analysis_lines(analysis)
+            raw = {"total": len(lines), "window_s": rule.anti_spam_delay or 60, "lines": lines}
+            analysis.triggered_lines_json = json.dumps(raw, ensure_ascii=False)
+        before, after = json.loads(analysis.context_before_json or "[]"), json.loads(analysis.context_after_json or "[]")
+        context = {"before": before, "between": None, "after": after} if (before or after) else None
+        result = await self.analyze_alert(
+            rule, raw, config, db,
+            matched_keywords=json.loads(analysis.matched_keywords_json or "[]"),
+            detection_id=analysis.detection_id, ref_time=analysis.analyzed_at, exclude_id=analysis.id, context=context,
+        )
+        self.apply_result(analysis, result)
+        analysis.ai_failed_at = (analysis.ai_failed_at or datetime.utcnow()) if result.get("failed") else None
+        return result
+
     async def trigger_notification(self, analysis: Analysis, rule: Rule, config: dict, db, repeats: int = 0,
-                                   manual: bool = False) -> bool:
+                                   manual: bool = False, note: Optional[str] = None) -> bool:
         """Envoie manuellement ou automatiquement une notification pour une analyse existante."""
         severity = analysis.severity
         # Mode discret : on s'arrête avant le résumé par l'IA, qui serait un appel pour rien
@@ -452,9 +485,9 @@ class Orchestrator:
 
 {nt('full_analysis_available', lang)}"""
 
-        if repeats:
-            note = nt('repeat_note', lang).format(n=repeats)
-            notify_body += f"\n\n{note}" if is_short_channel else f"<p><em>{html.escape(note)}</em></p>"
+        notes = ([nt('repeat_note', lang).format(n=repeats)] if repeats else []) + ([note] if note else [])
+        for text in notes:
+            notify_body += f"\n\n{text}" if is_short_channel else f"<p><em>{html.escape(text)}</em></p>"
 
         sent = await asyncio.to_thread(self.notifier.send, subject, notify_body, config,
                                        kind="manual" if manual else "alert", severity=severity)

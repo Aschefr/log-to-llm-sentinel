@@ -590,7 +590,9 @@ function renderAnalysisCard(a, opts = {}) {
                 ${ruleName}
                 ${a.detection_id ? `<span class="detection-id-badge" style="margin-left:0.5rem">#${escapeHtml(a.detection_id)}</span>` : ''}
                 <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
-                <span class="severity-badge ${escapeHtml(ev ? ev.severity : a.severity)}">${escapeHtml(ev ? ev.severity : a.severity)}</span>
+                ${a.ai_pending
+                    ? `<span class="ai-pending-badge" title="${escapeHtml(_t('common.ai_pending_title', 'L’IA n’a pas répondu : cette alerte sera analysée dès son retour, et notifiée si elle le mérite.'))}">${escapeHtml(_t('common.ai_pending', 'En attente de l’IA'))}</span>`
+                    : `<span class="severity-badge ${escapeHtml(ev ? ev.severity : a.severity)}">${escapeHtml(ev ? ev.severity : a.severity)}</span>`}
                 ${resolvedBadge}
                 ${recurBadge}
                 ${ev ? `<span class="event-note-count${(ev.notes || []).length ? '' : ' hidden'}" title="${escapeHtml(_t('common.notes_title', 'Notes pour l’IA'))}"><span aria-hidden="true">📝 </span><span>${(ev.notes || []).length}</span></span>` : ''}

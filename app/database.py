@@ -155,6 +155,11 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS ix_analyses_rule_event ON analyses (rule_id, event_key)",
         # Tri des non lues par l'IA
         "ALTER TABLE analyses ADD COLUMN triaged_at DATETIME",
+        # Analyses ratées faute d'IA : reprises à son retour
+        "ALTER TABLE analyses ADD COLUMN ai_failed_at DATETIME",
+        "ALTER TABLE analyses ADD COLUMN ai_retries INTEGER DEFAULT 0",
+        "CREATE INDEX IF NOT EXISTS ix_analyses_ai_failed ON analyses (ai_failed_at)",
+        "ALTER TABLE global_config ADD COLUMN ai_outage_notified_at DATETIME",
     ]
 
     migrations += [

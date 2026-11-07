@@ -244,6 +244,8 @@ class Analysis(Base):
     feedback = Column(String, nullable=True)  # 'irrelevant' : signalée « pas pertinente » par l'utilisateur
     triaged_at = Column(DateTime, nullable=True)  # Marquée comme lue par un tri de l'IA validé : permet d'annuler ce tri
     reused_from = Column(Integer, nullable=True)  # Répétition : verdict repris de cette analyse, sans appel à l'IA
+    ai_failed_at = Column(DateTime, nullable=True)  # L'IA n'a pas répondu : en attente d'une nouvelle analyse
+    ai_retries = Column(Integer, default=0)
 
 
 class ResolutionVerdict(Base):
@@ -284,6 +286,7 @@ class GlobalConfig(Base):
     monitoring_paused_at = Column(DateTime, nullable=True)
     quiet_mode = Column(Boolean, default=False)  # Mode discret : seules les alertes critiques sont notifiées
     quiet_mode_at = Column(DateTime, nullable=True)
+    ai_outage_notified_at = Column(DateTime, nullable=True)  # Avis « l'IA ne répond pas » envoyé : un seul par panne
     ollama_url = Column(String, default="http://ollama:11434")
     ollama_model = Column(String, default="gemma4:e4b")
     ollama_temp = Column(Float, default=0.1)

@@ -493,23 +493,8 @@ async def retry_analysis(analysis_id: int):
                 if not a or not r:
                     raise ValueError("analysis_or_rule_not_found")
 
-                # Rejouer à partir des lignes brutes (évite de ré-emballer l'en-tête du groupe)
-                if a.triggered_lines_json:
-                    raw = json.loads(a.triggered_lines_json)
-                else:
-                    lines = analysis_lines(a)
-                    raw = {"total": len(lines), "window_s": r.anti_spam_delay or 60, "lines": lines}
-                    a.triggered_lines_json = json.dumps(raw, ensure_ascii=False)
-                before, after = json.loads(a.context_before_json or "[]"), json.loads(a.context_after_json or "[]")
-                context = {"before": before, "between": None, "after": after} if (before or after) else None
-
-                # L'historique est calculé par rapport à la date de la détection d'origine
-                result = await _orchestrator.analyze_alert(
-                    r, raw, config, retry_db,
-                    matched_keywords=json.loads(a.matched_keywords_json or "[]"),
-                    detection_id=a.detection_id, ref_time=a.analyzed_at, exclude_id=a.id, context=context,
-                )
-                _orchestrator.apply_result(a, result)
+                # Rejoue les lignes brutes et le contexte d'origine ; une réussite sort l'alerte de l'attente de l'IA
+                await _orchestrator.reanalyze(a, r, config, retry_db)
                 a.analyzed_at = datetime.utcnow()
                 retry_db.commit()
                 entry.analysis_id = a.id

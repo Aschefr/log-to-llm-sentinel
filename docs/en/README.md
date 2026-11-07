@@ -24,6 +24,7 @@ Sentinel detects critical log events, automatically collects surrounding applica
 * [**Web Search and CVE Sheets**](features/web-search.md) — Optional: official sheets for cited CVEs, and a filtered web search for the chat through your own SearXNG.
 * [**Log Line Safety**](features/log-safety.md) — Why a log line cannot talk the AI out of an alert, and what a *Suspicious log line* means.
 * [**Pausing Monitoring**](features/monitoring-pause.md) — The header switch: what stops, what happens on resume.
+* [**When the AI is not answering**](features/ai-outage.md) — Alerts wait for the AI instead of passing as info, are analysed and notified when it is back, and you are told about the outage.
 * [**Inactivity Monitoring**](features/inactivity-monitoring.md) — Tracking log ingestion gaps to alert on dead processes.
 * [**Incident Resolution**](features/resolution-tracking.md) — Adaptive calm, health probes, AI validation modes and suggested patterns.
 * [**Infrastructure Diagnostics**](features/diagnostics.md) — Let the chat AI check containers and the server itself (read-only Docker proxy, restricted SSH key), with step-by-step setup for Linux and Unraid.

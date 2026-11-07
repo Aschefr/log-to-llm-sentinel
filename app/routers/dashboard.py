@@ -173,6 +173,7 @@ def _analysis_dict(a: Analysis, rule_name: str, recurrence: dict) -> dict:
         "summary": short_summary(a, 220) if (a.summary or a.ollama_response) else None,
         # Qui a écrit les lignes déclenchantes : montré devant le résumé, pour voir s'il parle bien de ça
         "components": line_components(analysis_lines(a)),
+        "ai_pending": a.ai_failed_at is not None,  # l'IA n'a pas répondu : pas encore de vraie gravité
         "recurrence_7d": recurrence.get(a.id, 0),
         "resolution_minutes": rule_stats.resolution_minutes(a),
     }

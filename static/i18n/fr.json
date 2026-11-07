@@ -759,6 +759,8 @@
     "notes_title": "Notes pour l'IA",
     "note_add": "Ajouter une note",
     "component_title": "Composant qui a écrit les lignes de cette alerte",
+    "ai_pending": "En attente de l’IA",
+    "ai_pending_title": "L’IA n’a pas répondu : cette alerte sera analysée dès son retour, et notifiée si elle le mérite.",
     "note_label": "Ce que l'IA devrait savoir",
     "note_placeholder": "Ex. : ce serveur tourne sous Unraid, sans systemd.",
     "note_hint": "Elle informe l'IA sans jamais faire taire une alerte. Prise en compte dès la prochaine analyse ; « Ré-essayer » l'applique à celle-ci.",
@@ -991,6 +993,13 @@
     "resolution_ai_denied": "L'IA n'a pas confirmé la résolution pour {rule_name}. Surveillance maintenue.",
     "resolution_manual": "Résolution manuelle par l'utilisateur.",
     "resolution_filtered_severity": "Notification de resolution ignoree : severite de l'incident inferieure au seuil configure.",
+    "ai_outage_subject_one": "[Sentinel] L'IA ne répond pas : 1 alerte en attente",
+    "ai_outage_subject_many": "[Sentinel] L'IA ne répond pas : {n} alertes en attente",
+    "ai_outage_body_one": "Ollama ne répond plus depuis {since}. 1 alerte de {rules} attend d'être analysée. Elle le sera dès son retour, et notifiée si elle le mérite.",
+    "ai_outage_body_many": "Ollama ne répond plus depuis {since}. {n} alertes de {rules} attendent d'être analysées. Elles le seront dès son retour, et celles qui le méritent seront notifiées.",
+    "ai_back_subject": "[Sentinel] L'IA répond de nouveau",
+    "ai_back_body": "Les alertes en attente ont été analysées. Celles qui le méritaient ont été notifiées, avec la mention « analysée en différé ».",
+    "late_note": "Analysée en différé : l'IA ne répondait pas au moment de l'alerte ({time}).",
     "repeat_note": "Cet événement s'est répété {n} fois depuis la dernière notification."
   },
   "api_errors": {
