@@ -5,33 +5,31 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **Alert cards name the component that wrote the lines** (a Home Assistant integration, a Docker Desktop part, a syslog program, a systemd unit), before the summary. A summary that talks about something else stands out at a glance.
-- **Meta-analyses keep apart**: a new meta-analysis starts on the first free slot, 15 minutes after any other one that would run at the same time, and the settings warn about a shared slot with a button to take the next free one.
-- **Back button in the header**: a page reached from a button or a link in the content (*Deepen with the AI*, *See in the rule*…) offers to go back to the page you came from. Choosing a page in the menu starts over.
-- **Quick actions on closed alert cards**: mark as read, flag as not relevant and add a note without opening the card. The dashboard history gets a *Mark all as read* button; it and the one on a rule's page now ask first, say how many unread events are critical, and offer *Sort my unread* as a safer way.
-- **Quiet mode**: a *Quiet* switch in the header lets only critical alerts through. Keyword changes, autopilot adjustments, resolutions, silent sources, scheduled meta-analyses and warning or info alerts are no longer sent; they stay visible in Sentinel. What you send yourself, a test or a resent alert, still goes out.
-- **Your own SSH key and account name**: the limited SSH access accepts a private key pasted from an earlier install, and on Linux the account the install block creates can have another name than `sentinel-diag`. The block stops without changing anything if that account already exists and was not created by Sentinel.
-- **MQTT topics to pick from**: once an MQTT connection is chosen in a rule, Sentinel listens for 3 seconds and offers the topics it saw under *Topic to follow*, shared prefixes first (`zigbee2mqtt/#`).
-- **CVE sheets** (optional): an analysis citing a CVE shows its official NVD sheet: actively exploited or not (CISA's KEV catalog), affected versions, score. Only the CVE number leaves your network, and a sheet never changes a severity.
-- **Web search in the chat and investigations** (optional): the AI can search the web through your own SearXNG. Queries holding an address, a path or a machine name are refused, and results are treated as data from strangers. Searches are limited, pause for 15 minutes if every engine fails, and the chat and Configuration say so. The compose file includes a private SearXNG under the `web` profile. Automatic alert analysis never uses it.
-- **Blocked attempts at a glance**: the overview of a CEF source (UniFi and others) groups blocked attempts by target port, without AI, and analysis cards show the fields of the line.
-- **Security alerts in the chat**: on an alert citing a CVE, the AI answers whether you are vulnerable, whether it got through and whether it is exploited, separating facts from deductions. It no longer proposes closing such an incident.
 - **Docker logs as a source**: follow a container's logs through the read-only Docker proxy, with no file to mount. Reading resumes where it stopped after a restart of Sentinel or of the container.
 - **Home Assistant as a source**: Sentinel reads its log directly with a long-lived access token, with no automation to install, and stack traces arrive whole.
 - **MQTT as a source**: follow the topics of an MQTT server (Zigbee2MQTT, Tasmota, ESPHome). The connection test shows the active topics.
 - **Log shippers**: a webhook rule also accepts the Loki and OpenTelemetry formats, so Fluent Bit, Grafana Alloy, Promtail, Vector or the OpenTelemetry Collector can send to Sentinel, including Windows event logs through Fluent Bit.
-- **Autopilot catches a serious line the first time**: out of memory, kernel panic, segfault, disk or file system errors and an unresponsive NFS server are analyzed even if no keyword matches. Until now, such a line had to come back several times before the autopilot could notice it.
 - **Connection guides**: each source shows a short step-by-step guide in the rule form, and says clearly when it cannot be read, in the rule list, on the rule page and on the dashboard.
+- **MQTT topics to pick from**: once an MQTT connection is chosen in a rule, Sentinel listens for 3 seconds and offers the topics it saw under *Topic to follow*, shared prefixes first (`zigbee2mqtt/#`).
+- **CVE sheets** (optional): an analysis citing a CVE shows its official NVD sheet: actively exploited or not (CISA's KEV catalog), affected versions, score. Only the CVE number leaves your network, and a sheet never changes a severity.
+- **Web search in the chat and investigations** (optional): the AI can search the web through your own SearXNG. Queries holding an address, a path or a machine name are refused, and results are treated as data from strangers. Searches are limited, pause for 15 minutes if every engine fails, and the chat and Configuration say so. The compose file includes a private SearXNG under the `web` profile. Automatic alert analysis never uses it.
+- **Security alerts in the chat**: on an alert citing a CVE, the AI answers whether you are vulnerable, whether it got through and whether it is exploited, separating facts from deductions. It no longer proposes closing such an incident.
+- **Blocked attempts at a glance**: the overview of a CEF source (UniFi and others) groups blocked attempts by target port, without AI, and analysis cards show the fields of the line.
+- **Your own SSH key and account name**: the limited SSH access accepts a private key pasted from an earlier install, and on Linux the account the install block creates can have another name than `sentinel-diag`. The block stops without changing anything if that account already exists and was not created by Sentinel.
+- **Quiet mode**: a *Quiet* switch in the header lets only critical alerts through. Keyword changes, autopilot adjustments, resolutions, silent sources, scheduled meta-analyses and warning or info alerts are no longer sent; they stay visible in Sentinel. What you send yourself, a test or a resent alert, still goes out.
+- **Alert cards name the component that wrote the lines** (a Home Assistant integration, a Docker Desktop part, a syslog program, a systemd unit), before the summary. A summary that talks about something else stands out at a glance.
+- **Quick actions on closed alert cards**: mark as read, flag as not relevant and add a note without opening the card. The dashboard history gets a *Mark all as read* button; it and the one on a rule's page now ask first, say how many unread events are critical, and offer *Sort my unread* as a safer way.
+- **Back button in the header**: a page reached from a button or a link in the content (*Deepen with the AI*, *See in the rule*…) offers to go back to the page you came from. Choosing a page in the menu starts over.
+- **Meta-analyses keep apart**: a new meta-analysis starts on the first free slot, 15 minutes after any other one that would run at the same time, and the settings warn about a shared slot with a button to take the next free one.
 
 ### Changed
 - **Sort my unread also looks at recent events**: they used to stay unread without the AI seeing them. The AI now gets them marked as recent and may suggest one only when a note explicitly covers it, it was flagged as not relevant, or it resolved on its own; a note no longer stretches to another failure. Critical events still always stay to read, and recent suggestions say so.
-- **Unread alerts stand out**: an unread card is tinted and outlined with a bold summary, like an unread mail; a read card keeps its summary in grey.
-- **Docker Desktop on Windows**: the README explains how to keep the database in a Docker volume. In a folder of the Windows disk, each request waited about 1.3 s for the database on our test PC, against 50 ms on Linux.
-- **Which rules use a diagnostic connection**: under each Docker, server or web search connection, *All rules* opens a list of the rules with a box each, to give or take its access from several rules at once.
+- **Unread alerts stand out**: an unread card is tinted and outlined with a bold summary, like an unread mail; a read card keeps its summary in grey. The unread dot no longer pulses.
+- **Header on one row**: the *Monitoring* and *Quiet* switches are stacked, so the menu, the switches and the server figures fit on one row from 1280 px; below that, the menu folds as on a phone.
 - **AI access in a rule**: the rule settings list every diagnostic access, Docker, server, web search and CVE sheets. One that is not set up shows greyed and opens its setup.
+- **Which rules use a diagnostic connection**: under each Docker, server or web search connection, *All rules* opens a list of the rules with a box each, to give or take its access from several rules at once.
 - **Home Assistant and MQTT connections in Configuration**: the form opens under a title, with the same connection guide as in a rule and a Cancel button.
-- **Chat: check what the AI read**: each entry of *What the AI looked at* now opens on the raw output of the tool, so an answer can be checked against what it was based on. This also works for past conversations.
-- **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
+- **Docker Desktop on Windows**: the README explains how to keep the database in a Docker volume. In a folder of the Windows disk, each request waited about 1.3 s for the database on our test PC, against 50 ms on Linux.
 
 ### Fixed
 - **Investigations sent you commands the AI could run itself**: the report asked for a *Checks to run* section with concrete commands, so it listed `docker logs` or `journalctl` even when the diagnostic tools could read them. An investigation now reads the container logs or the service journal around the alert itself, keeps for you only what its tools cannot check, and has a little more room to do so (8 rounds and 14 tool calls instead of 6 and 12).
@@ -40,12 +38,23 @@ All notable changes to this project will be documented in this file.
 - **Sort my unread said the AI had nothing to suggest when it had not been asked**: when every unread event is critical, the dialog now says they stay to read on purpose.
 - **Pages rebuilding themselves while loading**: the dashboard showed its history, then emptied it and asked for it again once the translations arrived, and every page downloaded the whole translation file again. The dashboard panels and the rules summary now keep their shape while their data arrives.
 - **SearXNG install guide**: the Unraid tab showed the Docker compose text.
+- **Other occurrences of an event**: their rows no longer overflow the analysis card.
+- **Closing an incident from its alert**: an open analysis now has the *Mark as resolved* button, which was only on the Overview and Resolution tabs.
+
+## [1.8.1] - 2026-11-07
+
+### Added
+- **Autopilot catches a serious line the first time**: out of memory, kernel panic, segfault, disk or file system errors and an unresponsive NFS server are analyzed even if no keyword matches. Until now, such a line had to come back several times before the autopilot could notice it.
+
+### Changed
+- **Chat: check what the AI read**: each entry of *What the AI looked at* now opens on the raw output of the tool, so an answer can be checked against what it was based on. This also works for past conversations.
+- **Documentation**: new screenshots on every page, made from an invented home lab, a new page on log line safety, and an up-to-date page on inactivity monitoring. The recommended models table showed too few missed serious cases for four models (`qwen3.5:9b`, `qwen3.6:27b`, `qwen3.8:27b`, `gemma4:31b`) and now gives the measured figures.
+
+### Fixed
 - **Chat on a phone**: the message box could sit hidden behind the browser's bar, seen on Firefox for Android. The page was sized as if that bar were not there.
 - **Keyword notifications cut mid-sentence**: the reason of a change was cut at 200 characters. It now ends on a whole sentence, the full text staying in the Keywords tab.
 - **Investigations that ended with no answer**: after using many tools, the AI could stop without writing anything, in 17 of 37 test runs that used all their tool calls. It is now asked once more to write its answer, which worked 18 times out of 18.
 - **Model reloaded during a chat**: the automatic title of a new conversation asked for a different context size, so Ollama reloaded the model for the title and again for the next question, about 57 s lost on the tested setup.
-- **Other occurrences of an event**: their rows no longer overflow the analysis card.
-- **Closing an incident from its alert**: an open analysis now has the *Mark as resolved* button, which was only on the Overview and Resolution tabs.
 - **Incidents closing too early**: when a return-to-normal line appeared, the AI judged it on the few lines just received, so a harmless line in the middle of a restart loop could close the incident. It now reads the last 30 lines of the log, errors included, and no longer works out durations from the times in log lines, which may be in another time zone. Replaying four real early closures: closed 16 times out of 20 before, 0 after; three fictional real recoveries still close every time.
 - **Autopilot and silent sources**: a rule put under autopilot kept a silence notification turned off earlier, with no way to see it in this mode. A silent source now always notifies under autopilot. Rules already under autopilot switch to this at the update.
 - **English interface**: part of the rule page and the Configuration tabs could stay in French, and full dates kept the French format.
