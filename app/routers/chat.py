@@ -641,7 +641,8 @@ async def investigate(data: dict, db: Session = Depends(get_db)):
     db.add(ChatMessage(conversation_id=conv.id, role="user", content=prompt,
                        metadata_json=json.dumps({"kind": "investigation_plan"})))
     db.commit()
-    task_id = await _start_generation(conv.id, db, AgentLimits(max_rounds=6, max_calls=12))
+    # Assez de tours pour lire aussi les logs du conteneur ou le journal du service, avant le rapport
+    task_id = await _start_generation(conv.id, db, AgentLimits(max_rounds=8, max_calls=14))
     return {"status": "ok", "id": conv.id, "task_id": task_id}
 
 

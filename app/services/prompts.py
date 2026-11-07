@@ -237,19 +237,19 @@ INVESTIGATION_PROMPT = {
 2. Vérifie la récurrence et les statistiques de la règle.
 3. Cherche des événements corrélés sur les autres règles au même moment.
 4. Consulte l'historique de résolution si utile.
-   Si des outils de diagnostic (docker_*, host_check) sont disponibles, vérifie l'état réel des conteneurs ou services concernés.
+   Si des outils de diagnostic (docker_*, host_check) sont disponibles, vérifie l'état réel des conteneurs ou services concernés, puis lis leurs logs ou leur journal autour de l'heure de l'alerte.
 5. Si une action est clairement justifiée, propose-la via propose_action à ce stade, avant le rapport.
 
-Puis rends un rapport structuré : **Constat**, **Hypothèses classées** (avec les éléments qui les appuient ou les contredisent), **Vérifications à faire** (commandes concrètes), **Recommandation** (en mentionnant l'éventuelle action proposée).""",
+Puis rends un rapport structuré : **Constat**, **Hypothèses classées** (avec les éléments qui les appuient ou les contredisent), **Vérifications à faire** (seulement ce qu'aucun de tes outils ne permet de vérifier, avec les commandes ; ce que tes outils permettent, fais-le avant le rapport), **Recommandation** (en mentionnant l'éventuelle action proposée).""",
     "en": """Run a full investigation of alert #{analysis_id} (rule #{rule_id}):
 1. Retrieve the wider context around the triggering lines.
 2. Check the rule's recurrence and statistics.
 3. Look for correlated events on the other rules at the same time.
 4. Check the resolution history if useful.
-   If diagnostic tools (docker_*, host_check) are available, check the actual state of the containers or services involved.
+   If diagnostic tools (docker_*, host_check) are available, check the actual state of the containers or services involved, then read their logs or journal around the time of the alert.
 5. If an action is clearly justified, propose it with propose_action at this point, before the report.
 
-Then write a structured report: **Findings**, **Ranked hypotheses** (with the evidence for and against), **Checks to run** (concrete commands), **Recommendation** (mentioning any proposed action).""",
+Then write a structured report: **Findings**, **Ranked hypotheses** (with the evidence for and against), **Checks to run** (only what none of your tools can check, with the commands; what your tools can do, do it before the report), **Recommendation** (mentioning any proposed action).""",
 }
 
 
