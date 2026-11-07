@@ -100,9 +100,11 @@ The block can be pasted again safely (it replaces its previous key line).
 Click **Test and save**: the values typed in the form are tested and saved only if the connection works (a **Save anyway** button appears otherwise). The output of the `overview` check is shown with the server's key fingerprint, which Sentinel remembers (connections fail if it changes).
 
 ### Available checks
-`overview`, `disk`, `memory`, `load`, `processes`, `mounts`, `network`, `kernel`, `syslog`, `array`, `failed-services`, `service <name>`, `journal <name>`.
+`overview`, `disk`, `memory`, `load`, `processes`, `mounts`, `network`, `kernel`, `syslog`, `array`, `failed-services`, `service <name>`, `journal <name>`, `fstab`, `nfs-exports <server>`.
 
 - `array`: on Unraid, the array state (started, sync errors, resync, disabled/invalid disks) and each disk's status, error count, temperature and file system; elsewhere, software RAID (`/proc/mdstat`) and ZFS pools (`zpool status -x`).
+- `fstab`: the mounts declared at boot, with passwords, user names and credential files masked, and the state of systemd mount units. Useful when a share did not come back after a restart.
+- `nfs-exports <server>`: what an NFS server exports (`showmount -e`), only for a server this machine already mounts from, so it cannot be used to probe other machines.
 - `kernel` and `network` leave out Docker's network noise (veth, bridges); `syslog` leaves out Sentinel's own SSH sessions.
 - Unraid has no systemd: `service`, `journal` and `failed-services` point to `syslog`, `array` and `processes` instead.
 

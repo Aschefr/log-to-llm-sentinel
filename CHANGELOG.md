@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Two more server checks for the AI**: `fstab` shows the mounts declared at boot, with passwords, user names and credential files masked, and the state of systemd mount units; `nfs-exports` shows what an NFS server exports, only for a server the machine already mounts from. They help when a share did not come back after a restart. The script on the server goes to version 3: *Test and save* says so, paste the install block again.
+
+### Fixed
+- **Closing an incident while a container is still down**: an investigation found the cause of a stopped container, then proposed to mark the incident as resolved. Sentinel now refuses this proposal while its own checks show a container stopped, unhealthy or restarting in a loop, and the AI says what to do to bring it back instead.
+
 ## [1.9.0] - 2026-11-07
 
 ### Added

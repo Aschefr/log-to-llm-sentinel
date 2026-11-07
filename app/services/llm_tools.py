@@ -325,6 +325,12 @@ def propose_action(db, action=None, reason=None, rule_id=None, analysis_id=None,
                    _conversation_id=None, **_):
     if action not in ACTIONS:
         raise ToolError(f"Action inconnue. Actions possibles : {', '.join(ACTIONS)}.")
+    down = _SEEN_DOWN.get(_conversation_id) if _conversation_id is not None else None
+    if action == "mark_resolved" and down:
+        listing = " ; ".join(f"{name} : {why}" for name, why in list(down.items())[:5])
+        raise ToolError(f"Clôture non proposée : tes propres vérifications montrent un conteneur encore en anomalie ({listing}). "
+                        "Trouver la cause ne règle pas le problème. Dis à l'utilisateur ce qu'il faut faire pour le remettre en marche ; "
+                        "une fois reparti, une nouvelle vérification le montrera et la clôture redeviendra possible.")
     cited = _alert_citing_cve(db, _conversation_id)
     if action == "mark_resolved" and cited:
         raise ToolError("Clôture non proposée : cette alerte cite une faille. Clore l'incident ne corrige rien, et seul l'utilisateur "
@@ -468,9 +474,40 @@ def _link(db, kind, connection, conversation_id) -> dict:
     return links[0]
 
 
+# Conteneurs vus en anomalie par les outils, par conversation : tant qu'il en reste, on ne propose pas de clore
+_SEEN_DOWN: dict = {}
+_SEEN_DOWN_MAX = 200
+
+
+def _note_container(conversation_id, name: str, problem: Optional[str]):
+    if conversation_id is None or not name:
+        return
+    seen = _SEEN_DOWN.setdefault(conversation_id, {})
+    if problem:
+        seen[name] = problem
+    else:
+        seen.pop(name, None)
+    while len(_SEEN_DOWN) > _SEEN_DOWN_MAX:
+        _SEEN_DOWN.pop(next(iter(_SEEN_DOWN)))
+
+
+def _status_problem(s: dict) -> Optional[str]:
+    """Anomalie d'un conteneur d'après son état détaillé, ou None s'il tourne normalement."""
+    health = (s.get("health") or {}).get("status")
+    if s.get("restarting"):
+        return "redémarre en boucle"
+    if health == "unhealthy":
+        return "en mauvaise santé (unhealthy)"
+    if not s.get("running") and s.get("exit_code") not in (0, 143, None):
+        return f"arrêté (code {s.get('exit_code')})"
+    return None
+
+
 def docker_list_containers(db, only_problems=False, connection=None, _conversation_id=None, **_):
     rows = _diag(diag.docker_containers, _link(db, "docker", connection, _conversation_id)["docker_url"])
     data = json.loads(rows)
+    for c in data:
+        _note_container(_conversation_id, c.get("name"), f"{c.get('state')} — {c.get('status')}" if _is_problem(c) else None)
     if only_problems:
         data = [c for c in data if _is_problem(c)]
     if not data:
@@ -479,7 +516,13 @@ def docker_list_containers(db, only_problems=False, connection=None, _conversati
 
 
 def docker_container_status(db, name, connection=None, _conversation_id=None, **_):
-    return _diag(diag.docker_container_status, _link(db, "docker", connection, _conversation_id)["docker_url"], name)
+    out = _diag(diag.docker_container_status, _link(db, "docker", connection, _conversation_id)["docker_url"], name)
+    try:
+        state = json.loads(out)
+        _note_container(_conversation_id, state.get("name") or name, _status_problem(state))
+    except (ValueError, AttributeError):
+        pass
+    return out
 
 
 def docker_container_logs(db, name, lines=100, since_minutes=None, connection=None, _conversation_id=None, **_):
@@ -591,7 +634,7 @@ WEB_TOOLS = [
         {"query": {"type": "string"}}, ["query"]),
 ]
 HOST_TOOLS = [
-    _fn("host_check", "Contrôle en lecture seule du serveur hôte. check : overview (charge, mémoire, disques), disk, memory, load, processes, mounts (partages réseau NFS/SMB), network, kernel (derniers messages du noyau, sans le bruit réseau de Docker), syslog, array (état de l'array Unraid et de ses disques, ou RAID logiciel / ZFS), failed-services, service (état d'un service systemd, target = nom), journal (journal d'un service systemd, target = nom). Sur Unraid, pas de systemd : utiliser syslog, array et processes.",
+    _fn("host_check", "Contrôle en lecture seule du serveur hôte. check : overview (charge, mémoire, disques), disk, memory, load, processes, mounts (partages réseau NFS/SMB), network, kernel (derniers messages du noyau, sans le bruit réseau de Docker), syslog, array (état de l'array Unraid et de ses disques, ou RAID logiciel / ZFS), failed-services, service (état d'un service ou d'une unité systemd, .mount compris, target = nom), journal (journal d'un service systemd, target = nom), fstab (montages déclarés au démarrage et unités de montage, mots de passe masqués), nfs-exports (partages exportés par un serveur NFS que cette machine monte déjà, target = nom ou adresse du serveur). Sur Unraid, pas de systemd : utiliser syslog, array et processes.",
         {"check": {"type": "string", "enum": list(diag.HOST_CHECKS)}, "target": {"type": "string"}}, ["check"]),
 ]
 

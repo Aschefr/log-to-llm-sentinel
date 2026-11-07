@@ -32,8 +32,10 @@ UNIT_RE = re.compile(r"^[A-Za-z0-9@._:-]{1,80}$")
 HOST_CHECKS = {
     "overview": False, "disk": False, "memory": False, "load": False, "processes": False,
     "mounts": False, "network": False, "kernel": False, "syslog": False, "array": False,
-    "failed-services": False, "service": True, "journal": True,
+    "failed-services": False, "service": True, "journal": True, "fstab": False, "nfs-exports": True,
 }
+# Argument d'un contrôle : un nom de service, ou un serveur NFS (nom ou adresse)
+HOST_ARG_RE = {"nfs-exports": re.compile(r"^[A-Za-z0-9][A-Za-z0-9.:-]{0,252}$")}
 
 
 class DiagnosticError(Exception):
@@ -279,8 +281,8 @@ def run_host_check(cfg: dict, check: str, arg: Optional[str] = None, _raw: Optio
         raise DiagnosticError(f"contrôle inconnu « {check} » (disponibles : {', '.join(HOST_CHECKS)})")
     words = [_raw] if _raw else [check]
     if HOST_CHECKS[check] and not _raw:
-        if not arg or not UNIT_RE.match(arg):
-            raise DiagnosticError("nom de service invalide")
+        if not arg or not HOST_ARG_RE.get(check, UNIT_RE).match(arg):
+            raise DiagnosticError("nom de serveur invalide" if check == "nfs-exports" else "nom de service invalide")
         words.append(arg)
     cmd = ["ssh", "-i", str(key_path()), "-p", str(int(cfg["ssh_port"])),
            "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-o", "ConnectTimeout=8",
@@ -309,7 +311,7 @@ def host_fingerprint(host: str, port: int = 22) -> Optional[str]:
 
 # ── Script installé sur le serveur ──────────────────────────────────────────────
 
-DIAG_SCRIPT_VERSION = "2"  # à incrémenter à chaque modification du script : Sentinel signale un script à mettre à jour
+DIAG_SCRIPT_VERSION = "3"  # à incrémenter à chaque modification du script : Sentinel signale un script à mettre à jour
 
 DIAG_SCRIPT = r'''#!/bin/bash
 # ══════════════════════════════════════════════════════════════════════════════
@@ -330,6 +332,11 @@ CLIENT_IP="${SSH_CONNECTION:-}"; CLIENT_IP="${CLIENT_IP%% *}"
 # ── Outils internes ───────────────────────────────────────────────────────────
 # Nom de service accepté : lettres, chiffres et @ . _ : - uniquement
 valid_unit() { [[ "$1" =~ ^[A-Za-z0-9@._:-]{1,80}$ ]]; }
+# Serveur NFS accepté : seulement un serveur dont cette machine monte déjà un partage (fstab ou montages actifs)
+known_nfs_server() {
+  [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9.:-]{0,252}$ ]] || return 1
+  awk -v h="$1:" 'index($1, h) == 1 { f = 1 } END { exit !f }' /etc/fstab /proc/mounts 2>/dev/null
+}
 has_systemd() { command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]; }
 no_systemd() {
   if [ -f /etc/unraid-version ]; then echo "Unraid n'utilise pas systemd : utiliser les contrôles syslog, array, processes ou les outils Docker."
@@ -392,9 +399,20 @@ case "$CHECK" in
   # 100 dernières lignes du journal d'un service précis
   journal)   valid_unit "$ARG" || { echo "nom de service invalide"; exit 2; }
              if has_systemd; then journalctl -u "$ARG" -n 100 --no-pager -o short-iso; else no_systemd; fi ;;
+  # Montages déclarés au démarrage (/etc/fstab), mots de passe masqués, et état des unités de montage systemd
+  fstab)     if [ -r /etc/fstab ]; then
+               grep -vE '^[[:space:]]*(#|$)' /etc/fstab | sed -E 's/((pass(word)?|credentials|user(name)?)=)[^,[:space:]]+/\1***/g'
+             else echo "/etc/fstab illisible"; fi
+             if has_systemd; then echo; echo "== Unités de montage"
+               systemctl list-units --type=mount --all --no-pager --plain --no-legend 2>/dev/null | grep -vE '^(-|sys-|proc-|dev-|run-|tmp\.mount|boot)' | head -n 30
+             fi ;;
+  # Partages exportés par un serveur NFS dont cette machine monte déjà quelque chose
+  nfs-exports) known_nfs_server "$ARG" || { echo "serveur NFS refusé : seulement un serveur cité dans /etc/fstab ou déjà monté"; exit 2; }
+             if command -v showmount >/dev/null 2>&1; then timeout 10 showmount -e -- "$ARG" 2>&1 | head -n 40
+             else echo "showmount indisponible sur ce serveur (paquet nfs-common ou nfs-utils)"; fi ;;
   # Version de ce script (Sentinel signale quand il faut le recoller)
   version)   echo "sentinel-diag $SCRIPT_VERSION" ;;
-  *)         echo "Contrôles disponibles : overview disk memory load processes mounts network kernel syslog array failed-services service <nom> journal <nom>" ;;
+  *)         echo "Contrôles disponibles : overview disk memory load processes mounts network kernel syslog array failed-services service <nom> journal <nom> fstab nfs-exports <serveur>" ;;
 esac
 '''
 
