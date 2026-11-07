@@ -48,7 +48,7 @@ class WebSearchError(Exception):
 
 
 def private_terms(db) -> List[str]:
-    """Noms de tes machines : sources syslog et connexions de diagnostic. Sensible à la casse, « Exposed » est aussi un mot courant."""
+    """Noms de tes machines : sources syslog et connexions de diagnostic. Sensible à la casse : un nom de machine peut aussi être un mot courant."""
     terms = set()
     for rule in db.query(Rule.log_file_path).filter(Rule.log_file_path.like("[SYSLOG]:%")).all():
         terms.add(rule[0].split(":", 1)[1])

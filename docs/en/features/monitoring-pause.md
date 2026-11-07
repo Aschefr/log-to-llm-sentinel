@@ -22,3 +22,8 @@ Sources keep being read, so a silent source is still known as silent, and lines 
 The switch is amber on every page, and its tooltip says since when. The dashboard shows *Monitoring paused* as its verdict, also in the browser tab, and never *All good*. If Sentinel stops responding, the switch says the state is unknown.
 
 A backup does not contain this state, so restoring one never pauses monitoring silently.
+
+## Quiet mode
+The *Quiet* switch, under *Monitoring*, keeps monitoring on but sends only critical alerts. Everything else stays visible in Sentinel and is not notified: warning and info alerts, keyword changes, autopilot adjustments, resolutions, silent sources and scheduled meta-analyses. What you send yourself still goes out, such as a test or a resent alert.
+
+Two notices pass in quiet mode as well, because Sentinel cannot judge alerts while they are due: the AI is not answering, and the AI is answering again (see [When the AI is not answering](ai-outage.md)). The switch is blue when quiet mode is on, and its tooltip says since when. A backup does not contain this state either.
