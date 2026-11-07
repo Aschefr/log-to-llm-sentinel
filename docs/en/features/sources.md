@@ -26,6 +26,8 @@ Use one rule per container.
 1. In Home Assistant, open your profile, **Security** tab, **Long-lived access tokens**, **Create token**. The account must be an administrator, because the log is reserved to administrators.
 2. In the rule form, choose **Home Assistant**, enter the address and the token, then click **Test**.
 
+![Home Assistant source and its connection guide](../../../screenshots/log-to-llm-sentinel_source_homeassistant.png)
+
 There is nothing to install in Home Assistant, and no change to `configuration.yaml`. Sentinel reads the system log every 10 seconds: warnings and errors, with their stack traces. Home Assistant does not publish other levels through this channel.
 
 The lines have the same form as the webhook automation from the README, so keywords and notes keep working if you switch a rule from the webhook to this source. You can then remove the automation.
@@ -49,6 +51,8 @@ A webhook rule also accepts the formats of log shippers, at two addresses built 
 * **OpenTelemetry logs (OTLP/HTTP)**: `<webhook URL>/v1/logs`, in JSON or Protobuf, with or without gzip. Used by the OpenTelemetry Collector and by applications that speak OTLP.
 
 The rule form gives ready-made configurations under **Send from a log shipper**, including **Windows event logs** through Fluent Bit.
+
+![Ready-made Fluent Bit configuration for a webhook rule](../../../screenshots/log-to-llm-sentinel_source_log_shipper.png)
 
 A line is prefixed with the name of its source when the sender gives one (`container`, `service_name`, `job`, `host`…). The time shown is the time of reception, not the time carried by the message.
 
