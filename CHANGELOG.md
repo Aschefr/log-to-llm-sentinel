@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.8.1] - 2026-11-07
 
 ### Added
 - **Autopilot catches a serious line the first time**: out of memory, kernel panic, segfault, disk or file system errors and an unresponsive NFS server are analyzed even if no keyword matches. Until now, such a line had to come back several times before the autopilot could notice it.
