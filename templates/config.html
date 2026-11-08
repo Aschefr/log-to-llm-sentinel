@@ -251,7 +251,7 @@
             <p class="form-hint diag-intro" data-i18n="diag.intro">Permet à l'IA du chat et de l'investigation de vérifier elle-même l'état réel de ton infrastructure. Tout est en lecture seule : rien ne peut être démarré, arrêté ou modifié.</p>
             <div class="diag-grid">
                 <!-- ── Second regard pendant l'analyse ── -->
-                <div class="diag-card" id="diag-second-look">
+                <div class="diag-card" id="diag-second-look" data-jump-status="diag-sl-status">
                     <div class="diag-card-head">
                         <h3 data-i18n="diag.sl_title">Second regard pendant l'analyse</h3>
                         <span class="diag-status" id="diag-sl-status"></span>
@@ -271,116 +271,127 @@
                     </div>
                     <p class="form-hint" data-i18n="diag.docker_hint">Via un proxy du socket Docker qui n'autorise que la lecture (état, santé, redémarrages, logs, consommation). Sentinel ne monte jamais le socket lui-même.</p>
                     <ul class="diag-links hidden" id="diag-docker-links"></ul>
-                    <h4 class="diag-form-title" id="diag-docker-form-title" data-i18n="diag.link_new">Nouvelle connexion</h4>
-                    <div class="form-group">
-                        <label for="diag-docker-name" data-i18n="diag.link_name">Nom</label>
-                        <input type="text" id="diag-docker-name" data-i18n-placeholder="diag.link_name_docker" placeholder="ex. : Docker d'Unraid" maxlength="60">
-                    </div>
-                    <div class="form-group">
-                        <label for="diag-docker-url" data-i18n="diag.docker_url">Adresse du proxy</label>
-                        <input type="text" id="diag-docker-url" class="mono" placeholder="http://docker-proxy:2375" spellcheck="false">
-                    </div>
-                    <div class="diag-actions">
-                        <button type="button" class="btn btn-primary btn-sm" id="diag-docker-test" data-i18n="diag.test_save">Tester et enregistrer</button>
-                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-docker-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
-                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-docker-cancel" data-i18n="common.cancel">Annuler</button>
-                        <span class="form-hint" id="diag-docker-result"></span>
-                    </div>
-                    <details class="diag-howto">
-                        <summary data-i18n="diag.howto">Comment l'installer ?</summary>
-                        <div class="rp-seg diag-platforms" role="group" data-target="docker">
-                            <button type="button" class="active" data-platform="compose">Docker compose</button>
-                            <button type="button" data-platform="unraid">Unraid</button>
+                    <button type="button" class="btn btn-primary btn-sm diag-add-btn hidden" id="diag-docker-add" aria-controls="diag-docker-add-form" aria-expanded="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="diag.add_docker">Ajouter un proxy Docker</span></button>
+                    <div class="diag-add" id="diag-docker-add-form">
+                        <h4 class="diag-form-title" id="diag-docker-form-title" data-i18n="diag.add_docker">Ajouter un proxy Docker</h4>
+                        <div class="form-group">
+                            <label for="diag-docker-name" data-i18n="diag.link_name">Nom</label>
+                            <input type="text" id="diag-docker-name" data-i18n-placeholder="diag.link_name_docker" placeholder="ex. : Docker d'Unraid" maxlength="60">
                         </div>
-                        <div class="diag-howto-body" data-howto="docker-compose">
-                            <p class="form-hint" data-i18n="diag.docker_compose_hint">Ajoute ce service dans le même docker-compose.yml que Sentinel, puis lance docker compose up -d. L'adresse http://docker-proxy:2375 est déjà pré-remplie.</p>
-                            <pre class="diag-code" id="diag-docker-compose-code"></pre>
-                            <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-docker-compose-code" data-i18n="common.copy">Copier</button>
+                        <div class="form-group">
+                            <label for="diag-docker-url" data-i18n="diag.docker_url">Adresse du proxy</label>
+                            <input type="text" id="diag-docker-url" class="mono" placeholder="http://docker-proxy:2375" spellcheck="false">
                         </div>
-                        <div class="diag-howto-body hidden" data-howto="docker-unraid">
-                            <ol class="diag-steps">
-                                <li data-i18n-html="diag.unraid_step1">Dans le terminal d'Unraid, crée un réseau dédié (une seule fois) : <code>docker network create sentinel</code>. Pour le voir dans la liste des réseaux, active <i>Paramètres › Docker › Preserve user defined networks</i>.</li>
-                                <li data-i18n-html="diag.unraid_step2">Dans l'onglet Apps, installe <b>dockersocket</b> (IBRACORP) et choisis le réseau <code>sentinel</code>. Garde <code>CONTAINERS=1</code> et <code>POST=0</code>.</li>
-                                <li data-i18n-html="diag.unraid_step3">Modifie le conteneur Log-to-LLM-Sentinel et choisis aussi le réseau <code>sentinel</code>.</li>
-                                <li data-i18n-html="diag.unraid_step4">L'adresse <code>http://dockersocket:2375</code> est pré-remplie : clique sur Tester et enregistrer.</li>
-                            </ol>
-                            <p class="form-hint" data-i18n="diag.unraid_no_port">Ne publie pas le port du proxy sur ton réseau : même en lecture seule, il expose la configuration de tous tes conteneurs.</p>
+                        <div class="diag-actions">
+                            <button type="button" class="btn btn-primary btn-sm" id="diag-docker-test" data-i18n="diag.test_save">Tester et enregistrer</button>
+                            <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-docker-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
+                            <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-docker-cancel" data-i18n="common.cancel">Annuler</button>
+                            <span class="form-hint" id="diag-docker-result" role="status"></span>
                         </div>
-                    </details>
+                        <details class="diag-howto">
+                            <summary data-i18n="diag.howto">Comment l'installer ?</summary>
+                            <div class="rp-seg diag-platforms" role="group" data-target="docker">
+                                <button type="button" class="active" data-platform="compose">Docker compose</button>
+                                <button type="button" data-platform="unraid">Unraid</button>
+                            </div>
+                            <div class="diag-howto-body" data-howto="docker-compose">
+                                <p class="form-hint" data-i18n="diag.docker_compose_hint">Ajoute ce service dans le même docker-compose.yml que Sentinel, puis lance docker compose up -d. L'adresse http://docker-proxy:2375 est déjà pré-remplie.</p>
+                                <pre class="diag-code" id="diag-docker-compose-code"></pre>
+                                <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-docker-compose-code" data-i18n="common.copy">Copier</button>
+                            </div>
+                            <div class="diag-howto-body hidden" data-howto="docker-unraid">
+                                <ol class="diag-steps">
+                                    <li data-i18n-html="diag.unraid_step1">Dans le terminal d'Unraid, crée un réseau dédié (une seule fois) : <code>docker network create sentinel</code>. Pour le voir dans la liste des réseaux, active <i>Paramètres › Docker › Preserve user defined networks</i>.</li>
+                                    <li data-i18n-html="diag.unraid_step2">Dans l'onglet Apps, installe <b>dockersocket</b> (IBRACORP) et choisis le réseau <code>sentinel</code>. Garde <code>CONTAINERS=1</code> et <code>POST=0</code>.</li>
+                                    <li data-i18n-html="diag.unraid_step3">Modifie le conteneur Log-to-LLM-Sentinel et choisis aussi le réseau <code>sentinel</code>.</li>
+                                    <li data-i18n-html="diag.unraid_step4">L'adresse <code>http://dockersocket:2375</code> est pré-remplie : clique sur Tester et enregistrer.</li>
+                                </ol>
+                                <p class="form-hint" data-i18n="diag.unraid_no_port">Ne publie pas le port du proxy sur ton réseau : même en lecture seule, il expose la configuration de tous tes conteneurs.</p>
+                            </div>
+                        </details>
+                    </div>
                 </div>
 
-                <!-- ── Serveur (SSH) ── -->
-                <div class="diag-card">
+                <!-- ── Serveur (SSH) : la clé de Sentinel, les serveurs, l'ajout d'un serveur ── -->
+                <div class="diag-card" id="diag-ssh-card">
                     <div class="diag-card-head">
                         <h3 data-i18n="diag.host_title">Serveur (SSH limité)</h3>
                         <span class="diag-status" id="diag-host-status"></span>
                     </div>
                     <p class="form-hint" data-i18n="diag.host_hint">Une clé SSH générée par Sentinel, autorisée sur le serveur uniquement pour un script de contrôles en lecture seule (disque, mémoire, charge, partages réseau, services). Même volée, elle ne permet rien d'autre.</p>
-                    <ul class="diag-links hidden" id="diag-ssh-links"></ul>
-                    <ol class="diag-steps">
-                        <li>
-                            <span data-i18n="diag.step_key">Génère la clé de Sentinel.</span>
-                            <div class="diag-actions">
-                                <button type="button" class="btn btn-secondary btn-sm" id="diag-key-generate" data-i18n="diag.generate_key">Générer la clé</button>
-                                <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-key-regenerate" data-i18n="diag.regenerate_key">Régénérer</button>
-                                <button type="button" class="btn btn-secondary btn-sm" id="diag-key-paste" aria-expanded="false" aria-controls="diag-key-import" data-i18n="diag.key_paste">Coller une clé existante</button>
-                            </div>
-                            <div class="diag-key-import hidden" id="diag-key-import">
-                                <label for="diag-key-private" class="form-hint" data-i18n="diag.key_paste_hint">Clé privée OpenSSH sans phrase de passe, de -----BEGIN à -----END. Sur un autre Sentinel, c'est le fichier data/ssh/sentinel_diag_ed25519 ; la ligne ssh-ed25519… affichée ici est la clé publique, elle ne suffit pas. La clé reste dans Sentinel et n'est jamais réaffichée.</label>
-                                <textarea id="diag-key-private" class="mono" rows="5" spellcheck="false" autocomplete="off" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
-                                <div class="diag-actions">
-                                    <button type="button" class="btn btn-primary btn-sm" id="diag-key-use" data-i18n="diag.key_use">Utiliser cette clé</button>
-                                    <button type="button" class="btn btn-secondary btn-sm" id="diag-key-paste-cancel" data-i18n="common.cancel">Annuler</button>
-                                    <span class="form-hint" id="diag-key-result" role="status"></span>
-                                </div>
-                            </div>
-                            <code class="diag-pubkey hidden" id="diag-pubkey"></code>
-                        </li>
-                        <li>
-                            <span data-i18n="diag.step_install">Colle ce bloc dans un terminal du serveur.</span>
-                            <p class="form-hint" data-i18n="diag.install_review">Pour le relire : l'en-tête résume ce qu'il fait, seules les étapes numérotées modifient le serveur, et tout ce qui suit est le script de contrôles en lecture seule, commenté contrôle par contrôle.</p>
-                            <div class="rp-seg diag-platforms" role="group" data-target="ssh">
-                                <button type="button" class="active" data-platform="linux">Linux</button>
-                                <button type="button" data-platform="unraid">Unraid</button>
-                            </div>
-                            <label class="rf-stack diag-account" id="diag-account-row"><span data-i18n="diag.account">Compte créé sur le serveur</span>
-                                <input type="text" id="diag-ssh-account" class="mono" value="sentinel-diag" maxlength="32" spellcheck="false" autocomplete="off" aria-describedby="diag-account-hint"></label>
-                            <p class="form-hint" id="diag-account-hint" data-i18n="diag.account_hint">Change-le avant de copier le bloc. Si ce compte existe déjà sans avoir été créé par Sentinel, le bloc s'arrête sans rien modifier.</p>
-                            <label class="rf-stack diag-account" id="diag-source-row"><span data-i18n="diag.source">Adresse de Sentinel vue par le serveur</span>
-                                <input type="text" id="diag-ssh-source" class="mono" maxlength="200" spellcheck="false" autocomplete="off" aria-describedby="diag-source-hint"></label>
-                            <p class="form-hint" id="diag-source-hint" data-i18n="diag.source_hint">La clé ne sera acceptée que depuis cette adresse : copiée ailleurs, elle ne servirait à rien. Pré-remplie avec l'adresse qui sert à ouvrir Sentinel ; un test réussi montre celle que le serveur voit vraiment. Laisse vide pour ne pas limiter.</p>
-                            <pre class="diag-code" id="diag-ssh-snippet"></pre>
-                            <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-ssh-snippet" data-i18n="common.copy">Copier</button>
-                        </li>
-                        <li>
-                            <span data-i18n="diag.step_settings">Vérifie l'adresse du serveur et l'utilisateur indiqué à la fin du bloc, puis clique sur Tester et enregistrer.</span>
-                            <h4 class="diag-form-title" id="diag-ssh-form-title" data-i18n="diag.link_new">Nouvelle connexion</h4>
-                            <div class="form-group">
-                                <label for="diag-ssh-name" data-i18n="diag.link_name">Nom</label>
-                                <input type="text" id="diag-ssh-name" data-i18n-placeholder="diag.link_name_ssh" placeholder="ex. : Serveur Unraid" maxlength="60">
-                            </div>
-                            <div class="diag-fields">
-                                <label class="rf-stack"><span data-i18n="diag.ssh_host">Adresse du serveur</span><input type="text" id="diag-ssh-host" class="mono" placeholder="192.168.1.10" spellcheck="false"></label>
-                                <label class="rf-stack"><span data-i18n="diag.ssh_port">Port</span><input type="number" id="diag-ssh-port" min="1" max="65535" value="22"></label>
-                                <label class="rf-stack"><span data-i18n="diag.ssh_user">Utilisateur</span><input type="text" id="diag-ssh-user" class="mono" placeholder="sentinel-diag" spellcheck="false"></label>
-                            </div>
-                            <div class="diag-actions">
-                                <button type="button" class="btn btn-primary btn-sm" id="diag-ssh-test" data-i18n="diag.test_save">Tester et enregistrer</button>
-                                <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-ssh-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
-                                <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-ssh-cancel" data-i18n="common.cancel">Annuler</button>
-                                <span class="form-hint" id="diag-ssh-result"></span>
-                            </div>
-                            <pre class="diag-code hidden" id="diag-ssh-output"></pre>
-                        </li>
-                    </ol>
-                    <details class="diag-howto hidden" id="diag-ssh-remove">
-                        <summary data-i18n="diag.remove_title">Retirer l'accès</summary>
-                        <p class="form-hint" data-i18n="diag.remove_hint">Colle ce bloc dans un terminal du serveur (plateforme choisie à l'étape 2) : il retire la clé de Sentinel et le script, et Sentinel ne peut plus se connecter. Oublie ensuite le serveur dans Sentinel.</p>
-                        <pre class="diag-code" id="diag-ssh-uninstall"></pre>
+                    <div class="diag-sub" id="diag-key-box">
+                        <h4 class="diag-form-title" data-i18n="diag.key_title">Clé de Sentinel</h4>
+                        <p class="form-hint" data-i18n="diag.key_hint">Une seule clé pour tous tes serveurs : le bloc d'installation de chacun l'autorise. La régénérer oblige à recoller le bloc sur chaque serveur.</p>
+                        <p class="form-hint" id="diag-key-none" data-i18n="diag.key_none">Pas encore de clé : génère-la avant d'ajouter un serveur.</p>
+                        <code class="diag-pubkey hidden" id="diag-pubkey"></code>
                         <div class="diag-actions">
-                            <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-ssh-uninstall" data-i18n="common.copy">Copier</button>
+                            <button type="button" class="btn btn-primary btn-sm" id="diag-key-generate" data-i18n="diag.generate_key">Générer la clé</button>
+                            <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-key-regenerate" data-i18n="diag.regenerate_key">Régénérer</button>
+                            <button type="button" class="btn btn-secondary btn-sm" id="diag-key-paste" aria-expanded="false" aria-controls="diag-key-import" data-i18n="diag.key_paste">Coller une clé existante</button>
+                            <span class="form-hint" id="diag-key-result" role="status"></span>
                         </div>
-                    </details>
+                        <div class="diag-key-import hidden" id="diag-key-import">
+                            <label for="diag-key-private" class="form-hint" data-i18n="diag.key_paste_hint">Clé privée OpenSSH sans phrase de passe, de -----BEGIN à -----END. Sur un autre Sentinel, c'est le fichier data/ssh/sentinel_diag_ed25519 ; la ligne ssh-ed25519… affichée ici est la clé publique, elle ne suffit pas. La clé reste dans Sentinel et n'est jamais réaffichée.</label>
+                            <textarea id="diag-key-private" class="mono" rows="5" spellcheck="false" autocomplete="off" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"></textarea>
+                            <div class="diag-actions">
+                                <button type="button" class="btn btn-primary btn-sm" id="diag-key-use" data-i18n="diag.key_use">Utiliser cette clé</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="diag-key-paste-cancel" data-i18n="common.cancel">Annuler</button>
+                                <span class="form-hint" id="diag-key-import-result" role="status"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="diag-sub">
+                        <h4 class="diag-form-title hidden" id="diag-ssh-servers-title" data-i18n="diag.servers_title">Serveurs</h4>
+                        <p class="form-hint hidden" id="diag-ssh-nokey" data-i18n="diag.servers_need_key">Les serveurs utilisent la clé de Sentinel : génère-la ou colle-la d'abord.</p>
+                        <ul class="diag-links hidden" id="diag-ssh-links"></ul>
+                        <button type="button" class="btn btn-primary btn-sm diag-add-btn hidden" id="diag-ssh-add" aria-controls="diag-ssh-add-form" aria-expanded="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="diag.add_ssh">Ajouter un serveur</span></button>
+                        <div class="diag-add hidden" id="diag-ssh-add-form">
+                            <h4 class="diag-form-title" id="diag-ssh-form-title" data-i18n="diag.add_ssh">Ajouter un serveur</h4>
+                            <ol class="diag-steps">
+                                <li>
+                                    <span data-i18n="diag.step_platform">Choisis le système du serveur.</span>
+                                    <div class="rp-seg diag-platforms" role="group" data-target="ssh">
+                                        <button type="button" class="active" data-platform="linux">Linux</button>
+                                        <button type="button" data-platform="unraid">Unraid</button>
+                                    </div>
+                                </li>
+                                <li id="diag-account-row">
+                                    <label class="rf-stack diag-account"><span data-i18n="diag.account">Compte créé sur le serveur</span>
+                                        <input type="text" id="diag-ssh-account" class="mono" value="sentinel-diag" maxlength="32" spellcheck="false" autocomplete="off" aria-describedby="diag-account-hint"></label>
+                                    <p class="form-hint" id="diag-account-hint" data-i18n="diag.account_hint">Change-le avant de copier le bloc. Si ce compte existe déjà sans avoir été créé par Sentinel, le bloc s'arrête sans rien modifier.</p>
+                                </li>
+                                <li>
+                                    <label class="rf-stack diag-account" id="diag-source-row"><span data-i18n="diag.source">Adresse de Sentinel vue par le serveur</span>
+                                        <input type="text" id="diag-ssh-source" class="mono" maxlength="200" spellcheck="false" autocomplete="off" aria-describedby="diag-source-hint"></label>
+                                    <p class="form-hint" id="diag-source-hint" data-i18n="diag.source_hint">La clé ne sera acceptée que depuis cette adresse : copiée ailleurs, elle ne servirait à rien. Pré-remplie avec l'adresse qui sert à ouvrir Sentinel ; un test réussi montre celle que le serveur voit vraiment. Laisse vide pour ne pas limiter.</p>
+                                </li>
+                                <li>
+                                    <span data-i18n="diag.step_install">Colle ce bloc dans un terminal du serveur.</span>
+                                    <p class="form-hint" data-i18n="diag.install_review">Pour le relire : l'en-tête résume ce qu'il fait, seules les étapes numérotées modifient le serveur, et tout ce qui suit est le script de contrôles en lecture seule, commenté contrôle par contrôle.</p>
+                                    <pre class="diag-code" id="diag-ssh-snippet"></pre>
+                                    <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-ssh-snippet" data-i18n="common.copy">Copier</button>
+                                </li>
+                                <li>
+                                    <span data-i18n="diag.step_settings">Vérifie l'adresse du serveur et l'utilisateur indiqué à la fin du bloc, puis clique sur Tester et enregistrer.</span>
+                                    <div class="form-group">
+                                        <label for="diag-ssh-name" data-i18n="diag.link_name">Nom</label>
+                                        <input type="text" id="diag-ssh-name" data-i18n-placeholder="diag.link_name_ssh" placeholder="ex. : Serveur Unraid" maxlength="60">
+                                    </div>
+                                    <div class="diag-fields">
+                                        <label class="rf-stack"><span data-i18n="diag.ssh_host">Adresse du serveur</span><input type="text" id="diag-ssh-host" class="mono" placeholder="192.168.1.10" spellcheck="false"></label>
+                                        <label class="rf-stack"><span data-i18n="diag.ssh_port">Port</span><input type="number" id="diag-ssh-port" min="1" max="65535" value="22"></label>
+                                        <label class="rf-stack"><span data-i18n="diag.ssh_user">Utilisateur</span><input type="text" id="diag-ssh-user" class="mono" placeholder="sentinel-diag" spellcheck="false"></label>
+                                    </div>
+                                    <div class="diag-actions">
+                                        <button type="button" class="btn btn-primary btn-sm" id="diag-ssh-test" data-i18n="diag.test_save">Tester et enregistrer</button>
+                                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-ssh-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
+                                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-ssh-cancel" data-i18n="common.cancel">Annuler</button>
+                                        <span class="form-hint" id="diag-ssh-result" role="status"></span>
+                                    </div>
+                                </li>
+                            </ol>
+                        </div>
+                    </div>
                 </div>
                 <!-- ── Recherche web ── -->
                 <div class="diag-card">
@@ -391,40 +402,43 @@
                     <p class="form-hint" data-i18n="diag.web_hint">Pour le chat et les investigations seulement. Les requêtes partent vers des moteurs publics : Sentinel refuse celles qui contiennent une adresse, un chemin ou le nom d'une de tes machines. L'analyse automatique des alertes n'y a jamais accès.</p>
                     <p class="form-hint rf-ko hidden" id="diag-web-pause" role="status"></p>
                     <ul class="diag-links hidden" id="diag-web-links"></ul>
-                    <h4 class="diag-form-title" id="diag-web-form-title" data-i18n="diag.link_new">Nouvelle connexion</h4>
-                    <div class="form-group">
-                        <label for="diag-web-name" data-i18n="diag.link_name">Nom</label>
-                        <input type="text" id="diag-web-name" data-i18n-placeholder="diag.link_name_web" placeholder="ex. SearXNG" spellcheck="false">
-                    </div>
-                    <div class="form-group">
-                        <label for="diag-web-url" data-i18n="diag.web_url">Adresse de l'instance</label>
-                        <input type="text" id="diag-web-url" class="mono" placeholder="http://searxng:8080" spellcheck="false">
-                    </div>
-                    <div class="diag-actions">
-                        <button type="button" class="btn btn-primary btn-sm" id="diag-web-test" data-i18n="diag.test_save">Tester et enregistrer</button>
-                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-web-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
-                        <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-web-cancel" data-i18n="common.cancel">Annuler</button>
-                        <span class="form-hint" id="diag-web-result"></span>
-                    </div>
-                    <details class="diag-howto">
-                        <summary data-i18n="diag.howto">Comment l'installer ?</summary>
-                        <div class="rp-seg diag-platforms" role="group" data-target="web">
-                            <button type="button" class="active" data-platform="compose">Docker compose</button>
-                            <button type="button" data-platform="unraid">Unraid</button>
+                    <button type="button" class="btn btn-primary btn-sm diag-add-btn hidden" id="diag-web-add" aria-controls="diag-web-add-form" aria-expanded="false"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="diag.add_web">Ajouter une instance</span></button>
+                    <div class="diag-add" id="diag-web-add-form">
+                        <h4 class="diag-form-title" id="diag-web-form-title" data-i18n="diag.add_web">Ajouter une instance</h4>
+                        <div class="form-group">
+                            <label for="diag-web-name" data-i18n="diag.link_name">Nom</label>
+                            <input type="text" id="diag-web-name" data-i18n-placeholder="diag.link_name_web" placeholder="ex. SearXNG" spellcheck="false">
                         </div>
-                        <div class="diag-howto-body" data-howto="web-compose">
-                            <p class="form-hint" data-i18n-html="diag.web_compose_hint">Le fichier compose de Sentinel contient déjà ce service, sans port publié. Lance-le avec <code>docker compose --profile web up -d</code>, puis garde l'adresse proposée.</p>
+                        <div class="form-group">
+                            <label for="diag-web-url" data-i18n="diag.web_url">Adresse de l'instance</label>
+                            <input type="text" id="diag-web-url" class="mono" placeholder="http://searxng:8080" spellcheck="false">
                         </div>
-                        <div class="diag-howto-body hidden" data-howto="web-unraid">
-                            <ol class="diag-steps">
-                                <li data-i18n-html="diag.web_unraid_step1">Dans l'onglet Apps, installe <b>SearXNG</b>.</li>
-                                <li data-i18n-html="diag.web_unraid_step2">Dans son <code>settings.yml</code>, généralement sous <code>/mnt/user/appdata/searxng/</code>, ajoute <code>json</code> sous <code>search: formats:</code>, à côté de <code>html</code>. Sans ça, SearXNG répond 403.</li>
-                                <li data-i18n-html="diag.web_unraid_step3">Redémarre SearXNG.</li>
-                                <li data-i18n-html="diag.web_unraid_step4">Saisis ici son adresse, par exemple <code>http://IP-DU-SERVEUR:8080</code>, ou <code>http://searxng:8080</code> s'il est sur le même réseau Docker que Sentinel.</li>
-                            </ol>
+                        <div class="diag-actions">
+                            <button type="button" class="btn btn-primary btn-sm" id="diag-web-test" data-i18n="diag.test_save">Tester et enregistrer</button>
+                            <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-web-save" data-i18n="diag.save_anyway">Enregistrer quand même</button>
+                            <button type="button" class="btn btn-secondary btn-sm hidden" id="diag-web-cancel" data-i18n="common.cancel">Annuler</button>
+                            <span class="form-hint" id="diag-web-result" role="status"></span>
                         </div>
-                    </details>
-                    <p class="form-hint" data-i18n="diag.web_engines">Beaucoup de moteurs bloquent les adresses résidentielles : le test indique ceux qui répondent vraiment depuis chez toi.</p>
+                        <details class="diag-howto">
+                            <summary data-i18n="diag.howto">Comment l'installer ?</summary>
+                            <div class="rp-seg diag-platforms" role="group" data-target="web">
+                                <button type="button" class="active" data-platform="compose">Docker compose</button>
+                                <button type="button" data-platform="unraid">Unraid</button>
+                            </div>
+                            <div class="diag-howto-body" data-howto="web-compose">
+                                <p class="form-hint" data-i18n-html="diag.web_compose_hint">Le fichier compose de Sentinel contient déjà ce service, sans port publié. Lance-le avec <code>docker compose --profile web up -d</code>, puis garde l'adresse proposée.</p>
+                            </div>
+                            <div class="diag-howto-body hidden" data-howto="web-unraid">
+                                <ol class="diag-steps">
+                                    <li data-i18n-html="diag.web_unraid_step1">Dans l'onglet Apps, installe <b>SearXNG</b>.</li>
+                                    <li data-i18n-html="diag.web_unraid_step2">Dans son <code>settings.yml</code>, généralement sous <code>/mnt/user/appdata/searxng/</code>, ajoute <code>json</code> sous <code>search: formats:</code>, à côté de <code>html</code>. Sans ça, SearXNG répond 403.</li>
+                                    <li data-i18n-html="diag.web_unraid_step3">Redémarre SearXNG.</li>
+                                    <li data-i18n-html="diag.web_unraid_step4">Saisis ici son adresse, par exemple <code>http://IP-DU-SERVEUR:8080</code>, ou <code>http://searxng:8080</code> s'il est sur le même réseau Docker que Sentinel.</li>
+                                </ol>
+                            </div>
+                        </details>
+                        <p class="form-hint" data-i18n="diag.web_engines">Beaucoup de moteurs bloquent les adresses résidentielles : le test indique ceux qui répondent vraiment depuis chez toi.</p>
+                    </div>
                 </div>
                 <!-- ── Fiches CVE ── -->
                 <div class="diag-card">
@@ -611,9 +625,9 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=24"></script>
+<script src="/static/js/config.js?v=25"></script>
 <script src="/static/js/passkey.js?v=1"></script>
 <script src="/static/js/auth_config.js?v=1"></script>
-<script src="/static/js/diagnostics_config.js?v=16"></script>
+<script src="/static/js/diagnostics_config.js?v=18"></script>
 <script src="/static/js/source_connections.js?v=4"></script>
 {% endblock %}

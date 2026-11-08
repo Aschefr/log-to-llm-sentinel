@@ -63,6 +63,15 @@ def link_dict(link: DiagnosticLink) -> dict:
             "web_url": link.web_url or ""}
 
 
+def ssh_link_details(link: DiagnosticLink) -> dict:
+    """What the interface needs to rebuild this server's own blocks, and whether its script needs re-pasting.
+    The platform follows from the user: the Linux block never creates root, Unraid always uses it."""
+    version = link.ssh_script_version or ""
+    return {"ssh_platform": "unraid" if (link.ssh_user or "") == "root" else "linux",
+            "ssh_source": link.ssh_source or "", "ssh_client_ip": link.ssh_client_ip or "",
+            "script_version": version, "script_outdated": bool(version) and version != DIAG_SCRIPT_VERSION}
+
+
 def all_links(db, kind: Optional[str] = None) -> List[dict]:
     """Connexions utilisables. Sans la clé de Sentinel, aucune connexion SSH ne peut servir."""
     rows = db.query(DiagnosticLink).order_by(DiagnosticLink.kind, DiagnosticLink.id).all()

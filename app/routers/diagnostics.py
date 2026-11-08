@@ -1,5 +1,6 @@
 """Connexions de diagnostic en lecture seule (proxies Docker, serveurs en SSH limité) et leurs tests."""
 import asyncio
+import ipaddress
 import json
 from typing import List, Optional
 
@@ -22,6 +23,14 @@ class LinkBody(BaseModel):
     ssh_port: Optional[int] = None
     ssh_user: Optional[str] = None
     web_url: Optional[str] = None
+    # SSH : adresses mises dans from= du bloc copié, et ce qu'a renvoyé le test qui a précédé l'enregistrement
+    ssh_source: Optional[str] = None
+    ssh_script_version: Optional[str] = None
+    ssh_client_ip: Optional[str] = None
+
+
+class LinkBlock(BaseModel):
+    ssh_source: str = ""
 
 
 class WebTest(BaseModel):
@@ -50,6 +59,7 @@ class SshTest(BaseModel):
     ssh_host: str
     ssh_port: int = 22
     ssh_user: str
+    link_id: Optional[int] = None  # connexion enregistrée testée : sa version de script et l'adresse vue sont retenues
 
 
 def _error(e: Exception):
@@ -74,7 +84,14 @@ def _link_values(db, body: LinkBody, link_id: Optional[int] = None) -> dict:
             raise HTTPException(status_code=422, detail="link_host_required")
         if not 1 <= port <= 65535:
             raise HTTPException(status_code=422, detail="link_port_invalid")
-        return {"name": name, "kind": "ssh", "ssh_host": host, "ssh_port": port, "ssh_user": user}
+        values = {"name": name, "kind": "ssh", "ssh_host": host, "ssh_port": port, "ssh_user": user}
+        if body.ssh_source is not None:
+            try:
+                values["ssh_source"] = diag.check_source(body.ssh_source) or ""
+            except diag.DiagnosticError as e:
+                raise HTTPException(status_code=422, detail=str(e))
+        values.update(_tested_values(body.ssh_script_version, body.ssh_client_ip))
+        return values
     if body.kind == "web":
         url = (body.web_url or "").strip().rstrip("/")
         if not url.startswith(("http://", "https://")):
@@ -83,11 +100,25 @@ def _link_values(db, body: LinkBody, link_id: Optional[int] = None) -> dict:
     raise HTTPException(status_code=422, detail="link_kind_invalid")
 
 
+def _tested_values(version: Optional[str], client_ip: Optional[str]) -> dict:
+    """What a successful test reported, as stored on the connection. A script without a number is stored as "0"."""
+    out = {}
+    if version is not None:
+        out["ssh_script_version"] = (str(version).strip() or "0")[:12]
+    if client_ip is not None:
+        try:
+            out["ssh_client_ip"] = str(ipaddress.ip_address(client_ip.strip())) if client_ip.strip() else ""
+        except ValueError:
+            out["ssh_client_ip"] = ""
+    return out
+
+
 @router.get("")
 def get_status():
     db = SessionLocal()
     try:
-        links = [diag.link_dict(l) for l in db.query(DiagnosticLink).order_by(DiagnosticLink.kind, DiagnosticLink.id).all()]
+        rows = db.query(DiagnosticLink).order_by(DiagnosticLink.kind, DiagnosticLink.id).all()
+        links = [{**diag.link_dict(l), **(diag.ssh_link_details(l) if l.kind == "ssh" else {})} for l in rows]
         rules = [(r.id, r.name, r.get_diagnostic_link_ids()) for r in db.query(Rule).order_by(Rule.name).all()]
         for link in links:
             link["rules"] = [name for _, name, ids in rules if ids is None or link["id"] in ids]
@@ -135,6 +166,24 @@ def update_link(link_id: int, body: LinkBody):
 
 class LinkRules(BaseModel):
     rule_ids: List[int]
+
+
+@router.put("/links/{link_id}/block")
+def set_link_block(link_id: int, body: LinkBlock):
+    """Remembers the addresses put in from= of the block just copied for this server, to pre-fill it next time."""
+    db = SessionLocal()
+    try:
+        link = db.query(DiagnosticLink).filter(DiagnosticLink.id == link_id, DiagnosticLink.kind == "ssh").first()
+        if not link:
+            raise HTTPException(status_code=404, detail="link_not_found")
+        try:
+            link.ssh_source = diag.check_source(body.ssh_source) or ""
+        except diag.DiagnosticError as e:
+            raise HTTPException(status_code=422, detail=str(e))
+        db.commit()
+        return {"ssh_source": link.ssh_source}
+    finally:
+        db.close()
 
 
 @router.put("/links/{link_id}/rules")
@@ -286,6 +335,16 @@ async def test_ssh(body: SshTest):
         out = await asyncio.to_thread(diag.run_host_check, cfg, "overview")
         info = await asyncio.to_thread(diag.installed_script_info, cfg)
         version = info["version"]
+        if body.link_id:
+            db = SessionLocal()
+            try:
+                link = db.query(DiagnosticLink).filter(DiagnosticLink.id == body.link_id, DiagnosticLink.kind == "ssh").first()
+                if link:
+                    for key, value in _tested_values(version or "", info["client_ip"] or "").items():
+                        setattr(link, key, value)
+                    db.commit()
+            finally:
+                db.close()
         return {"ok": True, "output": out[:3000], "host_fingerprint": diag.host_fingerprint(cfg["ssh_host"], cfg["ssh_port"]),
                 "script_version": version, "script_outdated": version != diag.DIAG_SCRIPT_VERSION,
                 "client_ip": info["client_ip"]}

@@ -486,6 +486,10 @@ class DiagnosticLink(Base):
     ssh_host = Column(String, default="")
     ssh_port = Column(Integer, default=22)
     ssh_user = Column(String, default="")
+    # La plateforme se déduit de l'utilisateur : root sur Unraid, le compte créé par le bloc sur Linux (jamais root)
+    ssh_source = Column(String, default="")          # adresses mises dans from= du dernier bloc copié pour ce serveur
+    ssh_script_version = Column(String, default="")  # version du script au dernier test réussi ; "0" : script sans numéro
+    ssh_client_ip = Column(String, default="")       # adresse de Sentinel vue par le serveur au dernier test réussi
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

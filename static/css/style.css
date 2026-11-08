@@ -812,11 +812,6 @@ body {
     100% { opacity: 1; }
 }
 
-.pulse-animation {
-    animation: pulse 1.5s infinite;
-    cursor: wait !important;
-}
-
 .btn-success-temporary {
     background: var(--success) !important;
     color: white !important;
@@ -2235,37 +2230,6 @@ mark.kw-highlight {
 /* Keyword label (analysis cards) */
 .kw-label { font-size: 0.78rem; font-weight: 600; color: var(--text-secondary); }
 
-/* ── Recovery Monitoring / Status Indicator Styles ── */
-.rule-status-dot {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-.status-normal {
-    background-color: var(--success);
-}
-.status-alert {
-    background-color: var(--danger);
-    animation: pulse-alert 2s infinite;
-}
-.status-resolving {
-    background-color: var(--warning);
-    animation: pulse-resolving 2s infinite;
-}
-
-@keyframes pulse-alert {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-@keyframes pulse-resolving {
-    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); }
-    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
-    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
-}
-
 .status-text-normal { color: var(--success); }
 .status-text-alert { color: var(--danger); }
 .status-text-resolving { color: var(--warning); }
@@ -3015,6 +2979,9 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .cfg-jump-item:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
 .cfg-jump-item.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
 .cfg-jump-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cfg-jump-dot { display: inline-block; width: 0.4rem; height: 0.4rem; margin-left: 0.4rem; border-radius: 50%; vertical-align: 0.1em; border: 1.5px solid currentColor; opacity: 0.6; box-sizing: border-box; }
+.cfg-jump-dot[hidden] { display: none; }
+.cfg-jump-dot--on { background: var(--success); border-color: var(--success); opacity: 1; }
 .cfg-jump-target { scroll-margin-top: calc(var(--cfg-sticky-top, 0px) + 3.75rem); }
 .diag-card { border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
 .diag-card-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
@@ -4023,6 +3990,35 @@ select option, select optgroup { background-color: var(--bg-primary); color: var
 .diag-key-import textarea { box-sizing: border-box; width: 100%; padding: 0.5rem 0.65rem; resize: vertical; color: var(--text-primary); font-size: 0.74rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; }
 .diag-account { max-width: 16rem; }
 .diag-account input { padding: 0.45rem 0.65rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; color: var(--text-primary); font-size: 0.85rem; }
+/* Diagnostic : clé de Sentinel commune, liste des connexions avec « Ajouter », panneau sous chaque connexion */
+.diag-sub { display: flex; flex-direction: column; gap: 0.45rem; }
+.diag-sub > .form-hint, .diag-sub > .diag-form-title, .diag-sub > .diag-actions { margin: 0; }
+#diag-key-box { padding-bottom: 0.8rem; border-bottom: 1px solid var(--border); }
+.diag-add-btn { align-self: flex-start; display: inline-flex; align-items: center; gap: 0.35rem; }
+.diag-add { display: flex; flex-direction: column; gap: 0.6rem; }
+.diag-sub > .diag-add { margin-top: 0.3rem; }
+.diag-links:not(.hidden) ~ .diag-add { padding-top: 0.8rem; border-top: 1px solid var(--border); }
+.diag-steps > li > .diag-account > span:first-child { font-size: 0.88rem; color: var(--text-primary); }
+.diag-link-title { overflow-wrap: anywhere; }
+.diag-link-warn { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; margin: 0.1rem 0 0; font-size: 0.8rem; color: var(--warning); }
+.diag-btn-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.diag-panel-btn { display: inline-flex; align-items: center; gap: 0.45rem; }
+.diag-panel-btn::after { content: ""; width: 0.36rem; height: 0.36rem; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: translateY(-0.12rem) rotate(45deg); transition: transform 0.15s ease-out; }
+.diag-panel-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.diag-panel-btn[aria-expanded="true"]::after { transform: translateY(0.1rem) rotate(-135deg); }
+@media (min-width: 641px) { .diag-btn-group--direct:not(:first-child) { padding-left: 0.75rem; border-left: 1px solid var(--border); } }
+.diag-link-panel { flex: 1 1 100%; display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; margin-top: 0.3rem; padding-top: 0.55rem; border-top: 1px solid var(--border); }
+.diag-link-panel > .form-hint { margin: 0; }
+.diag-link-panel .diag-actions { margin: 0; }
+.diag-link-panel .diag-code { max-height: 220px; }
+.diag-edit-fields { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr); gap: 0.5rem; }
+.diag-edit-fields--ssh { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) 90px minmax(0, 1.1fr); }
+.diag-edit-fields input { min-width: 0; padding: 0.45rem 0.65rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 0.5rem; color: var(--text-primary); font: inherit; font-size: 0.85rem; }
+@media (max-width: 640px) {
+    .diag-edit-fields, .diag-edit-fields--ssh { grid-template-columns: minmax(0, 1fr) 90px; }
+    .diag-edit-fields > :not(:nth-child(3)) { grid-column: 1 / -1; }
+    .diag-edit-fields--ssh > :nth-child(2) { grid-column: 1 / 2; }
+}
 #rs-shipper-details pre { white-space: pre; overflow-x: auto; margin: 0; }
 #rs-shipper-details .rp-seg { align-self: flex-start; max-width: 100%; }
 @media (max-width: 640px) {

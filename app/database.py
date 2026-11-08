@@ -182,6 +182,10 @@ def init_db():
         # Recherche web et fiches CVE
         "ALTER TABLE diagnostic_links ADD COLUMN web_url VARCHAR DEFAULT ''",
         "ALTER TABLE global_config ADD COLUMN cve_lookup_enabled BOOLEAN DEFAULT 0",
+        # Bloc d'installation par serveur et script à mettre à jour, retenus sur la connexion SSH
+        "ALTER TABLE diagnostic_links ADD COLUMN ssh_source VARCHAR DEFAULT ''",
+        "ALTER TABLE diagnostic_links ADD COLUMN ssh_script_version VARCHAR DEFAULT ''",
+        "ALTER TABLE diagnostic_links ADD COLUMN ssh_client_ip VARCHAR DEFAULT ''",
         # Le chat suit la langue du site : l'ancien prompt par défaut imposerait une langue
         """UPDATE global_config SET chat_system_prompt = '' WHERE chat_system_prompt IN (
             'Tu es un expert DevOps francophone. Réponds en français de manière directe et concise.',

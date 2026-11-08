@@ -20,7 +20,7 @@ To let the AI look outside your network, see [Web Search and CVE Sheets](web-sea
 
 ## Several machines, chosen per rule
 
-You can add as many connections as you need, Docker or SSH, each with a name, in *Configuration > Diagnostics*: for example SSH to your Unraid server and the Docker of this machine. Sentinel uses the same SSH key for all of them, so the block of step 2 is the same on every server.
+You can add as many connections as you need, Docker or SSH, each with a name, in *Configuration > Diagnostics*: for example SSH to your Unraid server and the Docker of this machine. Each card lists its connections with an **Add** button (*Add a Docker proxy*, *Add a server*, *Add an instance*); the add form opens by itself while a card has none. On each connection, **Test**, **Edit** (a small form under the connection) and **Delete**; a server also has **Install block** and **Remove access** (see below). Sentinel uses the same SSH key for all servers.
 
 Each rule then says which ones the AI may use, in **AI access for diagnosis** in its Settings tab, also on autopilot, since only you know which machine a log comes from:
 
@@ -74,16 +74,20 @@ Sentinel generates an SSH key. On the server, this key is only allowed to run on
 
 **Sentinel's own address.** The block can also limit the key to the address the server sees Sentinel from (`from=` option): a key copied out of Sentinel is then useless from another machine. The field *Sentinel's address as the server sees it* is filled in with the address used to open Sentinel when it is an IP, and **Test and save** shows the address the server really sees, filling the field if it was empty and warning if the block would refuse it. Leave it empty for no limit. Without [sign-in](sign-in.md), anyone who can reach Sentinel's interface can run the same read-only checks through the chat: turn sign-in on, or keep Sentinel on a trusted network. Sentinel never shows or sends its private key, and refuses to read its `ssh/` folder or its databases from the interface.
 
-### Step 1 — generate the key (in Sentinel)
-**Configuration › Diagnostics › Server** → **Generate the key**. The private key stays in Sentinel's data folder (`data/ssh/`), which the interface cannot read; only the public key is displayed.
+The **Server** card has three parts: **Sentinel's key**, shared by all servers; the list of **Servers**; and **Add a server**, a short numbered path.
 
-### Step 2 — install on the server (CLI)
-Choose your platform, click **Copy** and paste the block in a terminal on the server.
+### Sentinel's key (once)
+**Generate the key**. The private key stays in Sentinel's data folder (`data/ssh/`), which the interface cannot read; only the public key is displayed. **Paste an existing key** reuses the private key of another Sentinel. **Regenerate** warns first: the previous key stops working on every server, and each one needs its install block pasted again.
+
+### Adding a server
+**Add a server** (open by itself for the first one) asks, in order: the server's system (Linux or Unraid), the account to create (Linux only, `sentinel-diag` by default; if an account of that name exists and was not created by Sentinel, the block stops without changing anything), Sentinel's address as the server sees it, then shows the block to paste and finally the server's address and user.
+
+Click **Copy** and paste the block in a terminal on the server.
 
 To review it before pasting: the header sums up what the block does, only the numbered steps change the server, and everything after them is the read-only checks script, with a comment above each check.
 
 **Linux (Debian, Ubuntu…)** — the block, run with `sudo`:
-- creates a system user `sentinel-diag` (member of `systemd-journal` and `adm` to read journals),
+- creates a system user `sentinel-diag`, or the account name you chose (member of `systemd-journal` and `adm` to read journals),
 - installs the script at `/usr/local/bin/sentinel-diag`,
 - authorizes the key in `/home/sentinel-diag/.ssh/authorized_keys` with `restrict,command="/usr/local/bin/sentinel-diag"`, plus `from="<Sentinel's address>"` when that field is filled in.
 
@@ -92,14 +96,14 @@ To review it before pasting: the header sums up what the block does, only the nu
 - authorizes the key for `root` in `/boot/config/ssh/root/authorized_keys` (kept across reboots) and in the current session, with `restrict,command="bash /boot/config/sentinel/sentinel-diag.sh"`, plus `from=` when Sentinel's address is filled in. The checks then run as `root`, still limited to the read-only script.
 - SSH must be enabled: *Settings › Management Access › Use SSH*.
 
-The block can be pasted again safely (it replaces its previous key line).
+The block can be pasted again safely (it replaces its previous key line and script).
 
-### Step 3 — fill in Sentinel
+Last step of the path, in Sentinel:
 - **Server address**: the server's LAN IP (as reachable from the Sentinel container); pre-filled with the server IP from the general settings when set.
 - **Port**: `22` unless you changed it.
 - **User**: shown at the end of the block — `sentinel-diag` on Linux, `root` on Unraid (pre-filled for the selected platform).
 
-Click **Test and save**: the values typed in the form are tested and saved only if the connection works (a **Save anyway** button appears otherwise). The output of the `overview` check is shown with the server's key fingerprint, which Sentinel remembers (connections fail if it changes).
+Click **Test and save**: the values typed in the form are tested and saved only if the connection works (a **Save anyway** button appears otherwise). The form closes and the new server shows the output of the `overview` check with the server's key fingerprint, which Sentinel remembers (connections fail if it changes), the script version and the address the server sees Sentinel from.
 
 ### Available checks
 `overview`, `disk`, `memory`, `load`, `processes`, `mounts`, `network`, `kernel`, `syslog`, `array`, `failed-services`, `service <name>`, `journal <name>`, `fstab`, `nfs-exports <server>`.
@@ -110,15 +114,17 @@ Click **Test and save**: the values typed in the form are tested and saved only 
 - `kernel` and `network` leave out Docker's network noise (veth, bridges); `syslog` leaves out Sentinel's own SSH sessions.
 - Unraid has no systemd: `service`, `journal` and `failed-services` point to `syslog`, `array` and `processes` instead.
 
-### Updating the script
-The script carries a version number. When a new Sentinel version improves it, **Test and save** warns that the installed script is outdated: paste the step 2 block again (the key does not change).
+### Install block of a server: updating the script
+**Install block**, on a saved server, shows the block for that server: its platform, its account, and the Sentinel address last used in its block (or, the first time, the one its last test saw). This is the block to paste again after Sentinel updates the script or after the key is regenerated. Copying it records its address for next time; nothing is regenerated.
+
+The script carries a version number. Each test remembers the version installed on the server; when a new Sentinel version improves the script, the server shows *Outdated script on this server* with its **Install block** button right next to it (the key does not change).
 
 ### Revoking access
-Once the key exists, **Configuration › Diagnostics › Server › Remove access** shows the block that undoes the installation for the platform chosen in step 2:
+**Remove access**, on a saved server, shows the block that undoes the installation on that server:
 - Linux: removes the key from `/home/sentinel-diag/.ssh/authorized_keys`, deletes `/usr/local/bin/sentinel-diag`, then the `sentinel-diag` user and its home folder.
 - Unraid: removes the line containing `sentinel-diag` from `/boot/config/ssh/root/authorized_keys` (and from `/root/.ssh/authorized_keys` when it is a separate file), then deletes `/boot/config/sentinel/sentinel-diag.sh` and its folder.
 
-Then click **Forget the server in Sentinel** to clear the address and user (server diagnostics are disabled and the tools are no longer offered to the AI).
+Then **Delete** the connection in Sentinel: the AI no longer has access to that server. Deleting it alone leaves the key authorized on the server, which is why the confirmation reminds you of **Remove access**.
 
 You can also **Regenerate** the key in Sentinel: the previous key stops working everywhere, since Sentinel no longer holds it.
 
