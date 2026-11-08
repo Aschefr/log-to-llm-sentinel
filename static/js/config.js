@@ -39,7 +39,8 @@ function cfgT(key, fallback, vars) {
 /* ── Tabs ─────────────────────────────────────────────────────────────── */
 
 const CFG_TABS = { ollama: 'tab-ollama', notifications: 'tab-notifications', sources: 'tab-sources',
-                   diagnostic: 'diagnostics-section', data: 'tab-data', advanced: 'tab-advanced' };
+                   diagnostic: 'diagnostics-section', data: 'tab-data', advanced: 'tab-advanced',
+                   access: 'tab-access' };
 
 function selectConfigTab(tab) {
     const current = CFG_TABS[tab] ? tab : 'ollama';

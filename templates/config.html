@@ -15,6 +15,7 @@
         <a class="cfg-status-item" href="#diagnostic" data-tab="diagnostic" data-status="diagnostics"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong data-i18n="config.tab_diagnostic">Diagnostic</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
         <a class="cfg-status-item" href="#data" data-tab="data" data-status="data"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong data-i18n="config.tab_data">Données</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
         <a class="cfg-status-item" href="#advanced" data-tab="advanced" data-status="advanced"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong data-i18n="config.tab_advanced">Avancé</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
+        <a class="cfg-status-item" href="#access" data-tab="access" data-status="access"><span class="rp-dot rp-dot--idle"></span><span class="cfg-status-text"><strong data-i18n="auth.tab">Accès</strong><span class="cfg-status-detail" data-i18n="config.status_checking">Vérification…</span></span></a>
     </nav>
 
     <div class="sr-only" id="cfg-save-live" role="status" aria-live="polite"></div>
@@ -550,11 +551,69 @@
             </div>
         </section>
     </form>
+
+    <!-- ── Accès : hors du formulaire, chaque action s'applique tout de suite ── -->
+    <section class="rp-panel hidden" id="tab-access">
+        <div class="rp-card">
+            <h2 data-i18n="auth.title">Connexion à l'interface</h2>
+            <p class="form-hint" data-i18n="auth.intro">Désactivée, toute personne qui atteint Sentinel sur le réseau peut tout faire : réglages, suppressions, chat avec les outils de diagnostic. Activée, il faut une clé d'accès ou le mot de passe. La réception des logs par webhook reste ouverte, avec le jeton secret de chaque règle.</p>
+            <div class="cfg-row cfg-row--toggle">
+                <div class="cfg-row-label">
+                    <span class="cfg-label" data-i18n="auth.state_label">État</span>
+                    <p class="form-hint" id="auth-state-hint"></p>
+                </div>
+                <div class="cfg-row-control">
+                    <button type="button" class="btn btn-primary btn-sm hidden" id="auth-enable-btn" data-i18n="auth.enable">Activer la connexion</button>
+                    <button type="button" class="btn btn-secondary btn-sm hidden" id="auth-disable-btn" data-i18n="auth.disable">Désactiver</button>
+                </div>
+            </div>
+            <p class="form-hint cfg-result" id="auth-state-result" role="status"></p>
+        </div>
+
+        <div class="rp-card">
+            <h2 data-i18n="auth.passkeys_title">Clés d'accès</h2>
+            <p class="form-hint" data-i18n="auth.passkeys_hint">Une clé d'accès (passkey) se range dans Bitwarden, le gestionnaire du navigateur, Windows Hello ou le téléphone. Elle est liée au nom avec lequel tu ouvres Sentinel : une clé créée sur localhost ne sert pas sur sentinel.maison.lan.</p>
+            <p class="form-hint auth-context hidden" id="auth-passkey-context"></p>
+            <ul class="auth-list" id="auth-passkeys"></ul>
+            <div class="cfg-actions">
+                <input type="text" id="auth-passkey-name" class="auth-name" maxlength="60" data-i18n-placeholder="auth.passkey_name_placeholder" placeholder="Nom, ex. Bitwarden">
+                <button type="button" class="btn btn-secondary btn-sm" id="auth-passkey-add" data-i18n="auth.passkey_add">Ajouter une clé d'accès</button>
+                <span class="form-hint cfg-result" id="auth-passkey-result" role="status"></span>
+            </div>
+        </div>
+
+        <div class="rp-card">
+            <h2 data-i18n="auth.password_title">Mot de passe de secours</h2>
+            <p class="form-hint" data-i18n="auth.password_hint">Marche partout, y compris en HTTP sur une adresse IP, où les clés d'accès sont impossibles. 12 caractères au moins ; une phrase de passe tirée de ton gestionnaire convient très bien.</p>
+            <p class="form-hint" id="auth-password-state"></p>
+            <form id="auth-password-form" class="auth-password" novalidate>
+                <input type="text" class="hidden" autocomplete="username" value="sentinel" aria-hidden="true" tabindex="-1">
+                <input type="password" id="auth-password-new" autocomplete="new-password" minlength="12" data-i18n-placeholder="auth.password_new" placeholder="Nouveau mot de passe">
+                <input type="password" id="auth-password-confirm" autocomplete="new-password" minlength="12" data-i18n-placeholder="auth.password_confirm" placeholder="Le même, encore une fois">
+                <button type="submit" class="btn btn-secondary btn-sm" id="auth-password-save" data-i18n="auth.password_save">Enregistrer le mot de passe</button>
+                <button type="button" class="btn btn-secondary btn-sm hidden" id="auth-password-remove" data-i18n="auth.password_remove">Supprimer le mot de passe</button>
+            </form>
+            <p class="form-hint cfg-result" id="auth-password-result" role="status"></p>
+        </div>
+
+        <div class="rp-card">
+            <h2 data-i18n="auth.sessions_title">Sessions</h2>
+            <p class="form-hint" id="auth-sessions-state"></p>
+            <div class="cfg-actions">
+                <button type="button" class="btn btn-secondary btn-sm" id="auth-close-others" data-i18n="auth.close_others">Déconnecter les autres sessions</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="auth-logout" data-i18n="auth.logout">Se déconnecter</button>
+                <span class="form-hint cfg-result" id="auth-sessions-result" role="status"></span>
+            </div>
+            <p class="form-hint" data-i18n-html="auth.reset_hint">Clés et mot de passe perdus : crée un fichier vide <code>data/reset-auth</code> dans le dossier de données de Sentinel, puis redémarre le conteneur. La connexion est désactivée, ses clés, son mot de passe et ses sessions effacés, et le fichier supprimé.</p>
+        </div>
+    </section>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=23"></script>
+<script src="/static/js/config.js?v=24"></script>
+<script src="/static/js/passkey.js?v=1"></script>
+<script src="/static/js/auth_config.js?v=1"></script>
 <script src="/static/js/diagnostics_config.js?v=16"></script>
 <script src="/static/js/source_connections.js?v=4"></script>
 {% endblock %}

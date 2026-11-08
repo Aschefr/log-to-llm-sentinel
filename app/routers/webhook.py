@@ -99,6 +99,10 @@ def _find_rule(rule_id_or_token: str) -> Optional[Rule]:
     db = SessionLocal()
     try:
         if rule_id_or_token.isdigit():
+            # Un numéro de règle se devine : avec la connexion active, seul le jeton secret du webhook ouvre l'envoi
+            from app.services import auth
+            if auth.is_enabled():
+                raise HTTPException(status_code=403, detail="webhook_token_required")
             return db.query(Rule).filter(Rule.id == int(rule_id_or_token)).first()
         return db.query(Rule).filter(Rule.log_file_path == f"[WEBHOOK]:{rule_id_or_token}").first()
     finally:

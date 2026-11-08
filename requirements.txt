@@ -10,3 +10,4 @@ httpx==0.25.1
 websockets==13.1
 paho-mqtt==2.1.0
 python-multipart==0.0.6
+webauthn==3.0.1

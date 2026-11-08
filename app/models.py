@@ -528,3 +528,41 @@ class KeywordTemplate(Base):
     examples_json = Column(Text, default="[]")
     status = Column(String, default="new")  # 'new' | 'ignored' | 'covered'
     reviewed_count = Column(Integer, default=0)  # Nombre d'occurrences lors de la dernière revue
+
+
+class AuthState(Base):
+    """Connexion à l'interface (facultative) : une seule ligne. Hors de global_config pour qu'une restauration de
+    sauvegarde ne coupe ni ne remette jamais en place l'accès sans que ça se voie."""
+    __tablename__ = "auth_state"
+    id = Column(Integer, primary_key=True)
+    enabled = Column(Boolean, default=False)
+    password_hash = Column(String, nullable=True)  # scrypt, voir services/auth.py
+    user_handle = Column(String, nullable=True)  # identifiant WebAuthn de l'utilisateur unique, base64url
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
+class AuthPasskey(Base):
+    """Clé d'accès (WebAuthn) liée au nom de domaine depuis lequel elle a été créée (rp_id)."""
+    __tablename__ = "auth_passkeys"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, default="")
+    credential_id = Column(String, unique=True, index=True)  # base64url
+    public_key = Column(Text)  # base64url, clé publique COSE
+    sign_count = Column(Integer, default=0)
+    rp_id = Column(String)
+    transports_json = Column(Text, default="[]")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
+
+
+class AuthSession(Base):
+    """Session ouverte dans un navigateur : seul le hachage du jeton du cookie est gardé."""
+    __tablename__ = "auth_sessions"
+    id = Column(Integer, primary_key=True, index=True)
+    token_hash = Column(String, unique=True, index=True)
+    method = Column(String, default="")  # 'passkey' | 'password' | 'setup'
+    user_agent = Column(String, default="")
+    ip = Column(String, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_seen_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime)

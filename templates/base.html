@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Log to LLM Sentinel{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/favicon.png">
-    <link rel="stylesheet" href="/static/css/style.css?v=86">
+    <link rel="stylesheet" href="/static/css/style.css?v=89">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -75,6 +75,11 @@
             </div>
             <button type="button" id="theme-toggle-btn" class="theme-btn" onclick="toggleTheme()" data-i18n-title="header.theme_light" title="Passer au thème clair"></button>
             <div id="lang-switcher"></div>
+            {% if request.state.auth_session %}
+            <button type="button" class="theme-btn" id="logout-btn" onclick="sentinelLogout()" data-i18n-title="auth.logout" title="Se déconnecter">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            </button>
+            {% endif %}
         </div>
     </nav>
     <dialog class="changelog" id="changelog-dialog" aria-labelledby="changelog-title">
@@ -107,7 +112,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" crossorigin="anonymous"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js" crossorigin="anonymous"></script>
     <script src="/static/js/i18n.js?v=3"></script>
-    <script src="/static/js/common.js?v=36"></script>
+    <script src="/static/js/common.js?v=37"></script>
     <script src="/static/js/header.js?v=4"></script>
     <script src="/static/js/event_notes.js?v=2"></script>
     <script src="/static/js/triage.js?v=8"></script>

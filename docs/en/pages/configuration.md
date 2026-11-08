@@ -5,7 +5,7 @@
 The **Configuration** page is the single place for the AI model, notifications, sources, diagnostics, data and backups.
 
 ## Tabs and their state
-The six tabs at the top of the page each show the real state of what they configure, in text and with a colored dot.
+The seven tabs at the top of the page each show the real state of what they configure, in text and with a colored dot.
 
 | Tab | What it can say |
 |---|---|
@@ -15,6 +15,7 @@ The six tabs at the top of the page each show the real state of what they config
 | **Diagnostics** | Which Docker and server connections are set up. This is checked by **Test and save** in that tab, not every time the page opens. |
 | **Data** | Size of the data folder and how long data is kept |
 | **Advanced** | Whether debug mode is on |
+| **Access** | Sign-in off, or on with its passkeys and password |
 
 If the state cannot be read, the page says it is unknown.
 
@@ -122,6 +123,11 @@ The **Diagnostics** tab is described in [Infrastructure Diagnostics](../features
 
 ---
 
-## 6. Docker Setup Configurator
+## 6. Access tab
+Optional sign-in to the interface, off by default. Add a passkey or a backup password, then **Turn on sign-in**: the browser that turns it on stays signed in. Each action applies at once; this tab has no field saved on leave. Passkeys need HTTPS under a name, or `localhost`; the tab says when the current address cannot use them. The tab also lists the open sessions and explains the `data/reset-auth` file used when every key is lost. Details in [Sign-in to the interface](../features/sign-in.md).
+
+---
+
+## 7. Docker Setup Configurator
 To customize or regenerate your initial docker deployment parameters, use the built-in interactive **[Docker Configurator](../../../docker-setup.html)**. It generates custom `docker-compose.yml` templates pre-configured with the host Systemd journal bridge, custom log folder mounts, and local NVIDIA CUDA GPU accelerated Ollama setup instructions.
 

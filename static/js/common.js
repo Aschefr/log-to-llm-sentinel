@@ -1,4 +1,24 @@
 // Utilitaires communs
+
+// Connexion activée et session terminée (expirée, fermée ailleurs) : retour à la page de connexion, puis ici
+(function () {
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+        const response = await nativeFetch(...args);
+        if (response.status === 401 && response.headers.get('X-Sentinel-Auth') === 'required') {
+            location.href = '/login?next=' + encodeURIComponent(location.pathname + location.search + location.hash);
+        }
+        return response;
+    };
+})();
+
+async function sentinelLogout() {
+    try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+    } finally {
+        location.href = '/login';
+    }
+}
 async function apiFetch(url, options = {}) {
     const defaults = {
         headers: {

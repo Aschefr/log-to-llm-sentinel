@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Optional sign-in to the interface** (*Configuration › Access*, off by default): until now, anyone who could reach Sentinel on the network could change its settings, delete rules and use the chat with its diagnostic tools. Sign-in accepts passkeys, kept in Bitwarden, the browser, Windows Hello or a phone, and a backup password of at least 12 characters. Once it is on, every page and API call needs a session. A session is an `HttpOnly`, `SameSite=Lax` cookie valid 30 days after its last use. Requests that change something are refused when they come from another site. Webhook log reception stays open with each rule's secret token. The browser that turns sign-in on stays signed in, and the last sign-in method cannot be removed while it is on. Failed attempts are slowed down: after 5 failures from one address it must wait 1 minute, doubling up to 15, and more than 30 failures a minute from all addresses make everyone wait. If every key and the password are lost, an empty `data/reset-auth` file and a restart turn sign-in off. Passkeys need HTTPS under a name, or `localhost`: browsers refuse them on an IP address, so a Sentinel opened by its IP over HTTP signs in with the password. The new *Sign-in to the interface* page of the documentation shows how to put it behind an HTTPS reverse proxy. Sign-in settings are not part of backups.
+
+### Changed
+- **Webhook URLs with a rule number are refused while sign-in is on**: `/api/webhook/logs/3` could be guessed, so anyone on the network could push lines into any rule. With sign-in on, only the URL with the webhook's secret token is accepted, which is the one the rule form has always shown. Nothing changes while sign-in is off.
+
 ## [1.10.2] - 2026-11-08
 
 ### Security

@@ -117,6 +117,8 @@ async def lifespan(app: FastAPI):
 
     # Startup
     init_db()
+    from app.services import auth as auth_service
+    auth_service.load()  # avant la première requête : la garde doit connaître l'état dès le départ
     os.makedirs("/logs", exist_ok=True)
     os.makedirs("./data", exist_ok=True)
 
@@ -324,6 +326,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Log-to-LLM-Sentinel", lifespan=lifespan)
+# Connexion facultative (Configuration › Accès) : sans effet tant qu'elle n'est pas activée
+from app.auth_gate import AuthGate
+app.add_middleware(AuthGate)
 
 
 @app.get("/api/system/update-check")
@@ -382,6 +387,7 @@ from app.routers import webhook as webhook_router
 from app.routers import diagnostics as diagnostics_router
 from app.routers import triage as triage_router
 from app.routers import sources as sources_router
+from app.routers import auth as auth_router
 
 app.include_router(rules.router)
 app.include_router(config.router)
@@ -396,6 +402,7 @@ app.include_router(webhook_router.router)
 app.include_router(diagnostics_router.router)
 app.include_router(triage_router.router)
 app.include_router(sources_router.router)
+app.include_router(auth_router.router)
 
 
 # ── Pages ──
@@ -417,6 +424,17 @@ def new_rule_page(request: Request):
 @app.get("/rules/{rule_id}")
 def rule_page(request: Request, rule_id: int):
     return templates.TemplateResponse("rule.html", {"request": request, "rule_id": rule_id})
+
+
+@app.get("/login")
+def login_page(request: Request, next: str = "/"):
+    from app.services import auth as auth_service
+    # Seulement un chemin de Sentinel : un lien de connexion ne doit pas pouvoir renvoyer ailleurs. Les navigateurs
+    # retirent tabulations et retours à la ligne d'une adresse : « /<tab>/site » deviendrait « //site ».
+    target = next if re.fullmatch(r"/(?![/\\])[^\x00-\x20\x7f\\]*", next) else "/"
+    if not auth_service.is_enabled() or getattr(request.state, "auth_session", None):
+        return RedirectResponse(target, status_code=303)
+    return templates.TemplateResponse("login.html", {"request": request, "next": target})
 
 
 @app.get("/config")

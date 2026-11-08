@@ -13,7 +13,7 @@ Sentinel detects critical log events, automatically collects surrounding applica
 * [**Rules**](pages/rules.md) — Overview of every rule, then one page per rule: incident and statistics, live log, analyses, resolution and settings.
 * [**Log Chat**](pages/chat.md) — Ask about your logs: the AI reads the sources and alerts by itself, and changes nothing without your approval.
 * [**Meta-Analysis**](pages/meta-analysis.md) — A long-term dashboard across several rules, with periodic AI reports.
-* [**Global Configuration**](pages/configuration.md) — Ollama model, notifications, syslog sources, diagnostics, data retention and backups.
+* [**Global Configuration**](pages/configuration.md) — Ollama model, notifications, syslog sources, diagnostics, data retention, backups and sign-in.
 
 ### ⚙️ Deep-Dive Features
 * [**Autopilot**](features/autopilot.md) — Give only the source: the local AI sets up the rule (name, context, keywords, rhythm) from the log history, or after watching it for 24 h.
@@ -28,6 +28,7 @@ Sentinel detects critical log events, automatically collects surrounding applica
 * [**When the AI is not answering**](features/ai-outage.md) — Alerts wait for the AI instead of passing as info, are analysed and notified when it is back, and you are told about the outage.
 * [**Inactivity Monitoring**](features/inactivity-monitoring.md) — Tracking log ingestion gaps to alert on dead processes.
 * [**Incident Resolution**](features/resolution-tracking.md) — Adaptive calm, health probes, AI validation modes and suggested patterns.
+* [**Sign-in to the interface**](features/sign-in.md) — Optional: passkeys (Bitwarden, Windows Hello, phone) and a backup password, what stays open for webhooks, HTTPS needs and recovery.
 * [**Infrastructure Diagnostics**](features/diagnostics.md) — Let the chat AI check containers and the server itself (read-only Docker proxy, restricted SSH key), with step-by-step setup for Linux and Unraid.
 
 ### 🛠️ Setup & Ingestion Wizards
