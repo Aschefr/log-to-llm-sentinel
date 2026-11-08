@@ -20,7 +20,7 @@ from app.utils.log_utils import clean_log_line
 BATCH_EVENTS = 15
 MAX_EVENTS = 150
 NEW_EVENT_HOURS = 24
-SEEN_ONCE_DAYS = 7
+SEEN_ONCE_DAYS = 7  # même seuil écrit dans TRIAGE_SYSTEM (« il y a 7 jours ou plus »)
 REUSE_MINUTES = 10
 UNDO_DAYS = 7
 REASON_CHARS = 240
@@ -52,8 +52,9 @@ def _item(db, event: dict, reason: str = "", kind: str = "") -> dict:
     }
 
 
-def build_messages(db, lang: str, events: List[dict]) -> list:
+def build_messages(db, lang: str, events: List[dict], now: Optional[datetime] = None) -> list:
     L = lambda key, **kw: triage_label(lang, key, **kw)
+    now = now or datetime.utcnow()
     parts = []
     contexts = {}
     for n, e in enumerate(events, 1):
@@ -61,8 +62,11 @@ def build_messages(db, lang: str, events: List[dict]) -> list:
         rule = db.get(Rule, e["rule_id"])
         if rule and rule.application_context and rule.id not in contexts:
             contexts[rule.id] = f"{rule.name} : {' '.join(rule.application_context.split())[:300]}"
+        # Sans la date du jour, l'IA ne peut pas juger « vu une seule fois, il y a longtemps » : son âge en jours, calculé ici
+        days = max(0, (now - datetime.fromisoformat(e["last_at"].rstrip("Z"))).days)
         facts = [L("event", n=n, rule=e["rule_name"], severity=e["severity"], count=e["count"],
-                   first=e["first_at"][:10], last=e["last_at"][:10])]
+                   first=e["first_at"][:10], last=e["last_at"][:10]),
+                 L("age_today") if days == 0 else L("age_days", days=days)]
         if e["open_count"]:
             facts.append(L("open", count=e["open_count"]))
         if e["flagged"]:
@@ -77,7 +81,7 @@ def build_messages(db, lang: str, events: List[dict]) -> list:
         parts.append("\n".join(block))
     head = [L("rule_context", text=text) for text in contexts.values()]
     return [{"role": "system", "content": TRIAGE_SYSTEM.get(lang, TRIAGE_SYSTEM["fr"])},
-            {"role": "user", "content": "\n".join(head + ["", L("intro")]) + "\n\n" + "\n\n".join(parts)}]
+            {"role": "user", "content": "\n".join(head + ["", L("today", date=now.strftime("%Y-%m-%d")), L("intro")]) + "\n\n" + "\n\n".join(parts)}]
 
 
 def start(rule_id: Optional[int], tuning) -> dict:

@@ -284,10 +284,10 @@ mark_read = true seulement si tu peux le justifier par les données fournies :
 - une note de l'administrateur dit que c'est normal ou sans importance ;
 - l'événement a été signalé comme pas pertinent ;
 - il se répète depuis longtemps sans s'aggraver et sans conséquence visible ;
-- il n'a été vu qu'une fois, il y a longtemps, n'est jamais revenu et n'annonce rien de grave ;
+- il n'a été vu qu'une fois, il y a 7 jours ou plus, n'est jamais revenu et n'annonce rien de grave ;
 - il s'est résolu seul et n'a pas de conséquence durable.
 
-Un événement marqué « récent » n'a pas encore d'historique : les règles sur la répétition et sur l'événement vu une fois il y a longtemps ne s'appliquent pas. Ne le marque comme lu que si une note posée sur cet événement le dit normal, s'il a été signalé comme pas pertinent, ou si son résumé dit qu'il s'est résolu seul sans conséquence durable.
+Un événement marqué « récent » n'a pas encore d'historique : les règles sur la répétition et sur l'événement vu une fois il y a 7 jours ou plus ne s'appliquent pas. Ne le marque comme lu que si une note posée sur cet événement le dit normal, s'il a été signalé comme pas pertinent, ou si son résumé dit qu'il s'est résolu seul sans conséquence durable.
 
 Une note sur toute la source ne couvre que ce qu'elle décrit : ne l'étends pas à une autre panne, même sur la même machine.
 
@@ -302,10 +302,10 @@ mark_read = true only if the data provided lets you justify it:
 - an administrator note says it is normal or unimportant;
 - the event was flagged as not relevant;
 - it has been repeating for a long time without getting worse and without visible consequence;
-- it was seen only once, long ago, never came back and points to nothing serious;
+- it was seen only once, 7 days ago or more, never came back and points to nothing serious;
 - it resolved on its own with no lasting consequence.
 
-An event marked "recent" has no history yet: the rules about repetition and about an event seen once long ago do not apply. Mark it as read only if a note placed on this event says it is normal, if it was flagged as not relevant, or if its summary says it resolved on its own with no lasting consequence.
+An event marked "recent" has no history yet: the rules about repetition and about an event seen once 7 days ago or more do not apply. Mark it as read only if a note placed on this event says it is normal, if it was flagged as not relevant, or if its summary says it resolved on its own with no lasting consequence.
 
 A note on the whole source only covers what it describes: do not extend it to another failure, even on the same machine.
 
@@ -318,9 +318,12 @@ Give one decision for each number. reason: one short factual sentence, in Englis
 
 TRIAGE_LABELS = {
     "fr": {
+        "today": "Date du jour : {date}",
         "intro": "Événements à trier :",
         "rule_context": "Contexte de la règle {text}",
         "event": "#{n} règle « {rule} » — gravité {severity} — vu {count} fois, du {first} au {last}",
+        "age_today": "dernière fois aujourd'hui",
+        "age_days": "dernière fois il y a {days} j",
         "open": "{count} occurrence(s) sans résolution",
         "flagged": "signalé comme pas pertinent par l'utilisateur",
         "recent": "récent : pas encore d'historique (apparu il y a moins de 24 h, ou vu une seule fois cette semaine)",
@@ -330,9 +333,12 @@ TRIAGE_LABELS = {
         "note_source": "Note de l'administrateur sur toute la source, pas écrite pour cet événement : {text}",
     },
     "en": {
+        "today": "Today: {date}",
         "intro": "Events to sort:",
         "rule_context": "Rule context {text}",
         "event": "#{n} rule \"{rule}\" — severity {severity} — seen {count} times, from {first} to {last}",
+        "age_today": "last seen today",
+        "age_days": "last seen {days} day(s) ago",
         "open": "{count} occurrence(s) not resolved",
         "flagged": "flagged as not relevant by the user",
         "recent": "recent: no history yet (first seen less than 24 h ago, or seen only once this week)",
