@@ -303,6 +303,7 @@ async function loadDiagnostics() {
         selectPlatform('docker', DIAG.platform.docker);
         document.querySelectorAll('.diag-platforms[data-target="ssh"] button').forEach(b =>
             b.classList.toggle('active', b.dataset.platform === DIAG.platform.ssh));
+        prefillSource();
         renderKey(s.public_key);
     } catch (e) {
         diagResult('diag-docker-result', false, e.message);
@@ -325,7 +326,8 @@ async function renderSnippet() {
         pre.textContent = dT('diag.snippet_need_key', '← Génère d’abord la clé.');
         return;
     }
-    const query = `platform=${DIAG.platform.ssh}&user=${encodeURIComponent(DIAG_DEFAULTS.ssh.linux)}`;
+    const source = document.getElementById('diag-ssh-source').value.trim();
+    const query = `platform=${DIAG.platform.ssh}&user=${encodeURIComponent(DIAG_DEFAULTS.ssh.linux)}&source=${encodeURIComponent(source)}`;
     try {
         const res = await apiFetch(`/api/diagnostics/ssh/install?${query}`);
         pre.textContent = res.snippet;
@@ -334,6 +336,20 @@ async function renderSnippet() {
     } catch (e) {
         pre.textContent = e.message;
     }
+}
+
+/** Address the server sees Sentinel from, for the key's from= option: the one a successful test reported (kept in this
+ *  browser), else the address used to open Sentinel when it is an IP. A host name is left out: it may not be what the
+ *  server sees. */
+const DIAG_SOURCE_KEY = 'sentinel_diag_source';
+function prefillSource() {
+    const input = document.getElementById('diag-ssh-source');
+    if (input.value.trim()) return;
+    let seen = null;
+    try { seen = localStorage.getItem(DIAG_SOURCE_KEY); } catch (e) { /* stockage indisponible */ }
+    const host = location.hostname.replace(/^\[|\]$/g, '');
+    const isIp = /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || (host.includes(':') && /^[0-9a-f:]+$/i.test(host));
+    input.value = seen || (isIp && !['127.0.0.1', '::1'].includes(host) ? host : '');
 }
 
 /** The Linux account name: it becomes the platform default of the user field and goes into both blocks. */
@@ -415,10 +431,25 @@ async function testAndSaveSsh() {
     }
     if (!await saveLink('ssh', body, 'diag-ssh-result')) return;
     await resetLinkForm('ssh');
+    // Adresse vue par le serveur : elle remplit le champ du bloc s'il est vide, et signale un bloc qui la refuserait
+    const sourceInput = document.getElementById('diag-ssh-source');
+    let seenNote = '';
+    if (res.client_ip) {
+        try { localStorage.setItem(DIAG_SOURCE_KEY, res.client_ip); } catch (e) { /* stockage indisponible */ }
+        const typed = sourceInput.value.trim();
+        if (!typed) {
+            sourceInput.value = res.client_ip;
+            renderSnippet();
+        } else if (!typed.split(/[,\s]+/).includes(res.client_ip) && !typed.includes('/')) {
+            seenNote = ' ' + dT('diag.client_mismatch', 'Le bloc limite la clé à {src}, mais le serveur voit Sentinel depuis {ip} : corrige l’adresse avant de recoller le bloc.')
+                .replace('{src}', typed).replace('{ip}', res.client_ip);
+        }
+        if (!seenNote) seenNote = ' · ' + dT('diag.client_seen', 'le serveur voit Sentinel depuis {ip}').replace('{ip}', res.client_ip);
+    }
     if (res.script_outdated) {
-        diagResult('diag-ssh-result', false, dT('diag.script_outdated', '⚠ Connecté, mais le script installé sur le serveur est ancien : recolle le bloc de l’étape 2.'));
+        diagResult('diag-ssh-result', false, dT('diag.script_outdated', '⚠ Connecté, mais le script installé sur le serveur est ancien : recolle le bloc de l’étape 2.') + seenNote);
     } else {
-        diagResult('diag-ssh-result', true, `✓ ${dT('diag.connected', 'Connecté')}${(res.host_fingerprint || '').match(/SHA256:\S+/) ? ' · ' + res.host_fingerprint.match(/SHA256:\S+/)[0] : ''} · ${dT('diag.saved_ok', 'enregistré')}`);
+        diagResult('diag-ssh-result', true, `✓ ${dT('diag.connected', 'Connecté')}${(res.host_fingerprint || '').match(/SHA256:\S+/) ? ' · ' + res.host_fingerprint.match(/SHA256:\S+/)[0] : ''} · ${dT('diag.saved_ok', 'enregistré')}${seenNote}`);
     }
     out.textContent = res.output;
     out.classList.remove('hidden');
@@ -539,6 +570,11 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('diag-key-use').addEventListener('click', (e) => {
         if (!document.getElementById('diag-pubkey').textContent) return importKey();
         showInlineConfirm(e.currentTarget, dT('diag.regenerate_confirm', 'L’ancienne clé ne fonctionnera plus : il faudra recoller le bloc sur le serveur. Continuer ?'), importKey);
+    });
+    let sourceTimer = null;
+    document.getElementById('diag-ssh-source').addEventListener('input', () => {
+        clearTimeout(sourceTimer);
+        sourceTimer = setTimeout(renderSnippet, 400);
     });
     let accountTimer = null;
     document.getElementById('diag-ssh-account').addEventListener('input', (e) => {

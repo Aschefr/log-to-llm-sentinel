@@ -7,6 +7,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from app.database import SessionLocal
 from app.models import Rule
 from app import logger
+from app.utils.protected_paths import is_protected
 
 # Protects UI rendering + LLM context from oversized lines (e.g. Nextcloud JSON dumps on restart)
 MAX_LINE_LENGTH = 10_000
@@ -30,6 +31,8 @@ def read_lines(filepath: str, position: int, flush_partial: bool = False, skippi
 
     Les positions sont des octets : une ligne n'est jamais coupée, même au milieu d'un caractère. Une ligne plus longue
     que le morceau lu ne bloque pas la lecture : son début est gardé, son reste ignoré."""
+    if is_protected(filepath):
+        return [], position, False, skipping  # clé SSH ou base de Sentinel : jamais surveillée
     with open(filepath, "rb") as f:
         f.seek(position)
         chunk = f.read(READ_CHUNK_BYTES)

@@ -256,11 +256,12 @@ async def ssh_key_import(body: KeyImport):
 
 
 @router.get("/ssh/install")
-def ssh_install(platform: str = "linux", user: str = diag.DEFAULT_ACCOUNT):
+def ssh_install(platform: str = "linux", user: str = diag.DEFAULT_ACCOUNT, source: str = ""):
+    """source : adresses de Sentinel vues par le serveur ; la clé n'y sera acceptée que depuis elles (option from=)."""
     if platform not in ("linux", "unraid"):
         raise HTTPException(status_code=422, detail="platform: linux ou unraid")
     try:
-        return {"platform": platform, "snippet": diag.install_snippet(platform, user)}
+        return {"platform": platform, "snippet": diag.install_snippet(platform, user, source)}
     except diag.DiagnosticError as e:
         _error(e)
 
@@ -283,8 +284,10 @@ async def test_ssh(body: SshTest):
         return {"ok": False, "error": "port SSH invalide"}
     try:
         out = await asyncio.to_thread(diag.run_host_check, cfg, "overview")
-        version = await asyncio.to_thread(diag.installed_script_version, cfg)
+        info = await asyncio.to_thread(diag.installed_script_info, cfg)
+        version = info["version"]
         return {"ok": True, "output": out[:3000], "host_fingerprint": diag.host_fingerprint(cfg["ssh_host"], cfg["ssh_port"]),
-                "script_version": version, "script_outdated": version != diag.DIAG_SCRIPT_VERSION}
+                "script_version": version, "script_outdated": version != diag.DIAG_SCRIPT_VERSION,
+                "client_ip": info["client_ip"]}
     except diag.DiagnosticError as e:
         return {"ok": False, "error": str(e)}

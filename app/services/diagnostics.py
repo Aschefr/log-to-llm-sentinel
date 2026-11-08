@@ -8,6 +8,7 @@ Diagnostic en lecture seule de l'infrastructure, pour le chat et l'investigation
 
 Les sorties sont bornées et les variables d'environnement des conteneurs ne sont jamais renvoyées.
 """
+import ipaddress
 import json
 import os
 import re
@@ -311,7 +312,7 @@ def host_fingerprint(host: str, port: int = 22) -> Optional[str]:
 
 # ── Script installé sur le serveur ──────────────────────────────────────────────
 
-DIAG_SCRIPT_VERSION = "3"  # à incrémenter à chaque modification du script : Sentinel signale un script à mettre à jour
+DIAG_SCRIPT_VERSION = "4"  # à incrémenter à chaque modification du script : Sentinel signale un script à mettre à jour
 
 DIAG_SCRIPT = r'''#!/bin/bash
 # ══════════════════════════════════════════════════════════════════════════════
@@ -411,7 +412,8 @@ case "$CHECK" in
              if command -v showmount >/dev/null 2>&1; then timeout 10 showmount -e -- "$ARG" 2>&1 | head -n 40
              else echo "showmount indisponible sur ce serveur (paquet nfs-common ou nfs-utils)"; fi ;;
   # Version de ce script (Sentinel signale quand il faut le recoller)
-  version)   echo "sentinel-diag $SCRIPT_VERSION" ;;
+  # Version de ce script et adresse d'où Sentinel se connecte (pour limiter la clé à cette adresse : option from=)
+  version)   echo "sentinel-diag $SCRIPT_VERSION client ${CLIENT_IP:-?}" ;;
   *)         echo "Contrôles disponibles : overview disk memory load processes mounts network kernel syslog array failed-services service <nom> journal <nom> fstab nfs-exports <serveur>" ;;
 esac
 '''
@@ -421,11 +423,46 @@ def _script() -> str:
     return DIAG_SCRIPT.replace("@VERSION@", DIAG_SCRIPT_VERSION)
 
 
-def installed_script_version(cfg: dict) -> Optional[str]:
-    """Version du script installé sur le serveur (None si ancien script sans numéro de version)."""
+def installed_script_info(cfg: dict) -> dict:
+    """Version du script installé (None si ancien script sans numéro) et adresse de Sentinel vue par le serveur
+    (depuis la version 4 ; None avant)."""
     out = run_host_check(cfg, "overview", _raw="version")
-    m = re.match(r"^sentinel-diag (\S+)$", out.strip())
-    return m.group(1) if m else None
+    m = re.match(r"^sentinel-diag (\S+)(?: client (\S+))?$", out.strip())
+    if not m:
+        return {"version": None, "client_ip": None}
+    ip = m.group(2)
+    try:
+        ip = str(ipaddress.ip_address(ip)) if ip else None
+    except ValueError:
+        ip = None
+    return {"version": m.group(1), "client_ip": ip}
+
+
+def installed_script_version(cfg: dict) -> Optional[str]:
+    return installed_script_info(cfg)["version"]
+
+
+def check_source(source: Optional[str]) -> Optional[str]:
+    """Adresses autorisées à utiliser la clé (option from= d'authorized_keys) : adresses IP ou réseaux CIDR, 4 au plus,
+    séparés par des virgules ou des espaces. Vide : pas de limite. Une clé copiée hors de Sentinel ne sert alors à rien
+    depuis une autre machine."""
+    parts = [p for p in re.split(r"[,\s]+", (source or "").strip()) if p]
+    if not parts:
+        return None
+    if len(parts) > 4:
+        raise DiagnosticError("4 adresses au plus pour limiter la clé")
+    out = []
+    for p in parts:
+        try:
+            out.append(str(ipaddress.ip_network(p, strict=False)) if "/" in p else str(ipaddress.ip_address(p)))
+        except ValueError:
+            raise DiagnosticError(f"adresse invalide pour limiter la clé : {p[:60]}")
+    return ",".join(out)
+
+
+def _key_options(command: str, source: Optional[str]) -> str:
+    src = check_source(source)
+    return f'restrict,from="{src}",command="{command}"' if src else f'restrict,command="{command}"'
 
 
 DEFAULT_ACCOUNT = "sentinel-diag"
@@ -455,7 +492,7 @@ def _guarded(account: str, body: str, refusal: str) -> str:
     )
 
 
-def install_snippet(platform: str, account: str = DEFAULT_ACCOUNT) -> str:
+def install_snippet(platform: str, account: str = DEFAULT_ACCOUNT, source: Optional[str] = None) -> str:
     """Bloc à coller dans un terminal root du serveur (Linux classique ou Unraid).
 
     Les lignes qui modifient le serveur viennent en tête, sous des titres numérotés ;
@@ -466,7 +503,7 @@ def install_snippet(platform: str, account: str = DEFAULT_ACCOUNT) -> str:
         raise DiagnosticError("générer d'abord la clé")
     rule = "# " + "═" * 78 + "\n"
     if platform == "unraid":
-        line = f'restrict,command="bash /boot/config/sentinel/sentinel-diag.sh" {pub}'
+        line = f'{_key_options("bash /boot/config/sentinel/sentinel-diag.sh", source)} {pub}'
         return (
             rule
             + "# Log-to-LLM Sentinel — diagnostic serveur pour Unraid (6.9 ou plus récent)\n"
@@ -494,7 +531,7 @@ def install_snippet(platform: str, account: str = DEFAULT_ACCOUNT) -> str:
             "\necho 'Sentinel : diagnostic installé. Utilisateur à renseigner : root'\n"
         )
     u = check_account(account)
-    line = f'restrict,command="/usr/local/bin/sentinel-diag" {pub}'
+    line = f'{_key_options("/usr/local/bin/sentinel-diag", source)} {pub}'
     body = (
         "\n# 1. Utilisateur dédié, autorisé à lire les journaux système\n"
         f"sudo useradd --system --create-home --shell /bin/bash --comment '{ACCOUNT_COMMENT}' {u} 2>/dev/null || true\n"

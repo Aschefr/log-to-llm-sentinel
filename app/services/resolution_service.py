@@ -8,6 +8,7 @@ import statistics
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
+from app.utils.protected_paths import is_protected
 from app.database import SessionLocal
 from app.models import Rule, Analysis, GlobalConfig, ResolutionVerdict
 from app.services import monitoring
@@ -100,7 +101,7 @@ def _read_tail_lines(file_path: str, n: int = 30) -> List[str]:
     """Lit les N dernières lignes d'un fichier sans charger tout le fichier en mémoire.
     Utilise collections.deque pour un tail efficace en O(n)."""
     try:
-        if not os.path.exists(file_path):
+        if not os.path.exists(file_path) or is_protected(file_path):
             return []
         with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
             tail = list(collections.deque(f, n))

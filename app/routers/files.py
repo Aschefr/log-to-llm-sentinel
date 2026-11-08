@@ -7,6 +7,8 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from app.utils.protected_paths import PROTECTED_DETAIL, is_protected
+
 router = APIRouter(prefix="/api/files", tags=["files"])
 
 
@@ -59,6 +61,8 @@ def _resolve_under_roots(user_path: str) -> Path:
     except Exception:
         raise HTTPException(status_code=400, detail="path invalide")
 
+    if is_protected(target):
+        raise HTTPException(status_code=403, detail=PROTECTED_DETAIL)
     for root in _get_roots():
         if _is_under_root(target, root):
             return target
@@ -105,6 +109,8 @@ def browse(
             name = child.name
             if not show_hidden and name.startswith("."):
                 continue
+            if is_protected(child):
+                continue  # clé SSH et bases de Sentinel : ni listées ni lisibles
 
             try:
                 is_dir = child.is_dir()

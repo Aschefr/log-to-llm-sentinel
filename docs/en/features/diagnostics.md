@@ -72,8 +72,10 @@ Unraid has no compose and containers on its default bridge cannot reach each oth
 
 Sentinel generates an SSH key. On the server, this key is only allowed to run one script (`command=` and `restrict` options in `authorized_keys`). Sentinel only sends the **name** of a check (`disk`, `memory`, `service nginx`…); the script maps each name to a fixed command and rejects anything else. Even a stolen key cannot open a shell, forward ports or run another command.
 
+**Sentinel's own address.** The block can also limit the key to the address the server sees Sentinel from (`from=` option): a key copied out of Sentinel is then useless from another machine. The field *Sentinel's address as the server sees it* is filled in with the address used to open Sentinel when it is an IP, and **Test and save** shows the address the server really sees, filling the field if it was empty and warning if the block would refuse it. Leave it empty for no limit. Sentinel's interface has no login: anyone who can reach it can run the same read-only checks through the chat, so keep it on a trusted network or behind an authenticating reverse proxy. Sentinel never shows or sends its private key, and refuses to read its `ssh/` folder or its databases from the interface.
+
 ### Step 1 — generate the key (in Sentinel)
-**Configuration › Diagnostics › Server** → **Generate the key**. The private key stays in Sentinel's data folder (`data/ssh/`); only the public key is displayed.
+**Configuration › Diagnostics › Server** → **Generate the key**. The private key stays in Sentinel's data folder (`data/ssh/`), which the interface cannot read; only the public key is displayed.
 
 ### Step 2 — install on the server (CLI)
 Choose your platform, click **Copy** and paste the block in a terminal on the server.
@@ -83,11 +85,11 @@ To review it before pasting: the header sums up what the block does, only the nu
 **Linux (Debian, Ubuntu…)** — the block, run with `sudo`:
 - creates a system user `sentinel-diag` (member of `systemd-journal` and `adm` to read journals),
 - installs the script at `/usr/local/bin/sentinel-diag`,
-- authorizes the key in `/home/sentinel-diag/.ssh/authorized_keys` with `restrict,command="/usr/local/bin/sentinel-diag"`.
+- authorizes the key in `/home/sentinel-diag/.ssh/authorized_keys` with `restrict,command="/usr/local/bin/sentinel-diag"`, plus `from="<Sentinel's address>"` when that field is filled in.
 
 **Unraid (6.9 or later)** — paste it in the Unraid terminal (root). Unraid runs from RAM and its USB flash drive cannot hold executable files, so the block:
 - stores the script on the flash drive (`/boot/config/sentinel/sentinel-diag.sh`) and runs it through `bash`,
-- authorizes the key for `root` in `/boot/config/ssh/root/authorized_keys` (kept across reboots) and in the current session, with `restrict,command="bash /boot/config/sentinel/sentinel-diag.sh"`.
+- authorizes the key for `root` in `/boot/config/ssh/root/authorized_keys` (kept across reboots) and in the current session, with `restrict,command="bash /boot/config/sentinel/sentinel-diag.sh"`, plus `from=` when Sentinel's address is filled in. The checks then run as `root`, still limited to the read-only script.
 - SSH must be enabled: *Settings › Management Access › Use SSH*.
 
 The block can be pasted again safely (it replaces its previous key line).

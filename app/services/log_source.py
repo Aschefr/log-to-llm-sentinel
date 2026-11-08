@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from app import logger
+from app.utils.protected_paths import is_protected
 
 MAX_CONTEXT_LINE_CHARS = 500
 
@@ -85,6 +86,8 @@ def append_lines(path: Path, lines: List[str]):
 
 def count_lines(path: Path, max_bytes: int = 64 * 1024 * 1024) -> int:
     """Nombre de lignes du fichier (lecture bornée ; 0 si illisible)."""
+    if is_protected(path):
+        return 0
     try:
         n, read = 0, 0
         with open(path, "rb") as f:
@@ -100,6 +103,8 @@ def count_lines(path: Path, max_bytes: int = 64 * 1024 * 1024) -> int:
 
 def read_tail_lines(path: Path, max_bytes: int = 2 * 1024 * 1024) -> List[str]:
     """Lignes de la fin du fichier (au plus max_bytes lus). La première ligne partielle est ignorée."""
+    if is_protected(path):
+        return []  # une règle qui désignerait la clé SSH ou une base de Sentinel ne lit rien
     try:
         size = path.stat().st_size
         with open(path, "rb") as f:

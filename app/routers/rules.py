@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 
+from app.utils.protected_paths import PROTECTED_DETAIL, is_protected
 from app.database import SessionLocal
 from app.models import (Rule, Analysis, GlobalConfig, ResolutionVerdict, KeywordChange, KeywordTemplate, EventNote, MetaAnalysisConfig,
                         KeywordLearningSession)
@@ -308,6 +309,8 @@ async def create_rule(rule_data: RuleCreate):
         raise HTTPException(status_code=422, detail="name_required")
     if not rule_data.log_file_path.strip():
         raise HTTPException(status_code=422, detail="log_file_path_required")
+    if is_protected(rule_data.log_file_path):
+        raise HTTPException(status_code=422, detail=PROTECTED_DETAIL)
     db = SessionLocal()
     try:
         rule = Rule(
@@ -382,6 +385,8 @@ async def update_rule(rule_id: int, rule_data: RuleUpdate):
             rule.name = rule_data.name
         source_changed = rule_data.log_file_path is not None and rule_data.log_file_path != rule.log_file_path
         if rule_data.log_file_path is not None:
+            if is_protected(rule_data.log_file_path):
+                raise HTTPException(status_code=422, detail=PROTECTED_DETAIL)
             rule.log_file_path = rule_data.log_file_path
         if source_changed:
             # Comme à la création : l'ancienne position ne veut rien dire dans le nouveau fichier
@@ -730,7 +735,7 @@ def _read_last_lines(path: str, n: int = 5, max_bytes: int = 65536) -> List[str]
     Lit les N dernières lignes non vides d'un fichier.
     Retourne une liste vide si aucune ligne utile.
     """
-    if not os.path.exists(path):
+    if not os.path.exists(path) or is_protected(path):
         return []
 
     try:

@@ -345,6 +345,9 @@
                             <label class="rf-stack diag-account" id="diag-account-row"><span data-i18n="diag.account">Compte créé sur le serveur</span>
                                 <input type="text" id="diag-ssh-account" class="mono" value="sentinel-diag" maxlength="32" spellcheck="false" autocomplete="off" aria-describedby="diag-account-hint"></label>
                             <p class="form-hint" id="diag-account-hint" data-i18n="diag.account_hint">Change-le avant de copier le bloc. Si ce compte existe déjà sans avoir été créé par Sentinel, le bloc s'arrête sans rien modifier.</p>
+                            <label class="rf-stack diag-account" id="diag-source-row"><span data-i18n="diag.source">Adresse de Sentinel vue par le serveur</span>
+                                <input type="text" id="diag-ssh-source" class="mono" maxlength="200" spellcheck="false" autocomplete="off" aria-describedby="diag-source-hint"></label>
+                            <p class="form-hint" id="diag-source-hint" data-i18n="diag.source_hint">La clé ne sera acceptée que depuis cette adresse : copiée ailleurs, elle ne servirait à rien. Pré-remplie avec l'adresse qui sert à ouvrir Sentinel ; un test réussi montre celle que le serveur voit vraiment. Laisse vide pour ne pas limiter.</p>
                             <pre class="diag-code" id="diag-ssh-snippet"></pre>
                             <button type="button" class="btn btn-secondary btn-sm diag-copy" data-copy="diag-ssh-snippet" data-i18n="common.copy">Copier</button>
                         </li>
@@ -552,6 +555,6 @@
 
 {% block scripts %}
 <script src="/static/js/config.js?v=23"></script>
-<script src="/static/js/diagnostics_config.js?v=15"></script>
+<script src="/static/js/diagnostics_config.js?v=16"></script>
 <script src="/static/js/source_connections.js?v=4"></script>
 {% endblock %}

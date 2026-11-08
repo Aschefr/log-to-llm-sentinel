@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Security
+- **Sentinel's SSH key could be read from the interface**: the file browser of *Local file* sources could open any file under the data folder, Sentinel's private SSH key included, and so could a *Local file* rule pointing at it. The interface has no login, so anyone who could reach it on the network could copy the key. The key only ever allowed the read-only checks of Sentinel's script (no shell, no write), but it allowed them from any machine. Sentinel's SSH folder and its databases are now refused and hidden everywhere: file browser, log download, rules, live log, chat tools.
+- **The SSH key can be limited to Sentinel's address**: the install block now adds `from=` to the key, with the address the server sees Sentinel from (filled in from the address used to open Sentinel, then from what a successful test reports). A copied key is then useless from another machine. The server script goes to version 4: *Test and save* says so, paste the install block again. To replace a key that may have been copied, click *Regenerate* before pasting.
+
 ## [1.10.1] - 2026-11-08
 
 ### Changed
