@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - **Configuration: a section bar that stays in view**: each tab lists its sections in a bar that stays under the header while you scroll, highlights the one you are reading and takes you to another in one click. In *Diagnostic*, the sections now come one after another instead of side-by-side tiles of uneven height, and the *Second look during analysis* comes first: it is the one that changes how alerts are analysed.
+- **Switches for settings, checkboxes for lists**: every on/off setting is now a switch, and choosing items in a list (events the AI proposes to mark read, rules of a meta-analysis or of a connection, a rule's diagnostic access) keeps a checkbox, both in one modern style. The switches that already existed hid their real checkbox, so they could not be reached with the keyboard; all of them now take keyboard focus and show it.
 
 ## [1.10.0] - 2026-11-08
 

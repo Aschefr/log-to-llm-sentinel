@@ -147,7 +147,6 @@ function rowHtml(r, s) {
         <span class="ro-toggle">
             <label class="toggle-switch" title="${escapeHtml(r.enabled ? roT('rules.disable', 'Désactiver') : roT('rules.enable', 'Réactiver'))}">
                 <input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="setEnabled(${r.id}, this)" aria-label="${escapeHtml((r.enabled ? roT('rules.disable', 'Désactiver') : roT('rules.enable', 'Réactiver')) + ' ' + r.name)}">
-                <span class="toggle-slider"></span>
             </label>
         </span>
     </div>`;
