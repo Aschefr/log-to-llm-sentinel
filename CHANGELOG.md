@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.10.1] - 2026-11-08
 
 ### Changed
 - **Configuration: a section bar that stays in view**: each tab lists its sections in a bar that stays under the header while you scroll, highlights the one you are reading and takes you to another in one click. In *Diagnostic*, the sections now come one after another instead of side-by-side tiles of uneven height, and the *Second look during analysis* comes first: it is the one that changes how alerts are analysed.
