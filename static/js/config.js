@@ -94,8 +94,13 @@ function setupSectionBars() {
             btn.type = 'button';
             btn.className = 'cfg-jump-item';
             btn.dataset.target = section.id;
-            btn.textContent = heading.textContent.trim();
-            if (heading.dataset.i18n) btn.setAttribute('data-i18n', heading.dataset.i18n);
+            // Le libellé dans son propre span : la traduction réécrit son texte sans effacer le point d'état
+            const label = document.createElement('span');
+            label.textContent = heading.textContent.trim();
+            if (heading.dataset.i18n) label.setAttribute('data-i18n', heading.dataset.i18n);
+            btn.appendChild(label);
+            const status = section.dataset.jumpStatus && document.getElementById(section.dataset.jumpStatus);
+            if (status) cfgJumpStatus(btn, status);
             btn.addEventListener('click', () => {
                 const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
                 section.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
@@ -154,6 +159,25 @@ function setupSectionBars() {
     }
     document.addEventListener('change', onScroll);
     spy();
+}
+
+/** A small dot on a section chip mirrors the state badge of its section (green when on), so the state shows without scrolling. */
+function cfgJumpStatus(btn, status) {
+    const dot = document.createElement('span');
+    dot.className = 'cfg-jump-dot';
+    dot.setAttribute('aria-hidden', 'true');
+    const said = document.createElement('span');
+    said.className = 'sr-only';
+    btn.append(dot, said);
+    const sync = () => {
+        const text = status.textContent.trim();
+        dot.hidden = !text;
+        dot.classList.toggle('cfg-jump-dot--on', status.classList.contains('diag-status--on'));
+        said.textContent = text ? ` (${text})` : '';
+        btn.title = text;
+    };
+    sync();
+    if (window.MutationObserver) new MutationObserver(sync).observe(status, { attributes: true, attributeFilter: ['class'], childList: true, characterData: true, subtree: true });
 }
 
 /* ── Real state, at the top of the page ───────────────────────────────── */
