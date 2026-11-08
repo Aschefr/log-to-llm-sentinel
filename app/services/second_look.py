@@ -122,10 +122,12 @@ async def _check(ollama, semaphore, rule, result: dict, config: dict, db, tools:
     allowed = {t["function"]["name"] for t in tools}
     checks, seen, tool_addresses_ai = [], set(), False
 
-    async def _chat(**kw):
+    async def _chat(final=False, **kw):
+        # Tour final (outils retirés, verdict JSON) sans réflexion : chez Alanbix, qwen3.8:27b et bonsai-2:27b
+        # réfléchissaient alors sans fin (300 s sans réponse, une fois sur deux)
         async with semaphore:
             res = await ollama.chat(messages, url=config.get("ollama_url"), model=config.get("ollama_model"),
-                                    think=config.get("ollama_think_tools", True), options=options, **kw)
+                                    think=False if final else config.get("ollama_think_tools", True), options=options, **kw)
         if res.get("error"):
             raise RuntimeError(res["error"])
         return res
@@ -137,6 +139,10 @@ async def _check(ollama, semaphore, rule, result: dict, config: dict, db, tools:
             break
         res = await _chat(tools=tools)
         calls = res.get("tool_calls") or []
+        if not calls:
+            text, calls = llm_tools.text_tool_calls(res.get("content") or "")   # appel écrit en texte
+            if calls:
+                res = {**res, "content": text}
         if not calls and not checks and not nudged:
             # Mesuré : sans réflexion, gemma4:e4b répond le verdict d'emblée, « l'état sera vérifié », sans rien vérifier.
             # Une relance, une seule : il appelle alors les outils, ou redonne sa réponse si rien n'est vérifiable.
@@ -174,7 +180,7 @@ async def _check(ollama, semaphore, rule, result: dict, config: dict, db, tools:
         if answer:
             messages.append({"role": "assistant", "content": answer})
         messages.append({"role": "user", "content": second_look_label(lang, "final")})
-        res = await _chat(format=SECOND_LOOK_SCHEMA)
+        res = await _chat(final=True, format=SECOND_LOOK_SCHEMA)
         data = _load_json(res.get("content") or "") or {}
     verdict = data.get("verdict") if data.get("verdict") in ("worse", "confirmed", "better", "unclear") else "unclear"
     findings = scrub(" ".join(str(data.get("findings") or "").split()))[:FINDINGS_CHARS]

@@ -14,6 +14,7 @@ from app import logger
 from app.database import SessionLocal
 from app.models import Analysis, GlobalConfig, Rule
 from app.services import dashboard_watch, monitoring
+from app.services.alert_analysis import analysis_lines, close_one_off, watch_needed
 from app.services.app_config import config_to_dict
 from app.utils.notification_i18n import nt
 
@@ -125,6 +126,11 @@ async def run_once(orchestrator, now: Optional[datetime] = None, ready: Optional
                     out["failed"] += 1
                     break  # l'IA ne répond toujours pas : on réessaiera au prochain passage
                 out["retried"] += 1
+            # Analysée en retard : si l'événement était ponctuel, il n'y a rien à surveiller (la règle, elle, reste
+            # en alerte jusqu'à son retour à la normale habituel, pour ses autres analyses éventuelles)
+            if a.resolution_status is None and not watch_needed(result, analysis_lines(a)):
+                close_one_off(a)
+                db.commit()
             logger.info("AnalysisRetry", f"Alerte #{a.id} de « {rule.name} » analysée en différé : {a.severity}.")
             await orchestrator.notify_analysis(a, rule, result, config, db, note=nt("late_note", lang).format(time=_when(a.analyzed_at)))
         return out

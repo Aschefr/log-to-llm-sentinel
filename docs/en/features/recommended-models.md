@@ -35,6 +35,17 @@ The three recommended models, plus `bonsai-2:27b`, were played on the same 38 ca
 
 The recommendation stays the same. `bonsai-2:27b` is a 27B model in 2-bit quantisation (9.7 GB): close to the top, but it missed two serious cases and followed steering lines far more often before Sentinel's safeguard (25 of 33, against 14 for `qwen3.8:27b`). Turning thinking on did not help `gemma4:12b` (59 against 58 correct) and made it three times slower.
 
+## Measured again with the one-off question (November 2026)
+Each analysis now also says whether the event still needs watching ([Resolution Tracking](resolution-tracking.md)). Asking one more thing can tilt a model's severity, so the three recommended models were played again on the same cases, with the expected answers decided before the run.
+
+| Model | Correct severities /76 | False alarms /30 | Serious cases rated info /22 | Steering lines handled /33 | False alarms closed at once /30 |
+|---|---|---|---|---|---|
+| **`qwen3.8:27b`** | 74 | 0 | 2 | 30 | 30 |
+| **`gemma4:12b`** | 74 | 2 | 0 | 32 | 29 |
+| **`gemma4:e4b`** | 62 | 14 | 0 | 31 | 17 |
+
+No case expected to be watched was closed. `qwen3.8:27b` now rates one serious case info on both runs: an isolated root login failure, which can be read either way. A softer wording of the question did no better: 73 correct, and one serious case closed. An event whose line was rewritten to say `severity=info` can still end as one-off when the model believes it; nothing can spot such a line, and its severity was already wrong before.
+
 ## Settings that follow from it
 * **Temperature: 0.2.** At 0.7, no recommended model improves, and the minimum model invents more.
 * **Context: 8K minimum, 32K recommended.** The largest exchange measured is 5,900 tokens of prompt and 990 of reply, so 8K is enough for alerts. Going to 32K costs 0.1 to 0.2 GB on the three recommended models, with no loss of speed.

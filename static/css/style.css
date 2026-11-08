@@ -2858,15 +2858,38 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .ac-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.1rem 0.75rem; color: var(--text-secondary); font-size: 0.76rem; }
 .ac-meta .resolved-badge { padding: 0; border: 0; background: none; font-size: inherit; font-weight: 500; }
 .ac-open { color: var(--warning); font-weight: 600; }
+.ac-oneoff { color: var(--text-secondary); font-weight: 500; }
 .ac-meta .recur-badge { padding: 0; background: none; color: inherit; font-size: inherit; font-weight: 600; font-variant-numeric: tabular-nums; }
 .ac-meta .event-note-count { margin-left: 0; font-size: inherit; }
 .ac-meta .analysis-src { max-width: 100%; margin: 0; padding: 0; border: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.74rem; }
 .ac-meta .detection-id-badge { padding: 0; border: 0; background: none; color: inherit; font-size: 0.72rem; font-weight: 400; letter-spacing: 0; }
 .ac-meta .sl-badge { padding: 0 0.4rem; font-size: 0.7rem; }
 .ac-head .analysis-actions { grid-area: actions; align-self: center; flex-wrap: nowrap; }
+.ac-dock { display: contents; }
+.ac-dock-hint { display: none; }
+/* Folded card on a pointer screen: the text takes the whole width. A small handle on the right edge says the actions are
+   there; hovering the zone where they appear (or tabbing to a button) slides them in over the end of the card, on its own
+   surface. The hover zone is as wide as the buttons: aiming at one mid-animation must not close the panel. */
 @media (hover: hover) and (pointer: fine) {
-    .analysis-card.collapsed .ac-head .analysis-actions { opacity: 0; transition: opacity 120ms ease-out; }
-    .analysis-card.collapsed:hover .ac-head .analysis-actions, .analysis-card.collapsed:focus-within .ac-head .analysis-actions { opacity: 1; }
+    .analysis-card { --ac-surface: color-mix(in srgb, #fff 2%, var(--bg-primary)); }
+    .analysis-card.unread { --ac-surface: color-mix(in srgb, var(--accent) 8%, color-mix(in srgb, #fff 2%, var(--bg-primary))); }
+    [data-theme="light"] .analysis-card { --ac-surface: var(--bg-card); }
+    [data-theme="light"] .analysis-card.unread { --ac-surface: color-mix(in srgb, var(--accent) 5%, var(--bg-card)); }
+    .analysis-card.collapsed { position: relative; }
+    .analysis-card.collapsed .analysis-header.ac-head { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "toggle lines"; padding-right: 1.1rem; }
+    .analysis-card.collapsed .ac-dock { display: flex; position: absolute; top: 0; right: 0; bottom: 0; align-items: stretch; }
+    .analysis-card.collapsed .ac-dock-hint { display: flex; position: absolute; top: 50%; right: 0.42rem; align-items: center; justify-content: center; width: 1.25rem; height: 2.25rem; margin-top: -1.125rem; border-radius: 0.35rem; color: var(--text-secondary); opacity: 0.45; transition: opacity 120ms ease-out, background-color 120ms ease-out; }
+    .analysis-card.collapsed:hover .ac-dock-hint { opacity: 0.85; background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+    .analysis-card.collapsed .ac-head .analysis-actions {
+        position: relative; width: max-content; padding: 0 0.75rem 0 2.75rem; border-radius: 0 0.5rem 0.5rem 0;
+        background: linear-gradient(to right, transparent, var(--ac-surface) 2.25rem);
+        opacity: 0; transform: translateX(0.6rem); pointer-events: none;
+        transition: opacity 140ms ease-out, transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .analysis-card.collapsed .ac-dock:hover .analysis-actions, .analysis-card.collapsed .ac-dock:focus-within .analysis-actions { opacity: 1; transform: none; pointer-events: auto; }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+    .analysis-card.collapsed .ac-head .analysis-actions { transform: none; transition: opacity 100ms linear; }
 }
 @media (max-width: 640px) {
     .analysis-header.ac-head { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "toggle lines" ". actions"; row-gap: 0.45rem; }

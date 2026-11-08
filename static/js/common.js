@@ -519,6 +519,8 @@ function renderAnalysisCard(a, opts = {}) {
         ? `<span class="resolved-badge">${a.resolution_minutes != null
             ? escapeHtml(_t('common.resolved_in', 'Résolu en {d}').replace('{d}', formatMinutesShort(a.resolution_minutes)))
             : _t('monitor.badge_resolved', 'Résolu')}</span>`
+        : a.resolution_status === 'one_off'
+            ? `<span class="ac-oneoff" title="${escapeHtml(_t('common.state_one_off_title', 'Événement déjà terminé : clos à sa détection, sans retour à la normale à surveiller.'))}">${escapeHtml(_t('common.state_one_off', 'Ponctuel'))}</span>`
         : ev && ev.open_count > 0 && ev.rule_in_alert ? `<span class="ac-open">${escapeHtml(_t('common.state_open', 'En cours'))}</span>` : '';
     // Récurrence sur 7 jours (même événement à des valeurs variables près)
     let recurBadge = '';
@@ -615,12 +617,15 @@ function renderAnalysisCard(a, opts = {}) {
                     ${a.detection_id ? `<span class="detection-id-badge" title="${escapeHtml(_t('common.detection_id_title', 'Identifiant de la détection'))}">#${escapeHtml(a.detection_id)}</span>` : ''}
                 </div>
             </div>
-            <div class="analysis-actions">
-                ${readBtn}
-                ${flagBtn}
-                ${noteBtn}
-                ${copyBtn}
-                ${deleteBtn}
+            <div class="ac-dock">
+                <span class="ac-dock-hint" aria-hidden="true"><svg viewBox="0 0 16 16" width="12" height="12"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                <div class="analysis-actions">
+                    ${readBtn}
+                    ${flagBtn}
+                    ${noteBtn}
+                    ${copyBtn}
+                    ${deleteBtn}
+                </div>
             </div>
         </div>
         <div class="analysis-body">

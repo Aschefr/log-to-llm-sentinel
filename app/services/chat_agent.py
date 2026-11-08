@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
 from app import logger
-from app.services.llm_tools import available_tools, execute_tool, tool_label, truncate_output
+from app.services.llm_tools import ToolTagFilter, available_tools, execute_tool, tool_label, truncate_output
 from app.services.prompts import label
 
 TOOL_BUDGET_RATIO = 0.4   # part max du contexte occupée par les sorties d'outils
@@ -77,12 +77,24 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
     used = 0
     options = {"temperature": config.get("ollama_temp", 0.1), "num_ctx": config.get("ollama_ctx", 4096)}
 
-    async def _generate(tools_now):
-        """Un tour de génération : le texte visible part vers result et emit_text."""
-        content, tool_calls, think = "", [], _ThinkFilter()
+    def _show(visible):
+        nonlocal content
+        if visible:
+            content += visible
+            result.text += visible
+            emit_text(visible)
+
+    content = ""
+
+    async def _generate(tools_now, final=False):
+        """Un tour de génération : le texte visible part vers result et emit_text.
+        final : outils retirés après usage. Sans réflexion : chez Alanbix, qwen3.8:27b et bonsai-2:27b réfléchissaient
+        alors sans fin (300 s sans réponse, une fois sur deux) ; sans outils, la réflexion n'apporte rien (mesuré)."""
+        nonlocal content
+        content, tool_calls, think, tags = "", [], _ThinkFilter(), ToolTagFilter()
         stream = ollama.generate_stream(
             None, url=config.get("ollama_url"), model=config.get("ollama_model"),
-            options=options, think=config.get("ollama_think_tools", True),
+            options=options, think=False if final else config.get("ollama_think_tools", True),
             messages=messages, tools=tools_now,
         )
         # aclosing : referme le flux HTTP dès la sortie de boucle
@@ -91,14 +103,13 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
                 if "error" in chunk:
                     raise RuntimeError(chunk["error"])
                 msg = chunk.get("message", {})
-                visible = think.feed(msg.get("content", "") or "")
-                if visible:
-                    content += visible
-                    result.text += visible
-                    emit_text(visible)
+                _show(tags.feed(think.feed(msg.get("content", "") or "")))
                 tool_calls.extend(msg.get("tool_calls") or [])
                 if chunk.get("done"):
                     break
+        _show(tags.flush())
+        if not tool_calls and tools_now:
+            tool_calls = tags.calls   # appel écrit en texte : exécuté comme un vrai appel
         return content, tool_calls
 
     async def _turn():
@@ -109,14 +120,15 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
                 # En "user" : en "system", qwen3.8 l'ignore et redemande des outils même sans en recevoir, donc n'écrit rien
                 messages.append({"role": "user", "content": label(lang, "tools_exhausted")})
 
-            content, tool_calls = await _generate(tools_now)
+            final = use_tools and tools_now is None
+            content, tool_calls = await _generate(tools_now, final=final)
 
             # Au tour final (outils retirés), on ignore d'éventuels appels : la réponse texte fait foi
             if not tool_calls or tools_now is None:
                 # qwen3.8 s'arrête parfois sans rien écrire après beaucoup d'outils : une relance suffit (18 fois sur 18)
                 if not result.text.strip():
                     messages.append({"role": "user", "content": label(lang, "empty_retry")})
-                    await _generate(None)
+                    await _generate(None, final=use_tools)
                 return
             if result.text and not result.text.endswith("\n"):
                 result.text += "\n\n"

@@ -60,6 +60,72 @@ class ToolError(Exception):
     pass
 
 
+# gemma4:e4b écrit parfois un appel d'outil en texte, <tool_call name="get_x"/>, au lieu du format d'Ollama
+# (constaté chez Alanbix, 2026-11-08). Sans traitement, la balise s'affiche et aucun outil ne tourne.
+TOOL_TAG = "<tool_call"
+_TOOL_TAG_RE = re.compile(r"<tool_call\b([^>]*?)/>|<tool_call\b([^>]*)>(.*?)</tool_call>", re.S)
+_TAG_ATTR_RE = re.compile(r"""([\w-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')""")
+
+
+def _tag_call(m) -> Optional[dict]:
+    attrs = {k: a if a else b for k, a, b in _TAG_ATTR_RE.findall(m.group(1) or m.group(2) or "")}
+    body = (m.group(3) or "").strip()
+    name, args = attrs.pop("name", ""), attrs
+    if body:
+        try:
+            val = json.loads(body)
+        except ValueError:
+            val = None
+        if isinstance(val, dict):   # forme longue : <tool_call>{"name": ..., "arguments": {...}}</tool_call>
+            name = name or str(val.get("name") or "")
+            if isinstance(val.get("arguments"), dict):
+                args = {**args, **val["arguments"]}
+    return {"function": {"name": name, "arguments": args}} if name else None
+
+
+def text_tool_calls(text: str):
+    """(texte sans les balises d'appel d'outil, appels trouvés dans ces balises)."""
+    calls = [c for c in (_tag_call(m) for m in _TOOL_TAG_RE.finditer(text or "")) if c]
+    return _TOOL_TAG_RE.sub("", text or ""), calls
+
+
+class ToolTagFilter:
+    """Pour un flux : retient le texte dès qu'une balise <tool_call commence, le rend s'il n'en est pas une."""
+    MAX_TAG = 2000
+
+    def __init__(self):
+        self.buf, self.calls = "", []
+
+    def feed(self, text: str) -> str:
+        self.buf += text
+        out = ""
+        while self.buf:
+            i = self.buf.find("<")
+            if i == -1:
+                out, self.buf = out + self.buf, ""
+                break
+            out, self.buf = out + self.buf[:i], self.buf[i:]
+            if not TOOL_TAG.startswith(self.buf[:len(TOOL_TAG)]):
+                out, self.buf = out + "<", self.buf[1:]
+                continue
+            if len(self.buf) < len(TOOL_TAG):
+                break   # début de balise possible : attendre la suite
+            m = _TOOL_TAG_RE.match(self.buf)
+            if not m:
+                if len(self.buf) > self.MAX_TAG:   # jamais refermée : c'était du texte
+                    out, self.buf = out + self.buf, ""
+                break
+            call = _tag_call(m)
+            if call:
+                self.calls.append(call)
+            self.buf = self.buf[m.end():]
+        return out
+
+    def flush(self) -> str:
+        out, self.buf = self.buf, ""
+        return out
+
+
 _TS_ISO = re.compile(r"(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2}:\d{2})(?:[.,]\d+)?(Z|[+-]\d{2}:?\d{2})?")
 
 
@@ -198,7 +264,11 @@ def list_analyses(db, rule_id=None, severity=None, since_hours=168, limit=20, **
     if not rows:
         return "Aucune analyse correspondante."
     return "\n".join(f"#{a.id} [{a.detection_id or '-'}] {a.analyzed_at.strftime('%Y-%m-%d %H:%M')} UTC — {names.get(a.rule_id, '?')} — "
-                     f"{a.severity} — {a.resolution_status or 'non résolu'} — {short_summary(a, 200)}" for a in rows)
+                     f"{a.severity} — {_status(a)} — {short_summary(a, 200)}" for a in rows)
+
+
+def _status(a: Analysis) -> str:
+    return {"one_off": "ponctuel, clos à la détection (rien à surveiller)"}.get(a.resolution_status, a.resolution_status or "non résolu")
 
 
 def get_analysis(db, analysis_id=None, detection_id=None, **_):
@@ -213,7 +283,7 @@ def get_analysis(db, analysis_id=None, detection_id=None, **_):
         raise ToolError("Analyse introuvable.")
     rule = db.query(Rule).filter(Rule.id == a.rule_id).first()
     parts = [f"Analyse #{a.id} [{a.detection_id or '-'}] — règle #{a.rule_id} {rule.name if rule else '?'} — {a.analyzed_at.strftime('%Y-%m-%d %H:%M')} UTC — sévérité {a.severity}",
-             f"Résolution : {a.resolution_status or 'non résolu'}" + (f" le {a.resolved_at.strftime('%Y-%m-%d %H:%M')} UTC" if a.resolved_at else ""),
+             f"Résolution : {_status(a)}" + (f" le {a.resolved_at.strftime('%Y-%m-%d %H:%M')} UTC" if a.resolved_at else ""),
              f"\nÉvénements :\n{a.triggered_line}"]
     before = json.loads(a.context_before_json or "[]")
     after = json.loads(a.context_after_json or "[]")

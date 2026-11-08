@@ -14,6 +14,8 @@ An incident opens with the first analysed alert of a rule and stays open until *
   * *Fixed*: always the configured duration.
 * **Health probe** (optional): an HTTP(S) request (expected status codes, 2xx/3xx by default) or a TCP connection (`host:port`) defined by you. It runs every 60 s during an incident. As long as it fails, the incident stays open, even if the log is silent — which catches a service that crashed and stopped writing. Certificates are not verified (self-signed certificates are common on a LAN). Use **Test the probe** before saving.
 
+**One-off events open no incident.** When the analysis says an event is already over in its lines (a blocked attack, a Wi-Fi client that left, an isolated failure, a finished task), the alert is closed as soon as it is analysed, with the status *One-off*: the rule does not go into alert, there is no calm to wait for, and it does not count in the MTTR. Its notification is unchanged. The analysis cannot do this for a critical alert, for a line that reports a hard failure (out of memory, segfault, disk errors, a service restarting in a loop), or when a line tries to dictate the verdict: those are always watched. When in doubt, the AI is told to keep watching.
+
 A **success line** can close the incident earlier: when a line contains one of the rule's success patterns (and is not itself an error line), Sentinel checks whether the problem is over.
 
 ---

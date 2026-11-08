@@ -62,7 +62,7 @@ def analysis_brief(a: Analysis) -> dict:
         "analyzed_at": iso(a.analyzed_at),
         "severity": a.severity or "info",
         "summary": short_summary(a, 220),
-        "status": "resolved" if a.resolution_status == "resolved" else "open",
+        "status": a.resolution_status if a.resolution_status in ("resolved", "one_off") else "open",
         "resolution_minutes": resolution_minutes(a),
     }
 

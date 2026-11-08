@@ -13,7 +13,8 @@ from app.services.notification_service import NotificationService
 from app.services.app_config import config_to_dict, llm_options
 from app.services import event_notes
 from app.services.alert_analysis import (build_history, build_alert_messages, messages_to_text, parse_alert_response,
-                                         detect_severity, guard_log_instruction, analysis_lines, hard_failure_floor)
+                                         detect_severity, guard_log_instruction, analysis_lines, hard_failure_floor,
+                                         watch_needed, close_one_off)
 from app.services.log_source import find_context
 from app.services.prompts import ALERT_SCHEMA, label
 from app.utils.log_utils import clean_log_line, aggregate_lines, line_signature
@@ -336,6 +337,11 @@ class Orchestrator:
         analysis.second_look_json = json.dumps(second_look, ensure_ascii=False) if second_look else None
         if result.get("failed"):
             analysis.ai_failed_at = analysis.analyzed_at
+        # Événement ponctuel déjà terminé (attaque bloquée, client parti…) : clos tout de suite, la règle ne passe pas
+        # en alerte et il n'y a pas de retour à la normale à attendre. Un second regard qui a relevé la gravité compte.
+        one_off = not watch_needed({**result, "severity": severity}, raw_lines["lines"])
+        if one_off:
+            close_one_off(analysis)
         db.add(analysis)
         db.commit()
         db.refresh(analysis)
@@ -346,8 +352,8 @@ class Orchestrator:
         if not result.get("failed") or result.get("log_instruction"):
             await self.notify_analysis(analysis, rule, result, config, db)
 
-        # Hook de signalement d'erreur pour la résolution
-        if self.resolution_service:
+        # Hook de signalement d'erreur pour la résolution (rien à surveiller pour un événement ponctuel)
+        if self.resolution_service and not one_off:
             await self.resolution_service.on_error_detected(rule.id, severity=severity)
 
     async def notify_analysis(self, analysis: Analysis, rule: Rule, result: dict, config: dict, db, note: Optional[str] = None):

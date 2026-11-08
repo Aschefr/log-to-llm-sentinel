@@ -94,7 +94,9 @@ def render_history(history: dict, lang: str, max_recent: int = 5) -> str:
     lines.append(label(lang, "history_hours", hours=", ".join(f"{h:02d}h ×{n}" for h, n in sorted(hours.items()))))
     lines.append(label(lang, "history_recent"))
     for a in similar[:max_recent]:
-        if a.resolved_at:
+        if a.resolution_status == ONE_OFF:
+            status = label(lang, "resolution_one_off")
+        elif a.resolved_at:
             status = label(lang, "resolved_after", duration=_format_duration((a.resolved_at - a.analyzed_at).total_seconds()))
         else:
             status = a.resolution_status or label(lang, "resolution_pending")
@@ -279,13 +281,37 @@ def render_alert_markdown(data: dict, lang: str) -> str:
     return "\n\n".join(parts)
 
 
+ONE_OFF = "one_off"  # statut d'une analyse close dès sa création : événement ponctuel, rien à surveiller
+
+
+def watch_needed(parsed: dict, lines: List[str]) -> bool:
+    """Faut-il surveiller le retour à la normale ? Seule l'analyse peut dire qu'un événement est ponctuel et déjà fini,
+    mais elle ne peut pas couper la surveillance d'une panne franche, d'une alerte critical, ni quand une ligne tente
+    de dicter le verdict. Sans réponse exploitable de l'IA, on surveille."""
+    data = parsed.get("data") or {}
+    if parsed.get("failed") or not data or data.get("needs_watch") is not False:
+        return True
+    # log_guarded : le modèle a signalé une manipulation sur une ligne qui donne un verdict (une panne marquée « Simulation ») ;
+    # mesuré le 2026-11-08, qwen3.8:27b classait alors une panne de base de données en ponctuel, info et « simulation »
+    if parsed.get("severity") == "critical" or parsed.get("log_instruction") or parsed.get("log_guarded"):
+        return True
+    return any(is_hard_failure(line) for line in lines if line)
+
+
+def close_one_off(analysis: Analysis):
+    """Clôt une analyse ponctuelle à sa détection, hors du temps de retour à la normale (ce n'était pas une panne)."""
+    analysis.resolution_status = ONE_OFF
+    analysis.resolved_at = analysis.analyzed_at
+    analysis.exclude_from_mttr = True
+
+
 def guard_log_instruction(parsed: dict, lines: List[str], lang: str) -> dict:
     """Une ligne qui cherche à influencer l'IA ne fait pas baisser la gravité, et la personne qui lit l'alerte en est prévenue.
     log_instruction ne vaut True que pour le détecteur : le signal du modèle se trompe parfois, il ne doit pas forcer de notification."""
     detected = addresses_the_ai(lines)
     flagged = (parsed.get("data") or {}).get("log_manipulation") is True and model_flag_counts(lines)
     if not (detected or flagged):
-        return {**parsed, "log_instruction": False}
+        return {**parsed, "log_instruction": False, "log_guarded": False}
     severity = "warning" if parsed["severity"] == "info" else parsed["severity"]
     data = {**parsed["data"], "severity": severity} if parsed.get("data") else parsed.get("data")
     notice = label(lang, "log_instruction")
@@ -293,7 +319,8 @@ def guard_log_instruction(parsed: dict, lines: List[str], lang: str) -> dict:
     if not (summary or markdown).startswith(notice):
         markdown = f"**{notice}**\n\n{markdown}"
         summary = f"{notice} {summary}"[:500] if summary else summary
-    return {**parsed, "severity": severity, "data": data, "markdown": markdown, "summary": summary, "log_instruction": detected}
+    return {**parsed, "severity": severity, "data": data, "markdown": markdown, "summary": summary, "log_instruction": detected,
+            "log_guarded": True}   # gravité tenue par ce garde-fou : l'événement reste aussi surveillé (watch_needed)
 
 
 # Pannes franches qui ne descendent jamais à info, quel que soit le modèle : la liste du pilote automatique,

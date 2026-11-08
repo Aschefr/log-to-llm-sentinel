@@ -214,7 +214,8 @@ function setPullModel(name) {
 }
 
 /* Résultats de l'étude sur de vraies alertes, sur une RTX 3090 : voir docs/en/features/recommended-models.md
-   (mesurés de nouveau le 2026-11-08 : prompts actuels, 38 cas joués deux fois, contexte 32K, sans réflexion) */
+   (mesurés de nouveau le 2026-11-08 avec la question « à surveiller » : prompts actuels, 38 cas joués deux fois, contexte 32K,
+   sans réflexion ; bonsai-2:27b mesuré avant, sur les prompts de la 1.9) */
 const RECOMMENDED_MODELS = [
     { model: 'gemma4:e4b', tier: ['config.tier_minimum', 'Minimum'], memory: '3,2', seconds: 4 },
     { model: 'gemma4:12b', tier: ['config.tier_recommended', 'Conseillé'], memory: '7,6', seconds: 4 },
@@ -223,8 +224,8 @@ const RECOMMENDED_MODELS = [
 
 /* Même étude, détail par modèle, affiché dans « Comment ces modèles ont été choisis » */
 const MODEL_STUDY = [
-    { model: 'qwen3.8:27b', tier: ['config.tier_top', 'Top qualité'], correct: 76, falseAlarms: 0, missed: 0, steering: 32, seconds: 8 },
-    { model: 'gemma4:12b', tier: ['config.tier_recommended', 'Conseillé'], correct: 72, falseAlarms: 4, missed: 0, steering: 31, seconds: 4 },
+    { model: 'qwen3.8:27b', tier: ['config.tier_top', 'Top qualité'], correct: 74, falseAlarms: 0, missed: 2, steering: 30, seconds: 8 },
+    { model: 'gemma4:12b', tier: ['config.tier_recommended', 'Conseillé'], correct: 74, falseAlarms: 2, missed: 0, steering: 32, seconds: 4 },
     { model: 'bonsai-2:27b', tier: ['config.study_not_kept', 'Non retenu'], correct: 72, falseAlarms: 2, missed: 2, steering: 31, seconds: 7.5 },
     { model: 'gemma4:e4b', tier: ['config.tier_minimum', 'Minimum'], correct: 62, falseAlarms: 14, missed: 0, steering: 31, seconds: 4 },
 ];
