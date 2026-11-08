@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.10.0] - 2026-11-08
 
 ### Changed
 - **Calmer alert cards**: a folded card now reads in three lines: severity, rule and a short time (*14:05*, *yesterday 14:05*, the full date on hover); the summary; then the facts in small text (resolved in or open, occurrences, notes, component, detection ID). The keywords move inside the card, the extra unread dot and the *Rule:* prefix are gone (an unread card is already tinted with a bold summary), and the summary takes the whole width: the quick actions slide in from a small handle on the right edge when the pointer reaches them or a button gets keyboard focus, and stay under the card on a phone. On a phone, the dashboard shows *Needs attention* before the situation summary.
