@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.10.2] - 2026-11-08
 
 ### Security
 - **Sentinel's SSH key could be read from the interface**: the file browser of *Local file* sources could open any file under the data folder, Sentinel's private SSH key included, and so could a *Local file* rule pointing at it. The interface has no login, so anyone who could reach it on the network could copy the key. The key only ever allowed the read-only checks of Sentinel's script (no shell, no write), but it allowed them from any machine. Sentinel's SSH folder and its databases are now refused and hidden everywhere: file browser, log download, rules, live log, chat tools.
