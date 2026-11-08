@@ -13,6 +13,11 @@
         <span class="dash-verdict-time" id="dash-verdict-time"></span>
     </header>
 
+    <section class="dash-section dash-situation-section" aria-labelledby="dash-situation-title">
+        <h2 class="dash-heading" id="dash-situation-title" data-i18n="dashboard.situation_title">Point de situation</h2>
+        <div class="dash-panel dash-situation skel skel--line" id="dash-situation"></div>
+    </section>
+
     <section class="dash-section" aria-labelledby="dash-attention-title">
         <h2 class="dash-heading" id="dash-attention-title" data-i18n="dashboard.attention_title">À traiter</h2>
         <div id="dash-attention"></div>
@@ -51,5 +56,5 @@
 
 {% block scripts %}
 <script src="/static/js/source_connections.js?v=4"></script>
-<script src="/static/js/dashboard.js?v=12"></script>
+<script src="/static/js/dashboard.js?v=13"></script>
 {% endblock %}

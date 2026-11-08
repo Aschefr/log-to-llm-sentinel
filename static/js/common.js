@@ -50,6 +50,22 @@ function relativeTime(iso) {
     return format.format(-Math.round(seconds / 86400), 'day');
 }
 
+// Heure courte pour les listes : « 14:05 » aujourd'hui, « hier 14:05 », sinon « 06/11 14:05 » (date complète en infobulle)
+function shortWhen(dateString) {
+    if (!dateString) return '';
+    const iso = dateString.endsWith('Z') || dateString.includes('+') ? dateString : dateString + 'Z';
+    const d = new Date(iso), now = new Date();
+    const lang = window.i18n?.getCurrentLang?.() === 'fr' ? 'fr-FR' : undefined;
+    const hm = d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
+    const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === now.toDateString()) return hm;
+    if (d.toDateString() === yesterday.toDateString()) {
+        const word = window.t ? window.t('rule.yesterday') : 'hier';
+        return `${word && word !== 'rule.yesterday' ? word : 'hier'} ${hm}`;
+    }
+    return `${d.toLocaleDateString(lang, { day: '2-digit', month: '2-digit' })} ${hm}`;
+}
+
 function formatDate(dateString) {
     if (!dateString) return '';
     // Si la chaîne ne finit pas par Z et n'a pas de fuseau horaire, 
@@ -472,13 +488,8 @@ function renderAnalysisCard(a, opts = {}) {
     const ev = opts.event;  // événement regroupant cette analyse, s'il y en a un
     const flagged = ev ? ev.flagged : a.feedback === 'irrelevant';
     const isUnread = ev ? ev.unread : a.viewed === false || a.viewed === 0;
+    // Non lue : la carte est teintée et son résumé en gras (pas de pastille en plus)
     const unreadCls = isUnread ? ' unread' : '';
-    const unreadIndicator = isUnread ? `<span class="unread-dot-indicator" title="${_t('monitor.unviewed_tooltip', 'Non consultée')}">●</span>` : '';
-
-    // Keywords summary for collapsed header
-    const kwSummary = a.matched_keywords?.length
-        ? `<span class="analysis-kw-summary">${a.matched_keywords.slice(0,3).map(k => `<span class="log-kw-badge">${escapeHtml(k)}</span>`).join('')}${a.matched_keywords.length > 3 ? `<span class="log-kw-badge">+${a.matched_keywords.length - 3}</span>` : ''}</span>`
-        : '';
 
     // Copy SVG icon
     const copyBtn = showCopy ? `
@@ -502,14 +513,13 @@ function renderAnalysisCard(a, opts = {}) {
             <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="${CARD_ICONS.note}" /></svg>
         </button>` : '';
 
-    const ruleName = showRuleName && a.rule_name
-        ? `<strong>${_t('dashboard.rule_label', 'Règle:')} ${escapeHtml(a.rule_name)}</strong>`
-        : '';
+    const ruleName = showRuleName && a.rule_name ? `<strong class="ac-rule">${escapeHtml(a.rule_name)}</strong>` : '';
 
     const resolvedBadge = a.resolution_status === 'resolved'
         ? `<span class="resolved-badge">${a.resolution_minutes != null
             ? escapeHtml(_t('common.resolved_in', 'Résolu en {d}').replace('{d}', formatMinutesShort(a.resolution_minutes)))
-            : _t('monitor.badge_resolved', 'Résolu')}</span>` : '';
+            : _t('monitor.badge_resolved', 'Résolu')}</span>`
+        : ev && ev.open_count > 0 && ev.rule_in_alert ? `<span class="ac-open">${escapeHtml(_t('common.state_open', 'En cours'))}</span>` : '';
     // Récurrence sur 7 jours (même événement à des valeurs variables près)
     let recurBadge = '';
     if (ev) {
@@ -525,7 +535,7 @@ function renderAnalysisCard(a, opts = {}) {
     const sourceTag = components.length
         ? `<span class="analysis-src" title="${escapeHtml(_t('common.component_title', 'Composant qui a écrit les lignes de cette alerte'))}">${escapeHtml(components.join(' · '))}${extra > 0 ? ` +${extra}` : ''}</span>` : '';
     const summaryLine = a.summary && opts.showSummary !== false
-        ? `<div class="analysis-summary-line">${sourceTag}${escapeHtml(a.summary)}</div>` : '';
+        ? `<div class="analysis-summary-line">${escapeHtml(a.summary)}</div>` : '';
     const slBadge = secondLookBadgeHtml(a.second_look);
 
     let resolutionBlock = '';
@@ -585,24 +595,27 @@ function renderAnalysisCard(a, opts = {}) {
 
     return `
     <div class="${cardClass}${collapsedCls}${unreadCls}" id="analysis-card-${a.id}"${ev ? ` data-event="${ev.rule_id}-${ev.key}"` : ''}>
-        <div class="analysis-header" onclick="toggleAnalysisCardGeneric(event, this.parentElement)" style="cursor: pointer;">
-            <div>
-                <button type="button" class="collapse-toggle" aria-expanded="${!collapsed}" aria-label="${escapeHtml(_t('common.toggle_details', 'Afficher ou masquer le détail'))}">${toggleArrow}</button>
-                ${ruleName}
-                ${a.detection_id ? `<span class="detection-id-badge" style="margin-left:0.5rem">#${escapeHtml(a.detection_id)}</span>` : ''}
-                <span class="analysis-time">${a.analyzed_at ? formatDate(a.analyzed_at) : ''}</span>
-                ${a.ai_pending
-                    ? `<span class="ai-pending-badge" title="${escapeHtml(_t('common.ai_pending_title', 'L’IA n’a pas répondu : cette alerte sera analysée dès son retour, et notifiée si elle le mérite.'))}">${escapeHtml(_t('common.ai_pending', 'En attente de l’IA'))}</span>`
-                    : `<span class="severity-badge ${escapeHtml(ev ? ev.severity : a.severity)}">${escapeHtml(ev ? ev.severity : a.severity)}</span>`}
-                ${slBadge}
-                ${resolvedBadge}
-                ${recurBadge}
-                ${ev ? `<span class="event-note-count${(ev.notes || []).length ? '' : ' hidden'}" title="${escapeHtml(_t('common.notes_title', 'Notes pour l’IA'))}"><span aria-hidden="true">📝 </span><span>${(ev.notes || []).length}</span></span>` : ''}
-                ${unreadIndicator}
+        <div class="analysis-header ac-head" onclick="toggleAnalysisCardGeneric(event, this.parentElement)" style="cursor: pointer;">
+            <button type="button" class="collapse-toggle" aria-expanded="${!collapsed}" aria-label="${escapeHtml(_t('common.toggle_details', 'Afficher ou masquer le détail'))}">${toggleArrow}</button>
+            <div class="ac-lines">
+                <div class="ac-top">
+                    ${a.ai_pending
+                        ? `<span class="ai-pending-badge" title="${escapeHtml(_t('common.ai_pending_title', 'L’IA n’a pas répondu : cette alerte sera analysée dès son retour, et notifiée si elle le mérite.'))}">${escapeHtml(_t('common.ai_pending', 'En attente de l’IA'))}</span>`
+                        : `<span class="severity-badge ${escapeHtml(ev ? ev.severity : a.severity)}">${escapeHtml(ev ? ev.severity : a.severity)}</span>`}
+                    ${ruleName}
+                    <span class="analysis-time" title="${escapeHtml(a.analyzed_at ? formatDate(a.analyzed_at) : '')}">${escapeHtml(shortWhen(a.analyzed_at))}</span>
+                </div>
                 ${summaryLine}
+                <div class="ac-meta">
+                    ${resolvedBadge}
+                    ${recurBadge}
+                    ${slBadge}
+                    ${ev ? `<span class="event-note-count${(ev.notes || []).length ? '' : ' hidden'}" title="${escapeHtml(_t('common.notes_title', 'Notes pour l’IA'))}"><span aria-hidden="true">📝 </span><span>${(ev.notes || []).length}</span></span>` : ''}
+                    ${sourceTag}
+                    ${a.detection_id ? `<span class="detection-id-badge" title="${escapeHtml(_t('common.detection_id_title', 'Identifiant de la détection'))}">#${escapeHtml(a.detection_id)}</span>` : ''}
+                </div>
             </div>
             <div class="analysis-actions">
-                ${kwSummary}
                 ${readBtn}
                 ${flagBtn}
                 ${noteBtn}

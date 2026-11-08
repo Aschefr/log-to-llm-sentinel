@@ -112,6 +112,7 @@ async function loadOllama() {
 function renderAll() {
     renderVerdict();
     if (!DASH.watch) return;
+    renderSituation();
     renderAttention();
     renderTrend();
     renderPilot();
@@ -181,6 +182,56 @@ function renderVerdict() {
     document.getElementById('dash-verdict-time').textContent = DASH.updatedAt && !DASH.failed
         ? dT('dashboard.updated_at', 'Mis à jour à {t}', { t: DASH.updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }) : '';
     document.title = `${v.title} - Log to LLM Sentinel`;
+}
+
+// ─── Point de situation ─────────────────────────────────────────────────────
+// Facts computed by the server, always current; above them, a paragraph the AI rewrites when the situation changes.
+
+function situationText(ai, facts) {
+    const rules = Object.fromEntries(facts.activity.top.map(t => [t.analysis_id, t.rule_id]));
+    return escapeHtml(ai.text).replace(/\[#(\d+)\]/g, (m, id) => rules[id]
+        ? `<a class="dash-situation-ref" href="/rules/${rules[id]}?analysis=${id}#analyses">#${id}</a>` : '');
+}
+
+function situationMeta(ai, facts) {
+    if (facts.paused) return dT('dashboard.situation_paused', 'Surveillance en pause : ce point n’est plus mis à jour.');
+    const when = ai.at ? dT('dashboard.situation_written', 'Rédigé par l’IA il y a {d}', { d: dSince(ai.at) }) : '';
+    return ai.state === 'stale' ? `${when} · ${dT('dashboard.situation_stale', 'la situation a changé, réécriture à venir')}` : when;
+}
+
+function situationFacts(f) {
+    const r = f.rules, a = f.activity, items = [];
+    let watched = dCount(r.watched, 'dashboard.situation_rules_one', '{n} règle surveillée', 'dashboard.situation_rules_many', '{n} règles surveillées');
+    if (r.in_alert.length) watched += ` · ${dT('dashboard.situation_in_alert', 'en alerte : {names}', { names: r.in_alert.map(x => x.rule_name).join(', ') })}`;
+    if (r.silent.length) watched += ` · ${dT('dashboard.situation_silent', 'muette : {names}', { names: r.silent.map(x => x.rule_name).join(', ') })}`;
+    items.push(watched);
+    items.push(a.events
+        ? dT('dashboard.situation_activity', '24 h : {events} · {new} nouveaux · {open} encore ouverts', {
+            events: dCount(a.events, 'dashboard.situation_events_one', '{n} événement', 'dashboard.situation_events_many', '{n} événements'),
+            new: a.new, open: a.open })
+        : dT('dashboard.situation_no_activity', '24 h : aucune alerte.'));
+    if (r.quietest && r.quietest.last_line_at && Date.now() - new Date(r.quietest.last_line_at).getTime() > 3600000) {
+        items.push(dT('dashboard.situation_quietest', 'Silence le plus long : {name}, depuis {d}', { name: r.quietest.rule_name, d: dSince(r.quietest.last_line_at) })
+            + (r.quietest.limit_hours ? ` (${dT('dashboard.silence_limit', 'limite : {h} h', { h: r.quietest.limit_hours })})` : ''));
+    }
+    return `<ul class="dash-situation-facts">${items.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`;
+}
+
+function renderSituation() {
+    const box = document.getElementById('dash-situation');
+    const s = DASH.watch.situation;
+    if (!box || !s) return;
+    box.classList.remove('skel', 'skel--line');
+    const ai = s.ai, parts = [];
+    if (ai.enabled && ai.text) {
+        parts.push(`<p class="dash-situation-text">${situationText(ai, s.facts)}</p>`);
+        const meta = situationMeta(ai, s.facts);
+        if (meta) parts.push(`<p class="dash-situation-meta">${escapeHtml(meta)}</p>`);
+    } else if (ai.enabled && !s.facts.paused) {
+        parts.push(`<p class="dash-situation-meta">${escapeHtml(dT('dashboard.situation_pending', 'L’IA rédigera ce point dès qu’elle sera disponible.'))}</p>`);
+    }
+    parts.push(situationFacts(s.facts));
+    dSetHtml(box, parts.join(''));
 }
 
 // ─── À traiter ──────────────────────────────────────────────────────────────

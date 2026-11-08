@@ -180,7 +180,7 @@ def build_alert_messages(rule: Rule, events_text: str, matched_keywords: Optiona
         events_head += f"{label(lang, 'keywords')} : {', '.join(matched_keywords)}\n"
 
     # Budget : contexte total moins une réserve pour la réponse (et le raisonnement s'il est actif)
-    reserve = 2048 + (2048 if config.get("ollama_think", True) else 0)
+    reserve = 2048 + (2048 if config.get("ollama_think", False) else 0)
     budget = max(3000, int((config.get("ollama_ctx", 4096) - reserve) * CHARS_PER_TOKEN))
     rule_block = _render_rule(rule, now, lang)
     remaining = budget - len(system) - len(rule_block)

@@ -125,7 +125,7 @@ async def _check(ollama, semaphore, rule, result: dict, config: dict, db, tools:
     async def _chat(**kw):
         async with semaphore:
             res = await ollama.chat(messages, url=config.get("ollama_url"), model=config.get("ollama_model"),
-                                    think=config.get("ollama_think", True), options=options, **kw)
+                                    think=config.get("ollama_think_tools", True), options=options, **kw)
         if res.get("error"):
             raise RuntimeError(res["error"])
         return res

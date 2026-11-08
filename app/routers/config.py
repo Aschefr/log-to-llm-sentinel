@@ -87,6 +87,8 @@ class ConfigUpdate(BaseModel):
     ollama_model: Optional[str] = None
     ollama_ctx: Optional[int] = None
     ollama_think: Optional[bool] = None
+    ollama_think_tools: Optional[bool] = None
+    situation_ai: Optional[bool] = None
     notification_method: Optional[str] = None
     apprise_url: Optional[str] = None
     apprise_tags: Optional[str] = None
@@ -133,6 +135,8 @@ def get_config():
             "ollama_model": config.ollama_model,
             "ollama_ctx": config.ollama_ctx,
             "ollama_think": config.ollama_think,
+            "ollama_think_tools": config.ollama_think_tools if config.ollama_think_tools is not None else True,
+            "situation_ai": config.situation_ai if config.situation_ai is not None else True,
             "notification_method": config.notification_method,
             "apprise_url": config.apprise_url,
             "apprise_tags": config.apprise_tags,
@@ -191,6 +195,10 @@ async def update_config(config_data: ConfigUpdate):
             config.ollama_ctx = clamp_ctx(config_data.ollama_ctx)
         if config_data.ollama_think is not None:
             config.ollama_think = config_data.ollama_think
+        if config_data.ollama_think_tools is not None:
+            config.ollama_think_tools = config_data.ollama_think_tools
+        if config_data.situation_ai is not None:
+            config.situation_ai = config_data.situation_ai
         if config_data.notification_method is not None:
             config.notification_method = config_data.notification_method
         if config_data.apprise_url is not None:
@@ -310,7 +318,7 @@ async def test_ollama(request: Request):
                             prompt=prompt, 
                             url=url, 
                             model=model,
-                            think=cfg.get("ollama_think", True),
+                            think=cfg.get("ollama_think", False),
                             options={
                                 "temperature": cfg.get("ollama_temp", 0.1),
                                 "num_ctx": cfg.get("ollama_ctx", 4096)

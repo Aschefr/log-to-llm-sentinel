@@ -245,7 +245,7 @@ class Orchestrator:
                         messages,
                         url=config.get("ollama_url"),
                         model=config.get("ollama_model"),
-                        think=config.get("ollama_think", True),
+                        think=config.get("ollama_think", False),
                         options=llm_options(config),
                         format=ALERT_SCHEMA,
                     ),

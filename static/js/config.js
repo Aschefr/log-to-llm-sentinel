@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.i18n?.onLanguageChange(() => {
         refreshStatus();
         renderRecommendedModels();
+        renderModelStudy();
         loadSyslogHosts();
         if (typeof refreshDiag === 'function') refreshDiag().then(renderSnippet).catch(() => {});
     });
@@ -220,6 +221,37 @@ const RECOMMENDED_MODELS = [
     { model: 'qwen3.8:27b', tier: ['config.tier_top', 'Top qualité'], memory: '16,3', seconds: 8 },
 ];
 
+/* Même étude, détail par modèle, affiché dans « Comment ces modèles ont été choisis » */
+const MODEL_STUDY = [
+    { model: 'qwen3.8:27b', tier: ['config.tier_top', 'Top qualité'], correct: 76, falseAlarms: 0, missed: 0, steering: 32, seconds: 8 },
+    { model: 'gemma4:12b', tier: ['config.tier_recommended', 'Conseillé'], correct: 72, falseAlarms: 4, missed: 0, steering: 31, seconds: 4 },
+    { model: 'bonsai-2:27b', tier: ['config.study_not_kept', 'Non retenu'], correct: 72, falseAlarms: 2, missed: 2, steering: 31, seconds: 7.5 },
+    { model: 'gemma4:e4b', tier: ['config.tier_minimum', 'Minimum'], correct: 62, falseAlarms: 14, missed: 0, steering: 31, seconds: 4 },
+];
+
+function renderModelStudy() {
+    const table = document.getElementById('cfg-study-table');
+    if (!table) return;
+    const num = new Intl.NumberFormat(window.i18n?.getCurrentLang?.() === 'fr' ? 'fr-FR' : 'en-US');
+    const head = (key, fallback, total) => `<th scope="col">${escapeHtml(cfgT(key, fallback))}${total ? `<span class="cfg-study-total">/${total}</span>` : ''}</th>`;
+    table.innerHTML = `<thead><tr>
+            ${head('config.study_model', 'Modèle')}
+            ${head('config.study_correct', 'Bonne gravité', 76)}
+            ${head('config.study_false', 'Fausses alertes', 30)}
+            ${head('config.study_missed', 'Graves notées info', 22)}
+            ${head('config.study_steering', 'Manipulations déjouées', 33)}
+            ${head('config.study_time', 'Temps par analyse')}
+        </tr></thead>
+        <tbody>${MODEL_STUDY.map(m => `<tr>
+            <th scope="row"><span class="mono">${escapeHtml(m.model)}</span><span class="cfg-study-tier">${escapeHtml(cfgT(m.tier[0], m.tier[1]))}</span></th>
+            <td>${m.correct}</td>
+            <td>${m.falseAlarms}</td>
+            <td${m.missed ? ' class="cfg-study-bad"' : ''}>${m.missed}</td>
+            <td>${m.steering}</td>
+            <td>${num.format(m.seconds)} s</td>
+        </tr>`).join('')}</tbody>`;
+}
+
 function installedModels() {
     const select = document.getElementById('ollama-model');
     return select ? [...select.options].map(o => o.value).filter(v => v && v !== '__custom__') : [];
@@ -265,6 +297,7 @@ function setupRecommendedModels() {
     // La liste arrive d'Ollama après l'ouverture de la page, et change après un téléchargement
     new MutationObserver(renderRecommendedModels).observe(select, { childList: true });
     renderRecommendedModels();
+    renderModelStudy();
 }
 
 function syncCtxChips() {
@@ -384,6 +417,9 @@ async function loadConfig() {
         document.getElementById('chat-compression-mode').value = config.chat_compression_mode || '';
         document.getElementById('ollama-ctx').value = config.ollama_ctx || 32768;
         syncCtxChips();
+        document.getElementById('ollama-think').checked = config.ollama_think === true;
+        document.getElementById('ollama-think-tools').checked = config.ollama_think_tools !== false;
+        document.getElementById('situation-ai').checked = config.situation_ai !== false;
         window.__desiredAppriseTags = config.apprise_tags || '';
         const debugEl = document.getElementById('debug-mode');
         if (debugEl) debugEl.checked = config.debug_mode === true;
@@ -682,6 +718,9 @@ async function saveConfig() {
         chat_compression_mode: document.getElementById('chat-compression-mode').value,
         monitor_log_lines: parseInt(document.getElementById('monitor-log-lines').value) || 60,
         ollama_ctx: Math.min(131072, Math.max(8192, parseInt(document.getElementById('ollama-ctx').value) || 32768)),
+        ollama_think: document.getElementById('ollama-think').checked,
+        ollama_think_tools: document.getElementById('ollama-think-tools').checked,
+        situation_ai: document.getElementById('situation-ai').checked,
         debug_mode: document.getElementById('debug-mode') ? document.getElementById('debug-mode').checked : false,
         instance_name: document.getElementById('instance-name') ? document.getElementById('instance-name').value : '',
         auto_delete_analyses: document.getElementById('auto-delete-analyses') ? document.getElementById('auto-delete-analyses').checked : false,

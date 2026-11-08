@@ -82,7 +82,7 @@ async def run_agent_turn(ollama, semaphore, messages: List[dict], config: dict,
         content, tool_calls, think = "", [], _ThinkFilter()
         stream = ollama.generate_stream(
             None, url=config.get("ollama_url"), model=config.get("ollama_model"),
-            options=options, think=config.get("ollama_think", True),
+            options=options, think=config.get("ollama_think_tools", True),
             messages=messages, tools=tools_now,
         )
         # aclosing : referme le flux HTTP dès la sortie de boucle

@@ -292,7 +292,13 @@ class GlobalConfig(Base):
     ollama_model = Column(String, default="gemma4:e4b")
     ollama_temp = Column(Float, default=0.1)
     ollama_ctx = Column(Integer, default=32768)
-    ollama_think = Column(Boolean, default=True)
+    ollama_think = Column(Boolean, default=False)
+    ollama_think_tools = Column(Boolean, default=True)  # chat, enquêtes, second regard : outils
+    situation_ai = Column(Boolean, default=True)  # point de situation du dashboard rédigé par l'IA
+    situation_text = Column(Text, nullable=True)
+    situation_at = Column(DateTime, nullable=True)
+    situation_key = Column(String, nullable=True)  # empreinte des faits au moment de la rédaction
+    situation_lang = Column(String, nullable=True)
     system_prompt = Column(Text, default="")
     notification_method = Column(String, default="smtp")
     notification_state_json = Column(Text, default="{}")  # Derniers tests et envois, par méthode (voir config_status)

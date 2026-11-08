@@ -47,6 +47,24 @@
                 <h2 data-i18n="config.models_title">Quel modèle choisir</h2>
                 <p class="form-hint cfg-models-intro" data-i18n="config.models_intro">Mesurés sur de vraies alertes, avec une carte RTX 3090. Un clic choisit le modèle s'il est installé, sinon prépare son téléchargement.</p>
                 <div class="cfg-status cfg-models" id="cfg-models" role="group" aria-label="Modèles conseillés" data-i18n-aria-label="config.models_title"></div>
+                <details class="cfg-study">
+                    <summary data-i18n="config.study_title">Comment ces modèles ont été choisis</summary>
+                    <div class="cfg-study-body">
+                        <p class="form-hint" data-i18n="config.study_method">38 vraies alertes de serveurs domestiques, jouées deux fois chacune, plus 33 lignes de log qui tentent de dicter le verdict à l'IA. Contexte 32K, réflexion désactivée, carte RTX 3090, version 1.9.</p>
+                        <div class="cfg-study-wrap"><table class="cfg-study-table" id="cfg-study-table"></table></div>
+                        <ul class="cfg-study-notes">
+                            <li data-i18n-html="config.study_note_serious">Le critère qui compte le plus : aucune alerte grave notée info. <code>bonsai-2:27b</code> en laisse passer 2, c'est pourquoi il n'est pas retenu malgré son score.</li>
+                            <li data-i18n-html="config.study_note_minimum"><code>gemma4:e4b</code> sonne plus souvent pour rien, mais ne rate aucune alerte grave et tient dans 3,2 Go.</li>
+                        </ul>
+                        <h3 class="cfg-study-subtitle" data-i18n="config.study_settings_title">Et les réglages conseillés</h3>
+                        <ul class="cfg-study-notes">
+                            <li data-i18n-html="config.study_set_ctx"><strong>Contexte 32K.</strong> La plus grosse alerte mesurée tient en 5 900 tokens de prompt et 990 de réponse : 8K suffit. 32K coûte 0,1 à 0,2 Go de plus, sans perte de vitesse, et laisse tenir les méta-analyses et les longues conversations.</li>
+                            <li data-i18n-html="config.study_set_think_alerts"><strong>Réflexion désactivée pour les alertes.</strong> Une alerte se juge sans outils : avec <code>gemma4:12b</code>, 59 bonnes gravités sur 76 avec réflexion, 58 sans, et chaque analyse trois fois plus lente.</li>
+                            <li data-i18n-html="config.study_set_think_tools"><strong>Réflexion activée pour le chat et les enquêtes.</strong> Là, l'IA doit choisir ses outils : <code>gemma4:e4b</code> répond juste à 16 questions sur 16 avec réflexion, 10 sans. Environ 1,7 fois plus lent.</li>
+                            <li data-i18n-html="config.study_set_temp"><strong>Température 0,2, fixe.</strong> À 0,7, aucun modèle conseillé ne s'améliore, et le plus petit invente davantage.</li>
+                        </ul>
+                    </div>
+                </details>
                 <div class="cfg-row">
                     <div class="cfg-row-label">
                         <label for="pull-model-name" data-i18n="config.download_model">Télécharger un modèle</label>
@@ -76,6 +94,8 @@
                         <button type="button" class="chip" data-ctx="131072" onclick="setOllamaCtx(131072)">128K</button>
                     </div>
                 {% endcall %}
+                {{ toggle('situation-ai', 'config.situation_ai', 'Point de situation rédigé par l’IA', 'config.situation_ai_hint', "Un court paragraphe en haut du tableau de bord, réécrit seulement quand la situation change : une alerte s'ouvre ou se ferme, une source se tait. L'IA ne lit que les faits et les résumés des analyses, jamais les lignes de log. Les faits restent affichés sans elle.") }}
+                {{ toggle('ollama-think', 'config.ollama_think', 'Réflexion pour les alertes', 'config.ollama_think_hint', "Conseillé : désactivée. Mesuré sur 38 vraies alertes avec gemma4:12b : 59 bonnes gravités sur 76 avec, 58 sans, et chaque analyse trois fois plus lente.") }}
             </div>
 
             <div class="rp-card" id="chat-settings">
@@ -91,6 +111,7 @@
                         <option value="truncate" data-i18n="config.chat_compression_truncate">Oublier les plus anciens (immédiat)</option>
                     </select>
                 {% endcall %}
+                {{ toggle('ollama-think-tools', 'config.ollama_think_tools', 'Réflexion pour le chat et les enquêtes', 'config.ollama_think_tools_hint', "Conseillé : activée, aussi pour le second regard. Mesuré avec gemma4:e4b sur 16 questions qui demandent des outils : 16 réponses justes avec, 10 sans, car il demandait des identifiants au lieu de les chercher. Environ 1,7 fois plus lent.") }}
             </div>
         </section>
 
@@ -529,7 +550,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=17"></script>
+<script src="/static/js/config.js?v=21"></script>
 <script src="/static/js/diagnostics_config.js?v=14"></script>
 <script src="/static/js/source_connections.js?v=4"></script>
 {% endblock %}

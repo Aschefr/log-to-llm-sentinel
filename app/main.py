@@ -297,6 +297,9 @@ async def lifespan(app: FastAPI):
     # Alertes que l'IA n'a pas pu analyser : reprises dès qu'elle répond, avis si elle reste absente
     from app.services import analysis_retry
     asyncio.create_task(analysis_retry.run_forever(orchestrator))
+    # Point de situation du dashboard : réécrit par l'IA quand la situation change
+    from app.services import situation
+    asyncio.create_task(situation.run_forever(orchestrator))
     from app.utils import loop_watchdog
     loop_watchdog.start()  # signale dans les logs ce qui bloque la boucle principale
 

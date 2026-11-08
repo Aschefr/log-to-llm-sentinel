@@ -17,6 +17,7 @@ from app.services import monitoring
 from app.services import analysis_events
 from app.services import autopilot as ap
 from app.services import rule_stats
+from app.services import situation
 
 ACTIVITY_MAX = 6
 OLLAMA_CACHE_SECONDS = 20
@@ -117,6 +118,7 @@ def build(db) -> dict:
         "counts": analysis_events.counts(analysis_events.summarize(db)),
         "trend": _trend(analyses, now),
         "pilot": _pilot(db, enabled),
+        "situation": situation.payload(db),
     }
 
 

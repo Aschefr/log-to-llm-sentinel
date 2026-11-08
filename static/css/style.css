@@ -2844,6 +2844,34 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .sl-badge--raised { border-color: var(--danger); color: var(--danger); }
 .sl-badge--lowered { border-color: var(--success); color: var(--success); }
 .sl-badge--skipped { border-style: dashed; }
+/* Alert card header, three quiet lines: severity, rule and time; the summary; then the facts in small text.
+   The actions stay out of the way on a pointer screen and show on hover or keyboard focus. */
+.analysis-card.collapsed { padding: 0.8rem 1rem; }
+.analysis-header.ac-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "toggle lines actions"; align-items: start; column-gap: 0.6rem; }
+.ac-head > .collapse-toggle { grid-area: toggle; margin: 0.15rem 0 0; padding: 0; background: none; border: 0; cursor: pointer; line-height: 1.4; }
+.ac-lines { grid-area: lines; display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.ac-top { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.ac-top .severity-badge, .ac-top .ai-pending-badge { flex-shrink: 0; padding: 0.05rem 0.45rem; font-size: 0.66rem; letter-spacing: 0.03em; }
+.ac-rule { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.9rem; font-weight: 600; }
+.ac-top .analysis-time { margin-left: auto; flex-shrink: 0; font-size: 0.76rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ac-lines .analysis-summary-line { margin-top: 0; }
+.ac-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.1rem 0.75rem; color: var(--text-secondary); font-size: 0.76rem; }
+.ac-meta .resolved-badge { padding: 0; border: 0; background: none; font-size: inherit; font-weight: 500; }
+.ac-open { color: var(--warning); font-weight: 600; }
+.ac-meta .recur-badge { padding: 0; background: none; color: inherit; font-size: inherit; font-weight: 600; font-variant-numeric: tabular-nums; }
+.ac-meta .event-note-count { margin-left: 0; font-size: inherit; }
+.ac-meta .analysis-src { max-width: 100%; margin: 0; padding: 0; border: 0; overflow: hidden; text-overflow: ellipsis; font-size: 0.74rem; }
+.ac-meta .detection-id-badge { padding: 0; border: 0; background: none; color: inherit; font-size: 0.72rem; font-weight: 400; letter-spacing: 0; }
+.ac-meta .sl-badge { padding: 0 0.4rem; font-size: 0.7rem; }
+.ac-head .analysis-actions { grid-area: actions; align-self: center; flex-wrap: nowrap; }
+@media (hover: hover) and (pointer: fine) {
+    .analysis-card.collapsed .ac-head .analysis-actions { opacity: 0; transition: opacity 120ms ease-out; }
+    .analysis-card.collapsed:hover .ac-head .analysis-actions, .analysis-card.collapsed:focus-within .ac-head .analysis-actions { opacity: 1; }
+}
+@media (max-width: 640px) {
+    .analysis-header.ac-head { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "toggle lines" ". actions"; row-gap: 0.45rem; }
+    .ac-head .analysis-actions { justify-content: flex-start; }
+}
 .sl-checks { margin: 0.6rem 0 0.8rem; font-size: 0.82rem; }
 .sl-checks summary { cursor: pointer; color: var(--text-secondary); }
 .sl-checks ul { list-style: none; margin: 0.4rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
@@ -3092,6 +3120,22 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 .dash-verdict--warn .dash-verdict-icon { color: var(--warning); }
 .dash-verdict--unknown { border-color: var(--border); background: var(--bg-card); }
 .dash-heading { margin: 0 0 0.6rem; font-size: 1.05rem; font-weight: 600; }
+/* Point de situation: the AI's paragraph, then the facts it was written from */
+.dash-situation { display: flex; flex-direction: column; gap: 0.45rem; }
+.dash-situation-text { margin: 0; font-size: 0.95rem; line-height: 1.55; max-width: 80ch; text-wrap: pretty; }
+.dash-situation-ref { color: var(--accent); font-variant-numeric: tabular-nums; text-decoration: none; white-space: nowrap; }
+.dash-situation-ref:hover { text-decoration: underline; text-underline-offset: 2px; }
+.dash-situation-meta { margin: 0; color: var(--text-secondary); font-size: 0.78rem; }
+.dash-situation-facts { display: flex; flex-wrap: wrap; gap: 0.2rem 1.2rem; margin: 0.2rem 0 0; padding: 0.5rem 0 0; border-top: 1px solid var(--border); list-style: none; color: var(--text-secondary); font-size: 0.82rem; }
+.dash-situation-facts li { min-width: 0; overflow-wrap: anywhere; }
+/* On a phone, what needs an action comes first: the situation follows it */
+@media (max-width: 640px) {
+    .dash > .dash-verdict { order: 0; }
+    .dash > .dash-section:not(.dash-situation-section) { order: 1; }
+    .dash > .dash-situation-section { order: 2; }
+    .dash > :not(.dash-verdict):not(.dash-section) { order: 3; }
+    .dash > #dash-history { order: 4; }
+}
 .dash-calm { margin: 0; color: var(--text-secondary); font-size: 0.9rem; }
 .dash-list, .dash-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 0.75rem; }
 [data-theme="light"] .dash-list, [data-theme="light"] .dash-panel { box-shadow: var(--shadow-card); }
@@ -3306,6 +3350,30 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 .cfg-models-intro { margin: 0; max-width: 75ch; }
 .cfg-status.cfg-models { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .cfg-models .mono { overflow-wrap: anywhere; }
+/* "How these models were chosen": the study behind the recommendation, folded by default */
+.cfg-study > summary { display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2rem; font-size: 0.86rem; color: var(--text-secondary); cursor: pointer; list-style: none; }
+.cfg-study > summary::-webkit-details-marker { display: none; }
+.cfg-study > summary::before { content: ""; width: 0.38rem; height: 0.38rem; border: solid currentColor; border-width: 0 1.5px 1.5px 0; transform: rotate(-45deg); transition: transform 0.15s ease-out; }
+.cfg-study[open] > summary::before { transform: rotate(45deg); }
+.cfg-study > summary:hover { color: var(--text-primary); }
+.cfg-study > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 0.25rem; }
+.cfg-study-body { display: flex; flex-direction: column; gap: 0.7rem; padding: 0.3rem 0 0.4rem; }
+.cfg-study-body > .form-hint { margin: 0; max-width: 75ch; }
+.cfg-study-wrap { overflow-x: auto; }
+.cfg-study-table { width: 100%; min-width: 34rem; border-collapse: collapse; font-size: 0.84rem; font-variant-numeric: tabular-nums; }
+.cfg-study-table th, .cfg-study-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); text-align: right; vertical-align: baseline; }
+.cfg-study-table thead th { font-size: 0.74rem; font-weight: 600; color: var(--text-secondary); vertical-align: bottom; }
+.cfg-study-table th:first-child { text-align: left; }
+.cfg-study-table tbody tr:last-child > * { border-bottom: 0; }
+.cfg-study-table tbody th { font-weight: 400; }
+.cfg-study-table tbody th .mono { display: block; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.cfg-study-tier { display: block; font-size: 0.74rem; color: var(--text-secondary); }
+.cfg-study-total { display: block; font-weight: 400; opacity: 0.8; }
+.cfg-study-bad { color: var(--danger); font-weight: 600; }
+.cfg-study-notes { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.84rem; color: var(--text-secondary); max-width: 75ch; }
+.cfg-study-notes code { font-size: 0.8rem; color: var(--text-primary); }
+.cfg-study-notes strong { font-weight: 600; color: var(--text-primary); }
+.cfg-study-subtitle { margin: 0.3rem 0 0; font-size: 0.86rem; font-weight: 600; color: var(--text-primary); }
 .chip.active { color: var(--text-primary); border-color: var(--accent); background: rgba(59, 130, 246, 0.14); }
 .analysis-reused { margin: 0.25rem 0; }
 .diag-card { background: var(--bg-card); }
