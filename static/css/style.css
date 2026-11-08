@@ -2994,7 +2994,21 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 
 /* ── Diagnostic (Configuration) ── */
 .diag-intro { margin-bottom: 1rem; }
-.diag-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1rem; }
+/* Configuration: one section after another (no side-by-side tiles of uneven height), and the tab's sections in a bar
+   that stays under the header while scrolling. Section text keeps a reading width. */
+.diag-grid { display: flex; flex-direction: column; gap: 1rem; min-width: 0; }
+.diag-grid > .diag-card { max-width: 100%; }
+.diag-card > :not(.diag-card-head) { max-width: 56rem; }
+.cfg-jump { position: sticky; top: var(--cfg-sticky-top, 0px); z-index: 20; margin: -0.5rem 0 -0.25rem; padding: 0.5rem 0; background: var(--bg-primary); }
+.cfg-jump-row { display: flex; gap: 0.25rem; overflow-x: auto; scrollbar-width: none; padding: 0.3rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 0.6rem; transition: box-shadow 150ms ease-out; }
+.cfg-jump-row::-webkit-scrollbar { display: none; }
+.cfg-jump.stuck .cfg-jump-row { box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18); }
+.cfg-jump-item { flex-shrink: 0; padding: 0.35rem 0.75rem; border: 1px solid transparent; border-radius: 0.45rem; background: none; color: var(--text-secondary); font: inherit; font-size: 0.8rem; font-weight: 600; white-space: nowrap; cursor: pointer; transition: color 120ms ease-out, background-color 120ms ease-out; }
+.cfg-jump-item[hidden] { display: none; }
+.cfg-jump-item:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+.cfg-jump-item.active { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.cfg-jump-item:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.cfg-jump-target { scroll-margin-top: calc(var(--cfg-sticky-top, 0px) + 3.75rem); }
 .diag-card { border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
 .diag-card-head { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 .diag-card-head h3 { margin: 0; font-size: 1rem; }
@@ -3401,14 +3415,12 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 .analysis-reused { margin: 0.25rem 0; }
 .diag-card { background: var(--bg-card); }
 .diag-intro { margin: 0; max-width: 75ch; }
-#diagnostics-section .diag-grid { width: 100%; align-items: start; }
 @media (max-width: 1080px) { .cfg-status { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .cfg-status { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cfg-status.cfg-models { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) {
     .cfg-row { grid-template-columns: minmax(0, 1fr); }
     .cfg-row--toggle { grid-template-columns: minmax(0, 1fr) auto; }
     .cfg-row--short .cfg-row-control input { max-width: none; }
-    #diagnostics-section .diag-grid { grid-template-columns: minmax(0, 1fr); }
     .diag-fields { grid-template-columns: minmax(0, 1fr) 90px; }
     .diag-fields > :first-child { grid-column: 1 / -1; }
 }

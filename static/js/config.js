@@ -61,6 +61,98 @@ function setupTabs() {
     const fromHash = () => selectConfigTab(location.hash.slice(1) === 'diagnostics-section' ? 'diagnostic' : location.hash.slice(1));
     window.addEventListener('hashchange', fromHash);
     fromHash();
+    setupSectionBars();
+}
+
+/* Sections of each tab in a bar that stays under the header while scrolling (as in Alanbix's admin): the section in view
+   is highlighted, a click scrolls to it. Buttons, not links: a #hash would switch the tab. */
+function setupSectionBars() {
+    const navbar = document.querySelector('.navbar');
+    const stickyTop = () => (navbar && getComputedStyle(navbar).position === 'sticky' ? navbar.offsetHeight : 0);
+    const setTop = () => document.documentElement.style.setProperty('--cfg-sticky-top', `${stickyTop()}px`);
+    setTop();
+    if (navbar && window.ResizeObserver) new ResizeObserver(setTop).observe(navbar);
+    window.addEventListener('resize', setTop);
+
+    const bars = [];
+    Object.values(CFG_TABS).forEach(panelId => {
+        const panel = document.getElementById(panelId);
+        const sections = [...panel.querySelectorAll('.rp-card, .diag-card')].filter(s => s.querySelector('h2, h3'));
+        if (sections.length < 2) return;
+        const bar = document.createElement('nav');
+        bar.className = 'cfg-jump';
+        bar.setAttribute('aria-label', cfgT('config.section_jump', 'Aller à une section de l’onglet'));
+        bar.setAttribute('data-i18n-aria-label', 'config.section_jump');
+        const row = document.createElement('div');
+        row.className = 'cfg-jump-row';
+        sections.forEach((section, i) => {
+            if (!section.id) section.id = `${panelId}-part${i + 1}`;
+            section.classList.add('cfg-jump-target');
+            const heading = section.querySelector('h2, h3');
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'cfg-jump-item';
+            btn.dataset.target = section.id;
+            btn.textContent = heading.textContent.trim();
+            if (heading.dataset.i18n) btn.setAttribute('data-i18n', heading.dataset.i18n);
+            btn.addEventListener('click', () => {
+                const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                section.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+                markActive(bar, section.id);
+            });
+            row.appendChild(btn);
+        });
+        bar.appendChild(row);
+        panel.prepend(bar);
+        bars.push({ panel, bar, sections });
+    });
+
+    function markActive(bar, id) {
+        bar.querySelectorAll('.cfg-jump-item').forEach(btn => {
+            const on = btn.dataset.target === id;
+            btn.classList.toggle('active', on);
+            if (on) {
+                btn.setAttribute('aria-current', 'true');
+                // Sur un écran étroit la barre défile : garder la section courante en vue
+                const row = btn.parentElement;
+                if (btn.offsetLeft < row.scrollLeft || btn.offsetLeft + btn.offsetWidth > row.scrollLeft + row.clientWidth) {
+                    row.scrollLeft = btn.offsetLeft - 8;
+                }
+            } else {
+                btn.removeAttribute('aria-current');
+            }
+        });
+    }
+
+    let pending = false;
+    const spy = () => {
+        pending = false;
+        const current = bars.find(b => !b.panel.classList.contains('hidden'));
+        if (!current) return;
+        // Une section masquée par un réglage (SMTP, Apprise, Discord selon la méthode d'envoi) n'a pas de puce
+        const shown = current.sections.filter(s => s.offsetParent !== null);
+        current.bar.querySelectorAll('.cfg-jump-item').forEach(btn => {
+            btn.hidden = !shown.some(s => s.id === btn.dataset.target);
+        });
+        if (!shown.length) return;
+        const line = stickyTop() + current.bar.offsetHeight + 24;
+        let active = shown[0];
+        shown.forEach(s => { if (s.getBoundingClientRect().top <= line) active = s; });
+        // Tout en bas de la page, la dernière section ne peut pas monter jusqu'à la barre : elle devient la courante
+        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) active = shown[shown.length - 1];
+        markActive(current.bar, active.id);
+        current.bar.classList.toggle('stuck', current.bar.getBoundingClientRect().top <= stickyTop() + 1 && window.scrollY > 0);
+    };
+    const onScroll = () => { if (!pending) { pending = true; requestAnimationFrame(spy); } };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('hashchange', () => requestAnimationFrame(spy));
+    // Les réglages arrivent après l'ouverture de la page et peuvent masquer ou montrer des sections
+    if (window.MutationObserver) {
+        const watch = new MutationObserver(onScroll);
+        bars.forEach(b => b.sections.forEach(s => watch.observe(s, { attributes: true, attributeFilter: ['class', 'style', 'hidden'] })));
+    }
+    document.addEventListener('change', onScroll);
+    spy();
 }
 
 /* ── Real state, at the top of the page ───────────────────────────────── */

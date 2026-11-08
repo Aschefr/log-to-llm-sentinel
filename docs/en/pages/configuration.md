@@ -18,6 +18,8 @@ The six tabs at the top of the page each show the real state of what they config
 
 If the state cannot be read, the page says it is unknown.
 
+Under the tabs, a bar lists the sections of the open tab. It stays under the header while you scroll, highlights the section you are reading, and a click takes you to another one. In **Diagnostics**, the [second look](../features/second-look.md) comes first.
+
 ## Saving
 A setting is saved when you leave its field (or press Enter), and the result shows next to the field. A failure stays visible until the next attempt. **Test** buttons use what you just typed. A saved SMTP password is never sent back to the page: leave the field empty to keep it.
 

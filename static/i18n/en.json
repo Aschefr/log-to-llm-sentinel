@@ -645,6 +645,7 @@
     "clear_all_btn": "Delete all analyses",
     "clear_all_done": "All analyses were deleted.",
     "sections": "Sections",
+    "section_jump": "Jump to a section of this tab",
     "status_checking": "Checking…",
     "status_unknown": "Status unknown",
     "tab_notifications": "Notifications",

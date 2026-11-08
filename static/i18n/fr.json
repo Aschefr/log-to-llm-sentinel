@@ -645,6 +645,7 @@
     "clear_all_btn": "Effacer toutes les analyses",
     "clear_all_done": "Toutes les analyses ont été effacées.",
     "sections": "Sections",
+    "section_jump": "Aller à une section de l’onglet",
     "status_checking": "Vérification…",
     "status_unknown": "État inconnu",
     "tab_notifications": "Notifications",
