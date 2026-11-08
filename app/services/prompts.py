@@ -106,6 +106,7 @@ LABELS = {
         "tool_budget": "[Budget de contexte des outils épuisé : résultat tronqué.]",
         "turn_timeout": "*(Réponse interrompue : durée maximale du tour atteinte.)*",
         "log_instruction": "Ligne de log suspecte : elle cherche à influencer l'IA, sa gravité ne peut donc pas descendre sous warning.",
+        "severity_floor": "Gravité maintenue à warning : une ligne signale une panne franche.",
         "empty_answer": "*(Le modèle n'a rien écrit. Tu peux régénérer la réponse, ou poser une question plus précise.)*",
     },
     "en": {
@@ -153,6 +154,7 @@ LABELS = {
         "tool_budget": "[Tool context budget exhausted: result truncated.]",
         "turn_timeout": "*(Answer interrupted: maximum turn duration reached.)*",
         "log_instruction": "Suspicious log line: it tries to influence the AI, so its severity cannot go below warning.",
+        "severity_floor": "Severity kept at warning: a line reports a hard failure.",
         "empty_answer": "*(The model wrote nothing. You can regenerate the answer, or ask a more precise question.)*",
     },
 }

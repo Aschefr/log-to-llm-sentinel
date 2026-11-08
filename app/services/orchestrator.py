@@ -12,8 +12,8 @@ from app.services.ollama_service import OllamaService
 from app.services.notification_service import NotificationService
 from app.services.app_config import config_to_dict, llm_options
 from app.services import event_notes
-from app.services.alert_analysis import (build_history, build_alert_messages, messages_to_text,
-                                         parse_alert_response, detect_severity, guard_log_instruction, analysis_lines)
+from app.services.alert_analysis import (build_history, build_alert_messages, messages_to_text, parse_alert_response,
+                                         detect_severity, guard_log_instruction, analysis_lines, hard_failure_floor)
 from app.services.log_source import find_context
 from app.services.prompts import ALERT_SCHEMA, label
 from app.utils.log_utils import clean_log_line, aggregate_lines, line_signature
@@ -261,6 +261,9 @@ class Orchestrator:
         else:
             parsed = parse_alert_response(res["content"], lang)
         context_lines = [l for key in ("before", "between", "after") for l in (context or {}).get(key) or []]
+        if not failed:
+            # Le plancher ne regarde que les lignes de l'alerte : une panne franche du contexte n'est pas cet événement
+            parsed = hard_failure_floor(parsed, raw_lines["lines"], lang)
         parsed = guard_log_instruction(parsed, raw_lines["lines"] + context_lines, lang)
         # Sans réponse de l'IA, « info » n'est pas un verdict : l'alerte attend une nouvelle analyse (analysis_retry)
         parsed["failed"] = failed

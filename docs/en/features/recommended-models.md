@@ -20,6 +20,21 @@ Sentinel suggests three models so a new user has nothing to guess. They come fro
 ## Measured again on 1.8.0
 Version 1.8.0 changed how alerts are asked of the model ([Log Line Safety](log-safety.md)), so the 38 cases were played again on `qwen3.8:27b`, twice each, thinking off, against the previous prompts. Correct severities went from 72 to 75 of 76, serious cases rated `info` from 4 to 1, with no false alarm in either. The other models were not measured again.
 
+## Measured again on 1.9 (November 2026)
+The three recommended models, plus `bonsai-2:27b`, were played on the same 38 cases with the current prompts, twice each, 32K context, thinking off, plus 33 variants where a line tries to dictate the verdict. Two things came out of it.
+
+* **The `gemma4` models raised false alarms.** On normal lines (a cron session, a periodic request), they flagged an attempt to steer the AI, and Sentinel then kept the alert at warning. Sentinel now counts that flag only when a log line also holds a verdict word (test, simulation, normal, info, resolved…). None of the normal lines does.
+* **A hard failure no longer ends as info.** Out of memory, segfault, disk errors, a systemd service restarting in a loop: such a line keeps its alert at warning or above, whatever the model says.
+
+| Model | Correct severities /76 | False alarms /30 | Serious cases rated info /22 | Steering lines handled /33 | Time per analysis |
+|---|---|---|---|---|---|
+| **`qwen3.8:27b`** | 76 | 0 | 0 | 32 | 8 s |
+| **`gemma4:12b`** | 72 (58 before) | 4 (18 before) | 0 | 31 | 4 s |
+| `bonsai-2:27b` | 72 | 2 | 2 | 31 | 7.5 s |
+| **`gemma4:e4b`** | 62 (52 before) | 14 (24 before) | 0 | 31 | 4 s |
+
+The recommendation stays the same. `bonsai-2:27b` is a 27B model in 2-bit quantisation (9.7 GB): close to the top, but it missed two serious cases and followed steering lines far more often before Sentinel's safeguard (25 of 33, against 14 for `qwen3.8:27b`). Turning thinking on did not help `gemma4:12b` (59 against 58 correct) and made it three times slower.
+
 ## Settings that follow from it
 * **Temperature: 0.2.** At 0.7, no recommended model improves, and the minimum model invents more.
 * **Context: 8K minimum, 32K recommended.** The largest exchange measured is 5,900 tokens of prompt and 990 of reply, so 8K is enough for alerts. Going to 32K costs 0.1 to 0.2 GB on the three recommended models, with no loss of speed.

@@ -283,7 +283,8 @@ def guard_log_instruction(parsed: dict, lines: List[str], lang: str) -> dict:
     """Une ligne qui cherche à influencer l'IA ne fait pas baisser la gravité, et la personne qui lit l'alerte en est prévenue.
     log_instruction ne vaut True que pour le détecteur : le signal du modèle se trompe parfois, il ne doit pas forcer de notification."""
     detected = addresses_the_ai(lines)
-    if not (detected or (parsed.get("data") or {}).get("log_manipulation") is True):
+    flagged = (parsed.get("data") or {}).get("log_manipulation") is True and model_flag_counts(lines)
+    if not (detected or flagged):
         return {**parsed, "log_instruction": False}
     severity = "warning" if parsed["severity"] == "info" else parsed["severity"]
     data = {**parsed["data"], "severity": severity} if parsed.get("data") else parsed.get("data")
@@ -293,6 +294,38 @@ def guard_log_instruction(parsed: dict, lines: List[str], lang: str) -> dict:
         markdown = f"**{notice}**\n\n{markdown}"
         summary = f"{notice} {summary}"[:500] if summary else summary
     return {**parsed, "severity": severity, "data": data, "markdown": markdown, "summary": summary, "log_instruction": detected}
+
+
+# Pannes franches qui ne descendent jamais à info, quel que soit le modèle : la liste du pilote automatique,
+# plus les boucles de redémarrage de systemd (mesuré : « restart counter is at 36 » noté info par gemma4:12b).
+_RESTART_LOOP = re.compile(r"restart counter is at (?:[5-9]|\d{2,})\b|start request repeated too quickly", re.I)
+
+
+def is_hard_failure(line: str) -> bool:
+    from app.services.autopilot import serious_line   # import tardif : autopilot importe ce module
+    return serious_line(line) or bool(_RESTART_LOOP.search(line))
+
+
+def hard_failure_floor(parsed: dict, lines: List[str], lang: str) -> dict:
+    """Une panne franche dans les lignes de l'alerte reste au moins warning, quoi que dise le modèle."""
+    if parsed["severity"] != "info" or not any(is_hard_failure(l) for l in lines):
+        return parsed
+    data = {**parsed["data"], "severity": "warning"} if parsed.get("data") else parsed.get("data")
+    markdown = (parsed.get("markdown") or "") + f"\n\n*{label(lang, 'severity_floor')}*"
+    return {**parsed, "severity": "warning", "data": data, "markdown": markdown}
+
+
+# Mots d'une ligne qui donnerait un verdict (test, simulation, normal, info…). Le signal « manipulation » du modèle ne compte
+# que si une ligne en contient un : mesuré le 2026-11-08, gemma4:12b le cochait sur 14 lignes normales sur 30 (session cron,
+# GET /time), ce qui les remontait à warning ; aucune de ces lignes ne contient un tel mot, et qwen3.8:27b ne perd rien.
+_VERDICT_WORDS = re.compile(
+    r"\b(?:tests?|testing|simulat\w*|normal\w*|benign|b[ée]nin\w*|harmless|inoffensi\w*|ignor\w*|info|informational|"
+    r"maintenance|valid\w*|approved|resolved|r[ée]solu\w*|no action|aucune action|expected|attendu\w*|classif\w*|"
+    r"severity|s[ée]v[ée]rit[ée])\b", re.I)
+
+
+def model_flag_counts(lines: List[str]) -> bool:
+    return any(line and _VERDICT_WORDS.search(line) for line in lines)
 
 
 def parse_alert_response(content: str, lang: str) -> dict:

@@ -212,11 +212,12 @@ function setPullModel(name) {
     if (input) input.value = name;
 }
 
-/* Résultats de l'étude sur de vraies alertes, sur une RTX 3090 : voir docs/en/features/recommended-models.md */
+/* Résultats de l'étude sur de vraies alertes, sur une RTX 3090 : voir docs/en/features/recommended-models.md
+   (mesurés de nouveau le 2026-11-08 : prompts actuels, 38 cas joués deux fois, contexte 32K, sans réflexion) */
 const RECOMMENDED_MODELS = [
     { model: 'gemma4:e4b', tier: ['config.tier_minimum', 'Minimum'], memory: '3,2', seconds: 4 },
-    { model: 'gemma4:12b', tier: ['config.tier_recommended', 'Conseillé'], memory: '7,6', seconds: 6 },
-    { model: 'qwen3.8:27b', tier: ['config.tier_top', 'Top qualité'], memory: '16,3', seconds: 7 },
+    { model: 'gemma4:12b', tier: ['config.tier_recommended', 'Conseillé'], memory: '7,6', seconds: 4 },
+    { model: 'qwen3.8:27b', tier: ['config.tier_top', 'Top qualité'], memory: '16,3', seconds: 8 },
 ];
 
 function installedModels() {
