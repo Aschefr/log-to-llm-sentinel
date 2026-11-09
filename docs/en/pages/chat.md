@@ -48,8 +48,7 @@ When the selected Ollama model supports tool calling (Sentinel checks the model'
 
 ## 5. Context
 A model reads a limited amount of text at once. Beyond it, it forgets the beginning of the conversation. The context panel shows an estimate of the space used and what the AI really receives, and offers three ways to free space:
-* **Summarize with the AI**: keeps the meaning and frees about 70%. Takes a moment.
-* **Compact**: removes repetition and frees 30 to 50%.
+* **Summarize with the AI**: the AI merges the older messages into one summary, in fixed sections (facts, decisions and why, your preferences, open questions), keeping exact values such as paths, IP addresses and error messages, and noting what you corrected. The last two exchanges stay word for word. Each new summary merges the previous one, so the start of the conversation is never cut. If the model returns a summary that is cut short or loops, it is not kept: the conversation stays as it was and you can try again or forget the oldest messages. Takes a moment.
 * **Forget the oldest**: immediate. The first messages stay visible, dimmed, but the AI no longer reads them.
 
 A summary stays in the conversation, where you can correct it or restore the full history.
@@ -61,6 +60,6 @@ When a conversation is full, the panel opens and your message goes out once spac
 ## 6. Settings
 The chat has no settings of its own. In [Configuration > Ollama](configuration.md):
 * **Chat instructions**: optional text added to every conversation, such as your setup or the tone you want.
-* **When the context is full**: ask, summarize, compact or forget the oldest.
+* **When the context is full**: ask, summarize or forget the oldest.
 
 The chat answers in the site's language, and uses the same model and context size as the analyses.

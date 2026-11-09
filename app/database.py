@@ -179,6 +179,8 @@ def init_db():
         # La langue des analyses suit désormais celle du site
         "UPDATE global_config SET ollama_prompt_lang = site_lang WHERE site_lang IS NOT NULL AND site_lang != ''",
         "ALTER TABLE global_config ADD COLUMN chat_compression_mode VARCHAR DEFAULT ''",
+        # Le mode « compacter » est remplacé par le résumé ancré (2026-11-08)
+        "UPDATE global_config SET chat_compression_mode = 'summary' WHERE chat_compression_mode = 'compact'",
         # Recherche web et fiches CVE
         "ALTER TABLE diagnostic_links ADD COLUMN web_url VARCHAR DEFAULT ''",
         "ALTER TABLE global_config ADD COLUMN cve_lookup_enabled BOOLEAN DEFAULT 0",

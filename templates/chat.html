@@ -55,8 +55,7 @@
                 <p class="form-hint" id="chat-context-sentence" role="status"></p>
                 <div class="cfg-progress"><div id="chat-context-bar"></div></div>
                 <div class="cfg-status chat-free" role="group" aria-label="Libérer de l'espace" data-i18n-aria-label="chat.free_title">
-                    <button type="button" class="cfg-status-item" data-compress="summary"><span class="cfg-status-text"><strong data-i18n="chat.free_summary">Résumer par l'IA</strong><span class="cfg-status-detail" data-i18n="chat.free_summary_hint">Garde le sens, libère environ 70 %. Prend un moment.</span></span></button>
-                    <button type="button" class="cfg-status-item" data-compress="compact"><span class="cfg-status-text"><strong data-i18n="chat.free_compact">Compacter</strong><span class="cfg-status-detail" data-i18n="chat.free_compact_hint">Retire les répétitions, libère 30 à 50 %.</span></span></button>
+                    <button type="button" class="cfg-status-item" data-compress="summary"><span class="cfg-status-text"><strong data-i18n="chat.free_summary">Résumer par l'IA</strong><span class="cfg-status-detail" data-i18n="chat.free_summary_hint">Garde les faits, les décisions et tes préférences ; les deux derniers échanges restent tels quels. Prend un moment.</span></span></button>
                     <button type="button" class="cfg-status-item" data-compress="truncate"><span class="cfg-status-text"><strong data-i18n="chat.free_truncate">Oublier les plus anciens</strong><span class="cfg-status-detail" data-i18n="chat.free_truncate_hint">Immédiat. L'IA ne lit plus les premiers messages.</span></span></button>
                 </div>
                 <p class="form-hint" id="chat-context-auto"></p>
@@ -94,5 +93,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/chat.js?v=6"></script>
+<script src="/static/js/chat.js?v=7"></script>
 {% endblock %}

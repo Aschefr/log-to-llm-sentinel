@@ -452,6 +452,7 @@
     "compressed_context": "Compressed start",
     "restore_history": "Restore history",
     "compression_loading": "Compressing…",
+    "compression_rejected": "The AI summary was incomplete or repetitive: it was not kept and the conversation is unchanged. Try again, or forget the oldest messages.",
     "restore_confirm": "Restore the full history? The AI will read every message again, which takes much more room in the context.",
     "delete_message_confirm": "Delete this message?",
     "delete_message_title": "Delete this message",
@@ -497,9 +498,7 @@
     "context_ask": "When it is full, you will get this choice. An automatic setting exists in Configuration.",
     "free_title": "Free up space",
     "free_summary": "Summarize with the AI",
-    "free_summary_hint": "Keeps the meaning, frees about 70%. Takes a moment.",
-    "free_compact": "Compact",
-    "free_compact_hint": "Removes repetition, frees 30 to 50%.",
+    "free_summary_hint": "Keeps facts, decisions and your preferences; the last two exchanges stay as they are. Takes a moment.",
     "free_truncate": "Forget the oldest",
     "free_truncate_hint": "Immediate. The AI stops reading the first messages.",
     "prompt_preview": "See what the AI receives",
@@ -732,8 +731,7 @@
     "chat_compression": "When the context is full",
     "chat_compression_hint": "What the chat does when a conversation exceeds what the model can read at once.",
     "chat_compression_ask": "Ask me",
-    "chat_compression_summary": "Summarize with the AI (keeps the meaning)",
-    "chat_compression_compact": "Compact (removes repetition)",
+    "chat_compression_summary": "Summarize with the AI (keeps facts and decisions)",
     "chat_compression_truncate": "Forget the oldest (immediate)"
   },
   "common": {

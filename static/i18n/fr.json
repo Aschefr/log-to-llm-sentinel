@@ -452,6 +452,7 @@
     "compressed_context": "Début compressé",
     "restore_history": "Restaurer l'historique",
     "compression_loading": "Compression en cours…",
+    "compression_rejected": "Le résumé de l'IA était incomplet ou répétitif : il n'a pas été gardé, la conversation est inchangée. Réessaie, ou oublie les plus anciens messages.",
     "restore_confirm": "Restaurer l'historique complet ? L'IA relira tous les messages, ce qui prend beaucoup plus de place dans le contexte.",
     "delete_message_confirm": "Supprimer ce message ?",
     "delete_message_title": "Supprimer ce message",
@@ -497,9 +498,7 @@
     "context_ask": "Quand il sera plein, ce choix te sera proposé. Un réglage automatique existe dans Configuration.",
     "free_title": "Libérer de l'espace",
     "free_summary": "Résumer par l'IA",
-    "free_summary_hint": "Garde le sens, libère environ 70 %. Prend un moment.",
-    "free_compact": "Compacter",
-    "free_compact_hint": "Retire les répétitions, libère 30 à 50 %.",
+    "free_summary_hint": "Garde les faits, les décisions et tes préférences ; les deux derniers échanges restent tels quels. Prend un moment.",
     "free_truncate": "Oublier les plus anciens",
     "free_truncate_hint": "Immédiat. L'IA ne lit plus les premiers messages.",
     "prompt_preview": "Voir ce que l'IA reçoit",
@@ -732,8 +731,7 @@
     "chat_compression": "Quand le contexte est plein",
     "chat_compression_hint": "Ce que fait le chat quand une conversation dépasse ce que le modèle peut lire d'un coup.",
     "chat_compression_ask": "Me demander",
-    "chat_compression_summary": "Résumer par l'IA (garde le sens)",
-    "chat_compression_compact": "Compacter (retire les répétitions)",
+    "chat_compression_summary": "Résumer par l'IA (garde les faits et les décisions)",
     "chat_compression_truncate": "Oublier les plus anciens (immédiat)"
   },
   "common": {

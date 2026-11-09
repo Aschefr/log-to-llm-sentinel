@@ -107,8 +107,7 @@
                 {% call field('chat-compression-mode', 'config.chat_compression', 'Quand le contexte est plein', 'config.chat_compression_hint', "Ce que fait le chat quand une conversation dépasse ce que le modèle peut lire d'un coup.") %}
                     <select id="chat-compression-mode">
                         <option value="" data-i18n="config.chat_compression_ask">Me demander</option>
-                        <option value="summary" data-i18n="config.chat_compression_summary">Résumer par l'IA (garde le sens)</option>
-                        <option value="compact" data-i18n="config.chat_compression_compact">Compacter (retire les répétitions)</option>
+                        <option value="summary" data-i18n="config.chat_compression_summary">Résumer par l'IA (garde les faits et les décisions)</option>
                         <option value="truncate" data-i18n="config.chat_compression_truncate">Oublier les plus anciens (immédiat)</option>
                     </select>
                 {% endcall %}

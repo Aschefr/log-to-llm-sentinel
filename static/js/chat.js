@@ -899,7 +899,7 @@ async function applyCompression(mode, pendingContent = null) {
                 const st = await apiFetch(`/chat/api/compress/status/${res.task_id}`);
                 if (st.status === 'running') return;
                 clearInterval(timer);
-                if (st.status === 'error') failed(st.error);
+                if (st.status === 'error') failed(st.error === 'summary_rejected' ? T('chat.compression_rejected', st.error) : st.error);
                 else await after();
             } catch (e) { clearInterval(timer); failed(e.message); }
         }, 2000);

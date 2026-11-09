@@ -216,7 +216,8 @@ async def update_config(config_data: ConfigUpdate):
         if config_data.chat_system_prompt is not None:
             config.chat_system_prompt = config_data.chat_system_prompt.strip()
         if config_data.chat_compression_mode in ("", "summary", "compact", "truncate"):
-            config.chat_compression_mode = config_data.chat_compression_mode
+            # « compacter » n'existe plus : remplacé par le résumé ancré (2026-11-08)
+            config.chat_compression_mode = "summary" if config_data.chat_compression_mode == "compact" else config_data.chat_compression_mode
         if config_data.instance_name is not None:
             config.instance_name = config_data.instance_name
         if config_data.discord_webhook_url is not None:

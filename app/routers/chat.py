@@ -337,7 +337,7 @@ def build_chat_prompt(conv_id: int, db: Session) -> tuple[str, int]:
 
 import uuid
 from pydantic import BaseModel
-from app.utils.compression import run_compaction, run_summary, run_truncation
+from app.utils.compression import SummaryRejected, message_line, run_anchored, run_truncation, split_kept
 
 _compression_tasks = {}
 
@@ -361,7 +361,9 @@ async def start_compression(conv_id: int, req: CompressRequest, db: Session = De
     
     if not messages_to_process:
         raise HTTPException(status_code=400, detail="Aucun message à compresser")
-    
+    if req.mode == "compact":
+        req.mode = "summary"  # ancien mode « compacter », remplacé par le résumé ancré (2026-11-08)
+
     if req.mode == "truncate":
         # Truncate : garder les récents, résumer les anciens en une ligne chacun
         cfg = db.query(GlobalConfig).first()
@@ -402,73 +404,56 @@ async def start_compression(conv_id: int, req: CompressRequest, db: Session = De
         
         return {"status": "done", "mode": "truncate"}
     
-    # Pour compact et summary : construire le texte complet
-    text_to_compress = ""
-    # 09-A : compression chaînée — inclure le contexte précédent en tête
-    if conv.compressed_context:
-        text_to_compress += f"=== Contexte Précédent (compressé) ===\n{conv.compressed_context}\n\n"
-    elif conv.analysis_id:
+    # Résumé ancré : les derniers échanges restent mot pour mot, le reste est fusionné dans le résumé précédent
+    if req.mode != "summary":
+        raise HTTPException(status_code=400, detail="Mode invalide")
+    cfg = db.query(GlobalConfig).first()
+    url = (cfg.ollama_url if cfg else None) or "http://ollama:11434"
+    model = (cfg.ollama_model if cfg else None) or "gemma4:e4b"
+    ctx_size = (cfg.ollama_ctx if cfg else None) or 32768
+    to_summarize, _kept = split_kept(messages_to_process, ctx_size)
+    if not to_summarize:
+        return {"status": "done", "mode": "summary", "message": "Rien à résumer : seuls les derniers échanges restent"}
+    previous = conv.compressed_context or ""
+    lines = []
+    if not previous and conv.analysis_id:
+        # Première compaction : l'analyse initiale quitte le contexte avec les messages, elle entre donc dans le résumé
         a = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first()
         if a:
-            text_to_compress += f"=== Analyse initiale ===\n{a.triggered_line}\n{a.ollama_response}\n\n"
-            
-    for m in messages_to_process:
-        role_label = "Utilisateur" if m.role == "user" else "Assistant"
-        text_to_compress += f"{role_label} : {m.content}\n\n"
-        
-    text_to_compress = text_to_compress.strip()
-    cutoff_time = datetime.utcnow()
-    
-    if req.mode in ("compact", "summary"):
-        task_id = str(uuid.uuid4())
-        _compression_tasks[task_id] = {"status": "running", "result": None, "error": None}
-        
-        async def background_compress(t_id, txt, cid, dt, mode):
-            try:
-                if not _orchestrator:
-                    raise Exception("Orchestrator non initialisé")
-                    
-                url = "http://ollama:11434"
-                model = "gemma4:e4b"
-                ctx_size = 4096
-                with SessionLocal() as s:
-                    cfg = s.query(GlobalConfig).first()
-                    if cfg:
-                        url = cfg.ollama_url or url
-                        model = cfg.ollama_model or model
-                        ctx_size = cfg.ollama_ctx or ctx_size
+            lines.append(f"=== Analyse initiale ===\n{a.triggered_line}\n{a.ollama_response}")
+    lines += [message_line(m.role, m.content) for m in to_summarize]
+    lang = _chat_lang(cfg)
+    cutoff_time = to_summarize[-1].created_at  # les échanges gardés, plus récents, restent lus tels quels
 
-                if mode == "compact":
-                    res = await run_compaction(txt, _orchestrator.ollama, url, model, num_ctx=ctx_size)
-                else:
-                    res = await run_summary(txt, _orchestrator.ollama, url, model, num_ctx=ctx_size)
-                
-                with SessionLocal() as s:
-                    c = s.query(ChatConversation).filter(ChatConversation.id == cid).first()
-                    if c:
-                        c.compression_mode = mode
-                        c.compressed_context = res
-                        c.compressed_at = dt
-                        # 09-B : enregistrer dans l'historique des compressions
-                        new_comp = ChatCompression(
-                            conversation_id=cid,
-                            mode=mode,
-                            content=res,
-                            compressed_at=dt
-                        )
-                        s.add(new_comp)
-                        s.commit()
-                _compression_tasks[t_id]["status"] = "done"
-                _compression_tasks[t_id]["result"] = res
-            except Exception as e:
-                _compression_tasks[t_id]["status"] = "error"
-                _compression_tasks[t_id]["error"] = str(e)
-                
-        asyncio.create_task(background_compress(task_id, text_to_compress, conv_id, cutoff_time, req.mode))
-        return {"status": "running", "task_id": task_id}
-        
-    else:
-        raise HTTPException(status_code=400, detail="Mode invalide")
+    task_id = str(uuid.uuid4())
+    _compression_tasks[task_id] = {"status": "running", "result": None, "error": None}
+
+    async def background_compress(t_id, cid, dt):
+        try:
+            if not _orchestrator:
+                raise Exception("Orchestrator non initialisé")
+            res = await run_anchored(previous, lines, _orchestrator.ollama, url, model, num_ctx=ctx_size, lang=lang)
+            if not res:
+                raise Exception("Le modèle a rendu un résumé vide")
+            with SessionLocal() as s:
+                c = s.query(ChatConversation).filter(ChatConversation.id == cid).first()
+                if c:
+                    c.compression_mode = "summary"
+                    c.compressed_context = res
+                    c.compressed_at = dt
+                    s.add(ChatCompression(conversation_id=cid, mode="summary", content=res, compressed_at=dt))
+                    s.commit()
+            _compression_tasks[t_id]["status"] = "done"
+            _compression_tasks[t_id]["result"] = res
+        except SummaryRejected:
+            _compression_tasks[t_id]["status"] = "error"
+            _compression_tasks[t_id]["error"] = "summary_rejected"  # traduit par l'interface
+        except Exception as e:
+            _compression_tasks[t_id]["status"] = "error"
+            _compression_tasks[t_id]["error"] = str(e)
+
+    asyncio.create_task(background_compress(task_id, conv_id, cutoff_time))
+    return {"status": "running", "task_id": task_id}
 
 @router.get("/api/compress/status/{task_id}")
 async def get_compression_status(task_id: str):
