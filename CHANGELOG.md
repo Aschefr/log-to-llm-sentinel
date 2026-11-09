@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.11.1] - 2026-11-09
 
 ### Changed
 - **Recommended models chosen by rules, with a model per graphics card**: *Configuration › Which model to choose* used labels picked by hand from a table of raw results. Each model now gets a quality score out of 10, the weighted average of four measured tasks shown next to it: serious alerts caught (35 %), false alarms avoided (20 %), log lines steering the verdict foiled (25 %) and second-look investigations right (20 %). Fixed rules, shared with the other local-AI apps of the project, give the labels: under half the points on a task means *Not kept*, 0.3 point apart or less the lighter model wins, *Minimum* is the model for an 8 GB card and *Recommended* the one for 12 GB. A new table gives the recommended model for 8, 12, 16 and 24 GB cards, and each model shows its smallest card, memory with its quantisation, and response times. The four models were measured again on 9 November 2026 with the current prompts, investigations played twice with thinking on as in the app, and memory read on the graphics card: Ollama's own figure under-counts it, by up to 8 GB for `gemma4:12b`. `gemma4:12b` (9.5), `bonsai-2:27b` (9.4) and `qwen3.8:27b` (9.3) are within 0.2 point, so the lightest, `gemma4:12b` (9.1 GB), becomes *Recommended* and *Top quality*; `qwen3.8:27b` (18.7 GB) stays in the table without a label and now needs a 24 GB card. `gemma4:e4b` stays *Minimum*. On a phone, the table scrolls sideways with the model and its score kept in view.
