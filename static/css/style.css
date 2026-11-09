@@ -3371,7 +3371,7 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 .cfg-study-body { display: flex; flex-direction: column; gap: 0.7rem; padding: 0.3rem 0 0.4rem; }
 .cfg-study-body > .form-hint { margin: 0; max-width: 75ch; }
 .cfg-study-wrap { overflow-x: auto; }
-.cfg-study-table { width: 100%; min-width: 34rem; border-collapse: collapse; font-size: 0.84rem; font-variant-numeric: tabular-nums; }
+.cfg-study-table { width: 100%; min-width: 46rem; border-collapse: collapse; font-size: 0.84rem; font-variant-numeric: tabular-nums; }
 .cfg-study-table th, .cfg-study-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); text-align: right; vertical-align: baseline; }
 .cfg-study-table thead th { font-size: 0.74rem; font-weight: 600; color: var(--text-secondary); vertical-align: bottom; }
 .cfg-study-table th:first-child { text-align: left; }
@@ -3379,8 +3379,16 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 .cfg-study-table tbody th { font-weight: 400; }
 .cfg-study-table tbody th .mono { display: block; font-weight: 600; color: var(--text-primary); white-space: nowrap; }
 .cfg-study-tier { display: block; font-size: 0.74rem; color: var(--text-secondary); }
-.cfg-study-total { display: block; font-weight: 400; opacity: 0.8; }
+.cfg-study-total { display: block; font-weight: 400; opacity: 0.8; white-space: nowrap; }
 .cfg-study-bad { color: var(--danger); font-weight: 600; }
+.cfg-study-table .cfg-study-note { font-weight: 600; color: var(--text-primary); }
+.cfg-study-table.cfg-study-cards { width: auto; min-width: 0; }
+.cfg-study-cards td { text-align: left; }
+.cfg-study-table td { white-space: nowrap; }
+.cfg-study-table .cfg-study-fix1, .cfg-study-table .cfg-study-fix2 { position: sticky; z-index: 1; background: linear-gradient(var(--bg-card), var(--bg-card)), var(--bg-primary); }
+.cfg-study-table .cfg-study-fix1 { left: 0; width: 9.5rem; min-width: 9.5rem; max-width: 9.5rem; }
+.cfg-study-table .cfg-study-fix2 { left: 9.5rem; box-shadow: 1px 0 0 var(--border); }
+.cfg-study-table tbody .cfg-study-fix1 .mono { white-space: normal; overflow-wrap: anywhere; }
 .cfg-study-notes { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.84rem; color: var(--text-secondary); max-width: 75ch; }
 .cfg-study-notes code { font-size: 0.8rem; color: var(--text-primary); }
 .cfg-study-notes strong { font-weight: 600; color: var(--text-primary); }

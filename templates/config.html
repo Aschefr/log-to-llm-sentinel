@@ -51,11 +51,24 @@
                 <details class="cfg-study">
                     <summary data-i18n="config.study_title">Comment ces modèles ont été choisis</summary>
                     <div class="cfg-study-body">
-                        <p class="form-hint" data-i18n-html="config.study_method">38 vraies alertes de serveurs domestiques, jouées deux fois chacune, plus 33 lignes de log qui tentent de dicter le verdict à l'IA. Contexte 32K, réflexion désactivée, carte RTX 3090, prompts actuels mesurés le 8 novembre 2026 (<code>bonsai-2:27b</code> : version 1.9).</p>
+                        <p class="form-hint" data-i18n-html="config.study_method">38 vraies alertes de serveurs domestiques, jouées deux fois chacune, 33 lignes de log qui tentent de dicter le verdict à l'IA, et 18 enquêtes du second regard tirées d'incidents réels, jouées une fois. Contexte 32K, réflexion désactivée, carte RTX 3090. Alertes mesurées le 8 novembre 2026 sur les prompts actuels (<code>bonsai-2:27b</code> : version 1.9), enquêtes le 7 novembre.</p>
                         <div class="cfg-study-wrap"><table class="cfg-study-table" id="cfg-study-table"></table></div>
+                        <p class="form-hint" data-i18n-html="config.study_legend">Mémoire : version par défaut d'Ollama (quantification indiquée), contexte 32K, cache du contexte 8 bits (q8_0) avec flash attention. Avec le cache par défaut d'Ollama (16 bits), compte jusqu'à 0,5 Go de plus. * <code>bonsai-2:27b</code> : mesuré à 64K, un peu moins à 32K.</p>
+                        <h3 class="cfg-study-subtitle" data-i18n="config.study_cards_title">Ta carte graphique → modèle conseillé</h3>
+                        <div class="cfg-study-wrap"><table class="cfg-study-table cfg-study-cards" id="cfg-study-cards"></table></div>
+                        <p class="form-hint" data-i18n="config.study_cards_hint">La meilleure note parmi les modèles qui tiennent sur la carte et répondent en moins de 20 s. Un modèle tient si sa mémoire est au plus celle de la carte moins 1 Go. Un modèle trop gros marche quand même, mais beaucoup plus lentement.</p>
                         <ul class="cfg-study-notes">
-                            <li data-i18n-html="config.study_note_serious">Le critère qui compte le plus : aucune alerte grave notée info. <code>qwen3.8:27b</code> en note une seule, un échec de connexion root isolé, aux deux passages ; il reste le plus juste et ne sonne jamais pour rien. <code>bonsai-2:27b</code> en laisse passer 2 et suit bien plus souvent les lignes qui dictent le verdict, c'est pourquoi il n'est pas retenu.</li>
-                            <li data-i18n-html="config.study_note_minimum"><code>gemma4:e4b</code> sonne plus souvent pour rien, mais ne rate aucune alerte grave et tient dans 3,2 Go.</li>
+                            <li data-i18n-html="config.study_note_close"><code>gemma4:12b</code> et <code>qwen3.8:27b</code> sont à égalité, à 0,2 point. <code>qwen3.8:27b</code> ne sonne jamais pour rien et réussit mieux les enquêtes (17 sur 18 contre 15), mais note info une alerte grave aux deux passages : un échec de connexion root isolé, qui se lit dans les deux sens. <code>gemma4:12b</code> ne rate aucune alerte grave, déjoue deux manipulations de plus, répond deux fois plus vite et tient dans moitié moins de mémoire.</li>
+                            <li data-i18n-html="config.study_note_bonsai"><code>bonsai-2:27b</code>, un 27B en 2 bits, note la même alerte grave en info, et suit 25 des 33 lignes qui dictent le verdict avant les protections de Sentinel, contre 15 pour <code>qwen3.8:27b</code> et 18 pour <code>gemma4:12b</code> sur les mêmes prompts.</li>
+                            <li data-i18n-html="config.study_note_minimum"><code>gemma4:e4b</code> sonne plus souvent pour rien (14 fausses alertes sur 30), mais ne rate aucune alerte grave et tient dans 3,2 Go.</li>
+                            <li data-i18n-html="config.study_note_limits">Les deux passages d'alertes donnent le même score : l'incertitude vient du choix des cas, pas du hasard des réponses. Les enquêtes ne comptent qu'un passage, réflexion désactivée ; dans l'app, la réflexion est activée par défaut pour les enquêtes.</li>
+                        </ul>
+                        <h3 class="cfg-study-subtitle" data-i18n="config.study_rules_title">Comment les étiquettes sont données</h3>
+                        <ul class="cfg-study-notes">
+                            <li data-i18n-html="config.study_rule_note"><strong>Note sur 10, qualité seule</strong> : la moyenne des quatre tâches du tableau, pondérée par ce qui compte dans Sentinel. La vitesse et la mémoire n'y entrent pas : elles servent au choix par carte.</li>
+                            <li data-i18n-html="config.study_rule_exclusion"><strong>Non retenu</strong> : moins de la moitié des points à une tâche, à l'un des passages. Aucun des modèles mesurés ici.</li>
+                            <li data-i18n-html="config.study_rule_tie"><strong>Égalité</strong> : à 0,3 point d'écart ou moins, le modèle le plus léger l'emporte. Un cas d'alerte qui bascule vaut environ 0,1 point.</li>
+                            <li data-i18n-html="config.study_rule_tiers"><strong>Minimum</strong> : le modèle conseillé pour une carte de 8 Go. <strong>Recommandé</strong> : celui d'une carte de 12 Go. <strong>Top qualité</strong> : la meilleure note parmi les modèles qui répondent en moins de 20 s, à une alerte comme à une enquête. <strong>Alternative</strong> : une note plus haute mais plus lente, s'il y en a une.</li>
                         </ul>
                         <h3 class="cfg-study-subtitle" data-i18n="config.study_settings_title">Et les réglages conseillés</h3>
                         <ul class="cfg-study-notes">
@@ -624,7 +637,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/config.js?v=25"></script>
+<script src="/static/js/model_study.js?v=2"></script>
+<script src="/static/js/config.js?v=26"></script>
 <script src="/static/js/passkey.js?v=1"></script>
 <script src="/static/js/auth_config.js?v=1"></script>
 <script src="/static/js/diagnostics_config.js?v=18"></script>

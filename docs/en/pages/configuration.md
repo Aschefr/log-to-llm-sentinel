@@ -30,7 +30,7 @@ A setting is saved when you leave its field (or press Enter), and the result sho
 * **Ollama URL**: The access endpoint of your Ollama instance (default: `http://host.docker.internal:11434` for Docker hosts).
 * **Model Selection**: Dropdown list populated dynamically by queries to Ollama.
 * **Model (Manual Override)**: Text field to specify a model manually (e.g., `llama3:latest`).
-* **Which model to choose**: three [recommended models](../features/recommended-models.md), with their memory and speed as measured. One click selects a model if it is installed, otherwise prepares its download.
+* **Which model to choose**: the [recommended models](../features/recommended-models.md) (*Minimum* for an 8 GB card, *Recommended* for 12 GB, *Top quality*), with their memory and speed as measured. One click selects a model if it is installed, otherwise prepares its download.
 * **Download a model**: enter any model tag and click **Download** to pull it onto the host.
 * **Context**: 8K to 128K, 32K recommended. 8K is enough for alerts; with the chat, keep at least 16K, as its tools alone take 1,500 to 2,300 tokens. Meta-analyses and the chat use the same value, which also avoids reloading the model. If another app uses the same model on the same Ollama server, give it the same size: Ollama reloads a model whenever the size asked for changes (16 to 42 s for `qwen3.8:27b`). How many log lines the AI receives for an alert follows from it, so there is no separate limit to set.
 * **Situation summary written by the AI**: on by default. The short paragraph at the top of the [Dashboard](dashboard.md), rewritten only when the situation changes. Off, the dashboard keeps the facts without the paragraph.
@@ -39,7 +39,7 @@ A setting is saved when you leave its field (or press Enter), and the result sho
 * **When the context is full**: what the chat does when a conversation exceeds what the model can read at once: ask, summarize with the AI, or forget the oldest messages.
 * **Thinking for the chat and investigations**: on by default, also used by the [second look](../features/second-look.md). Without it, the smallest recommended model often asked for an ID instead of looking it up with its tools.
 
-The folded *How these models were chosen* panel under the recommended models shows the measured results behind the models and these settings.
+The folded *How these models were chosen* panel under the recommended models shows each model's score out of 10 with the four measured tasks and their weights, the recommended model for each graphics card size, the rules that give the labels, and the measurements behind these settings.
 
 The temperature is set to 0.2, and analyses and the chat are written in the site's language: the study behind these recommendations settled both, so there is nothing to adjust.
 

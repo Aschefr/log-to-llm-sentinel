@@ -330,70 +330,7 @@ function setPullModel(name) {
     if (input) input.value = name;
 }
 
-/* Résultats de l'étude sur de vraies alertes, sur une RTX 3090 : voir docs/en/features/recommended-models.md
-   (mesurés de nouveau le 2026-11-08 avec la question « à surveiller » : prompts actuels, 38 cas joués deux fois, contexte 32K,
-   sans réflexion ; bonsai-2:27b mesuré avant, sur les prompts de la 1.9) */
-const RECOMMENDED_MODELS = [
-    { model: 'gemma4:e4b', tier: ['config.tier_minimum', 'Minimum'], memory: '3,2', seconds: 4 },
-    { model: 'gemma4:12b', tier: ['config.tier_recommended', 'Conseillé'], memory: '7,6', seconds: 4 },
-    { model: 'qwen3.8:27b', tier: ['config.tier_top', 'Top qualité'], memory: '16,3', seconds: 8 },
-];
-
-/* Même étude, détail par modèle, affiché dans « Comment ces modèles ont été choisis » */
-const MODEL_STUDY = [
-    { model: 'qwen3.8:27b', tier: ['config.tier_top', 'Top qualité'], correct: 74, falseAlarms: 0, missed: 2, steering: 30, seconds: 8 },
-    { model: 'gemma4:12b', tier: ['config.tier_recommended', 'Conseillé'], correct: 74, falseAlarms: 2, missed: 0, steering: 32, seconds: 4 },
-    { model: 'bonsai-2:27b', tier: ['config.study_not_kept', 'Non retenu'], correct: 72, falseAlarms: 2, missed: 2, steering: 31, seconds: 7.5 },
-    { model: 'gemma4:e4b', tier: ['config.tier_minimum', 'Minimum'], correct: 62, falseAlarms: 14, missed: 0, steering: 31, seconds: 4 },
-];
-
-function renderModelStudy() {
-    const table = document.getElementById('cfg-study-table');
-    if (!table) return;
-    const num = new Intl.NumberFormat(window.i18n?.getCurrentLang?.() === 'fr' ? 'fr-FR' : 'en-US');
-    const head = (key, fallback, total) => `<th scope="col">${escapeHtml(cfgT(key, fallback))}${total ? `<span class="cfg-study-total">/${total}</span>` : ''}</th>`;
-    table.innerHTML = `<thead><tr>
-            ${head('config.study_model', 'Modèle')}
-            ${head('config.study_correct', 'Bonne gravité', 76)}
-            ${head('config.study_false', 'Fausses alertes', 30)}
-            ${head('config.study_missed', 'Graves notées info', 22)}
-            ${head('config.study_steering', 'Manipulations déjouées', 33)}
-            ${head('config.study_time', 'Temps par analyse')}
-        </tr></thead>
-        <tbody>${MODEL_STUDY.map(m => `<tr>
-            <th scope="row"><span class="mono">${escapeHtml(m.model)}</span><span class="cfg-study-tier">${escapeHtml(cfgT(m.tier[0], m.tier[1]))}</span></th>
-            <td>${m.correct}</td>
-            <td>${m.falseAlarms}</td>
-            <td${m.missed ? ' class="cfg-study-bad"' : ''}>${m.missed}</td>
-            <td>${m.steering}</td>
-            <td>${num.format(m.seconds)} s</td>
-        </tr>`).join('')}</tbody>`;
-}
-
-function installedModels() {
-    const select = document.getElementById('ollama-model');
-    return select ? [...select.options].map(o => o.value).filter(v => v && v !== '__custom__') : [];
-}
-
-function renderRecommendedModels() {
-    const box = document.getElementById('cfg-models');
-    if (!box) return;
-    const select = document.getElementById('ollama-model');
-    const installed = installedModels();
-    box.innerHTML = RECOMMENDED_MODELS.map(m => {
-        const isInstalled = installed.includes(m.model);
-        const current = select && select.value === m.model;
-        const state = !installed.length ? '' : isInstalled ? cfgT('config.model_installed', 'Installé') : cfgT('config.model_to_download', 'À télécharger');
-        const detail = cfgT('config.model_detail', '{gb} Go · {s} s par analyse').replace('{gb}', window.i18n?.getCurrentLang?.() === 'fr' ? m.memory : m.memory.replace(',', '.')).replace('{s}', m.seconds);
-        return `<button type="button" class="cfg-status-item${current ? ' active' : ''}" data-model="${m.model}" aria-pressed="${Boolean(current)}">
-            <span class="cfg-status-text">
-                <span class="cfg-status-detail">${escapeHtml(cfgT(m.tier[0], m.tier[1]))}</span>
-                <strong class="mono">${escapeHtml(m.model)}</strong>
-                <span class="cfg-status-detail">${escapeHtml(detail)}${state ? ` · ${escapeHtml(state)}` : ''}</span>
-            </span>
-        </button>`;
-    }).join('');
-}
+/* Données de l'étude, règles et rendu des cartes et du tableau : model_study.js */
 
 function setupRecommendedModels() {
     const box = document.getElementById('cfg-models');
