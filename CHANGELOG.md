@@ -7,6 +7,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 - **Recommended models chosen by rules, with a model per graphics card**: *Configuration › Which model to choose* used labels picked by hand from a table of raw results. Each model now gets a quality score out of 10, the weighted average of four measured tasks shown next to it: serious alerts caught (35 %), false alarms avoided (20 %), log lines steering the verdict foiled (25 %) and second-look investigations right (20 %). Fixed rules, shared with the other local-AI apps of the project, give the labels: under half the points on a task means *Not kept*, 0.3 point apart or less the lighter model wins, *Minimum* is the model for an 8 GB card and *Recommended* the one for 12 GB. A new table gives the recommended model for 8, 12, 16 and 24 GB cards, and each model shows its smallest card, memory with its quantisation, and response times. On the current measurements, `gemma4:12b` (9.5) and `qwen3.8:27b` (9.3) are tied, so the lighter `gemma4:12b` becomes *Recommended* and *Top quality*; `qwen3.8:27b` stays in the table without a label. On a phone, the table scrolls sideways with the model and its score kept in view.
 
+### Fixed
+- **An alert card could show a severity its analysis did not have**: the badge of a card showed the worst severity of every occurrence of the event, however old, while the summary, the analysis and the second look described the occurrence shown. A warning alert whose event had one critical occurrence six months earlier was headed *critical*, under a second look reporting *severity unchanged (warning)*. The badge now shows the occurrence's own severity; when the event once was worse, hovering the badge says so. The dashboard counters and the severity filter still count an event by its worst occurrence.
+
 ## [1.11.0] - 2026-11-09
 
 ### Added

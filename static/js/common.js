@@ -493,6 +493,15 @@ function resolveIncidentFromCard(ruleId, btn) {
     });
 }
 
+/* Le badge donne la gravité de l'occurrence affichée, celle que l'analyse et le second regard décrivent. L'événement
+   garde sa pire gravité pour les compteurs et le filtre : quand elle diffère, le survol la dit. */
+function severityBadge(a, ev) {
+    const sev = a.severity || (ev && ev.severity) || 'info';
+    const worse = ev && ev.severity && ev.severity !== sev;
+    const title = worse ? ` title="${escapeHtml(_cardT('common.worst_severity', 'Pire occurrence de cet événement : {severity}').replace('{severity}', ev.severity))}"` : '';
+    return `<span class="severity-badge ${escapeHtml(sev)}"${title}>${escapeHtml(sev)}</span>`;
+}
+
 function renderAnalysisCard(a, opts = {}) {
     const collapsed = opts.collapsed !== false;
     const showDelete = opts.showDelete || false;
@@ -623,7 +632,7 @@ function renderAnalysisCard(a, opts = {}) {
                 <div class="ac-top">
                     ${a.ai_pending
                         ? `<span class="ai-pending-badge" title="${escapeHtml(_t('common.ai_pending_title', 'L’IA n’a pas répondu : cette alerte sera analysée dès son retour, et notifiée si elle le mérite.'))}">${escapeHtml(_t('common.ai_pending', 'En attente de l’IA'))}</span>`
-                        : `<span class="severity-badge ${escapeHtml(ev ? ev.severity : a.severity)}">${escapeHtml(ev ? ev.severity : a.severity)}</span>`}
+                        : severityBadge(a, ev)}
                     ${ruleName}
                     <span class="analysis-time" title="${escapeHtml(a.analyzed_at ? formatDate(a.analyzed_at) : '')}">${escapeHtml(shortWhen(a.analyzed_at))}</span>
                 </div>

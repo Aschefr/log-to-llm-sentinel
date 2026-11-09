@@ -818,6 +818,7 @@
     "component_title": "Component that wrote the lines of this alert",
     "ai_pending": "Waiting for the AI",
     "ai_pending_title": "The AI did not answer: this alert will be analysed as soon as it is back, and notified if it deserves it.",
+    "worst_severity": "Worst occurrence of this event: {severity}",
     "note_label": "What the AI should know",
     "note_placeholder": "E.g. this server runs Unraid, without systemd.",
     "note_hint": "It informs the AI and never silences an alert. Used from the next analysis on; Retry applies it to this one.",

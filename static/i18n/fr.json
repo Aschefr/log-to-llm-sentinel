@@ -818,6 +818,7 @@
     "component_title": "Composant qui a écrit les lignes de cette alerte",
     "ai_pending": "En attente de l’IA",
     "ai_pending_title": "L’IA n’a pas répondu : cette alerte sera analysée dès son retour, et notifiée si elle le mérite.",
+    "worst_severity": "Pire occurrence de cet événement : {severity}",
     "note_label": "Ce que l'IA devrait savoir",
     "note_placeholder": "Ex. : ce serveur tourne sous Unraid, sans systemd.",
     "note_hint": "Elle informe l'IA sans jamais faire taire une alerte. Prise en compte dès la prochaine analyse ; « Ré-essayer » l'applique à celle-ci.",
