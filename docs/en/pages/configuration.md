@@ -32,7 +32,7 @@ A setting is saved when you leave its field (or press Enter), and the result sho
 * **Model (Manual Override)**: Text field to specify a model manually (e.g., `llama3:latest`).
 * **Which model to choose**: three [recommended models](../features/recommended-models.md), with their memory and speed as measured. One click selects a model if it is installed, otherwise prepares its download.
 * **Download a model**: enter any model tag and click **Download** to pull it onto the host.
-* **Context**: 8K to 128K, 32K recommended. Meta-analyses and the chat use the same value, which also avoids reloading the model. How many log lines the AI receives for an alert follows from it, so there is no separate limit to set.
+* **Context**: 8K to 128K, 32K recommended. 8K is enough for alerts; with the chat, keep at least 16K, as its tools alone take 1,500 to 2,300 tokens. Meta-analyses and the chat use the same value, which also avoids reloading the model. If another app uses the same model on the same Ollama server, give it the same size: Ollama reloads a model whenever the size asked for changes (16 to 42 s for `qwen3.8:27b`). How many log lines the AI receives for an alert follows from it, so there is no separate limit to set.
 * **Situation summary written by the AI**: on by default. The short paragraph at the top of the [Dashboard](dashboard.md), rewritten only when the situation changes. Off, the dashboard keeps the facts without the paragraph.
 * **Thinking for alerts**: off by default. For models that can think before answering; on alerts it brought no gain and made each analysis three times slower.
 * **Chat instructions**: optional text added to every [Log Chat](chat.md) conversation, such as your setup or the tone you want.

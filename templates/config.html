@@ -59,7 +59,7 @@
                         </ul>
                         <h3 class="cfg-study-subtitle" data-i18n="config.study_settings_title">Et les réglages conseillés</h3>
                         <ul class="cfg-study-notes">
-                            <li data-i18n-html="config.study_set_ctx"><strong>Contexte 32K.</strong> La plus grosse alerte mesurée tient en 5 900 tokens de prompt et 990 de réponse : 8K suffit. 32K coûte 0,1 à 0,2 Go de plus, sans perte de vitesse, et laisse tenir les méta-analyses et les longues conversations.</li>
+                            <li data-i18n-html="config.study_set_ctx"><strong>Contexte 32K.</strong> La plus grosse alerte mesurée tient en 5 900 tokens de prompt et 990 de réponse : rejouées à 8K, 16K et 32K avec <code>qwen3.8:27b</code>, les alertes donnent 74, 75 et 74 bonnes gravités sur 76. Le chat a besoin d'au moins 16K, ses outils prenant à eux seuls 1 500 à 2 300 tokens. 32K coûte 0,1 à 0,2 Go de plus, sans perte de vitesse, et laisse tenir les méta-analyses et les longues conversations. Une taille différente d'une application à l'autre sur le même modèle le fait recharger : 16 à 42 s pour <code>qwen3.8:27b</code>.</li>
                             <li data-i18n-html="config.study_set_think_alerts"><strong>Réflexion désactivée pour les alertes.</strong> Une alerte se juge sans outils : avec <code>gemma4:12b</code>, 59 bonnes gravités sur 76 avec réflexion, 58 sans, et chaque analyse trois fois plus lente.</li>
                             <li data-i18n-html="config.study_set_think_tools"><strong>Réflexion activée pour le chat et les enquêtes.</strong> Là, l'IA doit choisir ses outils : <code>gemma4:e4b</code> répond juste à 16 questions sur 16 avec réflexion, 10 sans. Environ 1,7 fois plus lent.</li>
                             <li data-i18n-html="config.study_set_temp"><strong>Température 0,2, fixe.</strong> À 0,7, aucun modèle conseillé ne s'améliore, et le plus petit invente davantage.</li>
@@ -85,7 +85,7 @@
 
             <div class="rp-card">
                 <h2 data-i18n="config.ollama_analyses">Analyses</h2>
-                {% call field('ollama-ctx', 'config.context_tokens', 'Contexte (tokens)', 'config.context_hint', "8K suffit aux alertes. 32K coûte à peine plus de mémoire et laisse tenir de longues méta-analyses entières.", row_class='cfg-row--short') %}
+                {% call field('ollama-ctx', 'config.context_tokens', 'Contexte (tokens)', 'config.context_hint', "8K suffit aux alertes. Avec le chat, garde au moins 16K : ses outils prennent déjà 1 500 à 2 300 tokens. 32K coûte à peine plus de mémoire et laisse tenir de longues méta-analyses entières. Si une autre application utilise le même modèle sur ce serveur Ollama, donne-lui la même taille : sinon Ollama le recharge à chaque changement. La quantité de lignes envoyée à l'IA pour une alerte s'adapte à ce réglage.", row_class='cfg-row--short') %}
                     <input type="number" id="ollama-ctx" step="1024" min="8192" max="131072">
                     <div class="preset-chips" id="ctx-chips">
                         <button type="button" class="chip" data-ctx="8192" onclick="setOllamaCtx(8192)">8K</button>
