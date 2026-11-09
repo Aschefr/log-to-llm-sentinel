@@ -859,6 +859,8 @@
     "sl_checked": "vérifiée",
     "sl_raised": "relevée depuis {s}",
     "sl_lowered": "baissée depuis {s}",
+    "sl_better": "rentrée dans l’ordre",
+    "sl_better_title": "Les contrôles montrent la situation rentrée dans l’ordre, mais la gravité de l’analyse est gardée.",
     "sl_title": "Second regard : l’IA a vérifié l’état réel des machines avant d’enregistrer l’alerte ({n} contrôle(s)).",
     "sl_outputs": "Résultats bruts des contrôles ({n})"
   },

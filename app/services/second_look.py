@@ -188,7 +188,7 @@ async def _check(ollama, semaphore, rule, result: dict, config: dict, db, tools:
             "findings": findings, "tool_addresses_ai": tool_addresses_ai}
 
 
-def _apply(result: dict, record: dict, lang: str) -> None:
+def _apply(result: dict, record: dict, lang: str, may_lower: bool = False) -> None:
     """Reporte le second regard sur le résultat de l'analyse : gravité, et une section dans l'analyse affichée."""
     before, after = record["severity_before"], record["severity_after"]
     if after != before:
@@ -197,14 +197,20 @@ def _apply(result: dict, record: dict, lang: str) -> None:
             result["data"] = {**result["data"], "severity": after}
     if record["status"] != "done":
         return
-    change = (second_look_label(lang, "raised" if RANK[after] > RANK[before] else "lowered", before=before, after=after)
-              if after != before else second_look_label(lang, "kept", severity=before))
+    # Contrôles rassurants mais gravité gardée : le dire, sinon « inchangée » contredit les constats affichés
+    kept_better = after == before and record.get("verdict") == "better"
+    if after != before:
+        change = second_look_label(lang, "raised" if RANK[after] > RANK[before] else "lowered", before=before, after=after)
+    else:
+        change = second_look_label(lang, "kept_better" if kept_better else "kept", severity=before)
     lines = [f"**{second_look_label(lang, 'section')}** ({change})"]
     if record.get("findings"):
         lines.append(record["findings"])
     lines.append(f"{second_look_label(lang, 'checked')} : " + " · ".join(c["label"] for c in record["checks"]))
     if record.get("tool_addresses_ai"):
         lines.append(f"*{second_look_label(lang, 'tool_addresses_ai')}*")
+    elif kept_better and not may_lower:
+        lines.append(f"*{second_look_label(lang, 'kept_why')}*")
     result["markdown"] = (result.get("markdown") or "").rstrip() + "\n\n" + "\n\n".join(lines)
     if after != before and record.get("findings") and result.get("summary"):
         # La notification courte n'a que le résumé : elle doit dire pourquoi la gravité a changé
@@ -238,7 +244,7 @@ async def run(ollama, semaphore, rule, result: dict, config: dict, db) -> Option
                                record.get("tool_addresses_ai", False))
     record.update(severity_before=before, severity_after=after, at=started.isoformat(),
                   seconds=round((datetime.utcnow() - started).total_seconds(), 1))
-    _apply(result, record, lang)
+    _apply(result, record, lang, settings(config)["may_lower"])
     logger.info("SecondLook", f"'{rule.name}' : {record['status']}, {len(record['checks'])} contrôle(s), "
                               f"{before} → {after} en {record['seconds']} s")
     return record

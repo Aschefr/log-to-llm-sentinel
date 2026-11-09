@@ -859,6 +859,8 @@
     "sl_checked": "checked",
     "sl_raised": "raised from {s}",
     "sl_lowered": "lowered from {s}",
+    "sl_better": "back to normal",
+    "sl_better_title": "The checks show things back to normal, but the analysis severity is kept.",
     "sl_title": "Second look: the AI checked the real state of the machines before storing the alert ({n} check(s)).",
     "sl_outputs": "Raw check results ({n})"
   },

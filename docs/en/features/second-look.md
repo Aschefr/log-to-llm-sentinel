@@ -13,7 +13,7 @@ It is off by default: turn it on in **Configuration › Diagnostics › Second l
 
 ## What you see
 
-* A small badge next to the severity: **checked**, **raised from warning** or **lowered from critical**.
+* A small badge next to the severity: **checked**, **raised from warning** or **lowered from critical**. When the checks find things back to normal but the severity stays, because lowering is off or a tool output addressed the AI, the badge says **back to normal** and the section says *severity kept*, with the reason.
 * At the end of the analysis, a **Second look** section with the finding and the list of what was checked. Notifications carry it too, and the short summary says why the severity changed.
 * **Raw check results**, folded under the analysis, so you can read what the AI read.
 

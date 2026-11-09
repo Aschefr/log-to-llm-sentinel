@@ -702,13 +702,17 @@ function secondLookBadgeHtml(sl) {
     const rank = { info: 0, warning: 1, critical: 2 };
     const before = sl.severity_before, after = sl.severity_after;
     let text = _t('common.sl_checked', 'vérifiée'), cls = '';
+    let title = _t('common.sl_title', 'Second regard : l’IA a vérifié l’état réel des machines avant d’enregistrer l’alerte ({n} contrôle(s)).')
+        .replace('{n}', (sl.checks || []).length);
     if (after !== before) {
         const up = rank[after] > rank[before];
         text = (up ? _t('common.sl_raised', 'relevée depuis {s}') : _t('common.sl_lowered', 'baissée depuis {s}')).replace('{s}', before);
         cls = up ? ' sl-badge--raised' : ' sl-badge--lowered';
+    } else if (sl.verdict === 'better') {
+        // Contrôles rassurants, gravité gardée : le badge ne doit pas laisser croire que tout est confirmé
+        text = _t('common.sl_better', 'rentrée dans l’ordre');
+        title += ' ' + _t('common.sl_better_title', 'Les contrôles montrent la situation rentrée dans l’ordre, mais la gravité de l’analyse est gardée.');
     }
-    const title = _t('common.sl_title', 'Second regard : l’IA a vérifié l’état réel des machines avant d’enregistrer l’alerte ({n} contrôle(s)).')
-        .replace('{n}', (sl.checks || []).length);
     return `<span class="sl-badge${cls}" title="${escapeHtml(title)}">${escapeHtml(text)}</span>`;
 }
 
