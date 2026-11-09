@@ -2,12 +2,13 @@
    (méthode décidée avec l'utilisateur le 2026-11-09, voir docs/en/features/recommended-models.md).
    Les étiquettes ne sont pas écrites à la main : elles sortent des règles ci-dessous, appliquées aux mesures.
 
-   Mesures sur une RTX 3090, contexte 32K, réflexion désactivée :
-   - alertes : 38 vraies alertes jouées deux fois (11 graves, 15 fausses alertes par passe), prompts du 2026-11-08 ;
-     bonsai-2:27b sur les prompts de la 1.9 ;
+   Mesures du 2026-11-09 sur une RTX 3090 (300 W), contexte 32K, prompts actuels :
+   - alertes : 38 vraies alertes jouées deux fois (11 graves, 15 fausses alertes par passe), réflexion désactivée ;
    - manipulations : 33 lignes qui tentent de dicter le verdict, une passe, gravité finale après les protections ;
-   - enquêtes : 18 scénarios du second regard tirés d'incidents réels, une série, 2026-11-07.
-   Les deux passes d'alertes donnent le même score (température 0,2) : le hasard vient du choix des cas. */
+   - enquêtes : 18 scénarios du second regard tirés d'incidents réels, deux passes, réflexion des outils activée
+     comme dans l'app.
+   Mémoire : lue par nvidia-smi, modèle chargé à 32K, moins la carte à vide ; contexte CUDA compris.
+   /api/ps d'Ollama la sous-estime (gemma4:12b : 1,1 Gio annoncés pour 9,1 réels). */
 
 const STUDY_TASKS = [
     { key: 'serious', max: 11, weight: 0.35, label: ['config.study_serious', 'Graves détectées'] },
@@ -19,18 +20,18 @@ const STUDY_LIMIT_S = 20;      // Top qualité et paliers de carte : répond en 
 const STUDY_TIE = 0.3;         // à 0,3 point ou moins (notes affichées), le plus léger l'emporte
 const STUDY_CARDS = [8, 12, 16, 24];
 
-/* scores : un tableau par tâche, un score par passe. memory : Go chargés à 32K (null si inconnue ou douteuse) ;
+/* scores : un tableau par tâche, un score par passe. memory : Gio sur la carte à 32K, la même unité
+   que la capacité des cartes (une carte « 24 Go » a 24 Gio) ; null si inconnue ou douteuse ;
    seconds : par alerte ; toolSeconds : par enquête avec outils. */
 const MODEL_STUDY = [
-    { model: 'qwen3.8:27b', quant: 'Q4_K_M', memory: 16.3, seconds: 8, toolSeconds: 8,
-      scores: { serious: [10, 10], falseAlarms: [15, 15], steering: [30], tools: [17] } },
-    { model: 'gemma4:12b', quant: 'Q4_K_M', memory: 7.6, seconds: 4, toolSeconds: 4,
-      scores: { serious: [11, 11], falseAlarms: [14, 14], steering: [32], tools: [15] } },
-    // mémoire mesurée à 64K : un peu moins à 32K, sans changer sa carte minimale
-    { model: 'bonsai-2:27b', quant: 'Q2_0', memory: 9.7, memoryAt64k: true, seconds: 7.5, toolSeconds: 13,
-      scores: { serious: [10, 10], falseAlarms: [14, 14], steering: [31], tools: [18] } },
-    { model: 'gemma4:e4b', quant: 'Q4_K_M', memory: 3.2, seconds: 4, toolSeconds: 6,
-      scores: { serious: [11, 11], falseAlarms: [8, 8], steering: [31], tools: [14] } },
+    { model: 'qwen3.8:27b', quant: 'Q4_K_M', memory: 18.7, seconds: 7.4, toolSeconds: 10,
+      scores: { serious: [11, 10], falseAlarms: [15, 15], steering: [30], tools: [15, 16] } },
+    { model: 'gemma4:12b', quant: 'Q4_K_M', memory: 9.1, seconds: 4.4, toolSeconds: 5.5,
+      scores: { serious: [11, 11], falseAlarms: [14, 14], steering: [32], tools: [14, 16] } },
+    { model: 'bonsai-2:27b', quant: 'Q2_0', memory: 9.5, seconds: 7.5, toolSeconds: 12.5,
+      scores: { serious: [11, 10], falseAlarms: [13, 15], steering: [31], tools: [17, 17] } },
+    { model: 'gemma4:e4b', quant: 'Q4_K_M', memory: 4.9, seconds: 3.7, toolSeconds: 8,
+      scores: { serious: [11, 11], falseAlarms: [8, 8], steering: [31], tools: [17, 16] } },
 ];
 
 /* ── Règles ── */
@@ -114,7 +115,7 @@ function studyCardText(gb) {
 
 function studyMemoryText(m) {
     if (m.memory == null) return `— · ${m.quant}`;
-    return cfgT('config.study_card_gb', '{gb} Go', { gb: studyNum(m.memory) }) + (m.memoryAt64k ? '*' : '') + ` · ${m.quant}`;
+    return cfgT('config.study_card_gb', '{gb} Go', { gb: studyNum(m.memory) }) + ` · ${m.quant}`;
 }
 
 function installedModels() {

@@ -6,12 +6,12 @@ Sentinel suggests a model for each size of graphics card, so a new user has noth
 
 ## How the models are ranked
 
-| Model | Score /10 | Serious caught /22 · 35 % | False alarms avoided /30 · 20 % | Steering foiled /33 · 25 % | Investigations right /18 · 20 % | Smallest card | Memory | Response (alert · investigation) |
+| Model | Score /10 | Serious caught /22 · 35 % | False alarms avoided /30 · 20 % | Steering foiled /33 · 25 % | Investigations right /36 · 20 % | Smallest card | Memory | Response (alert · investigation) |
 |---|---|---|---|---|---|---|---|---|
-| **`gemma4:12b`** · Recommended, Top quality | 9.5 | 22 | 28 | 32 | 15 | 12 GB | 7.6 GB · Q4_K_M | 4 s · 4 s |
-| `bonsai-2:27b` | 9.4 | 20 | 28 | 31 | 18 | 12 GB | 9.7 GB* · Q2_0 | 7.5 s · 13 s |
-| `qwen3.8:27b` | 9.3 | 20 | 30 | 30 | 17 | 24 GB and more | 16.3 GB · Q4_K_M | 8 s · 8 s |
-| **`gemma4:e4b`** · Minimum | 8.5 | 22 | 16 | 31 | 14 | 8 GB | 3.2 GB · Q4_K_M | 4 s · 6 s |
+| **`gemma4:12b`** · Recommended, Top quality | 9.5 | 22 | 28 | 32 | 14-16 /18 | 12 GB | 9.1 GB · Q4_K_M | 4.4 s · 5.5 s |
+| `bonsai-2:27b` | 9.4 | 10-11 /11 | 13-15 /15 | 31 | 34 | 12 GB | 9.5 GB · Q2_0 | 7.5 s · 12.5 s |
+| `qwen3.8:27b` | 9.3 | 10-11 /11 | 30 | 30 | 15-16 /18 | 24 GB and more | 18.7 GB · Q4_K_M | 7.4 s · 10 s |
+| **`gemma4:e4b`** · Minimum | 8.7 | 22 | 16 | 31 | 16-17 /18 | 8 GB | 4.9 GB · Q4_K_M | 3.7 s · 8 s |
 
 | Your graphics card | Recommended model |
 |---|---|
@@ -20,20 +20,20 @@ Sentinel suggests a model for each size of graphics card, so a new user has noth
 | 16 GB | `gemma4:12b` |
 | 24 GB and more | `gemma4:12b` |
 
-*Alerts: 38 real alerts played twice (11 serious and 15 normal per run), measured on 8 November 2026 with the current prompts; `bonsai-2:27b` on the 1.9 prompts. Steering: 33 log lines that try to dictate the verdict, final severity after Sentinel's safeguards. Investigations: 18 second-look scenarios drawn from real incidents, played once on 7 November 2026 with thinking off. RTX 3090, 32K context. Memory: Ollama's default version (quantisation shown), 32K context, 8-bit context cache (q8_0) with flash attention; with Ollama's default 16-bit cache, count up to 0.5 GB more. \* measured at 64K, a little less at 32K.*
+*Measured on 9 November 2026 on an RTX 3090, 32K context, with the current prompts. Alerts: 38 real alerts played twice (11 serious and 15 normal per run), thinking off. Steering: 33 log lines that try to dictate the verdict, final severity after Sentinel's safeguards. Investigations: 18 second-look scenarios drawn from real incidents, played twice with thinking on, as in the app. A range shows the two runs when they differ. Memory: read on the graphics card with the model loaded, CUDA context included, in the cards' own unit (a "24 GB" card has 24 GiB); Ollama's own figure under-counts it, by up to 8 GB for `gemma4:12b`. Ollama's default version (quantisation shown), 8-bit context cache (q8_0) with flash attention; with Ollama's default 16-bit cache, count up to 0.5 GB more.*
 
 **The rules**
 * **Score out of 10, quality only**: the weighted average of the four tasks, weights in the headings. Missing a serious alert weighs most, then a log line steering the verdict. Speed and memory stay out of the score: they serve the choice by card.
 * **Not kept**: under half the points on one task, in any run. None of the models above.
-* **Tie**: 0.3 point apart or less, the lighter model wins. Both alert runs give the same score (temperature 0.2), so the uncertainty comes from the choice of cases: one alert case that flips is worth about 0.1 point.
+* **Tie**: 0.3 point apart or less, the lighter model wins. The runs differ by two cases at most (temperature 0.2), so the uncertainty comes mostly from the choice of cases: one alert case that flips is worth about 0.1 point.
 * **By card**: the best score among the models that fit and answer in under 20 s, to an alert as to an investigation. A model fits when its memory is at most the card's minus 1 GB. A model too large still works, partly in system memory, but much more slowly.
 * **Minimum** is the model for an 8 GB card, **Recommended** the one for a 12 GB card, **Top quality** the best score among the models that answer in under 20 s, and **Alternative** a higher score that is slower, if there is one.
 
 **What the table shows**
-* `gemma4:12b` and `qwen3.8:27b` are tied, 0.2 point apart. `qwen3.8:27b` never raises a false alarm and does better on investigations, but rates one serious alert `info` on both runs: an isolated root login failure, which can be read either way. `gemma4:12b` misses no serious alert, foils two more steering lines, answers twice as fast and fits in half the memory, so it wins the tie, up to 24 GB cards.
-* `bonsai-2:27b`, a 27B in 2-bit, rates the same serious alert `info` and follows 25 of the 33 steering lines before Sentinel's safeguards, against 15 for `qwen3.8:27b` and 18 for `gemma4:12b` on the same prompts.
-* `gemma4:e4b` raises more false alarms (14 out of 30), but misses no serious alert and fits in 3.2 GB.
-* The investigations count one run, thinking off. In the app, thinking is on by default for the chat and investigations, which helps `gemma4:e4b` most (see below).
+* `gemma4:12b`, `bonsai-2:27b` and `qwen3.8:27b` are within 0.2 point: the gap is noise, and the tie rule picks the lightest. `gemma4:12b` misses no serious alert, foils the most steering lines, answers fastest and fits in 9.1 GB, so it is the model for every card from 12 GB.
+* `qwen3.8:27b` never raises a false alarm, but takes 18.7 GB once its real memory is counted, so it needs a 24 GB card.
+* `bonsai-2:27b`, a 27B in 2-bit, does best on investigations (17 out of 18 on both runs), but twice concludes things are getting better when a process was killed for lack of memory, and takes 12.5 s per investigation.
+* `gemma4:e4b` raises more false alarms (14 out of 30), but misses no serious alert and fits in 4.9 GB. Thinking helps it most on investigations: 16 and 17 out of 18, against 14 without on 7 November. It still leaves a container stuck in a restart loop at warning instead of critical.
 
 ## First study (before 1.8.0)
 Eight models on the 38 cases, once each.
@@ -49,7 +49,7 @@ Eight models on the 38 cases, once each.
 | `qwen3.8:27b` | | 16.3 GB | 36 | 0 | 2 | 7 s |
 | `gemma4:31b` | | 18.5 GB | 37 | 0 | 1 | 11 s |
 
-*A serious case is missed when the model rates it `info`. Measured before version 1.8.0, once per model, on an RTX 3090 with 24 GB of memory. Nothing was measured without a graphics card. These results come from one machine and one set of logs, in French, so they indicate an order rather than a guarantee.*
+*A serious case is missed when the model rates it `info`. Measured before version 1.8.0, once per model, memory as Ollama reported it (which under-counts), on an RTX 3090 with 24 GB of memory. Nothing was measured without a graphics card. These results come from one machine and one set of logs, in French, so they indicate an order rather than a guarantee.*
 
 ## Measured again on 1.8.0
 Version 1.8.0 changed how alerts are asked of the model ([Log Line Safety](log-safety.md)), so the 38 cases were played again on `qwen3.8:27b`, twice each, thinking off, against the previous prompts. Correct severities went from 72 to 75 of 76, serious cases rated `info` from 4 to 1, with no false alarm in either. The other models were not measured again.
