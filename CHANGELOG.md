@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.11.0] - 2026-11-09
 
 ### Added
 - **A chat summary that keeps the facts**: when a conversation fills the model's context, *Summarize with the AI* now merges the older messages into one summary in fixed sections (facts, decisions and why, your preferences, open questions), keeps exact values and corrections, and leaves the last two exchanges word for word. Each new summary merges the previous one, and a text too long for the context is summarized in several passes instead of losing its start. The summary is written in the interface language with its section titles in that language. A summary that comes back cut short or looping is refused and the conversation stays as it was, with a message saying so. Instructions that the model copies into your preferences are removed. Measured on a made-up Sentinel conversation after three successive summaries: 9, 10 and 10 facts out of 10 kept with `qwen3.8:27b` and 9, 10 and 9 with `gemma4:e4b`, against 3 to 8 with the former modes. *Compact* is gone: it grew at every pass; a setting on it now uses the summary.
