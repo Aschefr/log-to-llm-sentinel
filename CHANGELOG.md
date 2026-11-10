@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Changed
+- **The thinking switch says what it covers**: *Thinking for alerts* also drove the unread triage, resolution checks, the keyword arbiter, the situation summary and meta-analyses, which its name hid. It is now *Thinking for analyses*, and its help lists them. Still off by default: measured with `gemma4:e4b` on 36 real events of a test server, the triage made the same choices for 32 of them with thinking, at 18 to 29 s per batch of 12 instead of 6 to 10 s; two meta-analyses (24 hours and 7 days) found the same issues, at 14 to 23 s instead of 8 to 14 s.
 - **Check again in the unread triage**: the triage window kept its result for ten minutes, so reopening it showed the same proposals even after new alerts came in or others were read. A *Check again* button now runs the AI again on the unread events of the moment.
 - **Notes for the AI are easier to spot, and rule-wide notes are kept apart**: in a rule's *Analyses* tab, the folded *Notes for the AI* bar was a single line easy to miss, and once open it mixed notes read with every alert of the rule and notes tied to one alert. The bar now stands out with an icon and says what it holds (*1 on the whole rule · 2 on specific alerts*), or, when empty, what a note is for. Open, it shows two groups, *Whole rule* with its add button and *Specific alerts* with the line each note was written on and how to add one from an alert.
 
