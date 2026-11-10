@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **The second look could raise an alert to critical over another problem**: it answered *worse* because of something it saw on another element, such as an old out-of-memory kill in the kernel log or other containers, and a *worse* verdict raises the severity by one step. A DNS timeout or a failed `sudo` could end up critical with nothing wrong on the machine. The second look now answers *worse* or proposes critical only when its checks show a current impact on the alert's own element (stopped, unreachable, restart loop, data hit); otherwise it confirms the analysis or says it cannot tell. Measured on 9 lab scenarios, twice, with thinking on: false raises to critical went from 2 in 4 to none for both `gemma4:12b` and `qwen3.8:27b`, and real restart loops and stopped databases are still rated worse.
+
 ## [1.11.1] - 2026-11-09
 
 ### Changed
