@@ -15,7 +15,7 @@ The form says how many alerts each choice concerns today.
 
 The link between a note and an alert is computed from the lines, not guessed by the AI. Two alerts with no line in common are not linked, and a note never crosses from one rule to another. For knowledge that concerns everything the rule watches, use a note on all its alerts.
 
-A rule's **Analyses** tab lists all its notes, where you can also edit or delete them and add a note on all alerts of the rule.
+A rule's **Analyses** tab lists all its notes in a folded banner above the alerts. Folded, it already says how many notes apply to the whole rule and how many to specific alerts. Open, it shows them in two groups: **Whole rule**, where you can add a note on all alerts of the rule, and **Specific alerts**, each with the line it was written on (add those from the alert itself). You can edit or delete any note there.
 
 ## What the AI receives
 

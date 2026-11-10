@@ -3303,6 +3303,29 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 .rule-notes-body { display: flex; flex-direction: column; align-items: stretch; gap: 0.6rem; padding: 0 0.9rem 0.9rem; }
 .rule-notes-body .form-hint, .rule-notes-empty { margin: 0; }
 .rule-notes-add { align-self: flex-start; }
+/* Notes pour l'IA d'une règle : un bandeau qui dit ce qu'il contient, fermé ; deux groupes une fois ouvert */
+.rule-notes--ai { border-left: 3px solid var(--accent); background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.rule-notes--ai.is-empty { border-left-color: var(--border); background: none; }
+.rule-notes--ai > summary { align-items: center; gap: 0.7rem; min-height: 3.25rem; padding: 0.55rem 0.9rem; list-style: none; }
+.rule-notes--ai > summary::-webkit-details-marker { display: none; }
+.rule-notes-icon { flex: none; color: var(--accent); }
+.rule-notes--ai.is-empty .rule-notes-icon { color: var(--text-secondary); }
+.rule-notes-head { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1; }
+.rule-notes-title { font-size: 0.92rem; }
+.rule-notes-overview { color: var(--text-secondary); font-size: 0.8rem; font-weight: 400; }
+.rule-notes-toggle { flex: none; width: 0.5rem; height: 0.5rem; margin-right: 0.2rem; border-right: 2px solid var(--text-secondary); border-bottom: 2px solid var(--text-secondary); transform: rotate(45deg); transition: transform 0.15s ease; }
+.rule-notes--ai[open] .rule-notes-toggle { transform: rotate(-135deg); }
+.rule-notes--ai > summary:hover .rule-notes-title { color: var(--accent); }
+/* Chaque groupe est un encadré à part : liseré bleu pour toute la règle, gris pour les alertes précises */
+.rule-notes-group { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.7rem 0.85rem 0.8rem; border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; background: var(--bg-card); }
+.rule-notes-group[data-group="event"] { border-left-color: var(--text-secondary); }
+.rule-notes-group + .rule-notes-group { margin-top: 0.35rem; }
+.rule-notes-group-title { display: flex; align-items: center; gap: 0.4rem; margin: 0; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-primary); }
+.rule-notes-group-title svg { flex: none; color: var(--accent); }
+.rule-notes-group[data-group="event"] .rule-notes-group-title svg { color: var(--text-secondary); }
+.rule-notes-group-count { color: var(--text-secondary); font-weight: 400; font-variant-numeric: tabular-nums; }
+.rule-notes-group .event-notes-list:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { .rule-notes-toggle { transition: none; } }
 .event-notes .event-notes-list:empty { display: none; }
 
 /* Configuration */

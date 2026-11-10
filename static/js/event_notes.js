@@ -26,9 +26,10 @@ function noteErrorText(error) {
 function noteItemHtml(note, opts = {}) {
     const line = opts.showLine && note.line && note.scope !== 'source'
         ? `<code class="event-note-line">${escapeHtml(note.line)}</code>` : '';
+    const scope = opts.hideScope ? '' : `<span class="event-note-scope">${escapeHtml(opts.showLine && note.scope === 'event' ? noteT('common.note_scope_an_event', 'Une alerte et les alertes similaires') : noteScopeLabel(note.scope))}</span>`;
     return `<li class="event-note" data-note="${note.id}">
         <div class="event-note-meta">
-            <span class="event-note-scope">${escapeHtml(opts.showLine && note.scope === 'event' ? noteT('common.note_scope_an_event', 'Une alerte et les alertes similaires') : noteScopeLabel(note.scope))}</span>
+            ${scope}
             <span>${note.updated_at ? escapeHtml(formatDate(note.updated_at)) : ''}</span>
             <span class="event-note-actions">
                 <button type="button" class="btn-link" onclick="editNote(this)">${escapeHtml(noteT('common.edit', 'Modifier'))}</button>
@@ -125,6 +126,7 @@ function closeNoteForm(form) {
         item.querySelector('.event-note-actions').classList.remove('hidden');
     }
     if (section && section.classList.contains('event-notes') && !section.querySelector('.event-note')) section.classList.add('is-empty');
+    if (opener && opener.classList.contains('rule-notes-add')) opener.classList.remove('hidden');
     if (opener && opener.isConnected) opener.focus();
 }
 
@@ -207,22 +209,42 @@ function updateCardNoteCount(card, count) {
 
 /* All the notes of a rule, in its Analyses tab. */
 
+/* Two groups: notes read with every alert of the rule, and notes tied to one alert and its look-alikes. The folded
+   banner says how many of each, so the split shows before opening it. */
 async function loadRuleNotes(section) {
     const res = await apiFetch(`/api/monitor/rules/${section.dataset.rule}/notes`);
+    const groups = { source: res.notes.filter(n => n.scope === 'source'), event: res.notes.filter(n => n.scope !== 'source') };
     section.querySelector('.rule-notes-count').textContent = res.notes.length;
-    section.querySelector('.event-notes-list').innerHTML = res.notes.map(n => noteItemHtml(n, { showLine: true })).join('');
     section.querySelector('.rule-notes-empty').classList.toggle('hidden', res.notes.length > 0);
+    Object.entries(groups).forEach(([name, notes]) => {
+        const group = section.querySelector(`.rule-notes-group[data-group="${name}"]`);
+        if (!group) return;
+        group.querySelector('.rule-notes-group-count').textContent = notes.length;
+        group.querySelector('.event-notes-list').innerHTML = notes.map(n => noteItemHtml(n, { showLine: true, hideScope: true })).join('');
+        // Sans note sur des alertes précises, ce groupe n'a rien à montrer : on l'ajoute depuis une alerte
+        if (name === 'event') group.classList.toggle('hidden', !notes.length);
+    });
+    const overview = section.querySelector('.rule-notes-overview');
+    if (overview) {
+        overview.textContent = res.notes.length
+            ? [groups.source.length ? noteT('rule.notes_overview_source', '{n} sur toute la règle').replace('{n}', groups.source.length) : '',
+               groups.event.length ? noteT('rule.notes_overview_event', '{n} sur des alertes précises').replace('{n}', groups.event.length) : '']
+                .filter(Boolean).join(' · ')
+            : noteT('rule.notes_overview_empty', 'Dis à l’IA ce qu’elle ne peut pas deviner : un port ouvert exprès, un faux positif connu…');
+    }
+    section.classList.toggle('is-empty', !res.notes.length);
     const add = section.querySelector('.rule-notes-add');
     add.classList.toggle('hidden', res.notes.length >= res.max_notes);
-    section.querySelector(':scope .rule-notes-body > .event-note-form')?.remove();
+    section.querySelector('.rule-notes-body .event-note-form:not(.event-note .event-note-form)')?.remove();
 }
 
 function openRuleNoteForm(btn) {
-    const body = btn.closest('.rule-notes-body');
-    const open = body.querySelector(':scope > .event-note-form');
+    const host = btn.closest('.rule-notes-group') || btn.closest('.rule-notes-body');
+    const open = host.querySelector(':scope > .event-note-form');
     if (open) { open.querySelector('textarea').focus(); return; }
     const form = noteFormFrom(noteFormHtml({ hint: true }));
     form._opener = btn;
-    body.append(form);
+    btn.before(form);
+    btn.classList.add('hidden');
     form.querySelector('textarea').focus();
 }

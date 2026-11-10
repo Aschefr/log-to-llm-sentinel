@@ -44,7 +44,7 @@ The former Monitor viewer: live tail with keyword highlighting, *Matches* / *All
 * Filters with real counters: All, Unread, Critical, Warning, Info; period (7 days, 30 days, all); *Open incidents only*; *Mark all as read*; *Sort my unread*, which asks the AI which events of this rule can be marked as read (see the [Dashboard](dashboard.md)).
 * Each collapsed card shows the one-sentence summary, a recurrence badge (*× N in 7 d* or *new*) and the resolution time.
 * Expanded cards keep the usual actions: retry, notify, prompt, deepen in chat, investigate, delete — plus **Not relevant**, which asks the AI arbiter to stop this kind of alert (see [Keyword tuning](../features/keyword-learning.md)), and **Add a note**, which tells the AI what the logs cannot (see [Notes for the AI](../features/notes.md)).
-* **Notes for the AI**, above the list: all the notes of the rule, to read, edit or delete, and to add one on all alerts of the rule.
+* **Notes for the AI**, above the list: a folded banner that says how many notes apply to the whole rule and how many to specific alerts. Open, it splits them into these two groups, to read, edit or delete, and to add one on all alerts of the rule.
 
 ### Resolution tab
 See [Incident Resolution](../features/resolution-tracking.md): closing conditions of the ongoing incident, timeline, success-line patterns and AI suggestions to review, check history.
