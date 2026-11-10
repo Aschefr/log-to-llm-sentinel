@@ -152,7 +152,7 @@ function renderRecommendedModels() {
     box.innerHTML = shown.map(({ m, t }) => {
         const isInstalled = installed.includes(m.model);
         const current = select && select.value === m.model;
-        const state = !installed.length ? '' : isInstalled ? cfgT('config.model_installed', 'Installé') : cfgT('config.model_to_download', 'À télécharger');
+        const state = !(installed.length || select?.dataset.modelsLoaded) ? '' : isInstalled ? cfgT('config.model_installed', 'Installé') : cfgT('config.model_to_download', 'À télécharger');
         const detail = cfgT('config.model_detail', '{gb} Go · {s} s par analyse', { gb: studyNum(m.memory), s: studyNum(m.seconds, 0) });
         return `<button type="button" class="cfg-status-item${current ? ' active' : ''}" data-model="${escapeHtml(m.model)}" aria-pressed="${Boolean(current)}">
             <span class="cfg-status-text">

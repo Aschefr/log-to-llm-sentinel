@@ -423,7 +423,7 @@ function setupModelPulling() {
                                 if (data.status === 'success') {
                                     progressBar.style.width = '100%';
                                     statusText.textContent = '✅ ' + (window.t ? window.t('config.model_download_success') : 'Model downloaded successfully!');
-                                    setTimeout(() => setupOllamaModelSelect(), 2000);
+                                    setTimeout(() => { setupOllamaModelSelect(); refreshStatus(); cfgResult('ollama-test-message', null, ''); }, 2000);
                                 }
                             }
                         } catch (e) {
@@ -552,16 +552,21 @@ async function setupOllamaModelSelect() {
             hint.classList.remove('rf-ko');
         }
         const models = (res && res.models) ? res.models : [];
+        select.dataset.modelsLoaded = 'true';
+        if (hint && !models.length) {
+            hint.removeAttribute('data-i18n');
+            hint.textContent = cfgT('config.ollama_models_none', "Ollama répond, mais aucun modèle n'est installé : télécharges-en un dans « Quel modèle choisir » ci-dessous.");
+        }
 
         const desired = window.__desiredOllamaModel || 'llama3';
         const hasDesired = models.includes(desired);
 
         const options = [];
         if (models.length === 0) {
-            options.push(`<option value="__custom__">${window.t ? window.t('config.autre_option') : 'Other\u2026'}</option>`);
+            options.push(`<option value="__custom__">${escapeHtml(cfgT('config.autre_option', 'Autre…'))}</option>`);
         } else {
             options.push(...models.map(m => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`));
-            options.push(`<option value="__custom__">${window.t ? window.t('config.autre_option') : 'Other\u2026'}</option>`);
+            options.push(`<option value="__custom__">${escapeHtml(cfgT('config.autre_option', 'Autre…'))}</option>`);
         }
         select.innerHTML = options.join('');
 
@@ -575,7 +580,8 @@ async function setupOllamaModelSelect() {
         }
     } catch (e) {
         // La liste n'a pas pu être lue : l'explication va dans l'aide du champ, le modèle reste modifiable à la main
-        select.innerHTML = `<option value="__custom__">${window.t ? window.t('config.autre_option') : 'Other\u2026'}</option>`;
+        select.innerHTML = `<option value="__custom__">${escapeHtml(cfgT('config.autre_option', 'Autre…'))}</option>`;
+        delete select.dataset.modelsLoaded;
         if (hint) {
             hint.removeAttribute('data-i18n');
             hint.textContent = cfgT('config.ollama_models_error', "Liste indisponible. Vérifie l'URL ci-dessus, ou saisis le modèle à la main.");
@@ -724,7 +730,8 @@ async function runTest(url, messageEl, buttonEl) {
         // Le test doit porter sur ce qui vient d'être saisi : le champ quitté en cliquant ici est encore en cours d'envoi
         if (CFG_SAVE.inFlight) await CFG_SAVE.inFlight;
         const res = await apiFetch(url, { method: 'POST', signal: abortController.signal });
-        cfgResult(messageEl, true, (res && res.detail) ? res.detail : 'OK');
+        if (res && res.state === 'model_missing') showModelMissing(messageEl, res);
+        else cfgResult(messageEl, true, (res && res.detail) ? res.detail : 'OK');
     } catch (error) {
         if (error.name === 'AbortError') {
             cfgResult(messageEl, false, cfgT('config.test_cancelled', 'Test cancelled'));
@@ -738,6 +745,30 @@ async function runTest(url, messageEl, buttonEl) {
         stopBtn.remove();
         refreshStatus();
     }
+}
+
+/* Ollama répond mais n'a pas le modèle : ce n'est pas une panne, on dit que la connexion est bonne et on propose
+   de le télécharger, ou d'en choisir un conseillé. */
+function showModelMissing(messageEl, res) {
+    const key = (res.available_models || []).length ? 'config.test_model_missing' : 'config.test_model_missing_none';
+    cfgResult(messageEl, null, cfgT(key, "Connexion OK : Ollama répond, mais le modèle {model} n'y est pas installé.", { model: res.model }));
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-primary btn-sm cfg-result-action';
+    btn.textContent = cfgT('config.test_model_download', 'Télécharger {model}', { model: res.model });
+    btn.onclick = () => {
+        setPullModel(res.model);
+        const pull = document.getElementById('pull-model-btn');
+        pull.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        pull.click();
+        btn.remove();
+    };
+    const other = document.createElement('button');
+    other.type = 'button';
+    other.className = 'btn btn-secondary btn-sm cfg-result-action';
+    other.textContent = cfgT('config.test_model_choose', 'Voir les modèles conseillés');
+    other.onclick = () => document.getElementById('cfg-models').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    messageEl.append(' ', btn, ' ', other);
 }
 
 /** Sends every field. Returns an error message, or null when it is saved. */

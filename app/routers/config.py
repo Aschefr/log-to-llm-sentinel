@@ -65,12 +65,16 @@ async def pull_model(data: dict):
     async def event_generator():
         try:
             async with httpx.AsyncClient(timeout=None) as client:
-                async with client.stream("POST", pull_url, json={"name": model_name}) as response:
+                async with client.stream("POST", pull_url, json={"model": model_name, "name": model_name}) as response:
                     async for line in response.aiter_lines():
                         if line:
                             yield f"data: {line}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        finally:
+            # La liste des modèles a changé : l'état en haut de page ne doit pas garder l'ancienne
+            from app.services.dashboard_watch import _ollama_cache
+            _ollama_cache["at"] = 0.0
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
@@ -296,6 +300,7 @@ async def test_ollama(request: Request):
                 base = base[: -len("/api")]
                 
             available_models = []
+            reachable = False
             try:
                 req = urllib.request.Request(f"{base}/api/tags", method="GET")
                 with urllib.request.urlopen(req, timeout=8) as r:
@@ -304,8 +309,14 @@ async def test_ollama(request: Request):
                     for m in tags.get("models", []) or []:
                         name = m.get("name")
                         if name: available_models.append(name)
+                reachable = True
             except Exception as e:
                 logger.warning("ConfigRouter", f"Impossible de joindre /api/tags : {e}")
+
+            # Serveur joignable mais modèle absent : la connexion est bonne, il reste à le télécharger
+            if reachable and model not in available_models and f"{model}:latest" not in available_models:
+                return {"status": "model_missing", "ok": False, "state": "model_missing", "model": model,
+                        "detail": f"Connexion OK, modèle {model} absent", "available_models": available_models}
 
             # 2) generation asynchrone (streaming) protégée par le sémaphore
             prompt = "Réponds uniquement par 'OK'."

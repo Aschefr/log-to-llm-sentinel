@@ -30,6 +30,7 @@ A setting is saved when you leave its field (or press Enter), and the result sho
 * **Ollama URL**: The access endpoint of your Ollama instance (default: `http://host.docker.internal:11434` for Docker hosts).
 * **Model Selection**: Dropdown list populated dynamically by queries to Ollama.
 * **Model (Manual Override)**: Text field to specify a model manually (e.g., `llama3:latest`).
+* **Test Ollama**: checks the server and the chosen model. When the server answers but the model is not installed, it says the connection is fine and offers to download that model, or to pick one of the recommended models. Only a server that does not answer shows as an error.
 * **Which model to choose**: the [recommended models](../features/recommended-models.md) (*Minimum* for an 8 GB card, *Recommended* for 12 GB, *Top quality*), with their memory and speed as measured. One click selects a model if it is installed, otherwise prepares its download.
 * **Download a model**: enter any model tag and click **Download** to pull it onto the host.
 * **Context**: 8K to 128K, 32K recommended. 8K is enough for alerts; with the chat, keep at least 16K, as its tools alone take 1,500 to 2,300 tokens. Meta-analyses and the chat use the same value, which also avoids reloading the model. If another app uses the same model on the same Ollama server, give it the same size: Ollama reloads a model whenever the size asked for changes (16 to 42 s for `qwen3.8:27b`). How many log lines the AI receives for an alert follows from it, so there is no separate limit to set.
