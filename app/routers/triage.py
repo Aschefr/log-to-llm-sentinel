@@ -19,10 +19,10 @@ def _public(job: dict) -> dict:
 
 
 @router.post("/start")
-async def start_triage(rule_id: Optional[int] = None):
+async def start_triage(rule_id: Optional[int] = None, fresh: bool = False):
     if not kls._tuning:
         raise HTTPException(status_code=503, detail="triage_unavailable")
-    return _public(unread_triage.start(rule_id, kls._tuning))
+    return _public(unread_triage.start(rule_id, kls._tuning, fresh=fresh))
 
 
 @router.get("/jobs/{job_id}")

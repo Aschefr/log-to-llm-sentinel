@@ -93,11 +93,12 @@ def batch_size(total: int) -> int:
     return -(-total // batches)
 
 
-def start(rule_id: Optional[int], tuning) -> dict:
-    """Démarre un tri, ou retrouve celui en cours ou tout juste terminé : fermer la fenêtre n'oblige pas à recommencer."""
+def start(rule_id: Optional[int], tuning, fresh: bool = False) -> dict:
+    """Démarre un tri, ou retrouve celui en cours ou tout juste terminé : fermer la fenêtre n'oblige pas à recommencer.
+    fresh (« Revérifier ») relance l'IA sur les non lues du moment, même si un résultat récent existe."""
     global _job, _task
     now = datetime.utcnow()
-    if _job and _job["rule_id"] == rule_id and not _job["applied"]:
+    if not fresh and _job and _job["rule_id"] == rule_id and not _job["applied"]:
         recent = now - _job["started_at"] < timedelta(minutes=REUSE_MINUTES)
         if _job["status"] == "running" or (_job["status"] == "done" and recent and _job["total"]):
             return _job

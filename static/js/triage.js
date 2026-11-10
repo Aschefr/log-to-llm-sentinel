@@ -40,13 +40,19 @@ function trDialog() {
     return dialog;
 }
 
-async function openTriage(ruleId = null) {
+/** fresh: « Revérifier » relance l'IA sur les non lues du moment au lieu de reprendre le résultat récent. */
+async function openTriage(ruleId = null, fresh = false) {
     TRIAGE.ruleId = ruleId;
     TRIAGE.unchecked = new Set();
-    trDialog().showModal();
+    if (!trDialog().open) trDialog().showModal();
+    TRIAGE.job = fresh ? null : TRIAGE.job;
+    if (fresh) document.getElementById('triage-body').dataset.running = '';
     trRender();
+    const query = new URLSearchParams();
+    if (ruleId) query.set('rule_id', ruleId);
+    if (fresh) query.set('fresh', 'true');
     try {
-        TRIAGE.job = await apiFetch(`/api/triage/start${ruleId ? `?rule_id=${ruleId}` : ''}`, { method: 'POST' });
+        TRIAGE.job = await apiFetch(`/api/triage/start${query.size ? `?${query}` : ''}`, { method: 'POST' });
     } catch (e) {
         TRIAGE.job = { status: 'failed', error: 'internal', total: 0, done: 0, proposals: [], kept: [] };
     }
@@ -69,35 +75,30 @@ function trPoll() {
     }, 1500);
 }
 
-/** The AI reads the events by batches and answers once per batch: what is read is filled, the batch being read moves.
- *  Built once, then updated in place, so the animation does not restart at each poll. */
+/** The AI answers once per batch, so no honest fraction exists while it reads: a spinner says it is working, the text
+ *  says how many events it reads, and, with several batches, how many are already done.
+ *  Built once, then updated in place, so the spinner does not restart at each poll. */
 function trRenderRunning(body, foot, job) {
     const total = job?.total || 0, done = job?.done || 0;
     if (body.dataset.running !== '1') {
         body.dataset.running = '1';
-        body.innerHTML = `<p class="triage-lead" id="triage-run-text"></p>
-            <div class="triage-bar" id="triage-bar" role="progressbar" aria-valuemin="0">
-                <span class="triage-bar-done"></span><span class="triage-bar-current"></span>
+        body.innerHTML = `<div class="triage-run" role="status">
+                <span class="triage-spinner" aria-hidden="true"></span>
+                <div class="triage-run-text">
+                    <p class="triage-lead" id="triage-run-text"></p>
+                    <p class="form-hint" id="triage-run-done"></p>
+                </div>
             </div>
             <p class="form-hint" id="triage-run-time"></p>
             <p class="form-hint">${escapeHtml(trT('running_hint', 'Tu peux fermer cette fenêtre : le tri continue, et tu retrouveras le résultat en revenant ici.'))}</p>`;
         foot.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" onclick="trCancel()">${escapeHtml(trT('stop', 'Arrêter le tri'))}</button>`;
     }
     foot.querySelector('button')?.classList.toggle('hidden', !job);
-    const bar = document.getElementById('triage-bar');
-    const to = total ? Math.min(total, done + (job.batch || total)) : 0;
-    bar.querySelector('.triage-bar-done').style.width = total ? `${done / total * 100}%` : '0';
-    const current = bar.querySelector('.triage-bar-current');
-    // Le lot en cours reste visible même petit : une largeur minimale, sans sortir de la barre
-    current.style.left = total ? `min(${done / total * 100}%, calc(100% - 2.5rem))` : '0';
-    current.style.width = total ? `max(${(to - done) / total * 100}%, 2.5rem)` : '100%';
-    const text = !total ? trT('running', 'Préparation du tri…')
-        : to === done + 1 ? trT('running_one', 'L’IA lit l’événement {from} sur {total}…', { from: done + 1, total })
-        : trT('running_batch', 'L’IA lit les événements {from} à {to} sur {total}…', { from: done + 1, to, total });
-    document.getElementById('triage-run-text').textContent = text;
-    bar.setAttribute('aria-valuemax', String(total || 1));
-    bar.setAttribute('aria-valuenow', String(done));
-    bar.setAttribute('aria-valuetext', text);
+    document.getElementById('triage-run-text').textContent = !total ? trT('running', 'Préparation du tri…')
+        : total === 1 ? trT('running_single', 'L’IA lit ton événement non lu…')
+        : trT('running_all', 'L’IA lit les {total} événements…', { total });
+    document.getElementById('triage-run-done').textContent = done && done < total
+        ? trT('running_done', 'Déjà lus : {done} sur {total}.', { done, total }) : '';
     // Temps écoulé, à l'heure du serveur : la réponse d'un lot prend souvent une à deux minutes
     const skew = typeof HEADER !== 'undefined' && HEADER.serverSkew ? HEADER.serverSkew : 0;
     const seconds = job?.at ? Math.max(0, Math.round((Date.now() + skew - Date.parse(job.at)) / 1000)) : 0;
@@ -162,7 +163,10 @@ function trRenderResult(body, foot, job) {
 function trRenderFoot(foot, job) {
     const n = job.proposals.filter(p => !TRIAGE.unchecked.has(trKey(p))).length;
     const close = `<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('triage-dialog').close()">${escapeHtml(job.proposals.length ? trT('later', 'Pas maintenant') : trT('close', 'Fermer'))}</button>`;
-    foot.innerHTML = close + (job.proposals.length ? `<button type="button" class="btn btn-primary btn-sm" id="triage-apply" ${n ? '' : 'disabled'} onclick="trApply()">${escapeHtml(trCount(n, 'apply_one', 'Marquer 1 événement comme lu', 'apply_many', 'Marquer {n} événements comme lus'))}</button>` : '');
+    // Relance l'IA sur les non lues du moment : le résultat affiché peut dater de quelques minutes
+    const recheck = `<button type="button" class="btn btn-secondary btn-sm triage-recheck" onclick="openTriage(TRIAGE.ruleId, true)"
+        title="${escapeHtml(trT('recheck_title', 'Relancer l’IA sur tes non lues actuelles'))}">${escapeHtml(trT('recheck', 'Revérifier'))}</button>`;
+    foot.innerHTML = recheck + close + (job.proposals.length ? `<button type="button" class="btn btn-primary btn-sm" id="triage-apply" ${n ? '' : 'disabled'} onclick="trApply()">${escapeHtml(trCount(n, 'apply_one', 'Marquer 1 événement comme lu', 'apply_many', 'Marquer {n} événements comme lus'))}</button>` : '');
 }
 
 function trMeta(item) {
