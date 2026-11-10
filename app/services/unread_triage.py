@@ -84,6 +84,15 @@ def build_messages(db, lang: str, events: List[dict], now: Optional[datetime] = 
             {"role": "user", "content": "\n".join(head + ["", L("today", date=now.strftime("%Y-%m-%d")), L("intro")]) + "\n\n" + "\n\n".join(parts)}]
 
 
+def batch_size(total: int) -> int:
+    """Lots égaux d'au plus BATCH_EVENTS : 16 événements font deux lots de 8, pas 15 puis 1. Autant d'appels à l'IA,
+    une progression qui avance par moitiés, et jamais un dernier lot d'un seul événement."""
+    if total <= 0:
+        return BATCH_EVENTS
+    batches = -(-total // BATCH_EVENTS)
+    return -(-total // batches)
+
+
 def start(rule_id: Optional[int], tuning) -> dict:
     """Démarre un tri, ou retrouve celui en cours ou tout juste terminé : fermer la fenêtre n'oblige pas à recommencer."""
     global _job, _task
@@ -110,7 +119,7 @@ def start(rule_id: Optional[int], tuning) -> dict:
         db.close()
     eligible.sort(key=lambda e: -e["count"])  # les plus répétés d'abord : c'est là que le tri fait gagner le plus
     _job = {"id": uuid.uuid4().hex, "rule_id": rule_id, "status": "running", "error": None, "started_at": now,
-            "at": iso(now), "applied": False, "unread": len(unread), "total": len(eligible[:MAX_EVENTS]), "done": 0, "batch": BATCH_EVENTS,
+            "at": iso(now), "applied": False, "unread": len(unread), "total": len(eligible[:MAX_EVENTS]), "done": 0, "batch": batch_size(len(eligible[:MAX_EVENTS])),
             "not_reviewed": max(0, len(eligible) - MAX_EVENTS), "proposals": [], "kept": kept}
     if not eligible:
         _job["status"] = "done"
@@ -124,8 +133,9 @@ async def _run(job: dict, events: List[dict], tuning):
     lang = config.get("ollama_prompt_lang", "fr")
     answered = 0
     try:
-        for start_at in range(0, len(events), BATCH_EVENTS):
-            batch = events[start_at:start_at + BATCH_EVENTS]
+        size = job.get("batch") or batch_size(len(events))
+        for start_at in range(0, len(events), size):
+            batch = events[start_at:start_at + size]
             db = SessionLocal()
             try:
                 messages = build_messages(db, lang, batch)

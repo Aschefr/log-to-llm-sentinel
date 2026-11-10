@@ -1627,6 +1627,7 @@
     "retry": "Sort again",
     "running": "Preparing…",
     "running_batch": "The AI is reading events {from} to {to} of {total}…",
+    "running_one": "The AI is reading event {from} of {total}…",
     "running_since": "For {t} so far. An answer from the AI often takes one to two minutes.",
     "running_hint": "You can close this window: sorting carries on, and the result will be here when you come back.",
     "cancelled": "Sorting stopped. Nothing changed.",

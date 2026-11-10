@@ -1627,6 +1627,7 @@
     "retry": "Relancer le tri",
     "running": "Préparation du tri…",
     "running_batch": "L’IA lit les événements {from} à {to} sur {total}…",
+    "running_one": "L’IA lit l’événement {from} sur {total}…",
     "running_since": "Depuis {t}. Une réponse de l’IA prend souvent une à deux minutes.",
     "running_hint": "Tu peux fermer cette fenêtre : le tri continue, et tu retrouveras le résultat en revenant ici.",
     "cancelled": "Tri arrêté. Rien n’a changé.",

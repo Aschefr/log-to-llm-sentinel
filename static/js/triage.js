@@ -88,9 +88,12 @@ function trRenderRunning(body, foot, job) {
     const to = total ? Math.min(total, done + (job.batch || total)) : 0;
     bar.querySelector('.triage-bar-done').style.width = total ? `${done / total * 100}%` : '0';
     const current = bar.querySelector('.triage-bar-current');
-    current.style.left = total ? `${done / total * 100}%` : '0';
-    current.style.width = total ? `${(to - done) / total * 100}%` : '100%';
-    const text = total ? trT('running_batch', 'L’IA lit les événements {from} à {to} sur {total}…', { from: done + 1, to, total }) : trT('running', 'Préparation du tri…');
+    // Le lot en cours reste visible même petit : une largeur minimale, sans sortir de la barre
+    current.style.left = total ? `min(${done / total * 100}%, calc(100% - 2.5rem))` : '0';
+    current.style.width = total ? `max(${(to - done) / total * 100}%, 2.5rem)` : '100%';
+    const text = !total ? trT('running', 'Préparation du tri…')
+        : to === done + 1 ? trT('running_one', 'L’IA lit l’événement {from} sur {total}…', { from: done + 1, total })
+        : trT('running_batch', 'L’IA lit les événements {from} à {to} sur {total}…', { from: done + 1, to, total });
     document.getElementById('triage-run-text').textContent = text;
     bar.setAttribute('aria-valuemax', String(total || 1));
     bar.setAttribute('aria-valuenow', String(done));
