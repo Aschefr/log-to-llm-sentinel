@@ -17,7 +17,7 @@ const STUDY_TASKS = [
     { key: 'tools', max: 18, weight: 0.20, label: ['config.study_tools', 'Enquêtes justes'] },
 ];
 const STUDY_LIMIT_S = 20;      // Top qualité et paliers de carte : répond en moins de 20 s
-const STUDY_TIE = 0.3;         // à 0,3 point ou moins (notes affichées), le plus léger l'emporte
+const STUDY_TIE_QUESTIONS = 4;  // égalité : un écart qui tient dans 4 questions (règle commune, ai-bench/BENCH_PLAN.md)
 const STUDY_CARDS = [8, 12, 16, 24];
 
 /* scores : un tableau par tâche, un score par passe. memory : Gio sur la carte à 32K, la même unité
@@ -43,11 +43,16 @@ function studyNote(m) {
     return Math.round(raw * 100) / 10;   // note affichée, sur 10 à une décimale
 }
 
-/* Seconde exclusion commune : moins de la moitié des points à une tâche, à l'une des passes */
+/* Valeur d'une question en points de note : celle de la tâche la plus lourde (poids / nombre de cas distincts) */
+const studyQuestionPoints = () => Math.max(...STUDY_TASKS.map(t => 10 * t.weight / t.max));
+/* Seuil d'égalité sur les notes affichées : 4 questions, arrondi au dixième comme les notes */
+const studyTie = () => Math.round(STUDY_TIE_QUESTIONS * studyQuestionPoints() * 10) / 10;
+
+/* Seconde exclusion commune, en taux : moins de la moitié des points à une tâche, tous passages réunis */
 function studyExclusion(m) {
     for (const t of STUDY_TASKS) {
-        const worst = Math.min(...m.scores[t.key]);
-        if (worst < t.max / 2) return { task: t, score: worst, max: t.max };
+        const sc = m.scores[t.key], total = studySum(sc), max = t.max * sc.length;
+        if (total < max / 2) return { task: t, score: total, max };
     }
     return null;
 }
@@ -60,11 +65,21 @@ function studyMinCard(m) {
     return STUDY_CARDS.find(gb => studyFits(m, gb)) ?? null;
 }
 
-/* Meilleure note ; à égalité (0,3 point ou moins), le plus léger. Une mémoire inconnue passe après. */
+/* Moyenne d'une tâche par passage : les tâches répétées 10 fois ne pèsent pas plus que les autres */
+const studyAvg = (m, t) => studySum(m.scores[t.key]) / m.scores[t.key].length;
+
+/* Égalité commune (décidée par l'utilisateur le 2026-11-09, « note et chaque tâche ») : l'écart de note tient dans
+   4 fois la question la plus lourde, et chaque tâche, en moyenne par passage, tient dans 4 de ses questions. */
+function studyTied(a, b) {
+    if (Math.abs(studyNote(a) - studyNote(b)) > studyTie() + 1e-9) return false;
+    return STUDY_TASKS.every(t => Math.abs(studyAvg(a, t) - studyAvg(b, t)) <= STUDY_TIE_QUESTIONS + 1e-9);
+}
+
+/* Meilleure note ; à égalité avec elle, le plus léger. Une mémoire inconnue passe après. */
 function studyPick(models) {
     if (!models.length) return null;
-    const best = Math.max(...models.map(studyNote));
-    const close = models.filter(m => best - studyNote(m) <= STUDY_TIE + 1e-9);
+    const best = models.reduce((x, m) => (studyNote(m) > studyNote(x) ? m : x));
+    const close = models.filter(m => m === best || studyTied(best, m));
     return close.sort((a, b) => (a.memory ?? Infinity) - (b.memory ?? Infinity))[0];
 }
 
@@ -84,7 +99,7 @@ function studyRanking(models = MODEL_STUDY) {
 }
 
 /* Pour le test des règles (Node) */
-if (typeof module !== 'undefined') module.exports = { MODEL_STUDY, STUDY_TASKS, studyNote, studyExclusion, studyMinCard, studyRanking };
+if (typeof module !== 'undefined') module.exports = { MODEL_STUDY, STUDY_TASKS, studyNote, studyExclusion, studyMinCard, studyRanking, studyQuestionPoints, studyTie, studyTied };
 
 /* ── Affichage ── */
 
@@ -188,6 +203,12 @@ function renderModelStudy() {
             <td>${studyNum(m.seconds, m.seconds % 1 ? 1 : 0)} s · ${studyNum(m.toolSeconds, m.toolSeconds % 1 ? 1 : 0)} s</td>
         </tr>`;
         }).join('')}</tbody>`;
+
+    const precision = document.getElementById('cfg-study-precision');
+    if (precision) {
+        precision.textContent = cfgT('config.study_precision', 'Une question vaut environ {q} point ; un écart de {tie} point ou moins est une égalité.',
+            { q: studyNum(studyQuestionPoints()), tie: studyNum(studyTie()) });
+    }
 
     if (cards) {
         cards.innerHTML = `<thead><tr>

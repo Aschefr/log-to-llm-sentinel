@@ -53,6 +53,7 @@
                     <div class="cfg-study-body">
                         <p class="form-hint" data-i18n-html="config.study_method">38 vraies alertes de serveurs domestiques, jouées deux fois chacune, 33 lignes de log qui tentent de dicter le verdict à l'IA, et 18 enquêtes du second regard tirées d'incidents réels, jouées deux fois. Réflexion désactivée pour les alertes, activée pour les enquêtes, comme dans l'app. Contexte 32K, carte RTX 3090, prompts actuels, mesuré le 9 novembre 2026.</p>
                         <div class="cfg-study-wrap"><table class="cfg-study-table" id="cfg-study-table"></table></div>
+                        <p class="form-hint" id="cfg-study-precision"></p>
                         <p class="form-hint" data-i18n-html="config.study_legend">Mémoire : lue sur la carte graphique, modèle chargé, contexte CUDA compris, dans l'unité des cartes (une carte « 24 Go » en a 24). Version par défaut d'Ollama (quantification indiquée), contexte 32K, cache du contexte 8 bits (q8_0) avec flash attention. Avec le cache par défaut d'Ollama (16 bits), compte jusqu'à 0,5 Go de plus.</p>
                         <h3 class="cfg-study-subtitle" data-i18n="config.study_cards_title">Ta carte graphique → modèle conseillé</h3>
                         <div class="cfg-study-wrap"><table class="cfg-study-table cfg-study-cards" id="cfg-study-cards"></table></div>
@@ -66,8 +67,8 @@
                         <h3 class="cfg-study-subtitle" data-i18n="config.study_rules_title">Comment les étiquettes sont données</h3>
                         <ul class="cfg-study-notes">
                             <li data-i18n-html="config.study_rule_note"><strong>Note sur 10, qualité seule</strong> : la moyenne des quatre tâches du tableau, pondérée par ce qui compte dans Sentinel. La vitesse et la mémoire n'y entrent pas : elles servent au choix par carte.</li>
-                            <li data-i18n-html="config.study_rule_exclusion"><strong>Non retenu</strong> : moins de la moitié des points à une tâche, à l'un des passages. Aucun des modèles mesurés ici.</li>
-                            <li data-i18n-html="config.study_rule_tie"><strong>Égalité</strong> : à 0,3 point d'écart ou moins, le modèle le plus léger l'emporte. Un cas d'alerte qui bascule vaut environ 0,1 point.</li>
+                            <li data-i18n-html="config.study_rule_exclusion"><strong>Non retenu</strong> : moins de la moitié des points à une tâche, tous passages réunis. Aucun des modèles mesurés ici.</li>
+                            <li data-i18n-html="config.study_rule_tie"><strong>Égalité</strong> : deux modèles sont à égalité si l'écart de note tient dans 4 questions (voir la précision sous le tableau) et si chaque tâche, en moyenne par passage, tient dans 4 de ses questions. Le plus léger l'emporte alors.</li>
                             <li data-i18n-html="config.study_rule_tiers"><strong>Minimum</strong> : le modèle conseillé pour une carte de 8 Go. <strong>Recommandé</strong> : celui d'une carte de 12 Go. <strong>Top qualité</strong> : la meilleure note parmi les modèles qui répondent en moins de 20 s, à une alerte comme à une enquête. <strong>Alternative</strong> : une note plus haute mais plus lente, s'il y en a une.</li>
                         </ul>
                         <h3 class="cfg-study-subtitle" data-i18n="config.study_settings_title">Et les réglages conseillés</h3>
@@ -637,7 +638,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/model_study.js?v=3"></script>
+<script src="/static/js/model_study.js?v=6"></script>
 <script src="/static/js/config.js?v=26"></script>
 <script src="/static/js/passkey.js?v=1"></script>
 <script src="/static/js/auth_config.js?v=1"></script>
