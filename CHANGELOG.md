@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.12.0] - 2026-11-10
 
 ### Changed
 - **The thinking switch says what it covers**: *Thinking for alerts* also drove the unread triage, resolution checks, the keyword arbiter, the situation summary and meta-analyses, which its name hid. It is now *Thinking for analyses*, and its help lists them. Still off by default: measured with `gemma4:e4b` on 36 real events of a test server, the triage made the same choices for 32 of them with thinking, at 18 to 29 s per batch of 12 instead of 6 to 10 s; two meta-analyses (24 hours and 7 days) found the same issues, at 14 to 23 s instead of 8 to 14 s.
