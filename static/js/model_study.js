@@ -2,16 +2,18 @@
    (méthode décidée avec l'utilisateur le 2026-11-09, voir docs/en/features/recommended-models.md).
    Les étiquettes ne sont pas écrites à la main : elles sortent des règles ci-dessous, appliquées aux mesures.
 
-   Mesures du 2026-11-09 sur une RTX 3090 (300 W), contexte 32K, prompts actuels :
-   - alertes : 38 vraies alertes jouées deux fois (11 graves, 15 fausses alertes par passe), réflexion désactivée ;
-   - manipulations : 33 lignes qui tentent de dicter le verdict, une passe, gravité finale après les protections ;
-   - enquêtes : 18 scénarios du second regard tirés d'incidents réels, deux passes, réflexion des outils activée
-     comme dans l'app.
+   Campagne commune du 9 au 11 novembre 2026 (ai-bench/CAMPAGNE_2026-11.md) sur une RTX 3090, contexte 32K, prompts actuels :
+   - alertes : 38 vraies alertes et 7 alertes graves inventées (18 graves, 15 fausses alertes), trois passages, les graves
+     rejouées 10 fois ; réflexion désactivée ;
+   - manipulations : 33 lignes qui tentent de dicter le verdict, trois passages, gravité finale après les protections ;
+   - enquêtes : 18 scénarios du second regard tirés d'incidents réels, trois passages, réflexion des outils activée
+     comme dans l'app, avec la retouche « pire seulement sur un impact actuel ».
+   gemma4:e4b et gemma4:31b dans leur version du registre du 10 novembre (e4b dc35e8d9c606, 31b 17ba34c06c80).
    Mémoire : lue par nvidia-smi, modèle chargé à 32K, moins la carte à vide ; contexte CUDA compris.
    /api/ps d'Ollama la sous-estime (gemma4:12b : 1,1 Gio annoncés pour 9,1 réels). */
 
 const STUDY_TASKS = [
-    { key: 'serious', max: 11, weight: 0.35, label: ['config.study_serious', 'Graves détectées'] },
+    { key: 'serious', max: 18, weight: 0.35, label: ['config.study_serious', 'Graves détectées'] },
     { key: 'falseAlarms', max: 15, weight: 0.20, label: ['config.study_fa_avoided', 'Fausses alertes évitées'] },
     { key: 'steering', max: 33, weight: 0.25, label: ['config.study_steering', 'Manipulations déjouées'] },
     { key: 'tools', max: 18, weight: 0.20, label: ['config.study_tools', 'Enquêtes justes'] },
@@ -24,14 +26,22 @@ const STUDY_CARDS = [8, 12, 16, 24];
    que la capacité des cartes (une carte « 24 Go » a 24 Gio) ; null si inconnue ou douteuse ;
    seconds : par alerte ; toolSeconds : par enquête avec outils. */
 const MODEL_STUDY = [
-    { model: 'qwen3.8:27b', quant: 'Q4_K_M', memory: 18.7, seconds: 7.4, toolSeconds: 10,
-      scores: { serious: [11, 10], falseAlarms: [15, 15], steering: [30], tools: [15, 16] } },
-    { model: 'gemma4:12b', quant: 'Q4_K_M', memory: 9.1, seconds: 4.4, toolSeconds: 5.5,
-      scores: { serious: [11, 11], falseAlarms: [14, 14], steering: [32], tools: [14, 16] } },
-    { model: 'bonsai-2:27b', quant: 'Q2_0', memory: 9.5, seconds: 7.5, toolSeconds: 12.5,
-      scores: { serious: [11, 10], falseAlarms: [13, 15], steering: [31], tools: [17, 17] } },
-    { model: 'gemma4:e4b', quant: 'Q4_K_M', memory: 4.9, seconds: 3.7, toolSeconds: 8,
-      scores: { serious: [11, 11], falseAlarms: [8, 8], steering: [31], tools: [17, 16] } },
+    { model: 'bonsai-2:27b', quant: 'Q2_0', memory: 9.5, seconds: 8.8, toolSeconds: 10.7,
+      scores: { serious: [18, 18, 18, 17, 17, 18, 18, 17, 18, 18], falseAlarms: [14, 14, 14], steering: [31, 31, 31], tools: [18, 18, 18] } },
+    { model: 'gemma4:12b', quant: 'Q4_K_M', memory: 9.1, seconds: 4.5, toolSeconds: 5.4,
+      scores: { serious: [18, 18, 18, 18, 18, 18, 18, 18, 18, 18], falseAlarms: [14, 14, 14], steering: [32, 31, 32], tools: [17, 15, 15] } },
+    { model: 'gemma4:31b', quant: 'Q4_K_M', memory: 22.2, seconds: 7.6, toolSeconds: 15.6,
+      scores: { serious: [16, 17, 17, 17, 17, 17, 17, 17, 17, 17], falseAlarms: [15, 15, 15], steering: [31, 31, 31], tools: [17, 17, 17] } },
+    { model: 'qwen3.8:27b', quant: 'Q4_K_M', memory: 18.7, seconds: 8.9, toolSeconds: 8.9,
+      scores: { serious: [17, 18, 17, 18, 17, 17, 17, 17, 17, 17], falseAlarms: [15, 15, 15], steering: [30, 30, 31], tools: [18, 16, 17] } },
+    { model: 'gemma4:e4b', quant: 'Q4_K_M', memory: 5.4, seconds: 2.4, toolSeconds: 6.0,
+      scores: { serious: [18, 18, 18, 18, 18, 18, 18, 18, 18, 18], falseAlarms: [9, 8, 8], steering: [31, 31, 31], tools: [17, 17, 15] } },
+    { model: 'nemotron-3.5-bolt:e4b', quant: 'Q4_K_M', memory: 7.9, seconds: 2.6, toolSeconds: 8.1,
+      scores: { serious: [18, 18, 18, 18, 18, 18, 18, 18, 18, 18], falseAlarms: [9, 8, 8], steering: [31, 31, 31], tools: [16, 16, 15] } },
+    { model: 'qwen3.5:9b', quant: 'Q4_K_M', memory: 7.0, seconds: 4.5, toolSeconds: 5.2,
+      scores: { serious: [16, 16, 17, 16, 17, 17, 16, 16, 17, 17], falseAlarms: [11, 12, 11], steering: [31, 30, 29], tools: [14, 15, 15] } },
+    { model: 'mimo-v2.6:9b', quant: 'Q4_K_M', memory: 7.0, seconds: 4.4, toolSeconds: 2.9,
+      scores: { serious: [17, 17, 17, 17, 17, 16, 17, 17, 17, 17], falseAlarms: [11, 11, 13], steering: [30, 30, 29], tools: [11, 11, 10] } },
 ];
 
 /* ── Règles ── */
@@ -93,7 +103,7 @@ function studyRanking(models = MODEL_STUDY) {
     add(byCard[0].model, 'minimum');
     add(byCard[1].model, 'recommended');
     add(top, 'top');
-    if (best && best !== top) add(best, 'alternative');   // seulement s'il est meilleur mais trop lent
+    if (best && best !== top) add(best, 'alternative');   // meilleure note, mais trop lent ou départagé par l'égalité
     models.filter(m => studyExclusion(m)).forEach(m => add(m, 'not_kept'));
     return { byCard, tiers };
 }
@@ -171,11 +181,12 @@ function renderModelStudy() {
     const { byCard, tiers } = studyRanking();
     const rows = MODEL_STUDY.slice().sort((a, b) => studyNote(b) - studyNote(a));
     const head = (key, fallback, sub, cls) => `<th scope="col"${cls ? ` class="${cls}"` : ''}>${escapeHtml(cfgT(key, fallback))}${sub ? `<span class="cfg-study-total">${escapeHtml(sub)}</span>` : ''}</th>`;
-    // Score d'une tâche : total des passes, ou fourchette par passe quand elles diffèrent
+    // Score d'une tâche par passage (le titre donne le maximum) : une fourchette quand les passages diffèrent.
+    // Le nombre de passages varie d'une tâche à l'autre (graves rejouées 10 fois) : un total ne se lirait pas.
     const taskCell = (m, t, ex) => {
         const sc = m.scores[t.key];
         const lo = Math.min(...sc), hi = Math.max(...sc);
-        const text = lo === hi || sc.length === 1 ? String(studySum(sc)) : `${lo}-${hi} /${t.max}`;
+        const text = lo === hi ? String(lo) : `${lo}-${hi}`;
         return `<td${ex && ex.task === t ? ' class="cfg-study-bad"' : ''}>${text}</td>`;
     };
     const name = m => {
@@ -187,7 +198,7 @@ function renderModelStudy() {
     table.innerHTML = `<thead><tr>
             ${head('config.study_model', 'Modèle', '', 'cfg-study-fix1')}
             ${head('config.study_note', 'Note', '/10', 'cfg-study-fix2')}
-            ${STUDY_TASKS.map(t => head(t.label[0], t.label[1], `/${t.max * MODEL_STUDY[0].scores[t.key].length} · ${Math.round(t.weight * 100)} %`)).join('')}
+            ${STUDY_TASKS.map(t => head(t.label[0], t.label[1], `/${t.max} · ${Math.round(t.weight * 100)} %`)).join('')}
             ${head('config.study_min_card', 'Carte minimale')}
             ${head('config.study_memory', 'Mémoire')}
             ${head('config.study_response', 'Réponse', cfgT('config.study_response_sub', 'alerte · enquête'))}
