@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.12.1] - 2026-11-11
 
 ### Changed
 - **Recommended models measured again, eight models**: *Configuration › Which model to choose* now rests on a campaign shared with the other local-AI apps (9 to 11 November 2026): 18 serious alerts instead of 11, three runs of everything, the serious ones ten times. Eight models are in the table, with `gemma4:31b`, `nemotron-3.5-bolt:e4b`, `qwen3.5:9b` and `mimo-v2.6:9b` added, and `gemma4:e4b` and `gemma4:31b` in their new registry version. The choices do not change: `gemma4:e4b` for 8 GB, `gemma4:12b` from 12 GB. `bonsai-2:27b` has the best score (9.7) but ties with `gemma4:12b` (9.5), the lighter, and now shows as *Alternative*. `qwen3.5:4b` is not kept (too many false alarms).
