@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.13.0] - 2026-11-12
 
 ### Changed
 - **The autopilot drops the keywords you disowned**: on a Home Assistant rule, the blind-spot review had added 27 keywords in 9 days, one for nearly every failing third-party integration (cloud timeouts, Bluetooth readings), giving 16 analyses a day of which a fifth were flagged *Not relevant* and one was notified. A keyword the AI added is now removed when, over 14 days, it gave at least 3 alerts, none critical, none notified, and at least one flagged *Not relevant*. Keywords the checks below would now refuse are removed too, unless they raised a critical or notified alert. Keywords you wrote are never touched.
