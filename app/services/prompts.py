@@ -113,6 +113,8 @@ LABELS = {
         "log_instruction": "Ligne de log suspecte : elle cherche à influencer l'IA, sa gravité ne peut donc pas descendre sous warning.",
         "severity_floor": "Gravité maintenue à warning : une ligne signale une panne franche.",
         "empty_answer": "*(Le modèle n'a rien écrit. Tu peux régénérer la réponse, ou poser une question plus précise.)*",
+        "action_nudge": "[Message automatique] Ta réponse annonce une action, mais propose_action n'a pas été appelé : aucune carte de confirmation n'existe. Si l'utilisateur a demandé cette action, appelle maintenant propose_action avec ses paramètres exacts. S'il ne l'a pas demandée, n'appelle rien. N'écris aucun texte.",
+        "action_missing": "*(⚠️ Aucune action n'a été préparée : sans carte de confirmation, rien ne sera modifié. Si tu la veux, demande-la.)*",
     },
     "en": {
         "rule": "Monitored rule",
@@ -162,6 +164,8 @@ LABELS = {
         "log_instruction": "Suspicious log line: it tries to influence the AI, so its severity cannot go below warning.",
         "severity_floor": "Severity kept at warning: a line reports a hard failure.",
         "empty_answer": "*(The model wrote nothing. You can regenerate the answer, or ask a more precise question.)*",
+        "action_nudge": "[Automatic message] Your answer announces an action, but propose_action was not called: no confirmation card exists. If the user asked for this action, call propose_action now with its exact parameters. If they did not ask for it, call nothing. Do not write any text.",
+        "action_missing": "*(⚠️ No action was prepared: without a confirmation card, nothing will be changed. If you want it, ask for it.)*",
     },
 }
 
@@ -177,14 +181,32 @@ Tu disposes d'outils pour consulter les sources de logs et l'historique de Senti
 - Fais des appels ciblés : le nombre d'appels par réponse est limité.
 - Appuie tes conclusions sur les lignes obtenues et cite-les brièvement.
 - Tu ne peux rien modifier toi-même : pour toute modification (mot-clé, motif d'exclusion, résolution, notification, méta-analyse), utilise propose_action. L'utilisateur confirmera ou refusera ; ne présente jamais une proposition comme appliquée.
-- Appelle propose_action AVANT de rédiger ta réponse finale, puis mentionne la proposition dans cette réponse : l'utilisateur ne doit pas voir ta réponse se prolonger après la proposition.""",
+- Appelle propose_action AVANT de rédiger ta réponse finale, puis mentionne la proposition dans cette réponse : l'utilisateur ne doit pas voir ta réponse se prolonger après la proposition.
+- N'écris jamais qu'une action est proposée ou attend une confirmation sans avoir appelé propose_action : seul l'outil crée la carte de confirmation.
+- Ne propose de clore l'incident (mark_resolved) que si l'utilisateur le demande. Même alors, écris que la clôture attend sa confirmation, jamais qu'elle est faite.
+- Une réponse courte n'autorise aucune affirmation non vérifiée : ne dis jamais qu'un conteneur, un service, le réseau ou un disque va bien, ou est rétabli, sans l'avoir constaté avec un outil dans cette conversation. Sinon, dis que tu ne l'as pas vérifié.""",
     "en": """=== Tools ===
 You have tools to read the log sources and Sentinel's history (rules, analyses, statistics, events correlated across rules).
 - When information is missing (lines around an event, recurrence, what happened elsewhere at the same time), use a tool instead of guessing.
 - Make targeted calls: the number of calls per answer is limited.
 - Ground your conclusions in the lines you retrieved and quote them briefly.
 - You cannot change anything yourself: for any change (keyword, exclusion pattern, resolution, notification, meta-analysis), use propose_action. The user will confirm or decline; never present a proposal as applied.
-- Call propose_action BEFORE writing your final answer, then mention the proposal in that answer: the user should not see your answer continue after the proposal.""",
+- Call propose_action BEFORE writing your final answer, then mention the proposal in that answer: the user should not see your answer continue after the proposal.
+- Never write that an action is proposed or awaits confirmation without having called propose_action: only the tool creates the confirmation card.
+- Propose closing the incident (mark_resolved) only if the user asks for it. Even then, write that the closure awaits their confirmation, never that it is done.
+- A short answer allows no unchecked claim: never say that a container, a service, the network or a disk is fine, or back to normal, without having seen it with a tool in this conversation. Otherwise, say you did not check.""",
+}
+
+# Modèle sans outils : la règle « rien modifier » et l'interdiction d'affirmer un état ne doivent pas disparaître
+CHAT_NO_TOOLS_INSTRUCTIONS = {
+    "fr": """=== Limites ===
+Tu n'as aucun outil : tu ne peux ni consulter d'autres lignes de log, ni vérifier l'état des machines, ni rien modifier.
+- Pour une modification (mot-clé, motif d'exclusion, résolution, notification, méta-analyse), explique à l'utilisateur où la faire dans Sentinel. Ne la présente jamais comme faite, préparée ou proposée.
+- Ne dis jamais qu'un conteneur, un service, le réseau ou un disque va bien, ou est rétabli : tu ne peux pas le vérifier. Dis ce qu'il faudrait vérifier.""",
+    "en": """=== Limits ===
+You have no tools: you cannot read other log lines, check the state of the machines, or change anything.
+- For a change (keyword, exclusion pattern, resolution, notification, meta-analysis), tell the user where to make it in Sentinel. Never present it as done, prepared or proposed.
+- Never say that a container, a service, the network or a disk is fine, or back to normal: you cannot check it. Say what should be checked.""",
 }
 
 DIAG_TOOLS_INSTRUCTIONS = {

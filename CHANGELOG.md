@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **An action announced in the chat could have no card**: an answer wrote *Proposed action: `trigger_meta_analysis` (needs confirmation)* without calling the tool that creates the proposal, so no confirmation card appeared and an internal tool name showed in the text. When an answer announces an action without proposing it, Sentinel now asks the model once more, silently and with only the proposal tool, to propose it if the user asked for it; if there is still no card and the answer still offers an action, it ends with a warning that no action was prepared. A tool call written out in the text instead of being made is removed from the final answer.
+- **A meta-analysis could never be proposed from the chat**: the proposal needs the id of a meta-analysis, which no chat tool listed, so models passed the id of the rule or the alert and the proposal failed every time (0 out of 10 in a measurement on two models). This is the likely cause of the announced action without a card. The chat now picks the meta-analysis that covers the rule in question, or the rule of the conversation's alert; when several do, it asks which one and lists them.
+- **Closing an incident needed the rule id**: models first called it without the rule and only succeeded on a second try. The rule is now taken from the alert when it is not given. The assistant proposes to close an incident only when the user asks for it, and writes that the closure awaits confirmation, never that it is done.
+- **The proposal's internal wording showed in answers**: models copied the tool's reply, written for them in capitals, into the answer. That reply is now worded so it can be shown as it is.
+- **The chat could say all is well without checking**: the instruction to answer briefly had no counterweight, and nothing stopped the assistant from saying a container or the network was fine without looking. It is now told never to say that a container, a service, the network or a disk is fine, or back to normal, without having checked it with a tool, and to say when it did not check.
+- **A model without tools lost the rule that it cannot change anything**: that rule was part of the tool instructions, which a model without tool support never received. Such a model now gets its own short block: it can neither check nor change anything, and points to where a change is made in Sentinel.
+
 ## [1.13.0] - 2026-11-12
 
 ### Changed

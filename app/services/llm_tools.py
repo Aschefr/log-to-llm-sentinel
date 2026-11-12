@@ -392,6 +392,10 @@ def describe_effect(action: str, params: dict, lang: str = "fr") -> str:
     return (en if lang == "en" else fr).get(action, "ok")
 
 
+# Consigne pour le modèle, retirée de la réponse s'il la recopie
+PROPOSAL_HINT = "Termine ta réponse en la mentionnant en une phrase, sans réécrire ton analyse."
+
+
 def propose_action(db, action=None, reason=None, rule_id=None, analysis_id=None, config_id=None, value=None,
                    _conversation_id=None, **_):
     if action not in ACTIONS:
@@ -409,6 +413,11 @@ def propose_action(db, action=None, reason=None, rule_id=None, analysis_id=None,
     if action == "add_excluded_pattern" and cited and str(value or "").strip().lower() in cited.lower():
         raise ToolError("Exclusion non proposée : ce motif est dans la ligne de cette alerte de sécurité, il masquerait les prochaines "
                         "tentatives, y compris une attaque de la même source.")
+    # Mesuré : sans rule_id, mark_resolved échouait au premier appel ; la règle se déduit de l'alerte
+    if action == "mark_resolved" and rule_id in (None, ""):
+        rule_id = _rule_of(db, analysis_id, _conversation_id)
+    if action == "trigger_meta_analysis":
+        config_id = _meta_config_for(db, config_id, rule_id, analysis_id, _conversation_id)
     params = {}
     for key in ACTIONS[action]:
         val = {"rule_id": rule_id, "analysis_id": analysis_id, "config_id": config_id, "value": value}[key]
@@ -435,9 +444,8 @@ def propose_action(db, action=None, reason=None, rule_id=None, analysis_id=None,
     db.add(act)
     db.commit()
     db.refresh(act)
-    return (f"Action #{act.id} proposée : {describe_action(action, params)}. Elle est EN ATTENTE de confirmation par "
-            f"l'utilisateur et n'est PAS appliquée ; ne la présente pas comme effectuée. "
-            f"Termine ta réponse en la mentionnant en une phrase, sans réécrire ton analyse.")
+    return (f"Action #{act.id} proposée : {describe_action(action, params)}. Elle attend ta confirmation (bouton Appliquer "
+            f"de la carte) : rien n'est appliqué d'ici là.\n{PROPOSAL_HINT}")
 
 
 def action_to_dict(act: ChatAction, lang: str = "fr") -> dict:
@@ -617,11 +625,53 @@ def docker_container_stats(db, name, connection=None, _conversation_id=None, **_
     return _diag(diag.docker_container_stats, _link(db, "docker", connection, _conversation_id)["docker_url"], name)
 
 
+def _conversation_analysis(db, conversation_id) -> Optional[Analysis]:
+    """L'alerte à partir de laquelle la conversation a été ouverte, s'il y en a une."""
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conversation_id).first() if conversation_id else None
+    return db.query(Analysis).filter(Analysis.id == conv.analysis_id).first() if conv and conv.analysis_id else None
+
+
+def _rule_of(db, analysis_id, conversation_id) -> Optional[int]:
+    """La règle d'une analyse donnée, sinon celle de l'alerte de la conversation."""
+    a = db.query(Analysis).filter(Analysis.id == _clip(analysis_id, 0, 10**9, 0)).first() if analysis_id not in (None, "") else None
+    a = a or _conversation_analysis(db, conversation_id)
+    return a.rule_id if a else None
+
+
+def _meta_config_for(db, config_id, rule_id, analysis_id, conversation_id) -> int:
+    """La méta-analyse à lancer. Aucun outil ne liste les configurations : les modèles passent l'id de la règle ou de
+    l'analyse (mesuré : 0 proposition réussie sur 10). Un config_id inconnu est donc retrouvé par la règle concernée."""
+    configs = db.query(MetaAnalysisConfig).order_by(MetaAnalysisConfig.id).all()
+    if not configs:
+        raise ToolError("Aucune méta-analyse n'est configurée : l'utilisateur doit d'abord en créer une dans la page Méta-analyse.")
+    cid = _clip(config_id, 0, 10**9, 0) if config_id not in (None, "") else None
+    if cid and any(c.id == cid for c in configs):
+        return cid
+    rid = _clip(rule_id, 0, 10**9, 0) if rule_id not in (None, "") else None
+    if not (rid and db.query(Rule).filter(Rule.id == rid).first()):
+        rid = _rule_of(db, analysis_id, conversation_id)
+
+    def covers(c):
+        try:
+            ids = [int(i) for i in json.loads(c.rule_ids_json or "[]")]
+        except (TypeError, ValueError):
+            ids = []
+        return not ids or rid in ids   # liste vide : toutes les règles
+
+    found = [c for c in configs if covers(c)] if rid else configs
+    if len(found) > 1 and rid:   # une configuration propre à la règle passe avant celles qui couvrent tout
+        own = [c for c in found if c.rule_ids_json not in (None, "", "[]")]
+        found = own or found
+    if len(found) == 1:
+        return found[0].id
+    listing = " ; ".join(f"#{c.id} « {c.name} »" for c in (found or configs)[:10])
+    raise ToolError(f"Méta-analyse à préciser : passe config_id parmi {listing}.")
+
+
 def _exclusion_targets(db, rule: Rule, conversation_id) -> tuple:
     """Lignes qu'une exclusion proposée doit recouvrir : celles de l'alerte de la conversation quand elle est de cette
     règle, sinon celles des alertes de la règle sur 30 jours. Aucune ligne : rien à vérifier."""
-    conv = db.query(ChatConversation).filter(ChatConversation.id == conversation_id).first() if conversation_id else None
-    analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first() if conv and conv.analysis_id else None
+    analysis = _conversation_analysis(db, conversation_id)
     if analysis and analysis.rule_id == rule.id:
         return analysis_lines(analysis), "de l'alerte de cette conversation"
     since = datetime.utcnow() - timedelta(days=30)
@@ -631,8 +681,7 @@ def _exclusion_targets(db, rule: Rule, conversation_id) -> tuple:
 
 def _alert_citing_cve(db, conversation_id) -> str:
     """La ligne de l'alerte de cette conversation si elle cite un CVE, sinon une chaîne vide."""
-    conv = db.query(ChatConversation).filter(ChatConversation.id == conversation_id).first() if conversation_id else None
-    analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first() if conv and conv.analysis_id else None
+    analysis = _conversation_analysis(db, conversation_id)
     return analysis.triggered_line if analysis and cve_lookup.first_cve(analysis.triggered_line) else ""
 
 
@@ -702,9 +751,11 @@ TOOLS = [
     _fn("get_attack_summary", "Tentatives bloquées par le pare-feu sur une source CEF (UniFi…), regroupées par port et sens : flux, nombre de sources, signature. Montre ce qui est exposé et visé, au-delà d'une alerte isolée.",
         {"rule_id": _INT, "days": _INT}, ["rule_id"]),
     _fn("propose_action", "Propose une modification à l'utilisateur, qui devra la confirmer (rien n'est appliqué sans son accord). "
-        "Actions : add_excluded_pattern / add_keyword / remove_keyword (rule_id + value), mark_resolved (rule_id), "
+        "Actions : add_excluded_pattern / add_keyword / remove_keyword (rule_id + value), mark_resolved (rule_id, ou "
+        "analysis_id de l'alerte : seulement si l'utilisateur demande de clore l'incident), "
         "exclude_from_mttr (analysis_id : exclut UNE analyse précise du calcul du MTTR, ne change ni la règle ni les futures alertes), "
-        "resend_notification (analysis_id), trigger_meta_analysis (config_id). Pour ne plus être alerté sur un bruit récurrent, "
+        "resend_notification (analysis_id), trigger_meta_analysis (config_id si connu, sinon rule_id : la méta-analyse "
+        "qui couvre cette règle). Pour ne plus être alerté sur un bruit récurrent, "
         "c'est add_excluded_pattern (ou remove_keyword) qu'il faut proposer. Explique la raison dans reason.",
         {"action": {"type": "string", "enum": list(ACTIONS)}, "reason": {"type": "string"}, "rule_id": _INT,
          "analysis_id": _INT, "config_id": _INT, "value": {"type": "string"}}, ["action", "reason"]),

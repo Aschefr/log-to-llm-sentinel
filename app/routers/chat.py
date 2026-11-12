@@ -15,7 +15,7 @@ from app.services.chat_agent import run_agent_turn, replay_tool_messages, AgentL
 from app.services.llm_tools import apply_action, action_to_dict
 from app.services import cve_lookup, web_search
 from app.services.prompts import SECURITY_ALERT_INSTRUCTIONS, WEB_TOOLS_INSTRUCTIONS
-from app.services.prompts import CHAT_ANALYSIS_CONTEXT, CHAT_TOOLS_INSTRUCTIONS, DIAG_TOOLS_INSTRUCTIONS, DIAG_LINKS_INSTRUCTIONS, INVESTIGATION_PROMPT
+from app.services.prompts import CHAT_ANALYSIS_CONTEXT, CHAT_NO_TOOLS_INSTRUCTIONS, CHAT_TOOLS_INSTRUCTIONS, DIAG_TOOLS_INSTRUCTIONS, DIAG_LINKS_INSTRUCTIONS, INVESTIGATION_PROMPT
 from app.services import dashboard_watch, diagnostics, event_notes
 from app.services.alert_analysis import render_notes
 from app.services.orchestrator import Orchestrator
@@ -281,6 +281,8 @@ def build_chat_messages(conv_id: int, db: Session, with_tools: bool = False) -> 
 
     if mode_text:
         block_lines.append(mode_text)
+    if not with_tools:
+        block_lines.extend(["", CHAT_NO_TOOLS_INSTRUCTIONS.get(lang, CHAT_NO_TOOLS_INSTRUCTIONS["fr"])])
     if with_tools:
         block_lines.extend(["", CHAT_TOOLS_INSTRUCTIONS.get(lang, CHAT_TOOLS_INSTRUCTIONS["fr"])])
         links = diagnostics.links_for_conversation(db, conv_id)
