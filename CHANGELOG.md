@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+- **The autopilot drops the keywords you disowned**: on a Home Assistant rule, the blind-spot review had added 27 keywords in 9 days, one for nearly every failing third-party integration (cloud timeouts, Bluetooth readings), giving 16 analyses a day of which a fifth were flagged *Not relevant* and one was notified. A keyword the AI added is now removed when, over 14 days, it gave at least 3 alerts, none critical, none notified, and at least one flagged *Not relevant*. Keywords the checks below would now refuse are removed too, unless they raised a critical or notified alert. Keywords you wrote are never touched.
+- **A past outage no longer sets the silence delay**: the autopilot waited twice the longest silence seen before warning that a source was quiet, so one outage in the history made a source that writes every few seconds wait a whole day (25 h measured on a syslog host). On a busy source read over at least 3 days, a single silence more than twice as long as all the others is now set aside. A nightly pause, seen every day, still counts. The new delay applies at the rule's next weekly re-read.
+
+### Fixed
+- **A keyword came back the day after it was flagged**: after alerts on `healthcheck failed` lines were flagged *Not relevant*, the weekly re-read added `healthcheck failed` as a keyword. The arbiter can no longer add a keyword that matches a line of an alert flagged *Not relevant* over the last 30 days.
+- **Keywords too broad or tied to one address**: the arbiter could add `Traceback (most recent call last)`, which catches every Python error of a source, a lone exception name, or a line holding an IPv6 address, which only ever matches that one neighbour. These are now refused like `error` or an IPv4 address.
+- **An exception name accepted as a return-to-normal line**: the autopilot applied `CancelledError` as a sign that an incident was over, because the failure-word check missed exception names. They now count as failure words, and the pattern is removed at the next upkeep.
+- **An exclusion proposed in the chat could leave its alert untouched**: to silence outgoing P2P blocks, the chat proposed excluding a device's MAC address that the alert lines did not contain, and the alerts kept coming. An exclusion is now proposed only when it appears in the lines of the conversation's alert (or, without one, of the rule's alerts over 30 days); otherwise the AI is asked for an exact fragment of the line.
+
 ## [1.12.1] - 2026-11-11
 
 ### Changed

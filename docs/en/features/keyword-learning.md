@@ -28,7 +28,7 @@ The arbiter also receives the rule's [notes](notes.md). Its safeguards still app
 
 | Proposal | Discarded when… | Offered to you instead of applied when… |
 |---|---|---|
-| Add a keyword | it is not literally in the error lines, is generic (`error`, `failed`…), contains a variable part (number, address…), or an exclusion would neutralize it | the AI's confidence is below 70, or it would match more than 200 lines a day |
+| Add a keyword | it is not literally in the error lines, is generic (`error`, `failed`, a lone exception name such as `CancelledError`, `Traceback (most recent call last)`…), contains a variable part (number, IPv4 or IPv6 address…), an exclusion would neutralize it, or it matches a line of an alert flagged *Not relevant* over the last 30 days | the AI's confidence is below 70, or it would match more than 200 lines a day |
 | Add an exclusion | it is not literally in the noisy lines, or is generic | it would hide a `warning`/`critical` alert of the last 30 days, or neutralize a keyword, or confidence < 70 |
 | Remove a keyword | — | it is the rule's last keyword, it triggered `critical` alerts or many `warning`s, or confidence < 70 |
 

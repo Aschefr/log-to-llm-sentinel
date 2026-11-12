@@ -47,6 +47,9 @@ NOISE_REVIEW_DAYS = 7          # un mot-clé conservé n'est réexaminé qu'apr�
 NOISE_PER_REVIEW = 4
 AUTO_CONFIDENCE = 70
 MAX_KEYWORD_PER_DAY = 200      # au-delà, un nouveau mot-clé risque de noyer la règle : proposé, pas appliqué
+FLAGGED_DAYS = 30              # un mot-clé qui recouvre une alerte signalée pas pertinente depuis 30 jours n'est pas ajouté
+PRUNE_DAYS = 14                # pilote automatique : mot-clé ajouté par l'IA, retiré s'il n'a produit sur 14 jours…
+PRUNE_MIN_ALERTS = 3           # … qu'au moins 3 alertes, aucune critique, aucune notifiée, dont une signalée pas pertinente
 VALUE_MIN_LEN, VALUE_MAX_LEN = 3, 80
 CHANGES_RETENTION_DAYS = 180
 DISMISSED_RETRY_DAYS = 30      # pilote automatique : un changement écarté peut être reproposé après ce délai
@@ -59,6 +62,12 @@ GENERIC_VALUES = {
     "error", "errors", "err", "fail", "failed", "failure", "warning", "warn", "info", "debug", "notice",
     "critical", "fatal", "exception", "timeout", "denied", "invalid", "unable", "erreur", "échec",
 }
+
+# Début de trace ou nom d'exception seul : ils attraperaient n'importe quelle erreur de la source
+GENERIC_PHRASES = {"traceback", "traceback (most recent call last)", "stack trace", "stacktrace"}
+_BARE_EXCEPTION = re.compile(r"[\w.]*(?:error|exception)", re.IGNORECASE)
+# Adresse IPv6 (complète ou abrégée par « :: ») : la signature des lignes ne la remplace pas
+_HEX_COLON = re.compile(r"(?<![\w:.])[0-9a-f]*(?::[0-9a-f]*){2,7}(?![\w:])", re.IGNORECASE)
 
 # Niveau explicite : syslog <PRI>, champ JSON level, ou jeton de niveau dans la ligne
 _SYSLOG_PRI = re.compile(r"^\s*<(\d{1,3})>")
@@ -147,9 +156,14 @@ def _today() -> str:
     return datetime.utcnow().strftime("%Y-%m-%d")
 
 
+def _has_ipv6(value: str) -> bool:
+    return any("::" in m or (m.count(":") >= 3 and re.search("[a-f]", m, re.IGNORECASE))
+               for m in (x.group(0) for x in _HEX_COLON.finditer(value)))
+
+
 def _has_variable_part(value: str) -> bool:
     """Contient une valeur variable (horodatage, adresse, identifiant, grand nombre) : ne se généraliserait pas."""
-    return "<" in line_signature(value) and "<" not in value
+    return ("<" in line_signature(value) and "<" not in value) or _has_ipv6(value)
 
 
 def load_stats(rule: Rule) -> dict:
@@ -370,6 +384,23 @@ class KeywordTuningService:
                              if fr else (f"- Notifications from **{rule.notify_severity_threshold}**: {basis.get('low')} of the "
                                          f"{basis.get('alerts')} alerts of the last 30 days were info or not relevant"))
             dismiss_pending(db, rule)
+            for cand in prune_candidates(db, rule):
+                if len(rule.get_keywords()) <= 1:
+                    break
+                if cand["problem"]:
+                    reason = ({"generic": "trop générique, il attraperait n'importe quelle erreur",
+                               "variable": "il contient une valeur variable (adresse, identifiant)"}.get(cand["problem"], cand["problem"])
+                              if fr else {"generic": "too generic, it would catch any error",
+                                          "variable": "it holds a variable value (address, identifier)"}.get(cand["problem"], cand["problem"]))
+                else:
+                    reason = (f"{cand['alerts']} alertes en {PRUNE_DAYS} jours, aucune notifiée ni critique, "
+                              f"{cand['irrelevant']} signalée(s) pas pertinente(s)" if fr else
+                              f"{cand['alerts']} alerts in {PRUNE_DAYS} days, none notified or critical, "
+                              f"{cand['irrelevant']} flagged not relevant")
+                if record_change(db, rule, "keyword", "remove", cand["keyword"], "feedback", reason, 100,
+                                 {"alerts": cand["alerts"], "severities": cand["severities"],
+                                  "irrelevant": cand["irrelevant"]}):
+                    lines.append(f"- {'Mot-clé retiré' if fr else 'Keyword removed'} `{cand['keyword']}` : {reason}")
             recent = await asyncio.to_thread(lambda: read_tail_lines(resolve_path(rule.log_file_path))[-5000:])
             # Origine absente (versions précédentes) : un motif appris porte une date de validation, un motif manuel non
             origin_of = lambda p: p.get("origin") or ("learned" if p.get("last_validated_at") else "manual")
@@ -467,6 +498,32 @@ def change_dict(c: KeywordChange) -> dict:
 def _per_day(count: int, first: datetime, last: datetime) -> float:
     days = max(1.0, (last - first).total_seconds() / 86400) if first and last else 1.0
     return round(count / days, 1)
+
+
+def prune_candidates(db, rule: Rule, now: Optional[datetime] = None) -> List[dict]:
+    """Pilote automatique : mots-clés ajoutés par l'IA (angle mort, apprentissage) dont les alertes des 14 derniers
+    jours sont au moins 3, aucune critique, aucune notifiée, et dont au moins une a été signalée pas pertinente ; et
+    ceux que les garde-fous refuseraient aujourd'hui (générique, valeur variable) s'ils n'ont rien notifié de grave."""
+    now = now or datetime.utcnow()
+    added = {c.value.lower() for c in db.query(KeywordChange).filter(
+        KeywordChange.rule_id == rule.id, KeywordChange.kind == "keyword", KeywordChange.action == "add",
+        KeywordChange.status == "applied", KeywordChange.origin.in_(("blind_spot", "learning"))).all()}
+    keywords = [k for k in rule.get_keywords() if k.lower() in added]
+    if not keywords or len(rule.get_keywords()) <= 1:
+        return []
+    rows = db.query(Analysis).filter(Analysis.rule_id == rule.id,
+                                     Analysis.analyzed_at >= now - timedelta(days=PRUNE_DAYS)).all()
+    out = []
+    for kw in keywords:
+        mine = [a for a in rows if kw in json.loads(a.matched_keywords_json or "[]")]
+        irrelevant = sum(1 for a in mine if a.feedback == "irrelevant")
+        serious = any(a.notified for a in mine) or any((a.severity or "").lower() == "critical" for a in mine)
+        problem = _value_problem(kw)
+        problem = problem if problem in ("generic", "variable") else None  # une longueur hors bornes ne dit rien du sens
+        if not serious and (problem or (len(mine) >= PRUNE_MIN_ALERTS and irrelevant)):
+            out.append({"keyword": kw, "alerts": len(mine), "irrelevant": irrelevant, "problem": problem,
+                        "severities": dict(Counter((a.severity or "info").lower() for a in mine))})
+    return out
 
 
 def blind_spot_candidates(db, rule: Rule) -> List[dict]:
@@ -628,7 +685,7 @@ def _value_problem(v: str) -> Optional[str]:
     """Raison de rejet d'une valeur proposée par l'arbitre (None si acceptable)."""
     if not (VALUE_MIN_LEN <= len(v) <= VALUE_MAX_LEN):
         return "length"
-    if v.lower() in GENERIC_VALUES:
+    if v.lower() in GENERIC_VALUES or v.lower().rstrip(": ") in GENERIC_PHRASES or _BARE_EXCEPTION.fullmatch(v):
         return "generic"
     if _has_variable_part(v):
         return "variable"
@@ -703,6 +760,14 @@ def record_change(db, rule: Rule, kind: str, action: str, value: str, origin: st
     return change
 
 
+def flagged_lines(db, rule: Rule, days: int = FLAGGED_DAYS) -> List[str]:
+    """Lignes des alertes signalées pas pertinentes depuis 30 jours (en minuscules)."""
+    since = datetime.utcnow() - timedelta(days=days)
+    rows = db.query(Analysis).filter(Analysis.rule_id == rule.id, Analysis.feedback == "irrelevant",
+                                     Analysis.analyzed_at >= since).all()
+    return [l.lower() for a in rows for l in _analysis_lines(a)]
+
+
 def _confidence(item: dict) -> int:
     try:
         return max(0, min(100, int(item.get("confidence", 0))))
@@ -717,6 +782,7 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
     keywords = rule.get_keywords()
     excluded = rule.get_excluded_patterns()
     seen = set()  # même changement proposé deux fois dans une réponse (ex. une exclusion pour deux mots-clés)
+    flagged = None
 
     def once(kind, action, value):
         key = (kind, action, value.lower())
@@ -747,6 +813,14 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
             continue
         if keyword_match.neutralized([value], excluded) or any(k.lower() == value.lower() for k in keywords) \
                 or not once("keyword", "add", value):
+            continue
+        # L'utilisateur a signalé pas pertinente une alerte sur ces lignes : on ne la fait pas revenir
+        if flagged is None:
+            flagged = flagged_lines(db, rule)
+        if any(keyword_match.contains(value, l) for l in flagged):
+            if tpl is not None:
+                tpl.status, tpl.reviewed_count = "ignored", tpl.count
+            logger.info("KeywordTuning", f"Mot-clé proposé écarté pour '{rule.name}' (alerte signalée pas pertinente) : « {value} »")
             continue
         # Déjà couvert par un mot-clé ajouté juste avant (deux lignes du même événement)
         if all(keyword_match.classify(ex, keywords, excluded)[0] for ex in examples):

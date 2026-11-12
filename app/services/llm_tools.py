@@ -22,6 +22,7 @@ from app.services import attack_summary, cve_lookup, log_source, web_search
 from app.services import diagnostics as diag
 from app.services import event_notes
 from app.services.alert_analysis import analysis_lines, render_notes, short_summary
+from app.utils import keyword_match
 from app.utils.log_utils import clean_log_line, line_signature
 
 MAX_OUTPUT_CHARS = 4000
@@ -418,6 +419,13 @@ def propose_action(db, action=None, reason=None, rule_id=None, analysis_id=None,
         rule = _rule(db, params["rule_id"])
         if action == "remove_keyword" and params["value"] not in rule.get_keywords():
             raise ToolError(f"« {params['value']} » n'est pas un mot-clé de la règle #{rule.id} ({', '.join(rule.get_keywords())}).")
+        if action == "add_excluded_pattern":
+            targets, scope = _exclusion_targets(db, rule, _conversation_id)
+            low = params["value"].lower()
+            if targets and not any(keyword_match.contains(low, l.lower()) for l in targets):
+                raise ToolError(f"Exclusion non proposée : « {params['value']} » n'apparaît dans aucune ligne {scope}, elle ne "
+                                "ferait rien disparaître. Reprends un fragment exact d'une ligne déclenchante (copié de la ligne, "
+                                "pas déduit d'un nom ou d'une adresse vus ailleurs).")
     if "analysis_id" in params and not db.query(Analysis).filter(Analysis.id == params["analysis_id"]).first():
         raise ToolError(f"Analyse #{params['analysis_id']} introuvable.")
     if "config_id" in params and not db.query(MetaAnalysisConfig).filter(MetaAnalysisConfig.id == params["config_id"]).first():
@@ -607,6 +615,18 @@ def docker_container_logs(db, name, lines=100, since_minutes=None, connection=No
 
 def docker_container_stats(db, name, connection=None, _conversation_id=None, **_):
     return _diag(diag.docker_container_stats, _link(db, "docker", connection, _conversation_id)["docker_url"], name)
+
+
+def _exclusion_targets(db, rule: Rule, conversation_id) -> tuple:
+    """Lignes qu'une exclusion proposée doit recouvrir : celles de l'alerte de la conversation quand elle est de cette
+    règle, sinon celles des alertes de la règle sur 30 jours. Aucune ligne : rien à vérifier."""
+    conv = db.query(ChatConversation).filter(ChatConversation.id == conversation_id).first() if conversation_id else None
+    analysis = db.query(Analysis).filter(Analysis.id == conv.analysis_id).first() if conv and conv.analysis_id else None
+    if analysis and analysis.rule_id == rule.id:
+        return analysis_lines(analysis), "de l'alerte de cette conversation"
+    since = datetime.utcnow() - timedelta(days=30)
+    rows = db.query(Analysis).filter(Analysis.rule_id == rule.id, Analysis.analyzed_at >= since).all()
+    return [l for a in rows for l in analysis_lines(a)], f"des alertes de la règle #{rule.id} sur 30 jours"
 
 
 def _alert_citing_cve(db, conversation_id) -> str:
