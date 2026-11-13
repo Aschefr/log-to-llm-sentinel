@@ -679,7 +679,7 @@ function renderAnalysisCard(a, opts = {}) {
                     <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); togglePromptView(${a.id}, this)" title="${_t('common.view_prompt_title', 'Show the exact messages sent to the LLM')}">📜 ${_t('common.view_prompt', 'Prompt')}</button>
                     ${ev ? `<button type="button" class="btn btn-secondary btn-sm" data-note-open onclick="event.stopPropagation(); openNoteForm(this)">📝 ${_t('common.note_add', 'Ajouter une note')}</button>` : ''}
                     ${a.rule_id ? `<button class="btn btn-secondary btn-sm${flagged ? ' is-flagged' : ''}" data-irrelevant onclick="event.stopPropagation(); toggleIrrelevant(${a.id}, this)" aria-pressed="${flagged}"
-                        title="${_t('common.irrelevant_title', 'L’IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne')}">👎 ${flagged ? _t('common.irrelevant_done', 'Signalée pas pertinente') : _t('common.irrelevant', 'Pas pertinente')}</button>` : ''}
+                        title="${escapeHtml(irrelevantHelp(flagged))}">👎 ${flagged ? _t('common.irrelevant_done', 'Signalée pas pertinente') : _t('common.irrelevant', 'Pas pertinente')}</button>` : ''}
                     ${ev && ev.rule_in_alert && !a.resolution_status ? `<button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); resolveIncidentFromCard(${a.rule_id}, this)">${_t('rule.resolve', 'Marquer comme résolu')}</button>` : ''}
                     ${a.rule_id && !opts.hideRuleLink ? `<a class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" href="/rules/${a.rule_id}?analysis=${a.id}#analyses">🔍 ${_t('common.view_rule', 'Voir dans la règle')}</a>` : ''}
                 </div>
@@ -856,9 +856,17 @@ function irrelevantIconTitle(flagged) {
     return flagged ? _t('common.irrelevant_done', 'Signalée pas pertinente') : _t('common.irrelevant', 'Pas pertinente');
 }
 
+/** Ce que fait le bouton, au survol : notifications, analyses et mots-clés de la règle. */
+function irrelevantHelp(flagged) {
+    const _t = (k, fb) => (window.t ? window.t(k) : null) || fb;
+    return flagged
+        ? _t('common.irrelevant_undo_title', 'Retirer le signalement : l’événement redevient normal pour les notifications et l’IA.')
+        : _t('common.irrelevant_title', 'L’IA ajustera les mots-clés ou les exclusions de la règle pour ne plus déclencher sur ce genre de ligne.');
+}
+
 function irrelevantIconHtml(analysisId, flagged) {
     const title = escapeHtml(irrelevantIconTitle(flagged));
-    return `<button type="button" class="btn-icon card-flag-btn${flagged ? ' is-flagged' : ''}" data-irrelevant aria-pressed="${flagged}" title="${title}" aria-label="${title}"
+    return `<button type="button" class="btn-icon card-flag-btn${flagged ? ' is-flagged' : ''}" data-irrelevant aria-pressed="${flagged}" title="${escapeHtml(irrelevantHelp(flagged))}" aria-label="${title}"
         onclick="event.stopPropagation(); toggleIrrelevant(${analysisId}, this)">${irrelevantIconInner(flagged)}</button>`;
 }
 
@@ -876,11 +884,11 @@ async function toggleIrrelevant(analysisId, btn) {
             b.classList.toggle('is-flagged', !flagged);
             if (b.classList.contains('btn-icon')) {
                 b.innerHTML = irrelevantIconInner(!flagged);
-                b.title = irrelevantIconTitle(!flagged);
-                b.setAttribute('aria-label', b.title);
+                b.setAttribute('aria-label', irrelevantIconTitle(!flagged));
             } else {
                 b.textContent = '👎 ' + irrelevantIconTitle(!flagged);
             }
+            b.title = irrelevantHelp(!flagged);
         });
         if (!flagged && typeof showToast === 'function') {
             showToast(_t('common.irrelevant_toast', 'Merci : l’IA réexamine les mots-clés de la règle.'), 'success');

@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **One *Not relevant* flag could remove a good keyword**: a keyword with many legitimate warning alerts is kept as a proposal instead of being removed on its own, but that protection was lifted as soon as one of its alerts was flagged *Not relevant*. The keyword arbiter could then remove it without asking, although most of its alerts were real. Only the serious alerts nobody flagged count now: a keyword is removed on its own only when its alerts are mostly harmless or flagged.
+
+### Changed
+- **The *Not relevant* button says what it does**: hovering it explains that the event is no longer notified again unless it gets worse, that with the autopilot its lines stop going to the AI after 3 harmless or flagged analyses (checked again every 6 hours), that the AI reviews the rule's keywords right away (removal or targeted exclusion, with what stays a proposal), and where to undo a change. Hovering a flagged button explains what removing the flag does.
+- **The buttons of a rule's Keywords tab say what they do**: hovering *Review now*, *Analyze history*, *Observe*, *Add*, *Remove*, *Accept*, *Reject*, *Undo* and the analysis buttons explains what each one changes, whether it runs the local AI, and whether the AI may propose the same change again. For example, *Review now* runs the hourly review at once but does not read the log, unlike *Analyze history*; an exclusion is never removed automatically.
+
 ## [1.13.2] - 2026-11-13
 
 ### Fixed

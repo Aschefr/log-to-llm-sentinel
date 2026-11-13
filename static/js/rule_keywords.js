@@ -105,18 +105,18 @@ async function renderKeywords() {
         </div>
         <p class="rp-muted kw-mode-hint">${esc(modeHint)}</p>
         <div class="rp-actions kw-learn-actions">
-            <button class="btn btn-secondary btn-sm" onclick="kwReviewNow(this)" ${d.mode === 'off' ? 'disabled' : ''}>${esc(T('rule.kw_review_now', 'Revoir maintenant'))}</button>
+            <button class="btn btn-secondary btn-sm" onclick="kwReviewNow(this)" title="${esc(T('rule.kw_review_now_title', 'Lance tout de suite la revue horaire de l’IA.'))}" ${d.mode === 'off' ? 'disabled' : ''}>${esc(T('rule.kw_review_now', 'Revoir maintenant'))}</button>
             <span class="kw-learn-group">
                 <select id="kw-hist-days" aria-label="${esc(T('rule.kw_history_period', 'Période à analyser'))}">
                     ${[1, 3, 7, 14, 30].map(n => `<option value="${n * 24}" ${n === 7 ? 'selected' : ''}>${esc(T('rule.kw_days', '{n} derniers jours', { n }))}</option>`).join('')}
                 </select>
-                <button class="btn btn-secondary btn-sm" onclick="kwLearn('history', 'kw-hist-days', this)">${esc(T('rule.kw_learn_history', 'Analyser l’historique'))}</button>
+                <button class="btn btn-secondary btn-sm" onclick="kwLearn('history', 'kw-hist-days', this)" title="${esc(T('rule.kw_learn_history_title', 'Relit le journal sur la période choisie et demande à l’IA quels mots-clés et exclusions changer.'))}">${esc(T('rule.kw_learn_history', 'Analyser l’historique'))}</button>
             </span>
             <span class="kw-learn-group">
                 <select id="kw-live-hours" aria-label="${esc(T('rule.kw_live_period', 'Durée d’observation'))}">
                     ${[1, 6, 24].map(n => `<option value="${n}" ${n === 6 ? 'selected' : ''}>${esc(T('rule.kw_hours', '{n} h', { n }))}</option>`).join('')}
                 </select>
-                <button class="btn btn-secondary btn-sm" onclick="kwLearn('live', 'kw-live-hours', this)">${esc(T('rule.kw_learn_live', 'Observer'))}</button>
+                <button class="btn btn-secondary btn-sm" onclick="kwLearn('live', 'kw-live-hours', this)" title="${esc(T('rule.kw_learn_live_title', 'Garde ce qui arrive pendant la durée choisie, puis fait la même analyse.'))}">${esc(T('rule.kw_learn_live', 'Observer'))}</button>
             </span>
         </div>
     </section>`;
@@ -153,9 +153,9 @@ async function renderKeywords() {
                 <span class="rp-muted">${esc(period)}</span></div>
             ${body}
             <div class="rp-actions">
-                ${KW_ACTIVE.includes(s.status) ? `<button class="btn btn-secondary btn-sm" onclick="kwSessionAction(${s.id}, 'cancel', this)">${esc(T('common.cancel', 'Annuler'))}</button>` : ''}
-                ${s.status === 'validated' && s.changes.some(c => c.status === 'applied') ? `<button class="btn btn-secondary btn-sm" onclick="kwSessionAction(${s.id}, 'revert', this)">${esc(T('rule.kw_session_revert', 'Annuler ces changements'))}</button>` : ''}
-                ${['validated', 'reverted'].includes(s.status) ? `<a class="btn btn-secondary btn-sm" href="/api/keyword-learning/${s.id}/log">${esc(T('rule.kw_session_log', 'Échange avec l’IA'))}</a>` : ''}
+                ${KW_ACTIVE.includes(s.status) ? `<button class="btn btn-secondary btn-sm" onclick="kwSessionAction(${s.id}, 'cancel', this)" title="${esc(T('rule.kw_session_cancel_title', 'Arrête cette analyse. Rien n’est modifié.'))}">${esc(T('common.cancel', 'Annuler'))}</button>` : ''}
+                ${s.status === 'validated' && s.changes.some(c => c.status === 'applied') ? `<button class="btn btn-secondary btn-sm" onclick="kwSessionAction(${s.id}, 'revert', this)" title="${esc(T('rule.kw_session_revert_title', 'Défait tous les changements de cette analyse.'))}">${esc(T('rule.kw_session_revert', 'Annuler ces changements'))}</button>` : ''}
+                ${['validated', 'reverted'].includes(s.status) ? `<a class="btn btn-secondary btn-sm" href="/api/keyword-learning/${s.id}/log" title="${esc(T('rule.kw_session_log_title', 'Télécharge les échanges avec l’IA.'))}">${esc(T('rule.kw_session_log', 'Échange avec l’IA'))}</a>` : ''}
             </div>
         </section>`;
     }
@@ -170,8 +170,8 @@ async function renderKeywords() {
                 <span class="kw-hold">${esc(T('rule.kw_hold_prefix', 'Non appliqué : {why}', { why: kwLabel(KW_HOLDS, c.hold_reason) }))}</span>
                 ${kwEvidence(c)}</div>
             <span class="rp-actions">
-                <button class="btn btn-primary btn-sm" onclick="kwDecide(${c.id}, 'accept', this)">${esc(T('rule.accept', 'Accepter'))}</button>
-                <button class="btn btn-secondary btn-sm" onclick="kwDecide(${c.id}, 'reject', this)">${esc(T('rule.reject', 'Refuser'))}</button>
+                <button class="btn btn-primary btn-sm" onclick="kwDecide(${c.id}, 'accept', this)" title="${esc(T('rule.kw_accept_title', 'Applique ce changement à la règle.'))}">${esc(T('rule.accept', 'Accepter'))}</button>
+                <button class="btn btn-secondary btn-sm" onclick="kwDecide(${c.id}, 'reject', this)" title="${esc(T('rule.kw_reject_title', 'N’applique pas ce changement.'))}">${esc(T('rule.reject', 'Refuser'))}</button>
             </span></div>`).join('')}
     </section>` : '';
 
@@ -183,7 +183,7 @@ async function renderKeywords() {
         <td>${k.lines_per_day == null ? '—' : k.lines_per_day}</td>
         <td>${k.last_alert_at ? esc(fmtWhen(k.last_alert_at)) : '—'}</td>
         <td>${esc(kwLabel(KW_ORIGINS, k.origin))}</td>
-        <td><button class="btn btn-secondary btn-sm" data-v="${esc(k.value)}" onclick="kwEditList('keyword', 'remove', this.dataset.v, this)">${esc(T('rule.kw_remove', 'Retirer'))}</button></td>
+        <td><button class="btn btn-secondary btn-sm" data-v="${esc(k.value)}" onclick="kwEditList('keyword', 'remove', this.dataset.v, this)" title="${esc(T('rule.kw_remove_keyword_title', 'Retire ce mot-clé tout de suite.'))}">${esc(T('rule.kw_remove', 'Retirer'))}</button></td>
     </tr>`).join('');
     const keywords = `
     <section class="rp-card rp-table-card">
@@ -196,7 +196,7 @@ async function renderKeywords() {
             : `<p class="rp-muted">${esc(RP.rule && RP.rule.autopilot && RP.rule.autopilot.enabled && RP.rule.autopilot.status !== 'active'
                 ? T('rule.ap_kw_none', 'Pas encore de mot-clé : le pilote automatique les choisira. En attendant, la règle alerte sur les lignes de niveau erreur explicite.')
                 : T('rule.kw_none', 'Aucun mot-clé : la règle ne déclenche rien. Lance une analyse de l’historique ou ajoute-en un.'))}</p>`}
-        <form class="kw-add" onsubmit="kwAdd(event, 'keyword')">
+        <form class="kw-add" onsubmit="kwAdd(event, 'keyword')" title="${esc(T('rule.kw_add_keyword_title', 'Une ligne qui contient ce texte déclenche une analyse.'))}">
             <input type="text" id="kw-add-keyword" placeholder="${esc(T('rule.kw_add_keyword', 'Ajouter un mot-clé'))}" aria-label="${esc(T('rule.kw_add_keyword', 'Ajouter un mot-clé'))}">
             <button class="btn btn-secondary btn-sm" type="submit">${esc(T('rule.kw_add', 'Ajouter'))}</button>
         </form>
@@ -209,9 +209,9 @@ async function renderKeywords() {
         ${d.exclusions.length ? `<div class="rp-scroll"><table class="rp-table">
             <thead><tr><th>${esc(T('rule.kw_exclusion_col', 'Exclusion'))}</th><th>${esc(T('rule.kw_ignored_col', 'Lignes ignorées / jour'))}</th><th>${esc(T('rule.kw_origin', 'Origine'))}</th><th></th></tr></thead>
             <tbody>${d.exclusions.map(x => `<tr><td class="mono">${esc(x.value)}</td><td>${x.lines_per_day == null ? '—' : x.lines_per_day}</td><td>${esc(kwLabel(KW_ORIGINS, x.origin))}</td>
-                <td><button class="btn btn-secondary btn-sm" data-v="${esc(x.value)}" onclick="kwEditList('exclusion', 'remove', this.dataset.v, this)">${esc(T('rule.kw_remove', 'Retirer'))}</button></td></tr>`).join('')}</tbody>
+                <td><button class="btn btn-secondary btn-sm" data-v="${esc(x.value)}" onclick="kwEditList('exclusion', 'remove', this.dataset.v, this)" title="${esc(T('rule.kw_remove_exclusion_title', 'Retire cette exclusion.'))}">${esc(T('rule.kw_remove', 'Retirer'))}</button></td></tr>`).join('')}</tbody>
         </table></div>` : `<p class="rp-muted">${esc(T('rule.kw_no_exclusion', 'Aucune exclusion.'))}</p>`}
-        <form class="kw-add" onsubmit="kwAdd(event, 'exclusion')">
+        <form class="kw-add" onsubmit="kwAdd(event, 'exclusion')" title="${esc(T('rule.kw_add_exclusion_title', 'Une ligne qui contient ce texte ne déclenche plus rien.'))}">
             <input type="text" id="kw-add-exclusion" placeholder="${esc(T('rule.kw_add_exclusion', 'Ajouter une exclusion'))}" aria-label="${esc(T('rule.kw_add_exclusion', 'Ajouter une exclusion'))}">
             <button class="btn btn-secondary btn-sm" type="submit">${esc(T('rule.kw_add', 'Ajouter'))}</button>
         </form>
@@ -242,7 +242,7 @@ async function renderKeywords() {
                     <td>${esc(kwLabel(KW_ORIGINS, c.origin))}</td>
                     <td class="kw-reason">${esc(c.reason)}${c.hold_reason === 'manual_edit' || c.status === 'dismissed' ? ` <span class="rp-muted">(${esc(kwLabel(KW_HOLDS, c.hold_reason))})</span>` : ''}</td>
                     <td><span class="kw-status kw-status--${c.status}">${esc(kwLabel(KW_STATUS, c.status))}</span></td>
-                    <td>${c.status === 'applied' ? `<button class="btn btn-secondary btn-sm" onclick="kwDecide(${c.id}, 'revert', this)">${esc(T('rule.kw_undo', 'Annuler'))}</button>`
+                    <td>${c.status === 'applied' ? `<button class="btn btn-secondary btn-sm" onclick="kwDecide(${c.id}, 'revert', this)" title="${esc(T('rule.kw_undo_title', 'Défait ce changement sur la règle.'))}">${esc(T('rule.kw_undo', 'Annuler'))}</button>`
                         : c.status === 'dismissed' ? `<button class="btn btn-secondary btn-sm" title="${esc(T('rule.kw_apply_anyway_title', 'Le pilote l’a écarté par prudence ({why}).', { why: kwLabel(KW_HOLDS, c.hold_reason) }))}" onclick="kwDecide(${c.id}, 'accept', this)">${esc(T('rule.kw_apply_anyway', 'Appliquer quand même'))}</button>` : ''}</td>
                 </tr>`).join('')}</tbody>
             </table></div>

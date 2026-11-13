@@ -564,7 +564,7 @@ def alert_stats(db, rule: Rule, days: int = 30) -> dict:
     since = datetime.utcnow() - timedelta(days=days)
     rows = db.query(Analysis).filter(Analysis.rule_id == rule.id, Analysis.analyzed_at >= since).all()
     stats = defaultdict(lambda: {"alerts": 0, "severities": Counter(), "irrelevant": [], "lines": {},
-                                 "important_lines": [], "last_at": None})
+                                 "important_lines": [], "important": 0, "last_at": None})
     for a in rows:
         try:
             kws = json.loads(a.matched_keywords_json or "[]")
@@ -580,6 +580,8 @@ def alert_stats(db, rule: Rule, days: int = 30) -> dict:
                 s["last_at"] = a.analyzed_at
             if a.feedback == "irrelevant":
                 s["irrelevant"].append(a.id)
+            elif sev in ("warning", "critical"):
+                s["important"] += 1  # alerte sérieuse que personne n'a signalée : elle protège le mot-clé
             low_kw = [kw]
             for line in lines:
                 if not keyword_match.matching(low_kw, line):
@@ -622,6 +624,7 @@ def noise_candidates(db, rule: Rule, focus_analysis_id: Optional[int] = None) ->
         if kw in focus_kws or new_flags or (noisy and not recent):
             out.append({"keyword": kw, "alerts": s["alerts"], "severities": dict(s["severities"]),
                         "irrelevant": len(s["irrelevant"]), "irrelevant_ids": s["irrelevant"],
+                        "important": s["important"],
                         "per_day": round(pattern_daily_hits(data, "k", kw) or 0, 1),
                         "lines": sorted(s["lines"].values(), key=lambda g: g["count"], reverse=True)[:8],
                         "important_lines": s["important_lines"], "focus": kw in focus_kws})
@@ -867,7 +870,9 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
                 hold = "low_confidence"
             elif len(keywords) <= 1:
                 hold = "last_keyword"
-            elif sev.get("critical") or (sev.get("warning", 0) > 0.2 * cand["alerts"] and not cand["irrelevant"]):
+            # Seules les alertes sérieuses non signalées comptent : avant, un seul « Pas pertinent » levait la protection
+            # d'un mot-clé aux nombreuses alertes warning légitimes, que l'arbitre pouvait alors retirer seul
+            elif sev.get("critical") or cand.get("important", 0) > 0.2 * cand["alerts"]:
                 hold = "important_alerts"
             if not once("keyword", "remove", kw):
                 continue
