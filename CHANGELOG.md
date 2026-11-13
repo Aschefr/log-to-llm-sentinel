@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.13.3] - 2026-11-13
 
 ### Fixed
 - **One *Not relevant* flag could remove a good keyword**: a keyword with many legitimate warning alerts is kept as a proposal instead of being removed on its own, but that protection was lifted as soon as one of its alerts was flagged *Not relevant*. The keyword arbiter could then remove it without asking, although most of its alerts were real. Only the serious alerts nobody flagged count now: a keyword is removed on its own only when its alerts are mostly harmless or flagged.
