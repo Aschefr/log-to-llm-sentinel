@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **The second look checked a container that does not exist**: in a syslog line such as `<date> my-server dockerd[1125]: [resolver] failed to query external DNS server`, the AI took the host name for a container name, asked Docker for its state, got *container not found* and reported that as its finding. The first analysis made the same mistake. For lines in syslog format, Sentinel now tells the AI which host and which program wrote them, that the host name is not a container, and that `dockerd` or `containerd` is the host's Docker daemon. When a container is not found, the Docker tools now answer with the list of existing containers and the closest names, in the second look and in the chat.
+
 ## [1.13.0] - 2026-11-12
 
 ### Changed

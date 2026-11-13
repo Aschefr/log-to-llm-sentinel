@@ -8,6 +8,7 @@ Diagnostic en lecture seule de l'infrastructure, pour le chat et l'investigation
 
 Les sorties sont bornées et les variables d'environnement des conteneurs ne sont jamais renvoyées.
 """
+import difflib
 import ipaddress
 import json
 import os
@@ -122,12 +123,44 @@ def _docker_get(base: str, path: str, params: dict = None, raw: bool = False):
     except httpx.HTTPError as e:
         raise DiagnosticError(f"proxy Docker injoignable ({type(e).__name__})")
     if resp.status_code == 404:
-        raise DiagnosticError("conteneur introuvable")
+        raise ContainerNotFound("conteneur introuvable")
     if resp.status_code == 403:
         raise DiagnosticError("requête refusée par le proxy Docker (vérifier CONTAINERS=1)")
     if resp.status_code >= 400:
         raise DiagnosticError(f"erreur du proxy Docker (HTTP {resp.status_code})")
     return resp.content if raw else resp.json()
+
+
+class ContainerNotFound(DiagnosticError):
+    pass
+
+
+MAX_LISTED = 40
+
+
+def _not_found(base: str, name: str) -> DiagnosticError:
+    """Conteneur introuvable : donner les noms existants, pour que l'IA se reprenne. Vu en prod : dans une ligne syslog,
+    elle avait pris le nom de la machine (« srv-maison ») pour un conteneur, et s'était arrêtée sur le 404."""
+    try:
+        names = sorted(c["name"] for c in docker_containers(base))
+    except DiagnosticError:
+        names = []
+    msg = f"conteneur « {name} » introuvable"
+    if not names:
+        return DiagnosticError(msg)
+    close = difflib.get_close_matches(name, names, n=3, cutoff=0.4)
+    msg += f" ; conteneurs existants : {', '.join(names[:MAX_LISTED])}" + (" …" if len(names) > MAX_LISTED else "")
+    if close:
+        msg += f" (les plus proches : {', '.join(close)})"
+    return DiagnosticError(msg)
+
+
+def _container_get(base: str, name: str, suffix: str, params: dict = None, raw: bool = False):
+    name = _check_container(name)
+    try:
+        return _docker_get(base, f"/containers/{name}/{suffix}", params, raw)
+    except ContainerNotFound:
+        raise _not_found(base, name)
 
 
 def _check_container(name: str) -> str:
@@ -159,7 +192,7 @@ def docker_containers(base: str, all_containers: bool = True) -> list:
 
 
 def docker_container_status(base: str, name: str) -> dict:
-    d = _docker_get(base, f"/containers/{_check_container(name)}/json")
+    d = _container_get(base, name, "json")
     state = d.get("State") or {}
     health = state.get("Health") or {}
     return {
@@ -204,11 +237,11 @@ def docker_container_logs(base: str, name: str, lines: int = 100, since_minutes:
     params = {"stdout": "true", "stderr": "true", "timestamps": "true", "tail": str(lines)}
     if since_minutes:
         params["since"] = str(int(datetime.utcnow().timestamp()) - int(since_minutes) * 60)
-    return _demux_logs(_docker_get(base, f"/containers/{_check_container(name)}/logs", params, raw=True)).strip()
+    return _demux_logs(_container_get(base, name, "logs", params, raw=True)).strip()
 
 
 def docker_container_stats(base: str, name: str) -> dict:
-    s = _docker_get(base, f"/containers/{_check_container(name)}/stats", {"stream": "false"})
+    s = _container_get(base, name, "stats", {"stream": "false"})
     cpu, pre = s.get("cpu_stats") or {}, s.get("precpu_stats") or {}
     cpu_delta = (cpu.get("cpu_usage") or {}).get("total_usage", 0) - (pre.get("cpu_usage") or {}).get("total_usage", 0)
     sys_delta = (cpu.get("system_cpu_usage") or 0) - (pre.get("system_cpu_usage") or 0)
