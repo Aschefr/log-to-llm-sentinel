@@ -138,17 +138,68 @@ class ContainerNotFound(DiagnosticError):
 MAX_LISTED = 40
 
 
+CONTAINER_ID_RE = re.compile(r"^[0-9a-f]{12,64}$")
+EVENTS_LOOKBACK_S = 6 * 3600
+_LIFECYCLE = ("create", "start", "kill", "die", "stop", "destroy", "rename")
+
+
+def _container_events(base: str, container_id: str) -> list:
+    """Ce que Docker sait encore d'un conteneur disparu : son nom et ses derniers changements d'état. Docker ne garde que
+    ses 256 derniers événements (une quarantaine de minutes sur un hôte avec des healthchecks) : assez pour un second
+    regard lancé juste après la ligne, pas toujours pour une question posée plus tard."""
+    now = int(datetime.utcnow().timestamp())
+    try:
+        rows = _docker_get(base, "/events", {"since": str(now - EVENTS_LOOKBACK_S), "until": str(now),
+                                             "filters": json.dumps({"type": ["container"], "container": [container_id],
+                                                                    "event": list(_LIFECYCLE)})}, raw=True)
+    except DiagnosticError:
+        return []
+    events = []
+    for line in rows.decode("utf-8", errors="replace").splitlines():
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(e, dict) and str((e.get("Actor") or {}).get("ID", "")).startswith(container_id):
+            events.append(e)
+    return events
+
+
+def _gone_container(base: str, container_id: str, current: list) -> str:
+    """Un identifiant de conteneur qui n'existe plus. Vu en prod le 2026-11-13 : « Container failed to exit within 10s …
+    container=3f9c… » pendant une mise à jour ; le second regard a cherché l'identifiant et a conclu « introuvable »."""
+    events = _container_events(base, container_id)
+    name = next(((e.get("Actor") or {}).get("Attributes", {}).get("name") for e in reversed(events)
+                 if (e.get("Actor") or {}).get("Attributes", {}).get("name")), None)
+    if not events:
+        return (" ; cet identifiant n'est plus celui d'aucun conteneur : en général le conteneur a été supprimé ou recréé "
+                "depuis la ligne (mise à jour, docker compose up), ce qui n'est pas une panne en soi")
+    steps = ", ".join(f"{e.get('Action')} {datetime.utcfromtimestamp(e.get('time', 0)).strftime('%H:%M:%S')} UTC"
+                      for e in events[-6:])
+    msg = f" ; Docker se souvient de ce conteneur" + (f" : il s'appelait « {name} »" if name else "") + f" ({steps})"
+    now_running = next((c for c in current if name and c["name"] == name), None)
+    if now_running:
+        msg += (f" ; il a été recréé : le conteneur « {name} » actuel est un nouveau conteneur ({now_running['state']}, "
+                f"{now_running['status']}) ; vérifie celui-là par son nom")
+    elif any(e.get("Action") == "destroy" for e in events):
+        msg += " ; il a été supprimé et aucun conteneur ne porte plus ce nom"
+    return msg
+
+
 def _not_found(base: str, name: str) -> DiagnosticError:
     """Conteneur introuvable : donner les noms existants, pour que l'IA se reprenne. Vu en prod : dans une ligne syslog,
     elle avait pris le nom de la machine (« srv-maison ») pour un conteneur, et s'était arrêtée sur le 404."""
     try:
-        names = sorted(c["name"] for c in docker_containers(base))
+        current = docker_containers(base)
     except DiagnosticError:
-        names = []
+        current = []
+    names = sorted(c["name"] for c in current)
     msg = f"conteneur « {name} » introuvable"
+    if CONTAINER_ID_RE.match(name):
+        msg += _gone_container(base, name, current)
     if not names:
         return DiagnosticError(msg)
-    close = difflib.get_close_matches(name, names, n=3, cutoff=0.4)
+    close = [] if CONTAINER_ID_RE.match(name) else difflib.get_close_matches(name, names, n=3, cutoff=0.4)
     msg += f" ; conteneurs existants : {', '.join(names[:MAX_LISTED])}" + (" …" if len(names) > MAX_LISTED else "")
     if close:
         msg += f" (les plus proches : {', '.join(close)})"

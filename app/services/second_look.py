@@ -33,6 +33,8 @@ FINDINGS_CHARS = 300
 LINES_CHARS = 3000
 TOOL_NAMES = ("docker_list_containers", "docker_container_status", "docker_container_logs", "host_check")
 RANK = {"info": 0, "warning": 1, "critical": 2}
+# Champ act= des lignes CEF (pare-feu, IPS) : la connexion a été bloquée, il n'y a rien sur les serveurs à vérifier
+_BLOCKED = re.compile(r"\bact=(?:blocked?|drop(?:ped)?|den(?:y|ied)|reject(?:ed)?)\b", re.IGNORECASE)
 
 # Ce qui ressemble à un secret ne sort pas du second regard (constat, carte, notification)
 _SECRET = re.compile(
@@ -64,6 +66,16 @@ def tools_for_rule(db, rule) -> list:
             + llm_tools._for_links(llm_tools.HOST_TOOLS, diag.links_for_rule(db, rule, "ssh")))
 
 
+def already_blocked(events_text: str) -> bool:
+    """Toutes les lignes de l'alerte disent que la connexion a été bloquée. Vu en prod le 2026-11-13 : pour un paquet
+    bloqué par l'IPS d'UniFi, le second regard listait les services en échec de deux serveurs, 15 à 20 s de modèle pour
+    rien. Une alerte tronquée ne compte pas : les lignes coupées pourraient dire autre chose."""
+    lines = [l for l in (events_text or "").splitlines() if l.strip()]
+    if len(lines) > 1:
+        lines = lines[1:]  # en-tête du groupe de lignes
+    return bool(lines) and all(_BLOCKED.search(l) for l in lines)
+
+
 def skip_reason(config: dict, result: dict) -> Optional[str]:
     """Pourquoi cette analyse n'a pas de second regard, ou None. Seul « suspicious » est montré sur la carte."""
     s = settings(config)
@@ -75,6 +87,8 @@ def skip_reason(config: dict, result: dict) -> Optional[str]:
         return "scope"
     if result.get("log_instruction") or (result.get("data") or {}).get("log_manipulation") is True:
         return "suspicious"
+    if already_blocked(result.get("events_text")):
+        return "blocked"
     return None
 
 

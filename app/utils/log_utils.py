@@ -15,6 +15,10 @@ _SIG_RULES = [
     (re.compile(r"^<\d+>"), ""),
     (re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"), "<ID>"),
     (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b"), "<IP>"),
+    # Numéro de version (11.0.99, v2.4.1) : une mise à jour du programme ne fait pas un autre événement. Vu en prod
+    # le 2026-11-13 : UniFi Network écrit sa version dans chaque ligne, et après sa mise à jour aucune alerte
+    # n'avait plus d'historique. Après les adresses IP, qui ont quatre nombres.
+    (re.compile(r"\bv?\d+(?:\.\d+){2,}\b"), "<VER>"),
     # Nom de domaine public (une requête DNS, un site visité). Pas com.docker.backend.exe ni java.lang.Exception, qui
     # distinguent un événement d'un autre : d'où la liste des terminaisons, et le refus d'une suite après la dernière.
     (re.compile(r"\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\.)+(?:com|net|org|fr|de|eu|uk|be|ch|io|co|app|dev|info|biz|tv|me|ai|cloud|arpa)\b(?!\.?[\w-])\.?"), "<HOST>"),

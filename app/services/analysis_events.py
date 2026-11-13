@@ -16,7 +16,7 @@ from app.utils.log_utils import line_signature
 
 _RANK = {"info": 0, "warning": 1, "critical": 2}
 # À incrémenter quand le calcul des signatures change : les analyses et les notes existantes sont recalculées une fois
-EVENT_KEY_VERSION = 2
+EVENT_KEY_VERSION = 3
 REKEY_BATCH = 1000
 # Un événement qui continue ne notifie plus, mais ne se fait pas oublier non plus
 NOTIFY_REMINDER_HOURS = 6

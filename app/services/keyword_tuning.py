@@ -455,7 +455,10 @@ class KeywordTuningService:
             data = json.loads(clean_ollama_json(content))
             return data if isinstance(data, dict) else None
         except ValueError:
-            logger.warning("KeywordTuning", f"Réponse de l'arbitre illisible ({label}) : {content[:200]}")
+            # Le début et la fin : une réponse coupée par la limite de génération se voit à sa fin, pas à son début
+            tail = f" … {content[-300:]}" if len(content) > 500 else content[200:]
+            logger.warning("KeywordTuning", f"Réponse de l'arbitre illisible ({label}, {len(content)} caractères) : "
+                                            f"{content[:200]}{tail}")
             return None
 
 
