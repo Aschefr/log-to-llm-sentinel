@@ -19,7 +19,7 @@ from typing import Optional
 from app import logger
 from app.services import diagnostics as diag
 from app.services import llm_tools
-from app.services.alert_analysis import _load_json
+from app.services.alert_analysis import _load_json, syslog_origin
 from app.services.app_config import llm_options
 from app.services.log_guard import addresses_the_ai, fence
 from app.services.prompts import SECOND_LOOK_SCHEMA, SECOND_LOOK_SYSTEM, label, second_look_label
@@ -97,11 +97,13 @@ def _task(rule, result: dict, links: list, lang: str) -> str:
     data = result.get("data") or {}
     lines = (result.get("events_text") or "")[-LINES_CHARS:]
     context = f" ({rule.application_context.strip()[:300]})" if (rule.application_context or "").strip() else ""
-    return second_look_label(
+    task = second_look_label(
         lang, "task", rule=rule.name, context=context, severity=result.get("severity"),
         summary=result.get("summary") or "", cause=data.get("probable_cause") or second_look_label(lang, "unknown"),
         lines=fence(lines), links=", ".join(f"{l['name']} ({l['kind']})" for l in links) or second_look_label(lang, "none"),
         now=datetime.utcnow().strftime("%Y-%m-%d %H:%M"))
+    origin = syslog_origin(lines, lang)
+    return f"{task}\n\n{origin}" if origin else task
 
 
 def _args(raw) -> dict:

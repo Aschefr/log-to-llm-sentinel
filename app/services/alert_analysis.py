@@ -171,6 +171,39 @@ def _shrink_context(context: dict) -> dict:
     return {"before": before, "between": between, "after": after}
 
 
+# En-tête syslog : « date machine programme[pid]: message ». Dates ISO (fichier syslog), à l'ancienne (« Nov 13 16:20:40 »)
+# ou ligne reçue par Sentinel (« 2026-11-13 16:20:40  <6>machine programme: », souvent avec une date à l'ancienne
+# après <PRI> : « <38>Nov  8 09:03:09 machine programme[pid]: »). Le programme doit être suivi de « : » et
+# d'une espace : une ligne CEF (« machine CEF:0|… ») n'est pas lue.
+_SYSLOG_HEAD = re.compile(
+    r"^(?:\[×\d+\]\s+)?(?:\d{4}-\d{2}-\d{2}T\S+|[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}|\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+<\d+>(?:[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+)?)"
+    r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s+([A-Za-z0-9_.\-/]+)(?:\[\d+\])?:\s")
+_DOCKER_DAEMONS = {"dockerd", "containerd"}
+# Une ligne d'application datée en ISO (« 2026-11-13T16:20:40Z ERROR main: … ») n'a pas de machine
+_LEVELS = {"trace", "debug", "info", "notice", "warn", "warning", "error", "err", "fatal", "critical", "crit"}
+
+
+def syslog_origin(text: str, lang: str = "fr") -> str:
+    """Machine et programme des lignes au format syslog, dits à l'IA : vu en prod, elle prenait le nom de la machine
+    (« srv-maison dockerd[1125]: … ») pour un conteneur, et le second regard cherchait ce conteneur en vain."""
+    hosts, programs = [], []
+    for line in (text or "").splitlines():
+        m = _SYSLOG_HEAD.match(line.strip())
+        if m and m.group(1).lower() not in _LEVELS:
+            host, prog = m.group(1), m.group(2).rsplit("/", 1)[-1]
+            if host not in hosts:
+                hosts.append(host)
+            if prog not in programs:
+                programs.append(prog)
+    if not hosts:
+        return ""
+    note = label(lang, "syslog_origin", hosts=", ".join(hosts[:3]), programs=", ".join(programs[:5]))
+    daemons = [p for p in programs if p in _DOCKER_DAEMONS]
+    if daemons:
+        note += " " + label(lang, "syslog_origin_docker", programs=", ".join(daemons))
+    return note
+
+
 def build_alert_messages(rule: Rule, events_text: str, matched_keywords: Optional[list],
                          context: Optional[dict], history: Optional[dict],
                          config: dict, now: datetime, notes: Optional[List[dict]] = None) -> List[dict]:
@@ -180,6 +213,9 @@ def build_alert_messages(rule: Rule, events_text: str, matched_keywords: Optiona
     events_head = f"## {label(lang, 'events')}\n"
     if matched_keywords:
         events_head += f"{label(lang, 'keywords')} : {', '.join(matched_keywords)}\n"
+    origin = syslog_origin(events_text, lang)
+    if origin:
+        events_head += origin + "\n"
 
     # Budget : contexte total moins une réserve pour la réponse (et le raisonnement s'il est actif)
     reserve = 2048 + (2048 if config.get("ollama_think", False) else 0)
