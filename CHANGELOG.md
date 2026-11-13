@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.13.2] - 2026-11-13
 
 ### Fixed
 - **Each update of Sentinel raised an alert on its own host**: the system journal bridge runs `bash -c "… && journalctl -f …"`, so bash is process 1 of its container and ignores the stop signal. On every `docker compose up`, Docker waited 10 seconds and then killed it, and a rule watching the host's syslog alerted on *Container failed to exit within 10s of signal 15* (8 of 9 such lines over 6 days on one host came from Sentinel's own restarts). The bridge now has `init: true`, in `docker-compose.yml` and in the generated compose of the setup page, and stops in about a second. **Existing installs: add `init: true` to the `system-journal-exporter` service of your own compose file.**
