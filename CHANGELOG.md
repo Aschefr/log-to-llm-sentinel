@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.13.1] - 2026-11-13
 
 ### Fixed
 - **An action announced in the chat could have no card**: an answer wrote *Proposed action: `trigger_meta_analysis` (needs confirmation)* without calling the tool that creates the proposal, so no confirmation card appeared and an internal tool name showed in the text. When an answer announces an action without proposing it, Sentinel now asks the model once more, silently and with only the proposal tool, to propose it if the user asked for it; if there is still no card and the answer still offers an action, it ends with a warning that no action was prepared. A tool call written out in the text instead of being made is removed from the final answer.
