@@ -35,6 +35,8 @@ services:
   system-journal-exporter:
     image: ubuntu:24.04
     container_name: log-to-llm-sentinel-journal-bridge
+    # bash would be process 1 and ignore the stop signal: each update would wait 10 s, then Docker kills it
+    init: true
     command: |
       bash -c "apt-get update && apt-get install -y systemd && 
                journalctl -f -n 100 > /logs/host_system_journal.log"
