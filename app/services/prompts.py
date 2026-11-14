@@ -599,7 +599,7 @@ KEYWORD_ARBITER_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "template": {"type": "integer", "description": "Numéro du modèle de ligne (T1 → 1)"},
-                    "reason": {"type": "string"},
+                    "reason": {"type": "string", "description": "Une phrase : ce que montre la ligne et pourquoi agir ou non"},
                     "decision": {"type": "string", "enum": ["add_keyword", "ignore"]},
                     "keyword": {"type": "string", "description": "Partie exacte et constante des exemples (vide si ignore)"},
                     "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
@@ -613,7 +613,7 @@ KEYWORD_ARBITER_SCHEMA = {
                 "type": "object",
                 "properties": {
                     "keyword": {"type": "string"},
-                    "reason": {"type": "string"},
+                    "reason": {"type": "string", "description": "Une phrase : ce que montrent les alertes et pourquoi"},
                     "decision": {"type": "string", "enum": ["keep", "add_exclusion", "remove_keyword"]},
                     "exclusion": {"type": "string", "description": "Partie exacte et constante des lignes inutiles (vide sinon)"},
                     "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
@@ -638,12 +638,14 @@ Angles morts — lignes d'erreur qu'aucun mot-clé n'attrape. Pour chaque modèl
   outil de maintenance ou de mise à jour, tentative isolée gérée par l'application, détail d'un composant tiers.
 - Un même événement produit souvent plusieurs lignes (cause, code de sortie, conséquence) : un seul mot-clé suffit, sur la ligne la plus explicite ;
   ignore les autres modèles de cet événement, et ceux déjà couverts par un mot-clé que tu ajoutes.
+  Les lignes « même événement » sont écrites au même moment que T : le mot-clé peut venir de l'une d'elles, choisis la plus explicite.
 
 Événements — les modèles marqués [événement] n'ont pas de niveau d'erreur : la source raconte ce qui se passe (audit, sécurité, réseau).
 L'utilisateur ne sait pas forcément ce qui mérite une analyse, c'est à toi de le décider :
 - add_keyword pour ce qu'un responsable voudrait faire vérifier : menace de sécurité (même bloquée), changement de configuration,
   appareil ou lien perdu, compte ou droit modifié.
-- ignore pour la routine : connexions et déconnexions de clients, accès habituels, activité répétée sans conséquence.
+- ignore pour la routine : connexions et déconnexions de clients, connexion d'un administrateur ou d'une intégration connue,
+  sauvegarde réussie, mise à jour disponible ou installée, activité répétée sans conséquence.
 
 Bruit — mots-clés qui déclenchent surtout des alertes de faible importance. Pour chaque mot-clé :
 - keep si des alertes restent utiles et qu'aucune exclusion ne sépare proprement les lignes inutiles.
@@ -652,6 +654,7 @@ Bruit — mots-clés qui déclenchent surtout des alertes de faible importance. 
 Les lignes marquées [irrelevant] ont été signalées « pas pertinente » par l'utilisateur : vise-les avec une exclusion précise
 (la partie constante qui les distingue) plutôt que de retirer un mot-clé qui attrape aussi des alertes utiles.
 
+reason : une phrase utile à l'utilisateur (ce que montre la ligne, pourquoi agir ou non), jamais le nom de la décision.
 confidence (0 à 100) : ta certitude que la décision améliore la règle. En dessous de 70, la décision est proposée à l'utilisateur au lieu d'être appliquée.
 N'invente rien : appuie-toi uniquement sur les lignes fournies. Réponds pour chaque modèle T et chaque mot-clé listés.""",
     "en": """You are the arbiter that tunes the keywords of a log monitoring rule.
@@ -666,12 +669,14 @@ Blind spots — error lines that no keyword catches. For each template T:
   maintenance or update tool, isolated attempt handled by the application, third-party detail.
 - One event often produces several lines (cause, exit code, consequence): one keyword is enough, on the most explicit line;
   ignore the other templates of that event, and those already covered by a keyword you add.
+  Lines under "same event" are written at the same time as T: the keyword may come from one of them, pick the most explicit.
 
 Events — templates marked [event] have no error level: the source tells what happens (audit, security, network).
 The user does not necessarily know what deserves an analysis, so it is up to you to decide:
 - add_keyword for what a person in charge would want checked: security threat (even blocked), configuration change,
   lost device or link, changed account or permission.
-- ignore routine: clients connecting and disconnecting, usual access, repeated activity without consequence.
+- ignore routine: clients connecting and disconnecting, an administrator or known integration signing in,
+  successful backup, update available or installed, repeated activity without consequence.
 
 Noise — keywords that mostly trigger low-importance alerts. For each keyword:
 - keep if some alerts are still useful and no exclusion cleanly separates the useless lines.
@@ -680,6 +685,7 @@ Noise — keywords that mostly trigger low-importance alerts. For each keyword:
 Lines marked [irrelevant] were flagged "not relevant" by the user: target them with a precise exclusion
 (the constant part that sets them apart) rather than removing a keyword that also catches useful alerts.
 
+reason: one sentence useful to the user (what the line shows, why act or not), never the name of the decision.
 confidence (0 to 100): how sure you are that the decision improves the rule. Below 70, the decision is offered to the user instead of being applied.
 Do not invent anything: rely only on the lines provided. Answer for every listed template T and keyword.""",
 }
@@ -700,6 +706,9 @@ KEYWORD_LABELS = {
         "noise_lines": "  Lignes déclenchées :",
         "noise_line": "  - ×{count} [{severity}] {example}",
         "example": "  ex. : {example}",
+        "related": "  même événement, au même moment :",
+        "reason_add": "Erreur non surveillée, ≈ {per_day} ligne(s) par jour (l'IA n'a pas détaillé sa raison).",
+        "reason_noise": "{alerts} alerte(s) sur 30 jours, ≈ {per_day} ligne(s) par jour (l'IA n'a pas détaillé sa raison).",
         "nothing": "(rien à examiner)",
     },
     "en": {
@@ -717,6 +726,9 @@ KEYWORD_LABELS = {
         "noise_lines": "  Triggered lines:",
         "noise_line": "  - ×{count} [{severity}] {example}",
         "example": "  e.g.: {example}",
+        "related": "  same event, at the same time:",
+        "reason_add": "Unwatched error, ≈ {per_day} line(s) per day (the AI did not explain its reason).",
+        "reason_noise": "{alerts} alert(s) over 30 days, ≈ {per_day} line(s) per day (the AI did not explain its reason).",
         "nothing": "(nothing to review)",
     },
 }

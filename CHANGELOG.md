@@ -10,6 +10,16 @@ All notable changes to this project will be documented in this file.
 - **A download looked like a chat**: the button that downloads what an analysis sent to the AI and its answers was called *Exchange with the AI*, which read like a way to talk to the AI about the changes. It is now *Download the AI log*.
 - **French: "the pilot" became "l'autopilote"**: where the French interface said only *le pilote* (a change *écarté par le pilote*, *échecs du pilote*, the hints of the autopilot switch), it now says *l'autopilote*, as the English text already did.
 
+### Changed
+- **The autopilot's keyword choices, measured and tuned on a bench**: 13 rule set-ups, 6 weekly re-reads and 6 hourly reviews from home-lab sources (Docker, Unraid, UniFi gateway, switch and access point, Home Assistant, Nextcloud) were replayed with the default model and scored against written requirements. Problems found went from 56 to 9, and two set-ups of the same source now end with the same keywords in 18 cases out of 19 (keywords in common: 61% before, 96% after). What changed:
+  - **One keyword per event**: an error often writes several lines at the same second (the cause, the exception, the consequence). The autopilot now groups the lines that always come together before asking the AI, which sees one blind spot per event with its companion lines, and picks the keyword from the clearest one. A Home Assistant integration outage no longer gets three keywords plus a generic Python traceback line.
+  - **Rare incidents are seen**: the AI looks at 16 blind spots instead of 12, and 4 places are kept for one-off incidents (all their lines within 6 hours), which chronic errors used to crowd out. A Bluetooth adapter lost for three minutes was never reviewed before.
+  - **Readable reasons**: the small model sometimes wrote the name of its decision (*add_keyword*) as the reason shown in the Keywords tab. It is now asked for a sentence, and a missing reason is replaced by the figures, saying the AI gave none.
+  - **Routine events stay out**: on event sources (UniFi), a client connecting or leaving, a successful backup, an available update or a usual sign-in no longer becomes a keyword. A configuration change, a lost device or a changed account still does.
+  - **Traceback chain lines are generic**: *The above exception was the direct cause…* and *During handling of the above exception…* are refused as keywords, like *Traceback*.
+  - **Same lines, same decision**: the AI that tunes keywords now answers at temperature 0 with a fixed seed. The tag that fences log lines in prompts is now derived from the lines and a secret key of the installation (`data/fence.key`, created on first use) instead of drawn at random: a line still cannot guess the tag that would close it, and the same lines now give the same prompt.
+  - **One retry when the answer is unreadable**: an empty or broken JSON answer is asked again once with another seed, so a weekly re-read is not lost to one bad answer. A connection error or a timeout is not retried.
+
 ## [1.13.3] - 2026-11-13
 
 ### Fixed

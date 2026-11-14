@@ -3,10 +3,15 @@ Les lignes de log sont écrites par les programmes surveillés, et parfois par u
 Elles ne doivent pas pouvoir dicter son verdict à l'IA : elles lui sont présentées dans un bloc à part, et une ligne
 qui s'adresse à l'IA ne peut plus faire baisser la gravité, quoi qu'en dise la réponse du modèle.
 """
+import hashlib
+import hmac
+import os
 import re
 import secrets
+import threading
 import unicodedata
-from typing import Iterable
+from pathlib import Path
+from typing import Iterable, Optional
 
 _READER = (r"(?:classifier|classifieur|analyst|analyste|analista|moderator|moderateur|llm|chatbot|ai model|modele d'ia|modele ia"
            r"|ai assistant|assistant ia|assistant d'ia|ai agent|agent ia|assistant|l'ia|ai|ia)")
@@ -45,7 +50,33 @@ def addresses_the_ai(lines: Iterable[str]) -> bool:
     return any(line and _INSTRUCTION.search(_plain(line)) for line in lines)
 
 
+_fence_key: Optional[bytes] = None
+_fence_lock = threading.Lock()
+
+
+def _key() -> bytes:
+    """Clé secrète de l'installation (data/fence.key, créée au premier usage). Sans dossier inscriptible : clé du processus."""
+    global _fence_key
+    with _fence_lock:
+        if _fence_key is None:
+            path = Path(os.environ.get("SENTINEL_DATA_DIR", "/app/data")) / "fence.key"
+            try:
+                key = path.read_bytes()
+                if len(key) < 16:
+                    raise ValueError
+            except (OSError, ValueError):
+                key = secrets.token_bytes(32)
+                try:
+                    path.write_bytes(key)
+                    os.chmod(path, 0o600)
+                except OSError:
+                    pass
+            _fence_key = key
+        return _fence_key
+
+
 def fence(text: str) -> str:
-    """Encadre des lignes de log. La balise est tirée au sort à chaque appel : une ligne ne peut pas la refermer."""
-    tag = f"LOG-{secrets.token_hex(3)}"
+    """Encadre des lignes de log. La balise dépend du texte et d'une clé secrète : une ligne ne peut pas deviner celle qui
+    la refermerait, et les mêmes lignes donnent la même balise (réponses reproductibles de l'IA)."""
+    tag = "LOG-" + hmac.new(_key(), text.encode("utf-8", "replace"), hashlib.sha256).hexdigest()[:6]
     return f"<{tag}>\n{text}\n</{tag}>"

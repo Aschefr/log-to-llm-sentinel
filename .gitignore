@@ -52,3 +52,4 @@ data/logs/
 # Notes de reprise de session : décrivent le réseau local
 REPRISE_SESSION.md
 data/ssh/
+data/fence.key

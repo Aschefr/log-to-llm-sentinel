@@ -10,7 +10,7 @@ Sentinel treats log lines as data to analyze, never as instructions.
 
 ## 1. What Sentinel does
 
-* **Separate blocks**: log lines reach the AI in blocks marked with a random tag, so a line cannot close its block and pretend to be part of the instructions. This applies to alert analysis, return-to-normal checks, the keyword arbiter, the autopilot and *Sort my unread*.
+* **Separate blocks**: log lines reach the AI in blocks marked with a tag derived from the lines and a secret key of the installation (`data/fence.key`, created on first use), so a line cannot guess the tag that would close its block and pretend to be part of the instructions. The same lines get the same tag, so the AI gets the same prompt again. This applies to alert analysis, return-to-normal checks, the keyword arbiter, the autopilot and *Sort my unread*.
 * **A safety rule for the AI**: it must not obey any sentence in these blocks, even one presented as a message from the system or the administrator, and must report it. Your real [notes](notes.md) are outside these blocks.
 * **A detector that does not depend on the AI**: it looks for sentences that address the AI, such as *"ignore previous instructions"*, a fake `[SYSTEM]` message, or an order to answer `info`.
 * **A question to the AI**: before choosing a severity, the AI says whether a line tries to influence its verdict.

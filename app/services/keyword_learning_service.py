@@ -14,6 +14,7 @@ de 24 h ; à la fin, l'IA définit aussi le nom et le contexte de la règle, et 
 regroupement et le délai de silence (voir app/services/autopilot.py).
 """
 import asyncio
+import bisect
 import json
 import os
 import re
@@ -38,7 +39,7 @@ MAX_SCAN_BYTES = 300 * 1024 * 1024
 MAX_SIGNATURES = 20000
 MAX_TIMES_PER_TEMPLATE = 300    # instants gardés par modèle d'erreur (rythme des alertes, pilote automatique)
 BLIND_MIN_COUNT = 2
-BLIND_MAX = 12
+BLIND_MAX = 16
 EVENT_MAX_TEMPLATES = 40        # au-delà, un journal sans événements nommés ne se résume plus en quelques lignes
 NOISE_MAX = 8
 ACTIVE = ("pending", "scanning", "refining")
@@ -197,8 +198,11 @@ def scan(files: list, start: datetime, end: datetime, keywords: list, excluded: 
                         continue
                     t = templates[sig] = {"count": 0, "examples": [], "status": status, "hits": set(hits),
                                           "error_level": kt.error_level(line), "error_like": kt.error_like(line),
-                                          "times": []}
+                                          "times": [], "first_ts": current_ts, "last_ts": current_ts}
                 t["count"] += 1
+                if current_ts is not None:
+                    t["first_ts"] = t.get("first_ts") or current_ts
+                    t["last_ts"] = current_ts
                 if not t["error_like"] and kt.error_like(line):
                     t["error_like"], t["error_level"] = True, kt.error_level(line)
                 if t["error_like"] and current_ts is not None and len(t["times"]) < MAX_TIMES_PER_TEMPLATE:
@@ -232,15 +236,90 @@ def event_candidates(result: dict, days: float, room: int, named_only: bool = Fa
             for g in ordered[:room]]
 
 
+ONE_OFF_SLOTS = 4            # angles morts gardés aux incidents ponctuels, que leur faible nombre ferait passer après les erreurs chroniques
+ONE_OFF_SPAN_H = 6           # incident ponctuel : toutes ses lignes tiennent dans ces quelques heures
+SAME_EVENT_TOLERANCE_S = 2   # deux modèles d'un même événement s'écrivent à quelques secondes près
+SAME_EVENT_SHARE = 0.8       # part des instants de chacun que l'autre accompagne
+# Lignes d'enchaînement d'une trace Python : elles accompagnent n'importe quelle exception, jamais le bon mot-clé
+_TRACE_FRAGMENT = re.compile(r"The above exception was the direct cause|During handling of the above exception"
+                             r"|Traceback \(most recent call last\)|^\s*(?:raise \w|File \")", re.I | re.M)
+
+
+def _accompanies(a: list, b: list) -> float:
+    """Part des instants de a (triés) qu'un instant de b accompagne, sur la plage commune aux deux."""
+    lo, hi = max(a[0], b[0]), min(a[-1], b[-1])
+    tol = timedelta(seconds=SAME_EVENT_TOLERANCE_S)
+    inside = [t for t in a if lo - tol <= t <= hi + tol]
+    if len(inside) < 3:
+        return 0.0
+    hit = 0
+    for t in inside:
+        i = bisect.bisect_left(b, t - tol)
+        hit += i < len(b) and b[i] <= t + tol
+    return hit / len(inside)
+
+
+def same_event(a: list, b: list) -> bool:
+    """Deux modèles d'erreur décrivent le même événement : chacun accompagne l'autre presque à chaque fois
+    (cause, exception, conséquence d'une même panne). Un modèle bien plus fréquent que l'autre n'en fait pas partie."""
+    if len(a) < 3 or len(b) < 3:
+        return False
+    return _accompanies(a, b) >= SAME_EVENT_SHARE and _accompanies(b, a) >= SAME_EVENT_SHARE
+
+
+def _representative(members: list) -> dict:
+    """Ligne la plus explicite d'un événement : niveau d'erreur, pas une ligne d'enchaînement de trace, la plus fréquente."""
+    return max(members, key=lambda t: (t["error_level"], not _TRACE_FRAGMENT.search(t["examples"][0]), t["count"]))
+
+
+def group_blind(templates: list) -> list:
+    """Regroupe les modèles d'un même événement (triés du plus fréquent au moins fréquent) : l'arbitre voit un angle mort
+    par événement, et la place libérée laisse passer des erreurs plus rares."""
+    groups = []
+    for t in templates:
+        times = sorted(t["times"])
+        for g in groups:
+            if g["count"] <= 1.5 * t["count"] and same_event(g["times"], times):
+                g["members"].append(t)
+                break
+        else:
+            groups.append({"count": t["count"], "times": times, "members": [t]})
+    return groups
+
+
+def _span_h(group: dict) -> Optional[float]:
+    firsts = [m["first_ts"] for m in group["members"] if m.get("first_ts")]
+    lasts = [m["last_ts"] for m in group["members"] if m.get("last_ts")]
+    return (max(lasts) - min(firsts)).total_seconds() / 3600 if firsts and lasts else None
+
+
+def pick_blind(groups: list, room: int) -> list:
+    """Les plus fréquents, et quelques places pour les incidents ponctuels (une panne de quelques minutes passée inaperçue
+    parmi des erreurs chroniques), de niveau erreur d'abord. Les groupes restent dans l'ordre de fréquence."""
+    if len(groups) <= room:
+        return groups
+    one_off = [g for g in groups[room - ONE_OFF_SLOTS:]
+               if (_span_h(g) or ONE_OFF_SPAN_H) < ONE_OFF_SPAN_H]
+    one_off.sort(key=lambda g: (any(m["error_level"] for m in g["members"]), g["count"]), reverse=True)
+    keep = groups[:room - len(one_off[:ONE_OFF_SLOTS])] + one_off[:ONE_OFF_SLOTS]
+    return [g for g in groups if any(g is k for k in keep)]
+
+
 def scan_candidates(db, rule: Rule, result: dict, days: float):
     """Angles morts et mots-clés à examiner, au format de keyword_tuning.build_arbiter_messages."""
     templates = result["templates"]
-    blind = [{"template_id": None, "signature": sig, "count": t["count"], "examples": t["examples"],
-              "first": result["first"], "last": result["last"], "per_day": round(t["count"] / days, 1)}
-             for sig, t in templates.items()
-             if t["status"] is None and t["error_like"] and t["count"] >= BLIND_MIN_COUNT]
-    blind.sort(key=lambda c: c["count"], reverse=True)
-    blind = blind[:BLIND_MAX]
+    errors = sorted((dict(t, signature=sig) for sig, t in templates.items()
+                     if t["status"] is None and t["error_like"] and t["count"] >= BLIND_MIN_COUNT),
+                    key=lambda t: t["count"], reverse=True)
+    blind = []
+    for g in pick_blind(group_blind(errors), BLIND_MAX):
+        rep = _representative(g["members"])
+        others = [m for m in g["members"] if m is not rep]
+        blind.append({"template_id": None, "signature": rep["signature"], "count": rep["count"],
+                      "examples": rep["examples"], "first": result["first"], "last": result["last"],
+                      "per_day": round(rep["count"] / days, 1),
+                      # autres lignes du même événement : l'arbitre peut y prendre le mot-clé, un seul suffit
+                      "related": [m["examples"] for m in others[:3]]})
     # Le pilote choisit ce qui mérite une analyse, même sans ligne d'erreur : une source d'événements en a peu (une latence
     # WAN n'est pas une erreur). Une fois qu'elle a un mot-clé, seuls les événements nommés : le reste est trop bavard.
     if ap.enabled(rule) and len(blind) < BLIND_MAX:
@@ -537,7 +616,7 @@ async def _run_session(session_id: int):
         try:
             rule = db.query(Rule).filter(Rule.id == rule_id).first()
             changes = kt.apply_decisions(db, rule, decision, blind, noise, origin_blind="learning",
-                                         origin_noise="learning", session_id=session_id) if decision else []
+                                         origin_noise="learning", session_id=session_id, lang=lang) if decision else []
             if autopilot:
                 # Rythme réel : fenêtre de regroupement des lignes déclenchantes, délai de silence de la source
                 window = ap.grouping_window(ap.matched_timestamps(result["templates"], rule.get_keywords(),

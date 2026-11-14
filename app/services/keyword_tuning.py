@@ -46,6 +46,7 @@ NOISE_INFO_SHARE = 0.9
 NOISE_REVIEW_DAYS = 7          # un mot-clé conservé n'est réexaminé qu'après ce délai (sauf nouveau signalement)
 NOISE_PER_REVIEW = 4
 AUTO_CONFIDENCE = 70
+ARBITER_SEED = 7                # mêmes lignes, mêmes décisions : réglage de l'autopilote reproductible
 MAX_KEYWORD_PER_DAY = 200      # au-delà, un nouveau mot-clé risque de noyer la règle : proposé, pas appliqué
 FLAGGED_DAYS = 30              # un mot-clé qui recouvre une alerte signalée pas pertinente depuis 30 jours n'est pas ajouté
 PRUNE_DAYS = 14                # pilote automatique : mot-clé ajouté par l'IA, retiré s'il n'a produit sur 14 jours…
@@ -64,7 +65,9 @@ GENERIC_VALUES = {
 }
 
 # Début de trace ou nom d'exception seul : ils attraperaient n'importe quelle erreur de la source
-GENERIC_PHRASES = {"traceback", "traceback (most recent call last)", "stack trace", "stacktrace"}
+GENERIC_PHRASES = {"traceback", "traceback (most recent call last)", "stack trace", "stacktrace",
+                   "the above exception was the direct cause of the following exception",
+                   "during handling of the above exception, another exception occurred"}
 _BARE_EXCEPTION = re.compile(r"[\w.]*(?:error|exception)", re.IGNORECASE)
 # Adresse IPv6 (complète ou abrégée par « :: ») : la signature des lignes ne la remplace pas
 _HEX_COLON = re.compile(r"(?<![\w:.])[0-9a-f]*(?::[0-9a-f]*){2,7}(?![\w:])", re.IGNORECASE)
@@ -356,7 +359,7 @@ class KeywordTuningService:
                     return []
                 origin_noise = "feedback" if focus_analysis_id else "noise"
                 changes = apply_decisions(db, rule, decision, blind, noise, origin_blind="blind_spot",
-                                          origin_noise=origin_noise)
+                                          origin_noise=origin_noise, lang=config.get("ollama_prompt_lang", "fr"))
                 rule.keyword_tuned_at = datetime.utcnow()
                 db.commit()
                 for c in changes:
@@ -445,31 +448,39 @@ class KeywordTuningService:
 
     async def ask_arbiter(self, messages: list, config: dict, label: str = "", schema: dict = KEYWORD_ARBITER_SCHEMA,
                           kind: str = "KEYWORDS") -> Optional[dict]:
+        """Réponse JSON de l'arbitre. Une réponse vide ou illisible (le petit modèle déraille parfois) est redemandée une
+        fois avec une autre graine ; une erreur de connexion ou un dépassement de délai ne l'est pas."""
         if not self.orchestrator:
             return None
         from app.services.resolution_service import clean_ollama_json
-        async with self.orchestrator._ollama_semaphore:
+        for attempt in range(2):
+            async with self.orchestrator._ollama_semaphore:
+                try:
+                    res = await asyncio.wait_for(self.orchestrator.ollama.chat(
+                        messages, url=config.get("ollama_url"), model=config.get("ollama_model"),
+                        think=config.get("ollama_think", False),
+                        options=llm_options(config, temperature=0, seed=ARBITER_SEED + attempt), format=schema), timeout=300.0)
+                except asyncio.TimeoutError:
+                    res = {"content": "", "error": "Timeout Ollama (300 s)"}
+            content = res.get("content") or ""
+            logger.add_ollama_log(messages_to_text(messages), content or res.get("error") or "", kind)
+            if res.get("error"):
+                logger.warning("KeywordTuning", f"Arbitre indisponible ({label}) : {res.get('error')}")
+                return None
+            if not content:
+                logger.warning("KeywordTuning", f"Arbitre : réponse vide ({label}, essai {attempt + 1})")
+                continue
             try:
-                res = await asyncio.wait_for(self.orchestrator.ollama.chat(
-                    messages, url=config.get("ollama_url"), model=config.get("ollama_model"),
-                    think=config.get("ollama_think", False), options=llm_options(config, temperature=0.1),
-                    format=schema), timeout=300.0)
-            except asyncio.TimeoutError:
-                res = {"content": "", "error": "Timeout Ollama (300 s)"}
-        content = res.get("content") or ""
-        logger.add_ollama_log(messages_to_text(messages), content or res.get("error") or "", kind)
-        if res.get("error") or not content:
-            logger.warning("KeywordTuning", f"Arbitre indisponible ({label}) : {res.get('error') or 'réponse vide'}")
-            return None
-        try:
-            data = json.loads(clean_ollama_json(content))
-            return data if isinstance(data, dict) else None
-        except ValueError:
+                data = json.loads(clean_ollama_json(content))
+                if isinstance(data, dict):
+                    return data
+            except ValueError:
+                pass
             # Le début et la fin : une réponse coupée par la limite de génération se voit à sa fin, pas à son début
             tail = f" … {content[-300:]}" if len(content) > 500 else content[200:]
-            logger.warning("KeywordTuning", f"Réponse de l'arbitre illisible ({label}, {len(content)} caractères) : "
-                                            f"{content[:200]}{tail}")
-            return None
+            logger.warning("KeywordTuning", f"Réponse de l'arbitre illisible ({label}, essai {attempt + 1}, "
+                                            f"{len(content)} caractères) : {content[:200]}{tail}")
+        return None
 
 
 def _detached(c: KeywordChange) -> dict:
@@ -671,6 +682,10 @@ def build_arbiter_messages(lang: str, rule: Rule, blind: List[dict], noise: List
                          + (" " + L("event_mark") if c.get("kind") == "event" else ""))
             for ex in c["examples"][:2]:
                 parts.append(L("example", example=fence(clean_log_line(ex)[:400])))
+            if c.get("related"):
+                parts.append(L("related"))
+                for exs in c["related"][:2]:
+                    parts.append(L("example", example=fence(clean_log_line(exs[0])[:300])))
     else:
         parts.append(L("nothing"))
 
@@ -791,8 +806,34 @@ def _confidence(item: dict) -> int:
         return 0
 
 
+# Événement de routine d'une source d'événements (un client qui se connecte ou part) : la consigne le fait ignorer,
+# un petit modèle l'ajoute parfois quand même. Un appareil (borne, switch) perdu reste surveillé.
+_ROUTINE_EVENT = re.compile(r"\b(?:client|station|sta|guest|user)s?\b.{0,20}\b(?:connected|disconnected|roamed|joined|left)\b"
+                            r"|\bbackups? (?:created|completed|succeeded|finished|done)\b|\bupdates? available\b"
+                            r"|\baccessed\b|\b(?:logged|signed) (?:in|on)\b|\blog(?:in|on) succe", re.IGNORECASE)
+# Nom d'événement entier qui ne dit qu'une activité de routine (UniFi : « access », « fwUpdate ») ; « Access Denied » reste
+_ROUTINE_EVENT_NAME = re.compile(r"access|log(?:in|on)|sign[- ]?in|fw ?update|firmware ?update", re.IGNORECASE)
+
+
+def routine_event(cand: dict, value: str) -> bool:
+    """Événement de routine : par le mot-clé proposé, ou par le nom de l'événement (l'arbitre peut prendre un champ technique)."""
+    name = str(cand.get("signature") or "").strip()
+    return bool(_ROUTINE_EVENT.search(value) or _ROUTINE_EVENT.search(name) or _ROUTINE_EVENT_NAME.fullmatch(name))
+
+_DECISION_WORDS = {"add_keyword", "ignore", "keep", "add_exclusion", "remove_keyword"}
+
+
+def readable_reason(reason, lang: str, fallback_key: str, **kw) -> str:
+    """Raison de l'arbitre, ou une phrase tirée des chiffres quand il n'a recopié que sa décision (petit modèle)."""
+    r = re.sub(r"\s+", " ", str(reason or "")).strip()
+    if len(r) >= 15 and r.lower().strip(" .") not in _DECISION_WORDS:
+        return r
+    return keyword_label(lang, fallback_key, **kw)
+
+
 def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: List[dict],
-                    origin_blind: str, origin_noise: str, session_id: Optional[int] = None) -> List[KeywordChange]:
+                    origin_blind: str, origin_noise: str, session_id: Optional[int] = None,
+                    lang: str = "fr") -> List[KeywordChange]:
     """Vérifie chaque décision de l'arbitre sur les données, puis l'applique ou la propose."""
     changes = []
     keywords = rule.get_keywords()
@@ -820,8 +861,14 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
                 tpl.status, tpl.reviewed_count = "ignored", tpl.count
             continue
         value = clean_value(item.get("keyword"))
-        examples = cand["examples"]
-        if _value_problem(value) or not examples or not all(keyword_match.contains(value, ex.lower()) for ex in examples):
+        reason = readable_reason(reason, lang, "reason_add", per_day=cand["per_day"])
+        # Le mot-clé vient de la ligne montrée ou d'une autre ligne du même événement : toutes ses lignes le contiennent
+        examples = next((exs for exs in [cand["examples"]] + list(cand.get("related") or [])
+                         if exs and all(keyword_match.contains(value, ex.lower()) for ex in exs)), None)
+        if cand.get("kind") == "event" and routine_event(cand, value):
+            logger.info("KeywordTuning", f"Événement de routine écarté pour '{rule.name}' : « {value} »")
+            continue
+        if _value_problem(value) or not examples:
             # Non fondé sur les lignes (inventé, variable ou générique) : écarté
             if tpl is not None:
                 tpl.status, tpl.reviewed_count = "ignored", tpl.count
@@ -866,7 +913,8 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
             continue
         kw = cand["keyword"]
         reviews[kw] = {"at": datetime.utcnow().isoformat(), "irrelevant": cand.get("irrelevant_ids", [])}
-        reason, conf = str(item.get("reason", "")), _confidence(item)
+        conf = _confidence(item)
+        reason = readable_reason(item.get("reason"), lang, "reason_noise", alerts=cand["alerts"], per_day=cand["per_day"])
         sev = cand["severities"]
         evidence = {"alerts": cand["alerts"], "severities": sev, "irrelevant": cand["irrelevant"],
                     "per_day": cand["per_day"], "examples": [g["example"] for g in cand["lines"][:3]]}

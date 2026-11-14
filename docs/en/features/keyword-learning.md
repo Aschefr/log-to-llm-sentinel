@@ -58,7 +58,7 @@ On each rule page, **Keywords** shows:
 
 **Analyze history** reads the whole period in a single pass — the current file and the rotated `.1` file — and groups every line into templates. Lines without a timestamp (stack traces) belong to the previous line; timestamps without a time zone are aligned on UTC using the file's modification time. **Observe** waits for the period to end, then analyzes what arrived.
 
-The arbiter then receives the blind spots and, for each keyword, the templates it catches, and decides with the same checks as the hourly review. The session card shows what was read and changed, offers **Undo these changes** and **Download the AI log** (a text file with the data sent to the AI and its decision).
+The arbiter then receives the blind spots and, for each keyword, the templates it catches, and decides with the same checks as the hourly review. Templates whose lines are always written together (within 2 seconds, both ways) are one event: the arbiter sees them as one blind spot with its companion lines and takes the keyword from the clearest one. It sees up to 16 blind spots, the most frequent ones, with 4 places kept for one-off incidents (all their lines within 6 hours). It answers at temperature 0 with a fixed seed, and an unreadable answer is asked again once. The session card shows what was read and changed, offers **Undo these changes** and **Download the AI log** (a text file with the data sent to the AI and its decision).
 
 A new rule runs this analysis on the last 7 days when it is created (option in the rule form), so the keyword field can be left empty.
 
