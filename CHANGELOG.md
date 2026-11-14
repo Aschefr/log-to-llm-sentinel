@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.15.0] - 2026-11-14
 
 ### Added
 - **One-off signals: a trace, not an alert**: some events are worth keeping without being incidents, such as an attack the gateway already blocked, or a single client that got no DNS answer. Their lines now give an *info* card closed at once, with no notification, no second look and no wait for the return to normal, and a repeat reuses the previous verdict without calling the AI. Measured on a home-lab UniFi gateway over 7 days: 130 analyses of blocked threats, 107 of them *warning* and 118 watched until "back to normal".
