@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.14.0] - 2026-11-14
 
 ### Fixed
 - **Regression in 1.13.3: an analysis of the history could remove a good keyword on its own**: 1.13.3 protects a keyword by counting its serious alerts nobody flagged, but the candidates built by *Analyze history*, *Observe* and the autopilot's weekly re-read did not carry that count, so the protection was always zero there. A keyword with a single legitimate warning alert could be removed without asking. Those candidates now carry the count, and a candidate without it falls back to counting every warning, as before 1.13.3.
