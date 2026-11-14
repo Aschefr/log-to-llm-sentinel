@@ -16,6 +16,8 @@ An incident opens with the first analysed alert of a rule and stays open until *
 
 **One-off events open no incident.** When the analysis says an event is already over in its lines (a blocked attack, a Wi-Fi client that left, an isolated failure, a finished task), the alert is closed as soon as it is analysed, with the status *One-off*: the rule does not go into alert, there is no calm to wait for, and it does not count in the MTTR. Its notification is unchanged. The analysis cannot do this for a critical alert, for a line that reports a hard failure (out of memory, segfault, disk errors, a service restarting in a loop), or when a line tries to dictate the verdict: those are always watched. When in doubt, the AI is told to keep watching.
 
+**One-off signals are traces, not alerts.** An alert whose lines all report a connection already blocked by the security device (CEF `act=blocked`, `dropped`, `denied`…), or that only keywords marked *One-off signal* caught, is a signal: an *info* card closed at once (*One-off*), with no notification, no second look and no return to normal to wait for. A repeat reuses the previous verdict without calling the AI. A hard failure, a batch that also holds a line caught by an ordinary keyword, or a line that tries to dictate the verdict is never a signal. Mark a keyword in the rule's Keywords tab (*One-off signal* / *Make it an alert*). The autopilot marks the keywords it adds for chronic errors, more than one an hour, every day, for at least 3 days (see [Keyword learning](keyword-learning.md)).
+
 A **success line** can close the incident earlier: when a line contains one of the rule's success patterns (and is not itself an error line), Sentinel checks whether the problem is over.
 
 ---

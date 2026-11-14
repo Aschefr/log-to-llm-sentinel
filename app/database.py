@@ -194,6 +194,8 @@ def init_db():
             'You are an English-speaking DevOps expert. Answer in English directly and concisely.')""",
         # Les titres ne portent plus d'emoji : la page dessine ses propres repères
         "UPDATE chat_conversations SET title = substr(title, 3) WHERE title LIKE '🔎 %'",
+        # Mots-clés « signal ponctuel »
+        "ALTER TABLE rules ADD COLUMN signal_keywords_json TEXT DEFAULT '[]'",
     ]
 
     with engine.connect() as conn:

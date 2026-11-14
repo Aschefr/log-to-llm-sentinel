@@ -55,6 +55,7 @@ class Rule(Base):
 
     # ── Pilote automatique (AP-1) ──
     autopilot_json = Column(Text, default="{}")               # état du pilote : voir app/services/autopilot.py
+    signal_keywords_json = Column(Text, default="[]")         # mots-clés « signal ponctuel » : trace info close, pas une alerte
 
     def get_diagnostic_link_ids(self):
         """None : toutes les connexions. Une liste : seulement celles-là."""
@@ -70,6 +71,18 @@ class Rule(Base):
     def set_keywords(self, keywords):
         import json
         self.keywords_json = json.dumps(keywords)
+
+    def get_signal_keywords(self):
+        """Mots-clés « signal ponctuel » encore présents dans la règle."""
+        try:
+            marked = {str(v).lower() for v in _json.loads(self.signal_keywords_json or "[]")}
+        except ValueError:
+            return []
+        return [k for k in self.get_keywords() if k.lower() in marked]
+
+    def set_signal(self, keyword: str, signal: bool):
+        current = [k for k in self.get_signal_keywords() if k.lower() != keyword.lower()]
+        self.signal_keywords_json = _json.dumps(current + ([keyword] if signal else []))
 
     def get_excluded_patterns(self):
         import json

@@ -19,7 +19,7 @@ from typing import Optional
 from app import logger
 from app.services import diagnostics as diag
 from app.services import llm_tools
-from app.services.alert_analysis import _load_json, syslog_origin
+from app.services.alert_analysis import BLOCKED_LINE, _load_json, syslog_origin
 from app.services.app_config import llm_options
 from app.services.log_guard import addresses_the_ai, fence
 from app.services.prompts import SECOND_LOOK_SCHEMA, SECOND_LOOK_SYSTEM, label, second_look_label
@@ -34,7 +34,7 @@ LINES_CHARS = 3000
 TOOL_NAMES = ("docker_list_containers", "docker_container_status", "docker_container_logs", "host_check")
 RANK = {"info": 0, "warning": 1, "critical": 2}
 # Champ act= des lignes CEF (pare-feu, IPS) : la connexion a été bloquée, il n'y a rien sur les serveurs à vérifier
-_BLOCKED = re.compile(r"\bact=(?:blocked?|drop(?:ped)?|den(?:y|ied)|reject(?:ed)?)\b", re.IGNORECASE)
+_BLOCKED = BLOCKED_LINE
 
 # Ce qui ressemble à un secret ne sort pas du second regard (constat, carte, notification)
 _SECRET = re.compile(

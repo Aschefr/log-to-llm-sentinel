@@ -14,7 +14,7 @@ from app.services.app_config import config_to_dict, llm_options
 from app.services import event_notes
 from app.services.alert_analysis import (build_history, build_alert_messages, messages_to_text, parse_alert_response,
                                          detect_severity, guard_log_instruction, analysis_lines, hard_failure_floor,
-                                         watch_needed, close_one_off)
+                                         watch_needed, close_one_off, is_signal, as_signal)
 from app.services.log_source import find_context
 from app.services.prompts import ALERT_SCHEMA, label
 from app.utils.log_utils import clean_log_line, aggregate_lines, line_signature
@@ -320,8 +320,11 @@ class Orchestrator:
         else:
             result = await self.analyze_alert(rule, raw_lines, config, db,
                                               matched_keywords=matched_keywords, detection_id=detection_id)
+        # Signal ponctuel (attaque déjà bloquée, mot-clé marqué) : une trace info close, pas une alerte
+        if is_signal(rule, raw_lines["lines"], matched_keywords):
+            result = as_signal(result)
         # Une répétition reprend le verdict précédent sans appel à l'IA : pas de second regard non plus
-        second_look = None if prior else await self.second_look(rule, result, config, db)
+        second_look = None if prior or result.get("signal") else await self.second_look(rule, result, config, db)
         severity = result["severity"]
 
         analysis = Analysis(
@@ -339,7 +342,7 @@ class Orchestrator:
             analysis.ai_failed_at = analysis.analyzed_at
         # Événement ponctuel déjà terminé (attaque bloquée, client parti…) : clos tout de suite, la règle ne passe pas
         # en alerte et il n'y a pas de retour à la normale à attendre. Un second regard qui a relevé la gravité compte.
-        one_off = not watch_needed({**result, "severity": severity}, raw_lines["lines"])
+        one_off = result.get("signal") or not watch_needed({**result, "severity": severity}, raw_lines["lines"])
         if one_off:
             close_one_off(analysis)
         db.add(analysis)
@@ -348,8 +351,9 @@ class Orchestrator:
         if result.get("failed"):
             logger.warning("Orchestrator", f"'{rule.name}' : l'IA n'a pas répondu, alerte #{analysis.id} en attente d'une nouvelle analyse.")
 
-        # 6. Notifier — une alerte que l'IA n'a pas pu lire attend sa nouvelle analyse : notifiée à ce moment-là
-        if not result.get("failed") or result.get("log_instruction"):
+        # 6. Notifier — une alerte que l'IA n'a pas pu lire attend sa nouvelle analyse : notifiée à ce moment-là.
+        # Un signal ponctuel n'est pas notifié : il reste sur le tableau de bord.
+        if not result.get("signal") and (not result.get("failed") or result.get("log_instruction")):
             await self.notify_analysis(analysis, rule, result, config, db)
 
         # Hook de signalement d'erreur pour la résolution (rien à surveiller pour un événement ponctuel)
@@ -397,7 +401,9 @@ class Orchestrator:
             matched_keywords=json.loads(analysis.matched_keywords_json or "[]"),
             detection_id=analysis.detection_id, ref_time=analysis.analyzed_at, exclude_id=analysis.id, context=context,
         )
-        second_look = await self.second_look(rule, result, config, db)
+        if is_signal(rule, raw["lines"], json.loads(analysis.matched_keywords_json or "[]")):
+            result = as_signal(result)
+        second_look = None if result.get("signal") else await self.second_look(rule, result, config, db)
         self.apply_result(analysis, result)
         analysis.second_look_json = json.dumps(second_look, ensure_ascii=False) if second_look else None
         analysis.ai_failed_at = (analysis.ai_failed_at or datetime.utcnow()) if result.get("failed") else None

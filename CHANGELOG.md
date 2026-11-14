@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **One-off signals: a trace, not an alert**: some events are worth keeping without being incidents, such as an attack the gateway already blocked, or a single client that got no DNS answer. Their lines now give an *info* card closed at once, with no notification, no second look and no wait for the return to normal, and a repeat reuses the previous verdict without calling the AI. Measured on a home-lab UniFi gateway over 7 days: 130 analyses of blocked threats, 107 of them *warning* and 118 watched until "back to normal".
+  - **Attacks already blocked** are one-off signals on their own: every line of the alert reports the connection as blocked, dropped or denied by the security device (CEF `act=blocked`…).
+  - **A keyword can be marked *One-off signal*** in a rule's Keywords tab, and back with *Make it an alert*.
+  - **Chronic errors**: when the autopilot adds a keyword for an error that would fire more than once an hour, every day, for at least 3 days, the keyword is a one-off signal: an alert that rings all day is no longer one. The change history shows it. Measured on a Wi-Fi access point that reports client DNS timeouts all week: 41 alerts a day before, 9 after.
+  - A hard failure (out of memory, disk errors, a service restarting in a loop…) is never a signal, nor a batch that also holds a line caught by an ordinary keyword, nor a line that tries to dictate the verdict to the AI.
+
+### Fixed
+- **A line of Python code could become a keyword**: the autopilot took *raise err* from a Home Assistant traceback, a line that every chained exception writes. A traceback code line (*raise …*, *return await …*) is now refused as generic, like *Traceback*.
+
 ## [1.14.0] - 2026-11-14
 
 ### Fixed

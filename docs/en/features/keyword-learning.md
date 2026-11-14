@@ -17,7 +17,7 @@ For every line a rule receives, Sentinel counts (no AI involved, very light):
 
 Every hour, for each enabled rule whose tuning is not *Off*, the arbiter receives:
 
-* **Blind spots** seen at least 3 times → *add a keyword*, or *ignore* (expected, transient, maintenance, a container being stopped…). One keyword per event, even when it writes several lines.
+* **Blind spots** seen at least 3 times → *add a keyword*, or *ignore* (expected, transient, maintenance, a container being stopped…). One keyword per event, even when it writes several lines. A keyword added for a chronic error (more than one line an hour, every day, for at least 3 days of the period) is a one-off signal: its lines give an *info* card closed at once, without notification.
 * **Noisy keywords** → *keep*, *add an exclusion* for the useless lines, or *remove the keyword*. A keyword is reviewed when ≥ 10 alerts over 30 days are ≥ 90 % `info` without any `critical`, or when you flag one of its alerts **Not relevant**.
 
 Flagging an alert **Not relevant** (button on every alert card) flags every occurrence of that event and triggers this review right away for that rule: the arbiter targets the flagged lines with a precise exclusion rather than dropping a keyword that also catches useful alerts. The next analyses of that event are told about the flag too.

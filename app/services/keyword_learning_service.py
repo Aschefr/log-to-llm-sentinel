@@ -317,7 +317,7 @@ def scan_candidates(db, rule: Rule, result: dict, days: float):
         others = [m for m in g["members"] if m is not rep]
         blind.append({"template_id": None, "signature": rep["signature"], "count": rep["count"],
                       "examples": rep["examples"], "first": result["first"], "last": result["last"],
-                      "per_day": round(rep["count"] / days, 1),
+                      "per_day": round(rep["count"] / days, 1), "span_h": round(_span_h(g) or 0, 1),
                       # autres lignes du même événement : l'arbitre peut y prendre le mot-clé, un seul suffit
                       "related": [m["examples"] for m in others[:3]]})
     # Le pilote choisit ce qui mérite une analyse, même sans ligne d'erreur : une source d'événements en a peu (une latence

@@ -69,6 +69,8 @@ GENERIC_PHRASES = {"traceback", "traceback (most recent call last)", "stack trac
                    "the above exception was the direct cause of the following exception",
                    "during handling of the above exception, another exception occurred"}
 _BARE_EXCEPTION = re.compile(r"[\w.]*(?:error|exception)", re.IGNORECASE)
+# Ligne de code d'une trace Python (« raise err », « return await fn() ») : elle figure dans n'importe quelle exception
+_TRACE_CODE = re.compile(r"(?:raise|return|await|yield)(?:\s+(?:await|from))?\s+[\w.]+(?:\([^()]*\))?", re.IGNORECASE)
 # Adresse IPv6 (complète ou abrégée par « :: ») : la signature des lignes ne la remplace pas
 _HEX_COLON = re.compile(r"(?<![\w:.])[0-9a-f]*(?::[0-9a-f]*){2,7}(?![\w:])", re.IGNORECASE)
 
@@ -716,7 +718,8 @@ def _value_problem(v: str) -> Optional[str]:
     """Raison de rejet d'une valeur proposée par l'arbitre (None si acceptable)."""
     if not (VALUE_MIN_LEN <= len(v) <= VALUE_MAX_LEN):
         return "length"
-    if v.lower() in GENERIC_VALUES or v.lower().rstrip(": ") in GENERIC_PHRASES or _BARE_EXCEPTION.fullmatch(v):
+    if v.lower() in GENERIC_VALUES or v.lower().rstrip(": ") in GENERIC_PHRASES or _BARE_EXCEPTION.fullmatch(v) \
+            or _TRACE_CODE.fullmatch(v.strip()):
         return "generic"
     if _has_variable_part(v):
         return "variable"
@@ -748,8 +751,8 @@ def dismiss_pending(db, rule: Rule):
         c.status, c.decided_at = "dismissed", now
 
 
-def apply_change_to_rule(rule: Rule, kind: str, action: str, value: str) -> bool:
-    """Modifie la règle ; False si rien à faire (déjà dans l'état voulu)."""
+def apply_change_to_rule(rule: Rule, kind: str, action: str, value: str, signal: bool = False) -> bool:
+    """Modifie la règle ; False si rien à faire (déjà dans l'état voulu). signal : le mot-clé ajouté est un signal ponctuel."""
     current = rule.get_keywords() if kind == "keyword" else rule.get_excluded_patterns()
     present = any(x.lower() == value.lower() for x in current)
     if action == "add":
@@ -762,6 +765,7 @@ def apply_change_to_rule(rule: Rule, kind: str, action: str, value: str) -> bool
         new = [x for x in current if x.lower() != value.lower()]
     if kind == "keyword":
         rule.set_keywords(new)
+        rule.set_signal(value, signal and action == "add")
     else:
         rule.set_excluded_patterns(new)
     return True
@@ -778,7 +782,7 @@ def record_change(db, rule: Rule, kind: str, action: str, value: str, origin: st
         hold = "suggest_mode"
     status = "pending"
     if not hold:
-        if not apply_change_to_rule(rule, kind, action, value):
+        if not apply_change_to_rule(rule, kind, action, value, signal=bool((evidence or {}).get("signal"))):
             return None
         status = "applied"
     elif hold != "suggest_mode" and _autopilot_on(rule):
@@ -819,6 +823,16 @@ def routine_event(cand: dict, value: str) -> bool:
     """Événement de routine : par le mot-clé proposé, ou par le nom de l'événement (l'arbitre peut prendre un champ technique)."""
     name = str(cand.get("signature") or "").strip()
     return bool(_ROUTINE_EVENT.search(value) or _ROUTINE_EVENT.search(name) or _ROUTINE_EVENT_NAME.fullmatch(name))
+
+# Erreur chronique : elle déclencherait plus d'une analyse par heure, chaque jour, depuis au moins 3 jours. Une alerte qui
+# sonne toute la journée n'en est plus une : son mot-clé devient un signal ponctuel (trace info close, sans notification).
+CHRONIC_PER_DAY = 24
+CHRONIC_SPAN_H = 72
+
+
+def chronic(cand: dict) -> bool:
+    return cand.get("per_day", 0) >= CHRONIC_PER_DAY and (cand.get("span_h") or 0) >= CHRONIC_SPAN_H
+
 
 _DECISION_WORDS = {"add_keyword", "ignore", "keep", "add_exclusion", "remove_keyword"}
 
@@ -896,7 +910,7 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
         elif cand["per_day"] > MAX_KEYWORD_PER_DAY:
             hold = "too_frequent"
         evidence = {"examples": examples[:3], "count": cand["count"], "per_day": cand["per_day"],
-                    "signature": cand["signature"]}
+                    "signature": cand["signature"], **({"signal": True} if chronic(cand) else {})}
         c = record_change(db, rule, "keyword", "add", value, origin_blind, reason, conf, evidence, hold, session_id)
         if tpl is not None:
             tpl.status = "covered"
@@ -972,7 +986,11 @@ def decide(db, change: KeywordChange, action: str) -> Optional[str]:
     if not rule:
         return "rule_not_found"
     if action == "accept" and change.status in ("pending", "dismissed"):
-        apply_change_to_rule(rule, change.kind, change.action, change.value)
+        try:
+            signal = bool(json.loads(change.evidence_json or "{}").get("signal"))
+        except ValueError:
+            signal = False
+        apply_change_to_rule(rule, change.kind, change.action, change.value, signal=signal)
         change.status = "applied"
     elif action == "reject" and change.status == "pending":
         change.status = "rejected"

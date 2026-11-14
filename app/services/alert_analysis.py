@@ -369,6 +369,32 @@ def is_hard_failure(line: str) -> bool:
     return serious_line(line) or bool(_RESTART_LOOP.search(line))
 
 
+# Ligne d'un équipement de sécurité qui dit avoir déjà bloqué la connexion (CEF act=blocked, dropped, denied…)
+BLOCKED_LINE = re.compile(r"\bact=(?:blocked?|drop(?:ped)?|den(?:y|ied)|reject(?:ed)?)\b", re.IGNORECASE)
+
+
+def is_signal(rule: Rule, lines: List[str], matched_keywords: Optional[List[str]] = None) -> bool:
+    """Signal ponctuel : une trace à garder, pas une alerte. Toutes les lignes ont déjà été bloquées par l'équipement de
+    sécurité, ou ne sont attrapées que par des mots-clés marqués « signal ponctuel ». Une panne franche n'en est jamais un."""
+    lines = [l for l in lines if l]
+    if not lines or any(is_hard_failure(l) for l in lines):
+        return False
+    if all(BLOCKED_LINE.search(l) for l in lines):
+        return True
+    signals = {k.lower() for k in rule.get_signal_keywords()}
+    matched = [k for k in (matched_keywords or []) if k]
+    return bool(signals and matched) and all(k.lower() in signals for k in matched)
+
+
+def as_signal(result: dict) -> dict:
+    """Verdict d'un signal ponctuel : info, clos à la détection, sans notification. Une ligne qui tente de dicter le
+    verdict, ou une analyse que l'IA n'a pas pu faire, restent traitées comme une alerte."""
+    if result.get("failed") or result.get("log_instruction"):
+        return result
+    data = {**result["data"], "severity": "info"} if result.get("data") else result.get("data")
+    return {**result, "severity": "info", "data": data, "signal": True}
+
+
 def hard_failure_floor(parsed: dict, lines: List[str], lang: str) -> dict:
     """Une panne franche dans les lignes de l'alerte reste au moins warning, quoi que dise le modèle."""
     if parsed["severity"] != "info" or not any(is_hard_failure(l) for l in lines):

@@ -127,6 +127,11 @@ class PatternBody(BaseModel):
     pattern: str
 
 
+class SignalBody(BaseModel):
+    value: str
+    signal: bool
+
+
 class ProbeBody(BaseModel):
     probe_type: str
     probe_target: str
@@ -991,6 +996,7 @@ def get_rule_keywords(rule_id: int):
 
         keywords, excluded = rule.get_keywords(), rule.get_excluded_patterns()
         neutralized = keyword_match.neutralized(keywords, excluded)
+        signals = {k.lower() for k in rule.get_signal_keywords()}
         kw_rows = []
         for kw in keywords:
             a = alerts.get(kw) or {"alerts": 0, "severities": {}, "irrelevant": [], "last_at": None}
@@ -998,7 +1004,8 @@ def get_rule_keywords(rule_id: int):
             kw_rows.append({"value": kw, "alerts_30d": a["alerts"], "severities": dict(a["severities"]),
                             "irrelevant": len(a["irrelevant"]), "last_alert_at": rule_stats.iso(a["last_at"]),
                             "lines_per_day": _round1(kt.pattern_daily_hits(stats, "k", kw)),
-                            "origin": origin, "added_at": added_at, "neutralized_by": neutralized.get(kw)})
+                            "origin": origin, "added_at": added_at, "neutralized_by": neutralized.get(kw),
+                            "signal": kw.lower() in signals})
         ex_rows = []
         for ex in excluded:
             origin, added_at = origin_of("exclusion", ex)
@@ -1041,6 +1048,24 @@ def decide_keyword_change(rule_id: int, change_id: int, action: str):
             raise HTTPException(status_code=409, detail=error)
         db.commit()
         return kt.change_dict(change)
+    finally:
+        db.close()
+
+
+@router.post("/{rule_id}/keywords/signal")
+def set_keyword_signal(rule_id: int, body: SignalBody):
+    """Marque un mot-clé « signal ponctuel » (trace info close, sans notification) ou le rend à l'alerte."""
+    db = SessionLocal()
+    try:
+        rule = db.query(Rule).filter(Rule.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="rule_not_found")
+        keyword = next((k for k in rule.get_keywords() if k.lower() == body.value.strip().lower()), None)
+        if keyword is None:
+            raise HTTPException(status_code=404, detail="keyword_not_found")
+        rule.set_signal(keyword, body.signal)
+        db.commit()
+        return {"value": keyword, "signal": body.signal}
     finally:
         db.close()
 

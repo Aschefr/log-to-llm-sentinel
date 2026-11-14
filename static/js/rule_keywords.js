@@ -51,7 +51,8 @@ function kwLabel(map, key) { return map[key] ? T(...map[key]) : (key || ''); }
 
 function kwChangeText(c) {
     const kind = c.kind === 'keyword' ? T('rule.kw_keyword', 'mot-clé') : T('rule.kw_exclusion', 'exclusion');
-    return `${c.action === 'add' ? '+' : '−'} ${kind} « ${c.value} »`;
+    const signal = c.evidence && c.evidence.signal ? ` · ${T('rule.kw_signal', 'signal ponctuel')}` : '';
+    return `${c.action === 'add' ? '+' : '−'} ${kind} « ${c.value} »${signal}`;
 }
 
 function kwSevBar(sev, total) {
@@ -186,13 +187,17 @@ async function renderKeywords() {
 
     const kwRows = d.keywords.map(k => `<tr>
         <td><span class="mono">${esc(k.value)}</span>
+            ${k.signal ? `<span class="kw-signal" title="${esc(T('rule.kw_signal_badge_title', 'Ses lignes sont gardées en info sur le tableau de bord, closes aussitôt, sans notification ni surveillance du retour à la normale.'))}">${esc(T('rule.kw_signal', 'signal ponctuel'))}</span>` : ''}
             ${k.neutralized_by ? `<div class="rp-ko kw-warn">${esc(T('rule.kw_neutralized', 'Ne peut jamais se déclencher : l’exclusion « {x} » l’emporte.', { x: k.neutralized_by }))}</div>` : ''}</td>
         <td><strong>${k.alerts_30d}</strong> ${kwSevBar(k.severities, k.alerts_30d)}
             ${k.irrelevant ? `<span class="rp-muted">${esc(T('rule.kw_irrelevant_n', '{n} pas pertinente(s)', { n: k.irrelevant }))}</span>` : ''}</td>
         <td>${k.lines_per_day == null ? '—' : k.lines_per_day}</td>
         <td>${k.last_alert_at ? esc(fmtWhen(k.last_alert_at)) : '—'}</td>
         <td>${esc(kwLabel(KW_ORIGINS, k.origin))}</td>
-        <td><button class="btn btn-secondary btn-sm" data-v="${esc(k.value)}" onclick="kwEditList('keyword', 'remove', this.dataset.v, this)" title="${esc(T('rule.kw_remove_keyword_title', 'Retire ce mot-clé tout de suite.'))}">${esc(T('rule.kw_remove', 'Retirer'))}</button></td>
+        <td class="kw-row-actions"><button class="btn btn-secondary btn-sm" data-v="${esc(k.value)}" onclick="kwSetSignal(this.dataset.v, ${k.signal ? 'false' : 'true'}, this)"
+                title="${esc(k.signal ? T('rule.kw_to_alert_title', 'Ses lignes redeviennent des alertes : analysées, notifiées selon le seuil de la règle, et surveillées jusqu’au retour à la normale.')
+                                      : T('rule.kw_to_signal_title', 'Ses lignes ne sont plus des alertes : gardées en info sur le tableau de bord, closes aussitôt, sans notification. Pour un événement à tracer qui ne demande rien (attaque bloquée, incident passager d’un client).'))}">${esc(k.signal ? T('rule.kw_to_alert', 'En faire une alerte') : T('rule.kw_to_signal', 'Signal ponctuel'))}</button>
+            <button class="btn btn-secondary btn-sm" data-v="${esc(k.value)}" onclick="kwEditList('keyword', 'remove', this.dataset.v, this)" title="${esc(T('rule.kw_remove_keyword_title', 'Retire ce mot-clé tout de suite.'))}">${esc(T('rule.kw_remove', 'Retirer'))}</button></td>
     </tr>`).join('');
     const keywords = `
     <section class="rp-card rp-table-card">
@@ -353,6 +358,14 @@ async function kwEditList(kind, action, value, btn) {
         }
         await apiFetch(`/api/rules/${RP.id}`, { method: 'PUT', body: { [field]: list } });
         loadHeader();
+        renderKeywords();
+    } catch (e) { alert(e.message); if (btn) btn.disabled = false; }
+}
+
+async function kwSetSignal(value, signal, btn) {
+    if (btn) btn.disabled = true;
+    try {
+        await apiFetch(`/api/rules/${RP.id}/keywords/signal`, { method: 'POST', body: { value, signal } });
         renderKeywords();
     } catch (e) { alert(e.message); if (btn) btn.disabled = false; }
 }
