@@ -3024,6 +3024,13 @@ a.btn { text-decoration: none; display: inline-flex; align-items: center; }
 /* ── Rule page · Keywords tab (KW-2) ── */
 .kw-mode-hint { margin: 0.6rem 0 0.8rem; max-width: 70ch; }
 .kw-learn-actions { gap: 0.75rem; }
+/* Revue en cours : le bouton reste bloqué et une ligne d'état dit où elle en est */
+.kw-review-btn[aria-busy="true"] { display: inline-flex; align-items: center; gap: 0.4rem; }
+.kw-review-status { display: flex; align-items: center; gap: 0.5rem; margin: 0.7rem 0 0; font-size: 0.85rem; }
+.kw-spin { flex: none; display: inline-block; width: 0.85rem; height: 0.85rem; box-sizing: border-box; border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--accent) 22%, transparent); border-top-color: var(--accent);
+    animation: triage-spin 0.8s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .kw-spin { animation-duration: 2.4s; } }
 .kw-learn-group { display: inline-flex; gap: 0.35rem; align-items: center; }
 .rp-card > .rf-seg { align-self: flex-start; }
 .kw-add input, .kw-learn-group select {

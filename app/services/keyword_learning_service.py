@@ -253,13 +253,14 @@ def scan_candidates(db, rule: Rule, result: dict, days: float):
         if not matched:
             continue
         hits = sum(t["count"] for t in matched)
-        a = alerts.get(kw) or {"alerts": 0, "severities": {}, "irrelevant": [], "important_lines": []}
+        a = alerts.get(kw) or {"alerts": 0, "severities": {}, "irrelevant": [], "important_lines": [], "important": 0}
         lines = [{"count": t["count"], "example": t["examples"][0],
                   "severities": {"error-level" if t["error_level"] else "no-error-level": t["count"]}}
                  for t in sorted(matched, key=lambda t: t["count"], reverse=True)[:6]]
         important = list(a["important_lines"]) + [ex for t in matched if t["error_level"] for ex in t["examples"]]
         noise.append({"keyword": kw, "alerts": a["alerts"], "severities": dict(a["severities"]),
                       "irrelevant": len(a["irrelevant"]), "irrelevant_ids": a["irrelevant"],
+                      "important": a.get("important", 0),  # alertes sérieuses non signalées : elles protègent le mot-clé
                       "per_day": round(hits / days, 1), "lines": lines, "important_lines": important[:300],
                       "focus": False, "hits": hits})
     noise.sort(key=lambda c: c["hits"], reverse=True)

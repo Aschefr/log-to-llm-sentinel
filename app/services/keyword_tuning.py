@@ -189,6 +189,12 @@ class KeywordTuningService:
         self._stats: Dict[int, dict] = {}       # rule_id -> {date: {"lines": n, "hits": Counter}}
         self._templates: Dict[int, dict] = {}   # rule_id -> {signature: {count, first, last, examples}}
         self._reviewing = set()
+        self._review_failed = set()            # dernière revue de la règle arrêtée faute de réponse de l'IA
+        self.manual_reviews: Dict[int, dict] = {}  # rule_id -> revue demandée depuis la page : en cours, résultat
+
+    def review_running(self, rule_id: int) -> bool:
+        """Une revue de la règle tourne : demandée depuis la page (pilote compris) ou lancée par la boucle horaire."""
+        return rule_id in self._reviewing or bool((self.manual_reviews.get(rule_id) or {}).get("running"))
 
     # ── Observation (appelée pour chaque ligne reçue, doit rester légère) ──────────
     def observe(self, rule_id: int, line: str, status: Optional[str], hits: List[str]):
@@ -303,6 +309,8 @@ class KeywordTuningService:
             except Exception as e:
                 logger.error("Autopilot", f"Relance du pilote pour la règle {rule_id} : {e}")
         for rule_id in ids:
+            if self.review_running(rule_id):
+                continue  # une revue demandée depuis la page tourne déjà : elle compterait son résultat à tort
             try:
                 await self.review_rule(rule_id)
             except Exception as e:
@@ -314,6 +322,7 @@ class KeywordTuningService:
         if rule_id in self._reviewing:
             return []
         self._reviewing.add(rule_id)
+        self._review_failed.discard(rule_id)
         try:
             await self.flush()
             db = SessionLocal()
@@ -337,6 +346,7 @@ class KeywordTuningService:
 
             decision = await self.ask_arbiter(messages, config, label=f"rule {rule_id}")
             if decision is None:
+                self._review_failed.add(rule_id)
                 return []
 
             db = SessionLocal()
@@ -872,7 +882,7 @@ def apply_decisions(db, rule: Rule, decision: dict, blind: List[dict], noise: Li
                 hold = "last_keyword"
             # Seules les alertes sérieuses non signalées comptent : avant, un seul « Pas pertinent » levait la protection
             # d'un mot-clé aux nombreuses alertes warning légitimes, que l'arbitre pouvait alors retirer seul
-            elif sev.get("critical") or cand.get("important", 0) > 0.2 * cand["alerts"]:
+            elif sev.get("critical") or cand.get("important", sev.get("warning", 0)) > 0.2 * cand["alerts"]:  # sans le compte, tous les warnings protègent
                 hold = "important_alerts"
             if not once("keyword", "remove", kw):
                 continue

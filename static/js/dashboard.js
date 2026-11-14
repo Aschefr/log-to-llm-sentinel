@@ -153,7 +153,7 @@ function computeVerdict() {
     const a = w.attention, parts = [];
     if (a.alerts.length) parts.push(dCount(a.alerts.length, 'dashboard.alerts_one', '{n} alerte ouverte', 'dashboard.alerts_many', '{n} alertes ouvertes'));
     if (a.muted.length) parts.push(dCount(a.muted.length, 'dashboard.muted_one', '{n} source muette', 'dashboard.muted_many', '{n} sources muettes'));
-    if (a.pilot_errors.length) parts.push(dCount(a.pilot_errors.length, 'dashboard.pilot_errors_one', '{n} échec du pilote', 'dashboard.pilot_errors_many', '{n} échecs du pilote'));
+    if (a.pilot_errors.length) parts.push(dCount(a.pilot_errors.length, 'dashboard.pilot_errors_one', '{n} échec de l’autopilote', 'dashboard.pilot_errors_many', '{n} échecs de l’autopilote'));
     const problem = ollamaProblem();
     if (problem) parts.push(problem);
 
@@ -259,7 +259,7 @@ function renderAttention() {
         rows.push(attentionRow(`alert-${x.rule_id}-${analysis ? analysis.id : ''}`, `<span class="severity-badge ${escapeHtml(severity)}">${escapeHtml(severity)}</span>`, x.rule_name, text, when, href));
     });
     a.pilot_errors.forEach(x => rows.push(attentionRow(`pilot-${x.rule_id}`, `<span class="dash-tag">${escapeHtml(dT('dashboard.tag_pilot', 'Pilote'))}</span>`, x.rule_name,
-        dT('dashboard.pilot_error_text', 'La mise en place a échoué. Le pilote réessaiera automatiquement.'), '', `/rules/${x.rule_id}`)));
+        dT('dashboard.pilot_error_text', 'La mise en place a échoué. L’autopilote réessaiera automatiquement.'), '', `/rules/${x.rule_id}`)));
     const problem = DASH.ollama && DASH.ollama.state !== 'ok' ? DASH.ollama.state : null;
     if (problem) {
         const text = { unreachable: dT('dashboard.ollama_attention_down', 'Le serveur ne répond pas : les nouvelles alertes ne peuvent pas être analysées.'),

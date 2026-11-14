@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Regression in 1.13.3: an analysis of the history could remove a good keyword on its own**: 1.13.3 protects a keyword by counting its serious alerts nobody flagged, but the candidates built by *Analyze history*, *Observe* and the autopilot's weekly re-read did not carry that count, so the protection was always zero there. A keyword with a single legitimate warning alert could be removed without asking. Those candidates now carry the count, and a candidate without it falls back to counting every warning, as before 1.13.3.
+- **The Keywords tab gave no feedback and could be clicked again**: *Review now* came back after a few seconds while the AI was still reviewing, and nothing said when the review was over or what it found. The button now stays disabled with *Review running…* until the review ends, a status line says it is running, then gives its result for 15 minutes: the number of changes, *nothing to change*, or that the AI did not answer. A click during a review, including the hourly one, starts nothing more. *Analyze history* and *Observe* are disabled while an analysis runs, and the period you picked is no longer reset by the page refreshing every 3 seconds.
+- **A download looked like a chat**: the button that downloads what an analysis sent to the AI and its answers was called *Exchange with the AI*, which read like a way to talk to the AI about the changes. It is now *Download the AI log*.
+- **French: "the pilot" became "l'autopilote"**: where the French interface said only *le pilote* (a change *écarté par le pilote*, *échecs du pilote*, the hints of the autopilot switch), it now says *l'autopilote*, as the English text already did.
+
 ## [1.13.3] - 2026-11-13
 
 ### Fixed

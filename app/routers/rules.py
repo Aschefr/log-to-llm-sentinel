@@ -1019,6 +1019,9 @@ def get_rule_keywords(rule_id: int):
             "watching": [{"signature": t.signature, "count": t.count, "last_seen": rule_stats.iso(t.last_seen),
                           "example": (json.loads(t.examples_json or "[]") or [""])[0][:300]} for t in watching],
             "session": session,
+            # Revue en cours (bouton bloqué) et résultat de la dernière revue demandée depuis la page
+            "review": {**(keyword_tuning.manual_reviews.get(rule_id) or {}),
+                       "running": keyword_tuning.review_running(rule_id)} if keyword_tuning else None,
         }
     finally:
         db.close()
@@ -1047,8 +1050,21 @@ async def review_rule_keywords(rule_id: int):
     """Demande une revue immédiate à l'arbitre et, en pilote automatique, la maintenance du pilote (en tâche de fond)."""
     if not keyword_tuning:
         raise HTTPException(status_code=503, detail="keyword_tuning_unavailable")
+    # Un second clic, ou la revue horaire en cours : rien de plus à lancer, la page suit celle qui tourne
+    if keyword_tuning.review_running(rule_id):
+        return {"status": "running"}
+    state = keyword_tuning.manual_reviews[rule_id] = {"running": True, "started_at": rule_stats.iso(datetime.utcnow())}
+
     async def review():
-        await keyword_tuning.autopilot_maintenance(rule_id)  # sans effet hors pilote automatique
-        await keyword_tuning.review_rule(rule_id)
+        try:
+            lines = await keyword_tuning.autopilot_maintenance(rule_id)  # sans effet hors pilote automatique
+            changes = await keyword_tuning.review_rule(rule_id)
+            state.update(changes=len(changes) + len(lines or []), failed=rule_id in keyword_tuning._review_failed)
+        except Exception as e:
+            from app import logger
+            logger.error("KeywordTuning", f"Revue demandée de la règle {rule_id} : {e}")
+            state.update(changes=0, failed=True)
+        finally:
+            state.update(running=False, finished_at=rule_stats.iso(datetime.utcnow()))
     asyncio.create_task(review())
-    return {"status": "started"}
+    return {"status": "started", "started_at": state["started_at"]}

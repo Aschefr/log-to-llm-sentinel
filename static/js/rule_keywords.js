@@ -27,7 +27,7 @@ const KW_STATUS = {
     pending: ['rule.kw_status_pending', 'à valider'],
     rejected: ['rule.kw_status_rejected', 'refusé'],
     reverted: ['rule.kw_status_reverted', 'annulé'],
-    dismissed: ['rule.kw_status_dismissed', 'écarté par le pilote'],
+    dismissed: ['rule.kw_status_dismissed', 'écarté par l’autopilote'],
 };
 const KW_ACTIVE = ['pending', 'scanning', 'refining'];
 const AP_FIELDS = {
@@ -89,6 +89,12 @@ async function renderKeywords() {
     if (s && kwLastSessionStatus && KW_ACTIVE.includes(kwLastSessionStatus) && !KW_ACTIVE.includes(s.status)) loadHeader();
     kwLastSessionStatus = s ? s.status : null;
     const open = new Set([...panel.querySelectorAll('details[open]')].map(x => x.dataset.key));
+    // La page se redessine toutes les 3 s pendant une analyse ou une revue : garder la durée choisie
+    const picked = { hist: document.getElementById('kw-hist-days')?.value || '168', live: document.getElementById('kw-live-hours')?.value || '6' };
+    const review = d.review || {};
+    const reviewing = !!review.running;
+    const sessionRunning = !!(s && KW_ACTIVE.includes(s.status));
+    const busyTitle = T('rule.kw_session_busy_title', 'Une analyse est déjà en cours : attends sa fin ou annule-la ci-dessous.');
 
     const modeHint = {
         auto: T('rule.kw_mode_auto_hint', 'L’IA locale examine la règle toutes les heures : elle ajoute les mots-clés qui manquent et écarte le bruit, après des vérifications sur tes données. Ce qui ne passe pas ces vérifications t’est proposé.'),
@@ -105,20 +111,23 @@ async function renderKeywords() {
         </div>
         <p class="rp-muted kw-mode-hint">${esc(modeHint)}</p>
         <div class="rp-actions kw-learn-actions">
-            <button class="btn btn-secondary btn-sm" onclick="kwReviewNow(this)" title="${esc(T('rule.kw_review_now_title', 'Lance tout de suite la revue horaire de l’IA.'))}" ${d.mode === 'off' ? 'disabled' : ''}>${esc(T('rule.kw_review_now', 'Revoir maintenant'))}</button>
+            <button class="btn btn-secondary btn-sm kw-review-btn" onclick="kwReviewNow(this)" aria-busy="${reviewing}"
+                title="${esc(reviewing ? T('rule.kw_reviewing_title', 'Une revue de cette règle est en cours : le bouton se réactive quand elle est finie.') : T('rule.kw_review_now_title', 'Lance tout de suite la revue horaire de l’IA.'))}"
+                ${d.mode === 'off' || reviewing ? 'disabled' : ''}>${reviewing ? `<span class="kw-spin" aria-hidden="true"></span>${esc(T('rule.kw_reviewing', 'Revue en cours…'))}` : esc(T('rule.kw_review_now', 'Revoir maintenant'))}</button>
             <span class="kw-learn-group">
-                <select id="kw-hist-days" aria-label="${esc(T('rule.kw_history_period', 'Période à analyser'))}">
-                    ${[1, 3, 7, 14, 30].map(n => `<option value="${n * 24}" ${n === 7 ? 'selected' : ''}>${esc(T('rule.kw_days', '{n} derniers jours', { n }))}</option>`).join('')}
+                <select id="kw-hist-days" aria-label="${esc(T('rule.kw_history_period', 'Période à analyser'))}" ${sessionRunning ? 'disabled' : ''}>
+                    ${[1, 3, 7, 14, 30].map(n => `<option value="${n * 24}" ${String(n * 24) === picked.hist ? 'selected' : ''}>${esc(T('rule.kw_days', '{n} derniers jours', { n }))}</option>`).join('')}
                 </select>
-                <button class="btn btn-secondary btn-sm" onclick="kwLearn('history', 'kw-hist-days', this)" title="${esc(T('rule.kw_learn_history_title', 'Relit le journal sur la période choisie et demande à l’IA quels mots-clés et exclusions changer.'))}">${esc(T('rule.kw_learn_history', 'Analyser l’historique'))}</button>
+                <button class="btn btn-secondary btn-sm" onclick="kwLearn('history', 'kw-hist-days', this)" ${sessionRunning ? 'disabled' : ''} title="${esc(sessionRunning ? busyTitle : T('rule.kw_learn_history_title', 'Relit le journal sur la période choisie et demande à l’IA quels mots-clés et exclusions changer.'))}">${esc(T('rule.kw_learn_history', 'Analyser l’historique'))}</button>
             </span>
             <span class="kw-learn-group">
-                <select id="kw-live-hours" aria-label="${esc(T('rule.kw_live_period', 'Durée d’observation'))}">
-                    ${[1, 6, 24].map(n => `<option value="${n}" ${n === 6 ? 'selected' : ''}>${esc(T('rule.kw_hours', '{n} h', { n }))}</option>`).join('')}
+                <select id="kw-live-hours" aria-label="${esc(T('rule.kw_live_period', 'Durée d’observation'))}" ${sessionRunning ? 'disabled' : ''}>
+                    ${[1, 6, 24].map(n => `<option value="${n}" ${String(n) === picked.live ? 'selected' : ''}>${esc(T('rule.kw_hours', '{n} h', { n }))}</option>`).join('')}
                 </select>
-                <button class="btn btn-secondary btn-sm" onclick="kwLearn('live', 'kw-live-hours', this)" title="${esc(T('rule.kw_learn_live_title', 'Garde ce qui arrive pendant la durée choisie, puis fait la même analyse.'))}">${esc(T('rule.kw_learn_live', 'Observer'))}</button>
+                <button class="btn btn-secondary btn-sm" onclick="kwLearn('live', 'kw-live-hours', this)" ${sessionRunning ? 'disabled' : ''} title="${esc(sessionRunning ? busyTitle : T('rule.kw_learn_live_title', 'Garde ce qui arrive pendant la durée choisie, puis fait la même analyse.'))}">${esc(T('rule.kw_learn_live', 'Observer'))}</button>
             </span>
         </div>
+        ${kwReviewStatus(review)}
     </section>`;
 
     let session = '';
@@ -155,7 +164,7 @@ async function renderKeywords() {
             <div class="rp-actions">
                 ${KW_ACTIVE.includes(s.status) ? `<button class="btn btn-secondary btn-sm" onclick="kwSessionAction(${s.id}, 'cancel', this)" title="${esc(T('rule.kw_session_cancel_title', 'Arrête cette analyse. Rien n’est modifié.'))}">${esc(T('common.cancel', 'Annuler'))}</button>` : ''}
                 ${s.status === 'validated' && s.changes.some(c => c.status === 'applied') ? `<button class="btn btn-secondary btn-sm" onclick="kwSessionAction(${s.id}, 'revert', this)" title="${esc(T('rule.kw_session_revert_title', 'Défait tous les changements de cette analyse.'))}">${esc(T('rule.kw_session_revert', 'Annuler ces changements'))}</button>` : ''}
-                ${['validated', 'reverted'].includes(s.status) ? `<a class="btn btn-secondary btn-sm" href="/api/keyword-learning/${s.id}/log" title="${esc(T('rule.kw_session_log_title', 'Télécharge les échanges avec l’IA.'))}">${esc(T('rule.kw_session_log', 'Échange avec l’IA'))}</a>` : ''}
+                ${['validated', 'reverted'].includes(s.status) ? `<a class="btn btn-secondary btn-sm" href="/api/keyword-learning/${s.id}/log" title="${esc(T('rule.kw_session_log_title', 'Télécharge les échanges avec l’IA.'))}">${esc(T('rule.kw_session_log', 'Télécharger le journal de l’IA'))}</a>` : ''}
             </div>
         </section>`;
     }
@@ -243,7 +252,7 @@ async function renderKeywords() {
                     <td class="kw-reason">${esc(c.reason)}${c.hold_reason === 'manual_edit' || c.status === 'dismissed' ? ` <span class="rp-muted">(${esc(kwLabel(KW_HOLDS, c.hold_reason))})</span>` : ''}</td>
                     <td><span class="kw-status kw-status--${c.status}">${esc(kwLabel(KW_STATUS, c.status))}</span></td>
                     <td>${c.status === 'applied' ? `<button class="btn btn-secondary btn-sm" onclick="kwDecide(${c.id}, 'revert', this)" title="${esc(T('rule.kw_undo_title', 'Défait ce changement sur la règle.'))}">${esc(T('rule.kw_undo', 'Annuler'))}</button>`
-                        : c.status === 'dismissed' ? `<button class="btn btn-secondary btn-sm" title="${esc(T('rule.kw_apply_anyway_title', 'Le pilote l’a écarté par prudence ({why}).', { why: kwLabel(KW_HOLDS, c.hold_reason) }))}" onclick="kwDecide(${c.id}, 'accept', this)">${esc(T('rule.kw_apply_anyway', 'Appliquer quand même'))}</button>` : ''}</td>
+                        : c.status === 'dismissed' ? `<button class="btn btn-secondary btn-sm" title="${esc(T('rule.kw_apply_anyway_title', 'L’autopilote l’a écarté par prudence ({why}).', { why: kwLabel(KW_HOLDS, c.hold_reason) }))}" onclick="kwDecide(${c.id}, 'accept', this)">${esc(T('rule.kw_apply_anyway', 'Appliquer quand même'))}</button>` : ''}</td>
                 </tr>`).join('')}</tbody>
             </table></div>
         </details>
@@ -257,9 +266,9 @@ async function renderKeywords() {
         input.focus();
         input.select();
     }
-    // Faster refresh while a session runs
+    // Faster refresh while a session or a review runs
     clearTabTimers();
-    RP.timers.push(setInterval(renderKeywords, s && KW_ACTIVE.includes(s.status) ? 3000 : 30000));
+    RP.timers.push(setInterval(renderKeywords, sessionRunning || reviewing ? 3000 : 30000));
 }
 
 function setKwBadge(n) {
@@ -277,13 +286,27 @@ async function kwSetMode(mode) {
     } catch (e) { alert(e.message); }
 }
 
+/** Under the buttons: the review that runs, then the result of the last one asked from this page (15 min). */
+function kwReviewStatus(review) {
+    if (review.running) {
+        return `<p class="kw-review-status" role="status"><span class="kw-spin" aria-hidden="true"></span>${esc(T('rule.kw_reviewing_hint', 'L’IA examine la règle. Cela peut prendre de quelques secondes à quelques minutes ; tu peux quitter la page.'))}</p>`;
+    }
+    if (!review.finished_at || minutesSince(review.finished_at) > 15) return '';
+    const when = fmtWhen(review.finished_at);
+    if (review.failed) {
+        return `<p class="kw-review-status rp-ko" role="status">${esc(T('rule.kw_review_failed', 'Revue de {when} interrompue : l’IA n’a pas répondu. Le détail est dans le journal de l’application.', { when }))}</p>`;
+    }
+    return `<p class="kw-review-status rp-muted" role="status">${esc(review.changes
+        ? T('rule.kw_review_done', 'Revue de {when} terminée : {n} changement(s), visibles ci-dessous.', { when, n: review.changes })
+        : T('rule.kw_review_nothing', 'Revue de {when} terminée : rien à changer.', { when }))}</p>`;
+}
+
 async function kwReviewNow(btn) {
     btn.disabled = true;
     try {
         await apiFetch(`/api/rules/${RP.id}/keywords/review`, { method: 'POST' });
-        flash(document.getElementById('tab-keywords'), T('rule.kw_review_started', 'Revue demandée : l’IA examine la règle, le résultat apparaît ici dans quelques instants.'));
-        setTimeout(renderKeywords, 8000);
-    } catch (e) { alert(e.message); btn.disabled = false; }
+    } catch (e) { alert(e.message); }
+    renderKeywords();  // the button stays disabled while the review runs
 }
 
 async function kwLearn(mode, selectId, btn) {

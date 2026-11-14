@@ -236,9 +236,9 @@ function updateAutopilotUI() {
                 : _rfT('rf.ap_hint_new_off', 'Tu définis toi-même les mots-clés et les réglages de la règle.');
         } else if (on) {
             text = wasOn ? _rfT('rf.ap_hint_on', "L'IA tient la règle à jour : mots-clés, contexte relu chaque semaine, fenêtre de regroupement et délai de silence. Pour voir ou modifier ce qu'elle a défini, passe en Manuel.")
-                : _rfT('rf.ap_hint_enable', "En enregistrant, le pilote relit l'historique du journal et reprend la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent.");
+                : _rfT('rf.ap_hint_enable', "En enregistrant, l’autopilote relit l'historique du journal et reprend la fenêtre de regroupement, le délai de silence et le contexte s'il est vide. Le nom et ce que tu as écrit restent.");
         } else {
-            text = wasOn ? _rfT('rf.ap_hint_disable', "Les réglages marqués IA ont été définis par le pilote. En enregistrant en Manuel, le pilote s'arrête : tout reste tel quel et tu le gères toi-même. Tu peux le réactiver quand tu veux.")
+            text = wasOn ? _rfT('rf.ap_hint_disable', "Les réglages marqués IA ont été définis par l’autopilote. En enregistrant en Manuel, l’autopilote s’arrête : tout reste tel quel et tu le gères toi-même. Tu peux le réactiver quand tu veux.")
                 : _rfT('rf.ap_hint_off', 'Tu gères toi-même les réglages de cette règle. Le pilote automatique peut les reprendre à tout moment.');
         }
         hint.textContent = text;
