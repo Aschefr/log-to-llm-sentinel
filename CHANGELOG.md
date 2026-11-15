@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.15.1] - 2026-11-15
 
 ### Fixed
 - **The second look took a planned restart cycle for a crash loop**: a worker that systemd restarts after a clean stop every minute (such as the Nextcloud AI worker) shows a restart counter in the tens of thousands. The AI read *restart counter is at 10618* as instability and raised an APT alert from warning to critical. Sentinel now reads systemd restarts itself and tells the AI, unit by unit, whether they follow clean stops (a planned cycle) or failures (a crash loop). On a replayed alert with the local model, 7 findings out of 12 called the cycle a loop before, none after; a real crash loop is still raised to critical.
