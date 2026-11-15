@@ -814,10 +814,11 @@ Méthode :
 - Si aucun outil ne peut vérifier cette alerte (machine absente des connexions, événement réseau ou de sécurité sans trace locale), n'appelle aucun outil.
 - N'invente aucun résultat : seul ce que les outils ont renvoyé compte. Ne conclus jamais avant d'avoir lu leurs résultats.
 - Juge seulement l'élément de l'alerte. Un autre problème vu en passant (un autre conteneur, un ancien message du noyau) peut être cité dans findings, mais il ne rend pas cette alerte plus grave.
+- Un service arrêté proprement puis relancé par systemd (« Deactivated successfully » avant chaque relance) suit un cycle prévu, quel que soit son compteur de redémarrages : ce n'est pas une boucle. Seules des relances après échec (status non nul, « Failed with result ») en sont une.
 
 Une fois les résultats des outils lus, ou d'emblée si aucun outil ne peut vérifier l'alerte, réponds par un objet JSON, sans texte autour, en français : {"findings": "...", "verdict": "...", "severity": "..."}
 - findings : ce que les contrôles ont montré, en une ou deux phrases factuelles (300 caractères max), compréhensibles seules. Jamais de mot de passe, de jeton ni de clé.
-- verdict : worse si c'est plus grave que l'analyse (toujours arrêté, redémarre en boucle, plusieurs éléments touchés) ; confirmed si les contrôles confirment l'analyse ; better si c'est rentré dans l'ordre (le conteneur ou le service tourne et est sain) ; unclear si les contrôles ne permettent pas de conclure ou si tu n'as rien pu vérifier.
+- verdict : worse si c'est plus grave que l'analyse (toujours arrêté, relancé en boucle après des échecs, plusieurs éléments touchés) ; confirmed si les contrôles confirment l'analyse ; better si c'est rentré dans l'ordre (le conteneur ou le service tourne et est sain) ; unclear si les contrôles ne permettent pas de conclure ou si tu n'as rien pu vérifier.
 - severity : la gravité retenue après les contrôles. critical : service indisponible, perte ou corruption de données, sécurité compromise. warning : dégradation, erreur ou risque à vérifier. info : normal, transitoire ou bénin, aucune action.
 - Ne réponds worse et ne propose critical que si les outils montrent un impact actuel sur l'élément de l'alerte : arrêté, injoignable, en boucle, données touchées. Si les outils n'ont rien montré de tel sur cet élément (événement réseau, DNS ou d'authentification sans trace locale, ou problème d'un autre élément), réponds confirmed ou unclear et garde au plus la gravité de l'analyse.
 
@@ -829,10 +830,11 @@ Method:
 - If no tool can check this alert (machine not among the connections, network or security event with no local trace), call no tool.
 - Invent no result: only what the tools returned counts. Never conclude before reading their results.
 - Judge only the element of the alert. Another problem seen in passing (another container, an old kernel message) may be cited in findings, but it does not make this alert more severe.
+- A service stopped cleanly then restarted by systemd ("Deactivated successfully" before each restart) follows a planned cycle, whatever its restart counter: that is not a loop. Only restarts after failures (non-zero status, "Failed with result") are one.
 
 Once you have read the tool results, or right away if no tool can check the alert, answer with a JSON object, no text around it, in English: {"findings": "...", "verdict": "...", "severity": "..."}
 - findings: what the checks showed, in one or two factual sentences (300 characters max), self-contained. Never a password, token or key.
-- verdict: worse if it is more severe than the analysis (still stopped, restart loop, several parts hit); confirmed if the checks confirm the analysis; better if things are back to normal (the container or service runs and is healthy); unclear if the checks cannot settle it or you could check nothing.
+- verdict: worse if it is more severe than the analysis (still stopped, restarted in a loop after failures, several parts hit); confirmed if the checks confirm the analysis; better if things are back to normal (the container or service runs and is healthy); unclear if the checks cannot settle it or you could check nothing.
 - severity: the severity kept after the checks. critical: service down, data loss or corruption, security compromised. warning: degradation, error or risk worth checking. info: normal, transient or benign, no action.
 - Only answer worse or propose critical if the tools show a current impact on the alert's element: stopped, unreachable, restart loop, data hit. If the tools showed nothing like that on this element (network, DNS or authentication event with no local trace, or a problem of another element), answer confirmed or unclear and keep at most the analysis severity.
 
@@ -856,6 +858,9 @@ SECOND_LOOK_LABELS = {
         "checked": "Vérifié",
         "no_check": "L'IA n'a trouvé aucun contrôle utile pour cette alerte.",
         "tool_addresses_ai": "Une sortie d'outil s'adresse à l'IA : la gravité ne peut pas baisser.",
+        "restart_note": "Lecture de Sentinel (calculée sur cette sortie, hors des lignes de log) :",
+        "restart_clean": "{unit} est relancé par systemd après des arrêts propres (Deactivated successfully) : cycle prévu, pas une boucle de plantage ; son compteur de redémarrages ne mesure que sa durée.",
+        "restart_failed": "{unit} est relancé par systemd après des échecs : boucle de plantage.",
     },
     "en": {
         "task": "Alert to check, rule \"{rule}\"{context}.\nCurrent analysis: severity {severity}. {summary}\nProbable cause: {cause}\n\nLog lines of the alert:\n{lines}\n\nConnections of the rule: {links}\nCurrent date (UTC): {now}",
@@ -873,6 +878,9 @@ SECOND_LOOK_LABELS = {
         "checked": "Checked",
         "no_check": "The AI found no useful check for this alert.",
         "tool_addresses_ai": "A tool output addresses the AI: the severity cannot go down.",
+        "restart_note": "Sentinel's reading (computed from this output, outside the log lines):",
+        "restart_clean": "{unit} is restarted by systemd after clean stops (Deactivated successfully): a planned cycle, not a crash loop; its restart counter only measures its age.",
+        "restart_failed": "{unit} is restarted by systemd after failures: crash loop.",
     },
 }
 

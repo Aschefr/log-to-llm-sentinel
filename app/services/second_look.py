@@ -44,6 +44,45 @@ _SECRET = re.compile(
 )
 
 
+# Relances systemd : vu en prod le 2026-11-15, l'IA a lu « restart counter is at 10618 » d'un worker qui s'arrête
+# proprement toutes les 60 s, a conclu à une boucle et relevé l'alerte en critical. Le code dit, unité par unité, si les
+# relances suivent des arrêts propres (cycle prévu) ou des échecs (boucle de plantage).
+_RESTART = re.compile(r"\b([\w@.:-]+\.service): Scheduled restart job, restart counter is at \d+")
+_UNIT_STOP = re.compile(r"\b([\w@.:-]+\.service): (?:(Deactivated successfully|Succeeded\.)"
+                        r"|Main process exited, code=\w+, status=(\S+)|(Failed with result))")
+
+
+def restart_cycles(text: str) -> dict:
+    """{unité: "clean" | "failed"} pour les unités relancées par systemd dans cette sortie. Un seul échec avant une
+    relance suffit pour « failed » : des lignes « Deactivated successfully » glissées dans le journal ne masquent pas
+    une vraie boucle de plantage."""
+    pending, seen = {}, {}
+    for line in (text or "").splitlines():
+        m = _RESTART.search(line)
+        if m:
+            unit = m.group(1)
+            stop = pending.pop(unit, None)
+            if stop and seen.get(unit) != "failed":
+                seen[unit] = stop
+            continue
+        m = _UNIT_STOP.search(line)
+        if m:
+            unit, status = m.group(1), m.group(3)
+            failed = bool(m.group(4)) or (status is not None and not status.startswith("0/"))
+            if failed or pending.get(unit) != "failed":
+                pending[unit] = "failed" if failed else "clean"
+    return seen
+
+
+def restart_note(text: str, lang: str) -> str:
+    """Ce que les relances systemd de cette sortie veulent dire, calculé par le code, à joindre hors des lignes encadrées."""
+    cycles = restart_cycles(text)
+    if not cycles:
+        return ""
+    parts = [second_look_label(lang, "restart_" + kind, unit=unit) for unit, kind in sorted(cycles.items())]
+    return second_look_label(lang, "restart_note") + " " + " ".join(parts)
+
+
 def scrub(text: str) -> str:
     def _mask(m):
         if m.group(1):
@@ -186,7 +225,8 @@ async def _check(ollama, semaphore, rule, result: dict, config: dict, db, tools:
                 tool_addresses_ai = tool_addresses_ai or addresses_the_ai(out.splitlines())
                 checks.append({"name": name, "args": args, "label": llm_tools.tool_label(name, args, lang),
                                "error": out.startswith("Erreur"), "excerpt": scrub(out[:KEPT_CHARS])})
-                out = fence(llm_tools.truncate_output(out, TOOL_CHARS))
+                note = restart_note(out, lang)
+                out = fence(llm_tools.truncate_output(out, TOOL_CHARS)) + (f"\n{note}" if note else "")
             messages.append({"role": "tool", "content": out, "tool_name": name})
 
     if not checks:
