@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **A too generic keyword added by the autopilot was never removed**: *Traceback (most recent call last)*, added before 1.14.0 refused such keywords, gave 240 alerts in 14 days on a Home Assistant rule. The autopilot removes keywords its guards would refuse today, but kept this one because 8 of its alerts were critical. Seven of them were also caught by a specific keyword, and the last one was a Zigbee timeout wrongly rated critical. For a generic keyword, only the alerts it alone caught, and not flagged *Not relevant*, now count as serious.
+
 ## [1.15.1] - 2026-11-15
 
 ### Fixed

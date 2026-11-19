@@ -526,10 +526,21 @@ def _per_day(count: int, first: datetime, last: datetime) -> float:
     return round(count / days, 1)
 
 
+def _alone(analysis, kw: str) -> bool:
+    """Aucun autre mot-clé n'a attrapé cette alerte : sans ce mot-clé, elle n'aurait pas eu lieu."""
+    return all(k.lower() == kw.lower() for k in json.loads(analysis.matched_keywords_json or "[]"))
+
+
 def prune_candidates(db, rule: Rule, now: Optional[datetime] = None) -> List[dict]:
     """Pilote automatique : mots-clés ajoutés par l'IA (angle mort, apprentissage) dont les alertes des 14 derniers
     jours sont au moins 3, aucune critique, aucune notifiée, et dont au moins une a été signalée pas pertinente ; et
-    ceux que les garde-fous refuseraient aujourd'hui (générique, valeur variable) s'ils n'ont rien notifié de grave."""
+    ceux que les garde-fous refuseraient aujourd'hui (générique, valeur variable) s'ils n'ont rien notifié de grave.
+
+    Pour un mot-clé générique, seules comptent comme graves les alertes qu'il est le seul à attraper et qui ne sont pas
+    signalées pas pertinentes. Vu en prod le 2026-11-19 : « Traceback (most recent call last) », ajouté avant le
+    garde-fou, donnait 240 alertes en 14 jours ; ses 8 critiques étaient presque toutes attrapées aussi par un mot-clé
+    précis (qBittorrent, serveur injoignable), et la seule qu'il attrapait seul était un délai Zigbee jugé critical à
+    tort. Il n'était jamais retiré."""
     now = now or datetime.utcnow()
     added = {c.value.lower() for c in db.query(KeywordChange).filter(
         KeywordChange.rule_id == rule.id, KeywordChange.kind == "keyword", KeywordChange.action == "add",
@@ -543,9 +554,10 @@ def prune_candidates(db, rule: Rule, now: Optional[datetime] = None) -> List[dic
     for kw in keywords:
         mine = [a for a in rows if kw in json.loads(a.matched_keywords_json or "[]")]
         irrelevant = sum(1 for a in mine if a.feedback == "irrelevant")
-        serious = any(a.notified for a in mine) or any((a.severity or "").lower() == "critical" for a in mine)
         problem = _value_problem(kw)
         problem = problem if problem in ("generic", "variable") else None  # une longueur hors bornes ne dit rien du sens
+        weighed = [a for a in mine if a.feedback != "irrelevant" and _alone(a, kw)] if problem else mine
+        serious = any(a.notified or (a.severity or "").lower() == "critical" for a in weighed)
         if not serious and (problem or (len(mine) >= PRUNE_MIN_ALERTS and irrelevant)):
             out.append({"keyword": kw, "alerts": len(mine), "irrelevant": irrelevant, "problem": problem,
                         "severities": dict(Counter((a.severity or "info").lower() for a in mine))})
