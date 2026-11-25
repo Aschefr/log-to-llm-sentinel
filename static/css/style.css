@@ -3528,7 +3528,7 @@ button.collapse-toggle:hover { color: var(--text-primary); }
 .meta-cell--critical::after { content: ""; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: #fff; }
 .meta-heat-total { color: var(--text-secondary); font-size: 0.8rem; text-align: right; font-variant-numeric: tabular-nums; }
 .meta-heat-ticks { display: flex; justify-content: space-between; color: var(--text-secondary); font-size: 0.76rem; font-variant-numeric: tabular-nums; }
-.meta-tip { position: fixed; z-index: 50; display: flex; flex-direction: column; gap: 0.05rem; max-width: 18rem; padding: 0.45rem 0.65rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: 0.45rem; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); font-size: 0.8rem; font-variant-numeric: tabular-nums; pointer-events: none; }
+.meta-tip { position: fixed; z-index: 50; display: flex; flex-direction: column; gap: 0.05rem; max-width: 18rem; padding: 0.45rem 0.65rem; background: linear-gradient(var(--bg-card), var(--bg-card)) var(--bg-primary); border: 1px solid var(--border); border-radius: 0.45rem; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); font-size: 0.8rem; font-variant-numeric: tabular-nums; pointer-events: none; }
 .meta-tip.hidden { display: none; }
 .meta-tip span { color: var(--text-secondary); }
 .meta-table-wrap { overflow-x: auto; }

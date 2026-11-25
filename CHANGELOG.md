@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **A repeated error was taken for a new event when its line held a memory address**: Python errors print the object they failed on with its address (*<HTTPConnection(...) at 0x4bd520606a0>*), which changes every time. A Plex server that Home Assistant could not reach gave 52 full AI analyses in two days, instead of one verdict reused with longer and longer gaps. Memory addresses no longer count when Sentinel compares lines; short codes such as *0x80070005* still do. Past alerts are regrouped once at startup.
+- **Meta-analysis: the timeline tooltip was see-through in the dark theme**: hovering a day showed its details over the page text, unreadable. The tooltip now has a solid background in both themes.
+
 ## [1.15.2] - 2026-11-19
 
 ### Fixed

@@ -6,6 +6,10 @@ import re
 _SIG_REPEATED = re.compile(r"message repeated \d+ times: \[\s*(.*?)\s*\]\s*$")
 _SIG_RULES = [
     (re.compile(r"^\[×\d+\]\s*"), ""),  # préfixe des lignes regroupées (ancien format)
+    # Adresse mémoire d'un objet (<HTTPConnection(...) at 0x4bd520606a0>) : elle change à chaque occurrence. Vu en prod
+    # le 2026-11-25 : chaque délai de Plex dans Home Assistant passait pour un événement nouveau, 52 analyses en deux
+    # jours au lieu d'un verdict repris. Un code court (0x80070005, status 0x1) distingue un événement : il reste.
+    (re.compile(r"(?:(?<=\bat )0x[0-9a-fA-F]{4,}|\b0x[0-9a-fA-F]{9,})\b"), "<ADDR>"),
     (re.compile(r"\b(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}\b"), "<MAC>"),  # avant les heures : sa fin ressemble à 00:11:22
     (re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?"), "<TS>"),
     (re.compile(r"\b\d{4}[/-]\d{2}[/-]\d{2}\b"), "<DATE>"),
