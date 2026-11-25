@@ -197,11 +197,22 @@ def _analysis_dict(a: Analysis, rule_name: str, recurrence: dict) -> dict:
 
 @router.get("/events")
 def get_events(limit: int = 20, offset: int = 0, rule_id: int | None = None, severity: str | None = None,
-               unread: bool = False, open_only: bool = False, days: int | None = None, focus: int | None = None):
-    """Analyses regroupées par événement : une ligne par événement, avec le nombre de répétitions."""
+               unread: bool = False, open_only: bool = False, days: int | None = None, focus: int | None = None,
+               q: str | None = None, rules: bool = False):
+    """Analyses regroupées par événement : une ligne par événement, avec le nombre de répétitions.
+
+    q : texte cherché dans les lignes et l'analyse. rules : renvoie aussi le nombre d'événements par règle (après la
+    recherche, avant le filtre de règle), pour les filtres rapides du tableau de bord."""
     db = SessionLocal()
     try:
-        events = analysis_events.summarize(db, rule_id=rule_id, days=days, open_only=open_only)
+        events = analysis_events.summarize(db, rule_id=None if rules else rule_id, days=days, open_only=open_only)
+        q = (q or "").strip()
+        if q:
+            found = analysis_events.matching(db, q)
+            events = [e for e in events if (e["rule_id"], e["key"]) in found]
+        per_rule = analysis_events.by_rule(events) if rules else None
+        if rules and rule_id is not None:
+            events = [e for e in events if e["rule_id"] == rule_id]
         analysis_events.apply_focus(db, events, focus)
         selected = analysis_events.select(events, severity=severity, unread=unread)
         page = selected[offset:offset + limit]
@@ -214,7 +225,7 @@ def get_events(limit: int = 20, offset: int = 0, rule_id: int | None = None, sev
                 notes_of_rule[e["rule_id"]] = event_notes.rule_rows(db, e["rule_id"])
             e["notes"] = event_notes.applicable(notes_of_rule[e["rule_id"]], analysis_lines(a))
         return {"events": page, "has_more": offset + limit < len(selected), "total": len(selected),
-                "counts": analysis_events.counts(events)}
+                "counts": analysis_events.counts(events), "rules": per_rule}
     finally:
         db.close()
 

@@ -1,5 +1,6 @@
-// ─── Tri des non lues par l'IA ────────────────────────
-// The AI proposes, the user validates, the last triage can be undone.
+// ─── Conseil de lecture par l'IA ──────────────────────
+// For each unread event the AI says read it (and why) or dismiss it; the user validates what is dismissed, and the
+// last dismissal can be undone.
 // Closing the dialog leaves a running triage alive: reopening picks it up.
 // ──────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ function trDialog() {
     dialog.setAttribute('aria-labelledby', 'triage-title');
     dialog.innerHTML = `<div class="triage-inner">
         <header class="triage-head">
-            <h2 id="triage-title">${escapeHtml(trT('title', 'Trier mes non lues'))}</h2>
+            <h2 id="triage-title">${escapeHtml(trT('title', 'Conseil de lecture'))}</h2>
             <button type="button" class="theme-btn" id="triage-close" aria-label="${escapeHtml(trT('close', 'Fermer'))}" title="${escapeHtml(trT('close', 'Fermer'))}">
                 <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"/></svg>
             </button>
@@ -90,11 +91,11 @@ function trRenderRunning(body, foot, job) {
                 </div>
             </div>
             <p class="form-hint" id="triage-run-time"></p>
-            <p class="form-hint">${escapeHtml(trT('running_hint', 'Tu peux fermer cette fenêtre : le tri continue, et tu retrouveras le résultat en revenant ici.'))}</p>`;
-        foot.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" onclick="trCancel()">${escapeHtml(trT('stop', 'Arrêter le tri'))}</button>`;
+            <p class="form-hint">${escapeHtml(trT('running_hint', 'Tu peux fermer cette fenêtre : l’IA continue, et tu retrouveras son conseil en revenant ici.'))}</p>`;
+        foot.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" onclick="trCancel()">${escapeHtml(trT('stop', 'Arrêter'))}</button>`;
     }
     foot.querySelector('button')?.classList.toggle('hidden', !job);
-    document.getElementById('triage-run-text').textContent = !total ? trT('running', 'Préparation du tri…')
+    document.getElementById('triage-run-text').textContent = !total ? trT('running', 'Préparation…')
         : total === 1 ? trT('running_single', 'L’IA lit ton événement non lu…')
         : trT('running_all', 'L’IA lit les {total} événements…', { total });
     document.getElementById('triage-run-done').textContent = done && done < total
@@ -119,39 +120,43 @@ function trRender() {
     }
     body.dataset.running = '';
     if (job.status === 'failed' || job.status === 'cancelled') {
-        const text = job.status === 'cancelled' ? trT('cancelled', 'Tri arrêté. Rien n’a changé.')
-            : job.error === 'ai_unavailable' ? trT('failed_ai', 'L’IA n’a pas répondu. Rien n’a changé : vérifie Ollama, puis relance le tri.')
-            : job.error === 'expired' ? trT('failed_expired', 'Ce tri n’est plus disponible. Relance-le.')
-            : trT('failed', 'Le tri a échoué. Rien n’a changé.');
+        const text = job.status === 'cancelled' ? trT('cancelled', 'Conseil arrêté. Rien n’a changé.')
+            : job.error === 'ai_unavailable' ? trT('failed_ai', 'L’IA n’a pas répondu. Rien n’a changé : vérifie Ollama, puis redemande.')
+            : job.error === 'expired' ? trT('failed_expired', 'Ce conseil n’est plus disponible. Redemande-le.')
+            : trT('failed', 'Le conseil a échoué. Rien n’a changé.');
         body.innerHTML = `<p class="triage-lead">${escapeHtml(text)}</p>`;
-        foot.innerHTML = `<button type="button" class="btn btn-primary btn-sm" onclick="openTriage(TRIAGE.ruleId)">${escapeHtml(trT('retry', 'Relancer le tri'))}</button>`;
+        foot.innerHTML = `<button type="button" class="btn btn-primary btn-sm" onclick="openTriage(TRIAGE.ruleId)">${escapeHtml(trT('retry', 'Redemander'))}</button>`;
         return;
     }
     trRenderResult(body, foot, job);
 }
 
+// « À lire » first: that is the advice. Most serious first: an open critical, then critical, then the most repeated.
+function trReadOrder(a, b) {
+    const rank = x => (x.kind === 'critical' ? 4 : 0) + (x.severity === 'critical' ? 2 : 0) + (x.open_count ? 1 : 0);
+    return rank(b) - rank(a) || b.count - a.count;
+}
+
 function trRenderResult(body, foot, job) {
-    const proposals = job.proposals, kept = job.kept;
+    const dismiss = job.proposals, read = [...job.kept].sort(trReadOrder);
     if (!job.unread) {
-        body.innerHTML = `<p class="triage-lead">${escapeHtml(trT('nothing', 'Rien à trier : tu n’as aucun événement non lu.'))}</p>`;
+        body.innerHTML = `<p class="triage-lead">${escapeHtml(trT('nothing', 'Rien à lire : tu n’as aucun événement non lu.'))}</p>`;
         foot.innerHTML = `<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('triage-dialog').close()">${escapeHtml(trT('close', 'Fermer'))}</button>`;
         return;
     }
-    // Without proposal, say whether the AI looked at anything: the guards may have kept everything before asking it
-    const lead = proposals.length
-        ? trCount(proposals.length, 'lead_one', 'L’IA propose de marquer 1 événement comme lu. Décoche ce que tu veux garder.', 'lead_many', 'L’IA propose de marquer {n} événements comme lus. Décoche ce que tu veux garder.')
-        : job.total
-            ? trCount(job.total, 'lead_none_one', 'L’IA a regardé 1 événement et préfère que tu le lises.', 'lead_none_many', 'L’IA a regardé {n} événements et n’en propose aucun : elle préfère que tu les lises.')
-            : trCount(job.unread, 'lead_none_guarded_one', 'L’IA n’a rien eu à regarder : ton événement non lu est critique, il reste à lire d’office.', 'lead_none_guarded_many', 'L’IA n’a rien eu à regarder : tes {n} événements non lus sont critiques, ils restent à lire d’office.');
-    const more = job.not_reviewed ? `<p class="form-hint">${escapeHtml(trT('not_reviewed', '{n} autres événements n’ont pas été regardés : relance le tri après celui-ci.', { n: job.not_reviewed }))}</p>` : '';
+    const lead = !dismiss.length ? trT('lead_read_all', 'L’IA conseille de tout lire.')
+        : !read.length ? trT('lead_dismiss_all', 'L’IA propose de tout écarter. Décoche ce que tu veux garder.')
+        : trT('lead_mixed', 'L’IA conseille d’en lire {r} et d’en écarter {d}.', { r: read.length, d: dismiss.length });
+    const more = job.not_reviewed ? `<p class="form-hint">${escapeHtml(trT('not_reviewed', '{n} autres événements n’ont pas été regardés : redemande après celui-ci.', { n: job.not_reviewed }))}</p>` : '';
+    const section = (title, items, html) => items.length ? `<section class="triage-section">
+            <h3 class="triage-section-title">${escapeHtml(title)} <span class="triage-section-n">${items.length}</span></h3>
+            <ul class="triage-list">${items.map(html).join('')}</ul>
+        </section>` : '';
     body.innerHTML = `<p class="triage-lead">${escapeHtml(lead)}</p>
-        ${proposals.length ? `<ul class="triage-list">${proposals.map(trProposalHtml).join('')}</ul>` : ''}
+        ${section(trT('section_read', 'À lire'), read, trReadHtml)}
+        ${section(trT('section_dismiss', 'À écarter'), dismiss, trDismissHtml)}
         ${more}
-        ${kept.length ? `<details class="triage-kept" ${proposals.length ? '' : 'open'}>
-            <summary>${escapeHtml(trCount(kept.length, 'kept_one', '1 événement reste à lire', 'kept_many', '{n} événements restent à lire'))}</summary>
-            <ul class="triage-list">${kept.map(trKeptHtml).join('')}</ul>
-        </details>` : ''}
-        <p class="form-hint triage-note">${escapeHtml(trT('note', 'Marquer comme lu ne ferme aucun incident et ne supprime rien. Une répétition plus grave le remettra en non lu.'))}</p>`;
+        ${dismiss.length ? `<p class="form-hint triage-note">${escapeHtml(trT('note', 'Écarter, c’est marquer comme lu : cela ne ferme aucun incident et ne supprime rien. Une répétition plus grave le remettra à lire.'))}</p>` : ''}`;
     body.querySelectorAll('input[data-key]').forEach(box => box.addEventListener('change', () => {
         if (box.checked) TRIAGE.unchecked.delete(box.dataset.key);
         else TRIAGE.unchecked.add(box.dataset.key);
@@ -163,10 +168,10 @@ function trRenderResult(body, foot, job) {
 function trRenderFoot(foot, job) {
     const n = job.proposals.filter(p => !TRIAGE.unchecked.has(trKey(p))).length;
     const close = `<button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('triage-dialog').close()">${escapeHtml(job.proposals.length ? trT('later', 'Pas maintenant') : trT('close', 'Fermer'))}</button>`;
-    // Relance l'IA sur les non lues du moment : le résultat affiché peut dater de quelques minutes
+    // Redemande à l'IA sur les non lues du moment : le conseil affiché peut dater de quelques minutes
     const recheck = `<button type="button" class="btn btn-secondary btn-sm triage-recheck" onclick="openTriage(TRIAGE.ruleId, true)"
-        title="${escapeHtml(trT('recheck_title', 'Relancer l’IA sur tes non lues actuelles'))}">${escapeHtml(trT('recheck', 'Revérifier'))}</button>`;
-    foot.innerHTML = recheck + close + (job.proposals.length ? `<button type="button" class="btn btn-primary btn-sm" id="triage-apply" ${n ? '' : 'disabled'} onclick="trApply()">${escapeHtml(trCount(n, 'apply_one', 'Marquer 1 événement comme lu', 'apply_many', 'Marquer {n} événements comme lus'))}</button>` : '');
+        title="${escapeHtml(trT('recheck_title', 'Redemander à l’IA sur tes non lues actuelles'))}">${escapeHtml(trT('recheck', 'Revérifier'))}</button>`;
+    foot.innerHTML = recheck + close + (job.proposals.length ? `<button type="button" class="btn btn-primary btn-sm" id="triage-apply" ${n ? '' : 'disabled'} onclick="trApply()">${escapeHtml(trCount(n, 'apply_one', 'Écarter 1 événement', 'apply_many', 'Écarter {n} événements'))}</button>` : '');
 }
 
 function trMeta(item) {
@@ -184,7 +189,7 @@ function trEventHtml(item) {
     <span class="triage-meta">${escapeHtml(trMeta(item))}</span>`;
 }
 
-function trProposalHtml(item) {
+function trDismissHtml(item) {
     const key = trKey(item);
     return `<li class="triage-item">
         <input type="checkbox" data-key="${escapeHtml(key)}" ${TRIAGE.unchecked.has(key) ? '' : 'checked'} aria-label="${escapeHtml(item.summary)}">
@@ -194,10 +199,10 @@ function trProposalHtml(item) {
     </li>`;
 }
 
-function trKeptHtml(item) {
-    const reason = { critical: trT('kept_critical', 'Critique : un critique se lit toujours.'),
+function trReadHtml(item) {
+    const reason = { critical: trT('kept_critical', 'Incident critique encore ouvert : il se lit toujours.'),
         no_answer: trT('kept_no_answer', 'L’IA n’a pas répondu pour celui-ci.') }[item.kind] || item.reason || trT('kept_ai', 'L’IA préfère que tu le regardes.');
-    return `<li class="triage-item triage-item--kept">
+    return `<li class="triage-item triage-item--read">
         <div class="triage-text">${trEventHtml(item)}
             <span class="triage-reason">${escapeHtml(reason)}</span>
         </div>
@@ -220,7 +225,7 @@ async function trApply() {
     try {
         await apiFetch('/api/triage/apply', { method: 'POST', body: { job_id: job.id, keys } });
     } catch (e) {
-        document.getElementById('triage-body').insertAdjacentHTML('beforeend', `<p class="triage-error" role="alert">${escapeHtml(trT('failed_expired', 'Ce tri n’est plus disponible. Relance-le.'))}</p>`);
+        document.getElementById('triage-body').insertAdjacentHTML('beforeend', `<p class="triage-error" role="alert">${escapeHtml(trT('failed_expired', 'Ce conseil n’est plus disponible. Redemande-le.'))}</p>`);
         return;
     }
     document.getElementById('triage-dialog').close();
@@ -244,8 +249,8 @@ async function trRefreshLast() {
         return;
     }
     const when = new Date(last.at).toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-    el.innerHTML = `<p class="triage-last">${escapeHtml(trCount(last.events, 'last_one', 'Dernier tri, le {d} : 1 événement marqué comme lu.', 'last_many', 'Dernier tri, le {d} : {n} événements marqués comme lus.').split('{d}').join(when))}
-        <button type="button" class="triage-undo" onclick="trUndo()">${escapeHtml(trT('undo', 'Annuler ce tri'))}</button></p>`;
+    el.innerHTML = `<p class="triage-last">${escapeHtml(trCount(last.events, 'last_one', 'Dernier écart, le {d} : 1 événement écarté.', 'last_many', 'Dernier écart, le {d} : {n} événements écartés.').split('{d}').join(when))}
+        <button type="button" class="triage-undo" onclick="trUndo()">${escapeHtml(trT('undo', 'Annuler'))}</button></p>`;
 }
 
 async function trUndo() {

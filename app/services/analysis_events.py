@@ -182,7 +182,11 @@ def summarize(db, rule_id: Optional[int] = None, days: Optional[int] = None, ope
     """Un résumé par événement, le plus récent d'abord.
 
     Un événement est non lu tant qu'aucune occurrence n'a été lue, ou si une occurrence non lue est plus grave que tout
-    ce qui a été lu : une simple répétition d'un événement déjà vu ne le remet pas en non lu."""
+    ce qui a été lu : une simple répétition d'un événement déjà vu ne le remet pas en non lu.
+
+    Et seulement s'il attend quelqu'un : une occurrence critique non lue, ou un incident encore ouvert. Un avertissement
+    terminé sans gravité devient lu de lui-même. Vu en prod le 2026-11-25 : 59 événements non lus après quelques jours
+    sans visite, tous résolus, 3 seulement critiques ; le compteur ne voulait plus rien dire."""
     q = db.query(Analysis.id, Analysis.rule_id, Rule.name, Analysis.event_key, Analysis.severity, Analysis.viewed,
                  Analysis.analyzed_at, Analysis.resolution_status, Analysis.feedback, Rule.alert_status).join(Rule, Analysis.rule_id == Rule.id)
     if rule_id is not None:
@@ -215,7 +219,8 @@ def summarize(db, rule_id: Optional[int] = None, days: Optional[int] = None, ope
 
     events = []
     for g in groups.values():
-        unread = g["unread_rank"] > g["read_rank"]
+        unread = g["unread_rank"] > g["read_rank"] and (
+            g["unread_rank"] >= _rank("critical") or (g["open"] > 0 and g["rule_in_alert"]))
         events.append({
             "key": g["key"], "rule_id": g["rule_id"], "rule_name": g["rule_name"], "count": g["count"],
             "first_at": iso(g["first_at"]), "last_at": iso(g["last_at"]), "severities": g["severities"],
@@ -237,6 +242,23 @@ def counts(events: List[dict]) -> dict:
         result[e["severity"]] += 1
         result["unread_critical"] += e["unread"] and e["severity"] == "critical"
     return result
+
+
+def matching(db, text: str) -> set:
+    """Les événements (règle, clé) dont une occurrence contient ce texte, dans ses lignes ou dans l'analyse de l'IA."""
+    rows = db.query(Analysis.rule_id, Analysis.event_key).filter(or_(
+        Analysis.triggered_line.icontains(text, autoescape=True), Analysis.summary.icontains(text, autoescape=True),
+        Analysis.ollama_response.icontains(text, autoescape=True))).distinct().all()
+    return {(r.rule_id, r.event_key) for r in rows}
+
+
+def by_rule(events: List[dict]) -> List[dict]:
+    """Nombre d'événements par règle, la plus fournie d'abord : les filtres rapides de l'historique."""
+    rules = {}
+    for e in events:
+        r = rules.setdefault(e["rule_id"], {"rule_id": e["rule_id"], "rule_name": e["rule_name"], "count": 0})
+        r["count"] += 1
+    return sorted(rules.values(), key=lambda r: (-r["count"], r["rule_name"]))
 
 
 def select(events: List[dict], severity: Optional[str] = None, unread: bool = False) -> List[dict]:

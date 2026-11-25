@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Dashboard history: search and rule filter**: a search field looks through the log lines and the AI analysis of every event, and a rule list (busiest first, with counts) narrows the history to one rule. Both combine with the severity filters, whose counts follow them. Search, rule and severity now sit on a single toolbar under the *History* heading.
+
+### Changed
+- **Unread events no longer pile up into a meaningless count**: after a few days away, the dashboard showed dozens of unread events, almost all of them over and harmless. An event is now unread only when it waits for you: an unread critical occurrence, or an incident still open. A warning that ended without harm counts as read; it stays in the history.
+- **Sort my unread becomes Reading advice**: for each unread event, the AI now says whether to read it, and what to look at, or to dismiss it, and why. *To read* comes first, most serious first; *To dismiss* has checkboxes. Ended critical events are now reviewed too, since nearly everything left unread is critical: the AI may suggest dismissing one. Everything in *To dismiss* is ticked in advance; untick what you want to keep. A critical incident still open always stays to read. The *AI advice* button sits on the *To read* row of the dashboard, which is now highlighted as a whole on hover.
+
 ## [1.15.3] - 2026-11-25
 
 ### Fixed

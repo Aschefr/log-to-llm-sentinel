@@ -1,6 +1,11 @@
-"""Tri des événements non lus par l'IA, sur demande : elle propose, l'utilisateur valide, et le tri s'annule.
-Un événement critique n'est jamais proposé, quoi que réponde l'IA. Un événement récent lui est soumis comme tel, avec une
-règle plus stricte (pas d'historique pour juger). Marquer comme lu ne ferme aucun incident."""
+"""Conseil de lecture sur les événements non lus, sur demande : pour chacun, l'IA dit s'il faut le lire (et pourquoi)
+ou s'il peut être écarté. L'utilisateur valide ce qu'il écarte, et cela s'annule.
+
+Depuis que seuls les critiques et les incidents encore ouverts restent non lus (analysis_events.summarize), il ne restait
+presque rien à « trier » : l'IA regarde donc aussi les critiques terminés, et peut proposer d'en écarter. Un incident
+critique encore ouvert reste à lire quoi qu'elle réponde.
+Un événement récent est soumis comme tel, avec une règle plus stricte (pas d'historique pour juger). Écarter, c'est
+marquer comme lu : cela ne ferme aucun incident."""
 import asyncio
 import uuid
 from datetime import datetime, timedelta
@@ -30,8 +35,8 @@ _task: Optional[asyncio.Task] = None
 
 
 def protection(event: dict, now: Optional[datetime] = None) -> Optional[str]:
-    """Pourquoi cet événement reste à lire quoi qu'il arrive : critique."""
-    return "critical" if event["severity"] == "critical" else None
+    """Pourquoi cet événement reste à lire quoi qu'il arrive : un incident critique encore ouvert."""
+    return "critical" if event["severity"] == "critical" and event["open_count"] > 0 else None
 
 
 def is_recent(event: dict, now: Optional[datetime] = None) -> bool:
@@ -153,8 +158,8 @@ async def _run(job: dict, events: List[dict], tuning):
                 for n, e in enumerate(batch, 1):
                     d = decisions.get(n)
                     reason = " ".join(str((d or {}).get("reason") or "").split())[:REASON_CHARS]
-                    # Sans décision claire et motivée, l'événement reste à lire
-                    if d and d.get("mark_read") is True and reason:
+                    # Sans conseil clair et motivé, l'événement reste à lire
+                    if d and d.get("advice") == "dismiss" and reason:
                         job["proposals"].append(_item(db, e, reason=reason, kind="proposed"))
                     else:
                         job["kept"].append(_item(db, e, reason=reason, kind="ai" if d else "no_answer"))
@@ -185,8 +190,8 @@ def cancel(job_id: str) -> bool:
 
 
 def apply(db, job_id: str, keys: List[dict], now: Optional[datetime] = None) -> dict:
-    """Marque comme lus les événements validés, parmi ceux que l'IA a proposés. Les garde-fous sont revérifiés : un
-    événement devenu critique depuis la proposition reste à lire, comme ce qui est arrivé après elle."""
+    """Marque comme lus les événements validés, parmi ceux que l'IA propose d'écarter. Les garde-fous sont revérifiés :
+    un incident critique rouvert depuis le conseil reste à lire, comme ce qui est arrivé après lui."""
     job = get(job_id)
     if not job or job["status"] != "done":
         raise LookupError("triage_expired")
@@ -202,7 +207,7 @@ def apply(db, job_id: str, keys: List[dict], now: Optional[datetime] = None) -> 
             continue
         done = db.query(Analysis).filter(
             Analysis.rule_id == pair[0], Analysis.event_key == pair[1], Analysis.viewed == False,
-            Analysis.severity != "critical", Analysis.analyzed_at <= job["started_at"],
+            Analysis.analyzed_at <= job["started_at"],
         ).update({Analysis.viewed: True, Analysis.triaged_at: now}, synchronize_session=False)
         marked += done
         marked_events += bool(done)

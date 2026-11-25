@@ -928,7 +928,7 @@ async function confirmMarkAllRead(btn, counts, markAll, ruleId = null) {
         }
     }, {
         confirmLabel: _t('monitor.mark_all_read', 'Tout marquer comme lu'),
-        alternative: typeof openTriage === 'function' ? { label: _t('triage.title', 'Trier mes non lues'), onClick: () => openTriage(ruleId) } : null,
+        alternative: typeof openTriage === 'function' ? { label: _t('triage.title', 'Conseil de lecture'), onClick: () => openTriage(ruleId) } : null,
     });
 }
 

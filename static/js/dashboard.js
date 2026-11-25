@@ -18,6 +18,7 @@ const DASH = {
     watch: null, ollama: null, failed: false, updatedAt: null,
     filter: 'all', loaded: 0, hasMore: false, historyReady: false, historyFailed: false, historyRequest: 0,
     seenAttention: new Set(), attentionReady: false,
+    q: '', rule: null, ruleName: '', historyCounts: null, historyRules: null,
 };
 
 function dT(key, fallback, vars) {
@@ -276,9 +277,9 @@ function renderAttention() {
     const unread = DASH.watch.counts.unread;
     const unreadRow = unread ? `<div class="dash-unread"><button type="button" class="dash-row dash-row--unread" onclick="showUnread()">
         <span class="dash-tag">${escapeHtml(dT('dashboard.tag_read', 'À lire'))}</span>
-        <span class="dash-row-main"><strong>${escapeHtml(dCount(unread, 'dashboard.unread_one', '{n} événement non lu', 'dashboard.unread_many', '{n} événements non lus'))}</strong></span>
+        <span class="dash-row-main"><strong>${escapeHtml(dCount(unread, 'dashboard.unread_one', '{n} événement non lu', 'dashboard.unread_many', '{n} événements non lus'))}</strong><span class="dash-row-text">${escapeHtml(dT('dashboard.unread_why', 'Critique, ou incident encore ouvert.'))}</span></span>
         <span class="dash-row-when">${escapeHtml(dT('dashboard.unread_action', 'Voir'))}</span>
-    </button><button type="button" class="btn btn-secondary btn-sm dash-triage" onclick="openTriage()">${escapeHtml(dT('triage.title', 'Trier mes non lues'))}</button></div>` : '';
+    </button><button type="button" class="btn btn-secondary btn-sm dash-triage" onclick="openTriage()">${escapeHtml(dT('triage.open', 'Conseil de l’IA'))}</button></div>` : '';
     DASH.attentionReady = true;
     const empty = !rows.length && !unread;
     dSetHtml(document.getElementById('dash-attention'), empty
@@ -442,12 +443,44 @@ function renderOllama() {
 // ─── Historique ─────────────────────────────────────────────────────────────
 
 function renderFilters() {
-    const c = DASH.watch.counts, labels = severityLabels();
+    // Les compteurs suivent la recherche et la règle choisie, dès que l'historique a répondu
+    const c = DASH.historyCounts || DASH.watch?.counts, labels = severityLabels();
+    if (!c) return;
     const filters = [['all', dT('dashboard.filter_all', 'Toutes'), c.total], ['critical', labels.critical, c.critical], ['warning', labels.warning, c.warning],
         ['info', labels.info, c.info], ['unread', dT('dashboard.filter_unread', 'Non lues'), c.unread]];
     dSetHtml(document.getElementById('dash-filters'), filters.map(([id, label, n]) =>
         `<button type="button" class="${DASH.filter === id ? 'active' : ''}" aria-pressed="${DASH.filter === id}" onclick="setHistoryFilter('${id}')">${escapeHtml(label)} (${n})</button>`).join(''));
-    document.getElementById('dash-mark-all').classList.toggle('hidden', !c.unread);
+    document.getElementById('dash-mark-all').classList.toggle('hidden', !DASH.watch?.counts.unread);
+    renderRuleSelect();
+}
+
+// Filtre par règle : une liste, la plus fournie d'abord. Elle tient sur une ligne quel que soit le nombre de règles.
+function renderRuleSelect() {
+    let rules = DASH.historyRules || [];
+    if (DASH.rule != null && !rules.some(r => r.rule_id === DASH.rule)) rules = [...rules, { rule_id: DASH.rule, rule_name: DASH.ruleName, count: 0 }];
+    const el = document.getElementById('dash-rule');
+    const total = rules.reduce((n, r) => n + r.count, 0);
+    dSetHtml(el, `<option value="">${escapeHtml(dT('dashboard.rules_all', 'Toutes les règles'))} (${total})</option>`
+        + rules.map(r => `<option value="${r.rule_id}"${DASH.rule === r.rule_id ? ' selected' : ''}>${escapeHtml(r.rule_name)} (${r.count})</option>`).join(''));
+    el.value = DASH.rule == null ? '' : String(DASH.rule);
+    el.classList.toggle('is-set', DASH.rule != null);
+}
+
+function setHistoryRule(value) {
+    DASH.rule = value ? Number(value) : null;
+    DASH.ruleName = (DASH.historyRules || []).find(r => r.rule_id === DASH.rule)?.rule_name || '';
+    renderRuleSelect();
+    resetHistory();
+}
+
+let _historySearchTimer = null;
+function onHistorySearch(value) {
+    clearTimeout(_historySearchTimer);
+    _historySearchTimer = setTimeout(() => {
+        if (DASH.q === value.trim()) return;
+        DASH.q = value.trim();
+        resetHistory();
+    }, 300);
 }
 
 function setHistoryFilter(id) {
@@ -467,7 +500,9 @@ function resetHistory() {
 async function loadHistory(more = false) {
     const request = ++DASH.historyRequest;
     const limit = more ? DASH.loaded + DASH_PAGE_SIZE : Math.max(DASH.loaded, DASH_PAGE_SIZE);
-    let url = `/api/dashboard/events?limit=${limit}&offset=0`;
+    let url = `/api/dashboard/events?limit=${limit}&offset=0&rules=true`;
+    if (DASH.rule != null) url += `&rule_id=${DASH.rule}`;
+    if (DASH.q) url += `&q=${encodeURIComponent(DASH.q)}`;
     if (DASH.filter === 'unread') url += '&unread=true';
     else if (DASH.filter !== 'all') url += `&severity=${DASH.filter}`;
     try {
@@ -476,6 +511,9 @@ async function loadHistory(more = false) {
         reconcileEvents(document.getElementById('dash-history-list'), res.events, { showRuleName: true, freshClass: DASH.historyReady ? 'dash-new' : null });
         DASH.loaded = res.events.length;
         DASH.hasMore = res.has_more;
+        DASH.historyCounts = res.counts;
+        DASH.historyRules = res.rules;
+        renderFilters();
         DASH.historyFailed = false;
         DASH.historyReady = true;
     } catch (error) {
@@ -492,7 +530,7 @@ function renderHistoryState() {
     if (DASH.historyFailed && !hasCards) {
         dSetHtml(el, `<p class="dash-calm">${escapeHtml(dT('dashboard.loading_error', 'Erreur de chargement'))} <button type="button" class="btn btn-secondary btn-sm" onclick="loadHistory()">${escapeHtml(dT('dashboard.retry', 'Réessayer'))}</button></p>`);
     } else if (!hasCards && DASH.historyReady) {
-        dSetHtml(el, `<p class="dash-calm">${escapeHtml(DASH.filter === 'all' ? dT('dashboard.history_none', 'Les analyses apparaîtront ici dès qu’une règle se déclenchera.') : dT('dashboard.history_none_filter', 'Aucune analyse pour ce filtre.'))}</p>`);
+        dSetHtml(el, `<p class="dash-calm">${escapeHtml(DASH.filter === 'all' && !DASH.q && DASH.rule == null ? dT('dashboard.history_none', 'Les analyses apparaîtront ici dès qu’une règle se déclenchera.') : dT('dashboard.history_none_filter', 'Aucune analyse pour ce filtre.'))}</p>`);
     } else if (!hasCards) {
         dSetHtml(el, '<div class="dash-skeleton" aria-hidden="true"><span></span><span></span><span></span></div>');
     } else if (DASH.hasMore) {
