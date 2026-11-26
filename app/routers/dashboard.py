@@ -91,6 +91,18 @@ def get_watch():
         db.close()
 
 
+@router.get("/timeline")
+def get_timeline(hours: int = 12):
+    """Courbe des alertes des dernières heures : 6, 12, 24 ou 48 h, toujours en 24 tranches."""
+    if hours not in dashboard_watch.TIMELINE_STEPS:
+        raise HTTPException(status_code=400, detail="hours: 6, 12, 24 or 48")
+    db = SessionLocal()
+    try:
+        return dashboard_watch.timeline(db, hours)
+    finally:
+        db.close()
+
+
 @router.get("/ollama")
 def get_ollama_status():
     """État d'Ollama, à part : un serveur injoignable ne doit pas retarder le reste de la page."""

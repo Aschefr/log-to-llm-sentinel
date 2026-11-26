@@ -7,6 +7,8 @@
 const DASH_PAGE_SIZE = 20;
 const DASH_REFRESH_MS = 15000;
 const DASH_CHART_HEIGHT = 112;
+const DASH_TIMELINE_HOURS = [6, 12, 24, 48];
+const DASH_TIMELINE_KEY = 'sentinel.dashboard.timelineHours';
 const DASH_ICONS = {
     ok: 'M12 2C6.5 2 2 6.5 2 12S6.5 22 12 22 22 17.5 22 12 17.5 2 12 2M10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z',
     alert: 'M13 14H11V9H13M13 18H11V16H13M1 21H23L12 2L1 21Z',
@@ -19,6 +21,7 @@ const DASH = {
     filter: 'all', loaded: 0, hasMore: false, historyReady: false, historyFailed: false, historyRequest: 0,
     seenAttention: new Set(), attentionReady: false,
     q: '', rule: null, ruleName: '', historyCounts: null, historyRules: null,
+    timeline: null, timelineHours: savedTimelineHours(), timelineRequest: 0, timelineIndex: null,
 };
 
 function dT(key, fallback, vars) {
@@ -66,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('analysis-viewed', refresh);
     document.addEventListener('events-changed', refresh);
     setupChartTip();
+    setupTimeline();
     let shownLang = null;
     window.i18n?.onLanguageChange(lang => {
         const first = shownLang === null;
@@ -82,6 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function refresh() {
+    loadTimeline();
     loadWatch();
     loadOllama();
     loadHistory();
@@ -116,6 +121,7 @@ function renderAll() {
     renderSituation();
     renderAttention();
     renderTrend();
+    renderTimeline();
     renderPilot();
     renderOllama();
     renderFilters();
@@ -379,6 +385,207 @@ function setupChartTip() {
     panel.addEventListener('focusin', e => { const day = e.target.closest('.dash-day'); if (day) show(day); });
     panel.addEventListener('focusout', hide);
     panel.addEventListener('keydown', e => { if (e.key === 'Escape') hide(); });
+}
+
+// ─── Alertes des dernières heures ───────────────────────────────────────────
+// Une courbe du nombre d'alertes, en 24 tranches quelle que soit la durée choisie. Les bandes colorées en donnent la
+// gravité ; le trait suit le total. Le survol (ou les flèches au clavier) lit une tranche, le tableau les donne toutes.
+
+function savedTimelineHours() {
+    try {
+        const h = Number(localStorage.getItem(DASH_TIMELINE_KEY));
+        if (DASH_TIMELINE_HOURS.includes(h)) return h;
+    } catch (e) { /* stockage indisponible : la valeur par défaut suffit */ }
+    return 12;
+}
+
+function setTimelineHours(h) {
+    if (h === DASH.timelineHours) return;
+    DASH.timelineHours = h;
+    try { localStorage.setItem(DASH_TIMELINE_KEY, String(h)); } catch (e) { /* idem */ }
+    renderTimelineRange();
+    // Le graphique garde sa forme, estompé, le temps que la nouvelle période arrive
+    document.getElementById('dash-timeline-body').classList.add('is-loading');
+    loadTimeline();
+}
+
+async function loadTimeline() {
+    const request = ++DASH.timelineRequest, hours = DASH.timelineHours;
+    try {
+        const data = await apiFetch(`/api/dashboard/timeline?hours=${hours}`);
+        if (request !== DASH.timelineRequest) return;
+        DASH.timeline = data;
+    } catch (error) {
+        if (request !== DASH.timelineRequest) return;
+        console.error('Dashboard timeline:', error);
+    }
+    document.getElementById('dash-timeline-body').classList.remove('is-loading');
+    unskel('dash-timeline-body');
+    renderTimeline();
+}
+
+function renderTimelineRange() {
+    dSetHtml(document.getElementById('dash-range'), DASH_TIMELINE_HOURS.map(h =>
+        `<button type="button" class="${DASH.timelineHours === h ? 'active' : ''}" aria-pressed="${DASH.timelineHours === h}" onclick="setTimelineHours(${h})">${escapeHtml(dT('dashboard.timeline_hours', '{h} h', { h }))}</button>`).join(''));
+}
+
+function bucketTotal(b) {
+    return b.critical + b.warning + b.info;
+}
+
+function bucketTime(d) {
+    return d.toLocaleTimeString(dLocale(), { hour: '2-digit', minute: '2-digit' });
+}
+
+// « hier 14:00 – 16:00 », « 14:30 – 14:45 (en cours) »
+function bucketLabel(tl, i) {
+    const start = new Date(tl.buckets[i].start), end = new Date(start.getTime() + tl.step_minutes * 60000);
+    const now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1);
+    let day = '';
+    if (start.toDateString() === y.toDateString()) day = `${dT('rule.yesterday', 'hier')} `;
+    else if (start.toDateString() !== now.toDateString()) day = `${start.toLocaleDateString(dLocale(), { weekday: 'short', day: 'numeric' })} `;
+    const current = i === tl.buckets.length - 1 ? ` (${dT('dashboard.timeline_current', 'en cours')})` : '';
+    return `${day}${bucketTime(start)} – ${bucketTime(end)}${current}`;
+}
+
+// L'heure seule aujourd'hui, précédée du jour sinon
+function dayTime(d) {
+    return d.toDateString() === new Date().toDateString() ? bucketTime(d)
+        : `${d.toLocaleDateString(dLocale(), { weekday: 'short' })} ${bucketTime(d)}`;
+}
+
+// Repères sur des heures rondes de l'heure locale : toutes les 2 h sur 6 h, 3 h sur 12 h, 6 h sur 24 h, 12 h sur 48 h
+function axisTicks(tl) {
+    const every = { 6: 120, 12: 180, 24: 360, 48: 720 }[tl.hours] || tl.step_minutes * 6;
+    const slot = i => { const d = new Date(tl.buckets[i].start); return Math.floor((d.getHours() * 60 + d.getMinutes()) / every) + d.getDate() * 1000; };
+    return tl.buckets.map((b, i) => i).filter(i => i > 0 && i < tl.buckets.length - 1 && slot(i) !== slot(i - 1));
+}
+
+function axisLabel(tl, i) {
+    return i === tl.buckets.length - 1 ? dT('dashboard.timeline_now', 'maintenant') : dayTime(new Date(tl.buckets[i].start));
+}
+
+function renderTimeline() {
+    renderTimelineRange();
+    const tl = DASH.timeline, body = document.getElementById('dash-timeline-body');
+    if (!tl) return;
+    const labels = severityLabels(), n = tl.buckets.length, W = (n - 1) * 10, H = DASH_CHART_HEIGHT;
+    const top = niceMax(Math.max(...tl.buckets.map(bucketTotal), 1));
+    const x = i => i * 10, y = v => +(H - v / top * H).toFixed(2);
+    // Bandes empilées : infos en bas, critiques en haut, comme les barres des 7 jours
+    const levels = [b => b.info, b => b.info + b.warning, bucketTotal];
+    const line = f => tl.buckets.map((b, i) => `${x(i)},${y(f(b))}`).join(' ');
+    const bands = ['info', 'warning', 'critical'].map((s, k) => {
+        const upper = line(levels[k]);
+        const lower = k ? tl.buckets.map((b, i) => `${x(i)},${y(levels[k - 1](b))}`).reverse().join(' ') : `${W},${H} 0,${H}`;
+        return `<polygon class="dash-band dash-band--${s}" points="${upper} ${lower}"/>`;
+    }).join('');
+
+    const totals = { critical: 0, warning: 0, info: 0 };
+    tl.buckets.forEach(b => Object.keys(totals).forEach(s => { totals[s] += b[s]; }));
+    const peak = tl.buckets.reduce((best, b, i) => bucketTotal(b) > bucketTotal(tl.buckets[best]) ? i : best, 0);
+    const summary = tl.total
+        ? `<strong>${escapeHtml(dCount(tl.total, 'dashboard.trend_total_one', '{n} alerte', 'dashboard.trend_total_many', '{n} alertes'))}</strong><span>${escapeHtml(dT('dashboard.timeline_peak', 'Pic : {n} vers {t}', { n: bucketTotal(tl.buckets[peak]), t: dayTime(new Date(tl.buckets[peak].start)) }))}</span>`
+        : `<strong>${escapeHtml(dT('dashboard.timeline_none', 'Aucune alerte sur les {h} dernières heures.', { h: tl.hours }))}</strong>`;
+    const ticks = [...axisTicks(tl), n - 1].map(i => {
+        const edge = i === 0 ? ' dash-xlabel--first' : i === n - 1 ? ' dash-xlabel--last' : '';
+        return `<span class="dash-xlabel${edge}" style="left:${(i / (n - 1) * 100).toFixed(3)}%">${escapeHtml(axisLabel(tl, i))}</span>`;
+    }).join('');
+    const legend = ['critical', 'warning', 'info'].map(s => `<li><span class="dash-swatch dash-swatch--${s}" aria-hidden="true"></span>${escapeHtml(labels[s])} <strong>${totals[s]}</strong></li>`).join('');
+    const rows = tl.buckets.map((b, i) => `<tr><td>${escapeHtml(bucketLabel(tl, i))}</td><td>${b.critical}</td><td>${b.warning}</td><td>${b.info}</td><td>${bucketTotal(b)}</td></tr>`).join('');
+    const aria = dT('dashboard.timeline_aria', 'Courbe des alertes sur {h} h, par tranches de {m} min. Flèches gauche et droite pour lire chaque tranche.', { h: tl.hours, m: tl.step_minutes });
+    const wasOpen = body.querySelector('details')?.open;
+
+    dSetHtml(body, `
+        <p class="dash-trend-total">${summary}</p>
+        <div class="dash-chart" style="--dash-chart-height:${H}px">
+            <span class="dash-tick dash-tick--top">${top}</span><span class="dash-tick dash-tick--zero">0</span>
+            <div class="dash-plot" tabindex="0" role="group" aria-label="${escapeHtml(aria)}">
+                <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+                    ${bands}
+                    <polyline class="dash-line-total" points="${line(bucketTotal)}"/>
+                </svg>
+                <span class="dash-cross hidden" aria-hidden="true"><span class="dash-cross-dot"></span></span>
+            </div>
+            <div class="dash-xlabels" aria-hidden="true">${ticks}</div>
+        </div>
+        <ul class="dash-legend">${legend}</ul>
+        <details class="dash-table"><summary>${escapeHtml(dT('dashboard.trend_table', 'Voir le tableau'))}</summary>
+            <table><thead><tr><th>${escapeHtml(dT('dashboard.col_time', 'Heure'))}</th><th>${escapeHtml(labels.critical)}</th><th>${escapeHtml(labels.warning)}</th><th>${escapeHtml(labels.info)}</th><th>${escapeHtml(dT('dashboard.col_total', 'Total'))}</th></tr></thead><tbody>${rows}</tbody></table>
+        </details>`);
+    if (wasOpen) body.querySelector('details').open = true;
+    fitAxisLabels();
+    // Un rafraîchissement pendant le survol garde la tranche lue
+    if (DASH.timelineIndex != null) showTimelinePoint(Math.min(DASH.timelineIndex, n - 1));
+}
+
+// Sur un écran étroit les heures se chevauchent : on retire celles qui touchent leur voisine, « maintenant » restant
+function fitAxisLabels() {
+    const labels = [...document.querySelectorAll('#dash-timeline .dash-xlabel')];
+    if (!labels.length) return;
+    labels.forEach(l => l.classList.remove('hidden'));
+    const last = labels[labels.length - 1].getBoundingClientRect();
+    let edge = -Infinity;
+    labels.slice(0, -1).forEach(l => {
+        const r = l.getBoundingClientRect();
+        if (r.left < edge + 8 || r.right > last.left - 8) l.classList.add('hidden');
+        else edge = r.right;
+    });
+}
+
+function showTimelinePoint(i) {
+    const tl = DASH.timeline, plot = document.querySelector('#dash-timeline .dash-plot');
+    if (!tl || !plot) return;
+    DASH.timelineIndex = i;
+    const b = tl.buckets[i], n = tl.buckets.length, labels = severityLabels();
+    const top = niceMax(Math.max(...tl.buckets.map(bucketTotal), 1));
+    const cross = plot.querySelector('.dash-cross');
+    cross.style.left = `${i / (n - 1) * 100}%`;
+    cross.firstElementChild.style.top = `${(1 - bucketTotal(b) / top) * 100}%`;
+    cross.classList.remove('hidden');
+
+    const panel = document.getElementById('dash-timeline'), tip = document.getElementById('dash-timeline-tip');
+    const rows = ['critical', 'warning', 'info'].map(s => `<li><span class="dash-swatch dash-swatch--${s}" aria-hidden="true"></span>${escapeHtml(labels[s])}<strong>${b[s]}</strong></li>`).join('');
+    tip.innerHTML = `<div class="dash-tip-date">${escapeHtml(bucketLabel(tl, i))}</div><ul>${rows}</ul>`;
+    tip.classList.remove('hidden');
+    const box = panel.getBoundingClientRect(), r = plot.getBoundingClientRect();
+    const px = r.left - box.left + r.width * i / (n - 1);
+    // À droite du trait, ou à gauche quand la place manque
+    const left = px + 14 + tip.offsetWidth <= box.width - 8 ? px + 14 : px - 14 - tip.offsetWidth;
+    tip.style.left = `${Math.max(8, left)}px`;
+    tip.style.top = `${r.top - box.top}px`;
+}
+
+function hideTimelinePoint() {
+    DASH.timelineIndex = null;
+    document.querySelector('#dash-timeline .dash-cross')?.classList.add('hidden');
+    document.getElementById('dash-timeline-tip').classList.add('hidden');
+}
+
+function setupTimeline() {
+    const body = document.getElementById('dash-timeline-body');
+    let fitFrame = 0;
+    window.addEventListener('resize', () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(fitAxisLabels); });
+    const pick = e => {
+        const plot = e.target.closest?.('.dash-plot'), tl = DASH.timeline;
+        if (!plot || !tl) return;
+        const r = plot.getBoundingClientRect(), n = tl.buckets.length;
+        showTimelinePoint(Math.max(0, Math.min(n - 1, Math.round((e.clientX - r.left) / r.width * (n - 1)))));
+    };
+    body.addEventListener('pointermove', pick);
+    body.addEventListener('pointerdown', pick);
+    body.addEventListener('pointerleave', hideTimelinePoint);
+    body.addEventListener('focusin', e => { if (e.target.closest('.dash-plot') && DASH.timeline) showTimelinePoint(DASH.timeline.buckets.length - 1); });
+    body.addEventListener('focusout', hideTimelinePoint);
+    body.addEventListener('keydown', e => {
+        if (!e.target.closest('.dash-plot') || !DASH.timeline) return;
+        const n = DASH.timeline.buckets.length, i = DASH.timelineIndex ?? n - 1;
+        const next = { ArrowLeft: i - 1, ArrowRight: i + 1, Home: 0, End: n - 1 }[e.key];
+        if (e.key === 'Escape') hideTimelinePoint();
+        if (next === undefined) return;
+        e.preventDefault();
+        showTimelinePoint(Math.max(0, Math.min(n - 1, next)));
+    });
 }
 
 // ─── Pilote automatique et Ollama ───────────────────────────────────────────

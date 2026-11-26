@@ -64,6 +64,29 @@ def _trend(analyses, now: datetime) -> dict:
     }
 
 
+# Durée affichée → largeur d'une tranche : toujours 24 points, assez fins pour voir une rafale, assez peu pour rester lisibles
+TIMELINE_STEPS = {6: 15, 12: 30, 24: 60, 48: 120}
+
+
+def timeline(db, hours: int, now: Optional[datetime] = None) -> dict:
+    """Alertes des dernières heures par tranche régulière et par sévérité, la plus ancienne d'abord. Les tranches
+    tombent sur des heures rondes (UTC) ; la dernière contient l'instant présent et n'est donc pas finie."""
+    now = now or datetime.utcnow()
+    step = timedelta(minutes=TIMELINE_STEPS[hours])
+    epoch = datetime(2000, 1, 1)
+    end = epoch + ((now - epoch) // step + 1) * step
+    start = end - timedelta(hours=hours)
+    ids = [r.id for r in db.query(Rule.id).all()]
+    rows = db.query(Analysis.analyzed_at, Analysis.severity).filter(
+        Analysis.analyzed_at >= start, Analysis.analyzed_at < end, Analysis.rule_id.in_(ids)).all()
+    n = int((end - start) / step)
+    buckets = [{"start": rule_stats.iso(start + i * step), "critical": 0, "warning": 0, "info": 0} for i in range(n)]
+    for at, severity in rows:
+        buckets[int((at - start) / step)][severity if severity in ("critical", "warning") else "info"] += 1
+    return {"hours": hours, "step_minutes": TIMELINE_STEPS[hours], "now": rule_stats.iso(now), "buckets": buckets,
+            "total": len(rows)}
+
+
 def _pilot(db, rules) -> dict:
     piloted = [r for r in rules if ap.enabled(r)]
     names = {r.id: r.name for r in piloted}

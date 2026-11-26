@@ -25,6 +25,14 @@
     </section>
 
     <div class="dash-grid">
+        <section class="dash-panel dash-timeline" id="dash-timeline" aria-labelledby="dash-timeline-title">
+            <div class="dash-panel-head">
+                <h2 class="dash-panel-title" id="dash-timeline-title" data-i18n="dashboard.timeline_title">Alertes · dernières heures</h2>
+                <div class="rp-seg dash-range" id="dash-range" role="group" data-i18n-aria-label="dashboard.timeline_range" aria-label="Période affichée"></div>
+            </div>
+            <div id="dash-timeline-body" class="skel skel--chart"></div>
+            <div class="dash-tip hidden" id="dash-timeline-tip" role="status"></div>
+        </section>
         <section class="dash-panel dash-trend" id="dash-trend" aria-labelledby="dash-trend-title">
             <h2 class="dash-panel-title" id="dash-trend-title" data-i18n="dashboard.trend_title">Alertes · 7 jours</h2>
             <div id="dash-trend-body" class="skel skel--chart"></div>
@@ -63,5 +71,5 @@
 
 {% block scripts %}
 <script src="/static/js/source_connections.js?v=4"></script>
-<script src="/static/js/dashboard.js?v=19"></script>
+<script src="/static/js/dashboard.js?v=23"></script>
 {% endblock %}

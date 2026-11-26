@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Dashboard: alerts over the last hours**: a curve of the number of alerts over the last 6, 12, 24 or 48 hours, always in 24 slices (15 minutes to 2 hours each), coloured by severity, with its peak, a hover or keyboard readout per slice and a table view. The chosen period is remembered in the browser. It takes the top of the left column; *Alerts · 7 days* moves just below it.
+
 ## [1.16.0] - 2026-11-26
 
 ### Added
