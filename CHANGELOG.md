@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.16.0] - 2026-11-26
 
 ### Added
 - **Dashboard history: search and rule filter**: a search field looks through the log lines and the AI analysis of every event, and a rule list (busiest first, with counts) narrows the history to one rule. Both combine with the severity filters, whose counts follow them. Search, rule and severity now sit on a single toolbar under the *History* heading.
