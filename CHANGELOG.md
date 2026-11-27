@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+- **Copy button on alert cards outside the dashboard**: on a rule's page (Analyses tab) the button that copies an analysis did nothing, because its code only shipped with the dashboard. It now works on every page that shows alert cards.
+
 ## [1.17.0] - 2026-11-27
 
 ### Added

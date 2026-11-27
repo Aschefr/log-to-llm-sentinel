@@ -179,6 +179,26 @@ function copyToClipboard(text) {
 }
 
 
+// Copy button of an analysis card (every page that shows cards: dashboard, rule page...)
+function copyAnalysisText(btn) {
+    const card = btn.closest('.analysis-card');
+    if (!card) return;
+    const line = card.querySelector('.analysis-line')?.innerText || '';
+    const response = card.querySelector('.analysis-response')?.innerText || '';
+    const text = `Ligne: ${line}
+
+Analyse:
+${response}`;
+
+    copyToClipboard(text).then(() => {
+        const oldContent = btn.innerHTML;
+        btn.innerHTML = '✅';
+        setTimeout(() => { btn.innerHTML = oldContent; }, 2000);
+    }).catch(err => {
+        console.error('Erreur copie:', err);
+    });
+}
+
 async function openChat(analysisId, rawPrompt = null, rawResponse = null) {
     try {
         const res = await apiFetch('/chat/api/create', {

@@ -747,22 +747,6 @@ function renderHistoryState() {
     }
 }
 
-function copyAnalysisText(btn) {
-    const card = btn.closest('.analysis-card');
-    if (!card) return;
-    const line = card.querySelector('.analysis-line').innerText;
-    const response = card.querySelector('.analysis-response').innerText;
-    const text = `Ligne: ${line}\n\nAnalyse:\n${response}`;
-
-    copyToClipboard(text).then(() => {
-        const oldContent = btn.innerHTML;
-        btn.innerHTML = '✅';
-        setTimeout(() => { btn.innerHTML = oldContent; }, 2000);
-    }).catch(err => {
-        console.error('Erreur copie:', err);
-    });
-}
-
 async function retryAnalysis(analysisId, btn) {
     const oldHtml = btn.innerHTML;
     btn.disabled = true;
